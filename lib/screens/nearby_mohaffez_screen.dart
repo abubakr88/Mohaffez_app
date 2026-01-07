@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'mohaffez_profile_screen.dart';
 
@@ -65,7 +66,10 @@ class NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
     return null;
   }
 
+  // الدالة المحدثة - البحث عن المحفظين مباشرة
   Future<void> _loadNearbyMohaffez() async {
+    if (!mounted) return;
+
     setState(() {
       _loading = true;
       _errorMessage = '';
@@ -74,82 +78,68 @@ class NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
     });
 
     try {
-      final List<MohaffezWithDistance> mohaffez = [];
+      // البحث عن المحفظين في مجموعة users مباشرة
+      final mohaffezSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'mohaffez')
+          .get();
 
-      final sessionsSnapshot =
-          await FirebaseFirestore.instance.collection('hafizSessions').get();
+      final List<MohaffezWithDistance> mohaffezList = [];
 
-      for (final doc in sessionsSnapshot.docs) {
+      for (var doc in mohaffezSnapshot.docs) {
         final data = doc.data();
 
-        final double? lat = _toDouble(data['lat']);
-        final double? lng = _toDouble(data['lng']);
-        if (lat == null || lng == null) continue;
+        // التحقق من وجود موقع للمحفظ
+        final double? lat = _toDouble(data['latitude']);
+        final double? lng = _toDouble(data['longitude']);
 
-        final distance =
-            calculateDistance(widget.userLat, widget.userLng, lat, lng);
+        if (lat == null || lng == null) {
+          continue;
+        }
 
-        mohaffez.add(
+        // حساب المسافة
+        final distance = calculateDistance(
+          widget.userLat,
+          widget.userLng,
+          lat,
+          lng,
+        );
+
+        // إنشاء كائن MohaffezWithDistance
+        mohaffezList.add(
           MohaffezWithDistance(
             city: data['city'] as String? ?? '',
             country: data['country'] as String? ?? '',
             lat: lat,
             lng: lng,
             distance: distance,
-            type: 'جلسة تحفيظ',
-            details: 'أجزاء: ${(data['juzCount'] ?? 1).toString()}',
-            date: (data['sessionDate'] as Timestamp?)?.toDate(),
-            mohaffezId: data['mohaffezId'] as String?,
+            type: 'محفظ',
+            details: data['bio'] as String? ?? '',
+            date: null,
+            mohaffezId: doc.id,
+            mohaffezName: data['name'] as String?,
+            mohaffezPhotoUrl: data['photoUrl'] as String?,
+            rating: (data['rating'] as num?)?.toDouble() ?? 4.5,
+            reviewCount: data['reviewCount'] as int? ?? 0,
+            specialization: data['specialization'] as String? ?? 'تحفيظ القرآن',
           ),
         );
       }
 
-      final lessonsSnapshot =
-          await FirebaseFirestore.instance.collection('quranLessons').get();
+      // ترتيب حسب المسافة
+      mohaffezList.sort((a, b) => a.distance.compareTo(b.distance));
 
-      for (final doc in lessonsSnapshot.docs) {
-        final data = doc.data();
-
-        final double? lat = _toDouble(data['lat']);
-        final double? lng = _toDouble(data['lng']);
-        if (lat == null || lng == null) continue;
-
-        final distance =
-            calculateDistance(widget.userLat, widget.userLng, lat, lng);
-
-        mohaffez.add(
-          MohaffezWithDistance(
-            city: data['city'] as String? ?? '',
-            country: data['country'] as String? ?? '',
-            lat: lat,
-            lng: lng,
-            distance: distance,
-            type: 'درس فقهي',
-            details: data['topicTitle'] as String? ?? '',
-            date: (data['lessonDate'] as Timestamp?)?.toDate(),
-            mohaffezId: data['mohaffezId'] as String?,
-          ),
-        );
-      }
-
-      await _fetchMohaffezNames(mohaffez);
-
-      mohaffez.sort((a, b) => a.distance.compareTo(b.distance));
-
-      final now = DateTime.now();
-      mohaffez.removeWhere((m) {
-        if (m.date == null) return true;
-        final d = m.date!;
-        return d.isBefore(DateTime(now.year, now.month, now.day));
-      });
+      if (!mounted) return;
 
       setState(() {
-        _allMohaffez.addAll(mohaffez);
+        _allMohaffez.addAll(mohaffezList);
         _loading = false;
       });
 
       _applyFilters();
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _loading = false;
         _errorMessage = 'حدث خطأ أثناء تحميل البيانات: $e';
@@ -157,58 +147,9 @@ class NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
     }
   }
 
-  Future<void> _fetchMohaffezNames(
-    List<MohaffezWithDistance> mohaffez,
-  ) async {
-    // Extract unique mohaffez IDs
-    final uniqueIds = mohaffez
-        .where((m) => m.mohaffezId != null && m.mohaffezId!.isNotEmpty)
-        .map((m) => m.mohaffezId!)
-        .toSet()
-        .toList();
-
-    if (uniqueIds.isEmpty) return;
-
-    // FIXED: Batch fetch all mohaffez data in chunks (Firestore 'whereIn' limit is 10)
-    final Map<String, Map<String, dynamic>> mohaffezData = {};
-    
-    // Process in chunks of 10 (Firestore limitation)
-    for (int i = 0; i < uniqueIds.length; i += 10) {
-      final chunk = uniqueIds.skip(i).take(10).toList();
-      
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .where(FieldPath.documentId, whereIn: chunk)
-            .get();
-
-        for (final doc in snapshot.docs) {
-          if (doc.exists) {
-            mohaffezData[doc.id] = doc.data();
-          }
-        }
-      } catch (e) {
-        debugPrint('Error fetching mohaffez chunk: $e');
-      }
-    }
-
-    // Map data back to mohaffez list
-    for (final m in mohaffez) {
-      if (m.mohaffezId != null && mohaffezData.containsKey(m.mohaffezId)) {
-        final data = mohaffezData[m.mohaffezId]!;
-        m.mohaffezName = data['name'] as String? ?? '';
-        m.mohaffezPhotoUrl = data['photoUrl'] as String?;
-        m.rating = (data['rating'] as num?)?.toDouble() ?? 4.5;
-        m.reviewCount = data['reviewCount'] as int? ?? 0;
-        m.specialization = data['specialization'] as String? ?? 'تحفيظ القرآن';
-      } else {
-        m.mohaffezName = null;
-        m.mohaffezPhotoUrl = null;
-      }
-    }
-  }
-
   void _applyFilters() {
+    if (!mounted) return;
+
     final query = _searchController.text.toLowerCase();
     setState(() {
       _filteredMohaffez = _allMohaffez.where((m) {
@@ -223,10 +164,12 @@ class NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
   }
 
   void _onDistanceChanged(double? value) {
-    if (value == null) return;
+    if (value == null || !mounted) return;
+
     setState(() {
       _selectedDistance = value;
     });
+
     _applyFilters();
   }
 

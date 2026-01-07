@@ -20,9 +20,9 @@
             android:value="mohaffez_finder_channel" />
 
         <!-- Google Maps API Key -->
-        <meta-data
+        <!-- <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDXNWZOe677Wn_DmzsveNaY0iiOP9NH2M0" />
+            android:value="AIzaSyDXNWZOe677Wn_DmzsveNaY0iiOP9NH2M0" /> -->
 
         <!-- Main Activity -->
         <activity
