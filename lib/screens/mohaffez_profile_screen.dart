@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../services/follow_service.dart';
 import '../providers/booking_provider.dart';
+import '../shared/widgets/verification_badge.dart';
+import '../shared/widgets/availability_calendar_widget.dart';
 
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -181,7 +184,6 @@ class _MohaffezProfileScreenState
       }
     } catch (e) {
       ref.read(bookingLoadingProvider.notifier).state = false;
-      
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('حدث خطأ: ${e.toString()}')),
@@ -328,7 +330,6 @@ class _MohaffezProfileScreenState
                                     slotStart.add(const Duration(minutes: 45));
 
                                 Navigator.pop(ctx);
-
                                 await requestSession(
                                   context,
                                   selectedType!,
@@ -444,6 +445,7 @@ class _MohaffezProfileScreenState
                         parsed.$1,
                         parsed.$2,
                       );
+
                       if (slotTime.isBefore(DateTime.now())) {
                         return const SizedBox(height: 32);
                       }
@@ -557,10 +559,11 @@ class _MohaffezProfileScreenState
                     final data = snapshot.data?.data() ?? {};
                     final photoUrl = data['photoUrl'] as String?;
                     final specialization =
-                        (data['specialization'] as String?) ?? '';
+                        (data['specialization'] as String?) ?? 'تحفيظ القرآن الكريم';
                     final rating =
                         (data['rating'] as num?)?.toDouble() ?? 4.5;
                     final reviewCount = (data['reviewCount'] as int?) ?? 0;
+                    final bio = data['bio'] as String?;
 
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -578,12 +581,27 @@ class _MohaffezProfileScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                widget.mohaffezName,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              // NEW: Name with badges
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      widget.mohaffezName,
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // NEW: Display badges
+                                  if (data['badges'] != null)
+                                    VerificationBadgesRow(
+                                      badges: Map<String, bool>.from(
+                                          data['badges'] as Map),
+                                      size: 20,
+                                    ),
+                                ],
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -593,6 +611,19 @@ class _MohaffezProfileScreenState
                                   color: Colors.grey.shade600,
                                 ),
                               ),
+                              // NEW: Show bio if available
+                              if (bio != null && bio.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  bio,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                               const SizedBox(height: 8),
                               Row(
                                 children: [
@@ -670,7 +701,7 @@ class _MohaffezProfileScreenState
               ),
               const SizedBox(height: 12),
 
-              // Available Slots
+              // NEW: Available Slots with Calendar Widget
               Container(
                 color: Colors.white,
                 width: double.infinity,
@@ -797,63 +828,27 @@ class _MohaffezProfileScreenState
   }
 
   Widget buildAvailableSlots(BuildContext context) {
-    final now = DateTime.now();
-    final days = [
-      {'label': 'اليوم', 'date': now},
-      {'label': 'غدًا', 'date': now.add(const Duration(days: 1))},
-      {'label': 'بعد غد', 'date': now.add(const Duration(days: 2))},
-    ];
-
-    return SizedBox(
-      height: 100,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: days.length,
-        itemBuilder: (context, index) {
-          final day = days[index];
-          final date = day['date'] as DateTime;
-          final label = day['label'] as String;
-          final dateStr = '${date.day}/${date.month}';
-
-          return Container(
-            width: 110,
-            margin: const EdgeInsets.only(left: 8),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  dateStr,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '08:00 - 16:00',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    // NEW: Use the calendar widget
+    return Column(
+      children: [
+        AvailabilityCalendarWidget(
+          mohaffezId: widget.mohaffezId,
+          daysToShow: 7,
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: () {
+            // TODO: Navigate to full calendar view
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('عرض التقويم الكامل - قريباً'),
+              ),
+            );
+          },
+          icon: const Icon(Icons.calendar_month),
+          label: const Text('عرض التقويم الكامل'),
+        ),
+      ],
     );
   }
 }

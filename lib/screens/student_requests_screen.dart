@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../shared/widgets/empty_state.dart';
 
 class StudentRequestsScreen extends StatelessWidget {
   const StudentRequestsScreen({super.key});
@@ -53,12 +54,15 @@ class StudentRequestsScreen extends StatelessWidget {
 
             final docs = snapshot.data!.docs;
             if (docs.isEmpty) {
-              return const Center(
-                child: Text('لا توجد طلبات حتى الآن'),
+              return const EmptyState(
+                icon: Icons.pending_actions_outlined,
+                title: 'لا توجد طلبات حتى الآن',
+                message: 'ابحث عن محفظ قريب واحجز جلسة',
               );
             }
 
             return ListView.builder(
+              padding: const EdgeInsets.all(12),
               itemCount: docs.length,
               itemBuilder: (context, index) {
                 final data = docs[index].data();
@@ -74,8 +78,8 @@ class StudentRequestsScreen extends StatelessWidget {
 
                 final dateStr = baseDate != null
                     ? '${baseDate.day}/${baseDate.month}/${baseDate.year} '
-                      '${baseDate.hour.toString().padLeft(2, '0')}:'
-                      '${baseDate.minute.toString().padLeft(2, '0')}'
+                        '${baseDate.hour.toString().padLeft(2, '0')}:'
+                        '${baseDate.minute.toString().padLeft(2, '0')}'
                     : '';
 
                 final statusColor = _statusColor(status);
@@ -83,7 +87,7 @@ class StudentRequestsScreen extends StatelessWidget {
 
                 return Card(
                   margin:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
@@ -98,19 +102,22 @@ class StudentRequestsScreen extends StatelessWidget {
                                 imamName,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 15,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$sessionType - $slot',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
+                        if (sessionType.isNotEmpty || slot.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '$sessionType - $slot',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
-                        ),
+                        ],
                         if (imamAddress.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Row(
@@ -153,7 +160,9 @@ class StudentRequestsScreen extends StatelessWidget {
                             ],
                           ),
                         ],
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
+                        
+                        // Timeline visualization
                         Row(
                           children: [
                             _buildTimelineDot(
@@ -172,7 +181,7 @@ class StudentRequestsScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: const [
@@ -181,18 +190,38 @@ class StudentRequestsScreen extends StatelessWidget {
                             Text('مرفوض', style: TextStyle(fontSize: 11)),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Text('الحالة الحالية: '),
-                            Text(
-                              statusText,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: statusColor.withOpacity(0.3),
                             ),
-                          ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getStatusIcon(status),
+                                color: statusColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'الحالة: $statusText',
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -213,6 +242,10 @@ class StudentRequestsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: active ? color : Colors.grey.shade300,
         shape: BoxShape.circle,
+        border: Border.all(
+          color: active ? color : Colors.grey.shade400,
+          width: 2,
+        ),
       ),
     );
   }
@@ -224,5 +257,16 @@ class StudentRequestsScreen extends StatelessWidget {
         color: Colors.grey.shade300,
       ),
     );
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'accepted':
+        return Icons.check_circle;
+      case 'rejected':
+        return Icons.cancel;
+      default:
+        return Icons.schedule;
+    }
   }
 }

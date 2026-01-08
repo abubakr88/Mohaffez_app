@@ -9,8 +9,9 @@ import 'profile_screen.dart';
 import 'notifications_screen.dart';
 import 'nearby_mohaffez_screen.dart';
 import 'auth_screen.dart';
-import '../widgets/offline_banner.dart';
+import '../shared/widgets/offline_banner.dart';
 import '../services/cache_service.dart';
+import '../shared/constants/app_theme.dart';
 
 // Bottom nav index provider
 final bottomNavIndexProvider = StateProvider<int>((ref) => 0);
@@ -148,10 +149,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ]
         : [
             const StudentHome(),
-            NearbyMohaffezScreen(
-              userLat: userLat ?? 30.0444,
-              userLng: userLng ?? 31.2357,
-            ),
+            const NearbyMohaffezScreen(),
             const NotificationsScreen(),
             const ProfileScreen(),
           ];

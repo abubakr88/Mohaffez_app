@@ -19,10 +19,6 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="mohaffez_finder_channel" />
 
-        <!-- Google Maps API Key -->
-        <!-- <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDXNWZOe677Wn_DmzsveNaY0iiOP9NH2M0" /> -->
 
         <!-- Main Activity -->
         <activity

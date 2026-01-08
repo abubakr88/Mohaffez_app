@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/connectivity_service.dart';
+import '../../services/connectivity_service.dart';
 
 class OfflineBanner extends StatelessWidget {
   const OfflineBanner({super.key});

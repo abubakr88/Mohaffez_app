@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home_shell.dart';
-import '../widgets/offline_banner.dart';
+import '../shared/widgets/offline_banner.dart';
 import '../services/cache_service.dart';
+import '../shared/utils/validation_utils.dart';
+import '../../shared/constants/app_theme.dart'; 
 
 enum UserRole { mohaffez, student }
 
@@ -127,34 +129,75 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('تسجيل الدخول - محفظ القرآن'),
-        ),
-        body: Column(
-          children: [
-            const OfflineBanner(),
-            Expanded(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (!_isLogin)
-                          TextFormField(
-                            controller: _nameController,
-                            decoration:
-                                const InputDecoration(labelText: 'الاسم الكامل'),
-                            validator: (value) =>
-                                value == null || value.isEmpty ? 'مطلوب' : null,
+@override
+Widget build(BuildContext context) {
+  return Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('تسجيل الدخول - محفظ القرآن'),
+      ),
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ADD LOGO HERE - NEW
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/images/icon.png',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
+                            Icons.school,
+                            size: 100,
+                            color: AppTheme.primaryAmber,
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'محفظي القريب',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              color: AppTheme.primaryAmber,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 32),
+                      // END OF NEW LOGO SECTION
+                      
+                      if (!_isLogin)
+                        TextFormField(
+                          controller: _nameController,
+                          decoration:
+                              const InputDecoration(labelText: 'الاسم الكامل'),
+                          validator: (value) =>
+                              value == null || value.isEmpty ? 'مطلوب' : null,
+                        ),
+                      const SizedBox(height: 12),
+                      // ... rest of the form fields
+
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _emailController,
@@ -163,30 +206,16 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                           keyboardType: TextInputType.emailAddress,
                           textDirection: TextDirection.ltr,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'الرجاء إدخال البريد الإلكتروني';
-                            }
-                            // Proper email regex validation
-                            final emailRegex = RegExp(
-                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                            );
-                            if (!emailRegex.hasMatch(value)) {
-                              return 'الرجاء إدخال بريد إلكتروني صحيح';
-                            }
-                            return null;
-                          },
+                          validator: ValidationUtils.email,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _passwordController,
-                          decoration:
-                              const InputDecoration(labelText: 'كلمة المرور'),
+                          decoration: const InputDecoration(
+                            labelText: 'كلمة المرور',
+                          ),
                           obscureText: true,
-                          validator: (value) =>
-                              value != null && value.length >= 6
-                                  ? null
-                                  : 'الحد الأدنى 6 حروف',
+                          validator: ValidationUtils.password,
                         ),
                         const SizedBox(height: 12),
                         if (!_isLogin)
@@ -231,9 +260,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             });
                           },
                           child: Text(
-                            _isLogin
-                                ? 'إنشاء حساب جديد'
-                                : 'لدي حساب بالفعل',
+                            _isLogin ? 'إنشاء حساب جديد' : 'لدي حساب بالفعل',
                           ),
                         ),
                       ],
