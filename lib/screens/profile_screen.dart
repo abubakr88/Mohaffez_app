@@ -7,22 +7,25 @@ import 'dart:io';
 
 import 'pick_location_screen.dart';
 import '../shared/widgets/profile_completion_indicator.dart';
-import '../services/profile_completion_service.dart';
 import '../shared/widgets/verification_badge.dart';
+import '../shared/widgets/cached_avatar.dart';
+import '../shared/widgets/shimmer_widgets.dart';
+import '../services/profile_completion_service.dart';
+import '../config/image_cache_config.dart';
 import 'mohaffez_credentials_screen.dart';
 import 'availability_management_screen.dart';
-import '../shared/widgets/shimmer_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> {
   bool uploading = false;
 
+  /// Pick and upload profile photo
   Future<void> pickAndUploadPhoto() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -57,12 +60,12 @@ class ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحديث الصورة الشخصية بنجاح')),
+        const SnackBar(content: Text('تم تحديث الصورة بنجاح')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ أثناء رفع الصورة: $e')),
+        SnackBar(content: Text('خطأ: $e')),
       );
     } finally {
       if (mounted) {
@@ -73,6 +76,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Pick and save location (for Mohaffez)
   Future<void> pickAndSaveImamAddress() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -92,7 +96,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (lat == null || lng == null || locationName.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يجب اختيار عنوان صالح')),
+        const SnackBar(content: Text('يرجى اختيار موقع صحيح')),
       );
       return;
     }
@@ -105,7 +109,115 @@ class ProfileScreenState extends State<ProfileScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ عنوان المحفظ بنجاح')),
+      const SnackBar(content: Text('تم تحديث العنوان بنجاح')),
+    );
+  }
+
+  /// Show cache management dialog
+  Future<void> _showCacheDialog(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                Icons.cleaning_services,
+                color: Colors.orange.shade700,
+              ),
+              const SizedBox(width: 8),
+              const Text('مسح الذاكرة المؤقتة'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'سيتم مسح جميع الصور المخزنة مؤقتاً على جهازك.',
+                style: TextStyle(fontSize: 15),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.blue.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'سيتم تحميل الصور مرة أخرى عند الحاجة',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                // Show loading
+                Navigator.pop(ctx);
+
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (loadingCtx) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+
+                // Clear cache
+                await ImageCacheConfig.clearCache();
+
+                // Small delay for better UX
+                await Future.delayed(const Duration(milliseconds: 500));
+
+                if (context.mounted) {
+                  Navigator.pop(context); // Close loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text('تم مسح الذاكرة المؤقتة بنجاح'),
+                        ],
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.delete_sweep),
+              label: const Text('مسح الآن'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -117,7 +229,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       return const Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-          body: Center(child: Text('الرجاء تسجيل الدخول أولاً')),
+          body: Center(child: Text('يرجى تسجيل الدخول')),
         ),
       );
     }
@@ -134,6 +246,7 @@ class ProfileScreenState extends State<ProfileScreen> {
               .doc(user.uid)
               .snapshots(),
           builder: (context, snapshot) {
+            // Show shimmer while loading
             if (!snapshot.hasData) {
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -144,9 +257,9 @@ class ProfileScreenState extends State<ProfileScreen> {
             }
 
             final data = snapshot.data!.data() ?? {};
-            final name = data['name'] as String? ?? '';
+            final name = data['name'] as String? ?? 'مستخدم';
             final email = data['email'] as String? ?? '';
-            final role = data['role'] as String? ?? '';
+            final role = data['role'] as String? ?? 'student';
             final photoUrl = data['photoUrl'] as String?;
             final followers = data['followerCount'] as int? ?? 0;
             final following = data['followingCount'] as int? ?? 0;
@@ -158,26 +271,32 @@ class ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Profile photo section
+                  // ===== PROFILE PHOTO SECTION =====
                   GestureDetector(
                     onTap: uploading ? null : pickAndUploadPhoto,
                     child: Stack(
                       alignment: Alignment.bottomRight,
                       children: [
-                        CircleAvatar(
+                        // Avatar with cached image
+                        CachedAvatar(
+                          imageUrl: photoUrl,
                           radius: 45,
-                          backgroundImage:
-                              photoUrl != null ? NetworkImage(photoUrl) : null,
-                          child: photoUrl == null
-                              ? const Icon(Icons.person, size: 40)
-                              : null,
                         ),
+
+                        // Camera/upload indicator
                         Positioned(
                           bottom: 0,
                           right: 0,
-                          child: CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Colors.black54,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                            ),
                             child: uploading
                                 ? const SizedBox(
                                     width: 16,
@@ -197,26 +316,45 @@ class ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
+
                   const SizedBox(height: 12),
 
-                  // Name and role
+                  // ===== NAME AND EMAIL =====
                   Text(
                     name,
                     style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
                   ),
-                  Text(email),
+
+                  Text(
+                    email,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+
                   const SizedBox(height: 4),
+
+                  // ===== ROLE AND BADGES =====
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         isMohaffez ? 'محفظ' : 'طالب',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 14,
+                        ),
                       ),
-                      // NEW: Show badges for Mohaffez
+
+                      // Show badges for Mohaffez
                       if (isMohaffez && data['badges'] != null) ...[
                         const SizedBox(width: 8),
                         VerificationBadgesRow(
-                          badges: Map<String, bool>.from(data['badges'] as Map),
+                          badges: Map<String, bool>.from(
+                            data['badges'] as Map,
+                          ),
                           size: 18,
                         ),
                       ],
@@ -225,32 +363,23 @@ class ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Followers/Following
+                  // ===== FOLLOWERS/FOLLOWING =====
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Column(
-                        children: [
-                          const Text('المتابِعون'),
-                          Text(followers.toString()),
-                        ],
-                      ),
+                      _buildStatColumn('متابِعون', followers),
                       const SizedBox(width: 32),
-                      Column(
-                        children: [
-                          const Text('المتابَعون'),
-                          Text(following.toString()),
-                        ],
-                      ),
+                      _buildStatColumn('متابَعون', following),
                     ],
                   ),
 
-                  // NEW: Profile completion indicator for Mohaffez
+                  // ===== PROFILE COMPLETION (MOHAFFEZ ONLY) =====
                   if (isMohaffez) ...[
                     const SizedBox(height: 24),
                     FutureBuilder<ProfileCompletionData>(
-                      future:
-                          ProfileCompletionService.calculateCompletion(user.uid),
+                      future: ProfileCompletionService.calculateCompletion(
+                        user.uid,
+                      ),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
                           return const SizedBox.shrink();
@@ -260,59 +389,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                         return ProfileCompletionIndicator(
                           percentage: completionData.percentage,
                           missingFields: completionData.missingFields,
-                          onTap: () {
-                            // Show dialog with missing fields
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => Directionality(
-                                textDirection: TextDirection.rtl,
-                                child: AlertDialog(
-                                  title: const Text('اكتمال الملف الشخصي'),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'نسبة الاكتمال: ${completionData.percentage.toInt()}%',
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      if (completionData
-                                          .missingFields.isNotEmpty) ...[
-                                        const Text(
-                                          'العناصر المفقودة:',
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        ...completionData.missingFields
-                                            .map((field) {
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                                bottom: 4),
-                                            child: Row(
-                                              children: [
-                                                const Icon(Icons.circle, size: 8),
-                                                const SizedBox(width: 8),
-                                                Text(field),
-                                              ],
-                                            ),
-                                          );
-                                        }),
-                                      ],
-                                    ],
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx),
-                                      child: const Text('حسناً'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                          onTap: () => _showCompletionDialog(
+                            context,
+                            completionData,
+                          ),
                         );
                       },
                     ),
@@ -320,12 +400,12 @@ class ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 24),
 
-                  // NEW: Mohaffez management buttons
+                  // ===== MOHAFFEZ MANAGEMENT BUTTONS =====
                   if (isMohaffez) ...[
                     _buildManagementCard(
                       icon: Icons.workspace_premium,
-                      title: 'الشهادات والمؤهلات',
-                      subtitle: 'إدارة شهاداتك ومؤهلاتك',
+                      title: 'الشهادات والإجازات',
+                      subtitle: 'إدارة المؤهلات والشهادات',
                       color: Colors.blue,
                       onTap: () {
                         Navigator.push(
@@ -336,46 +416,55 @@ class ProfileScreenState extends State<ProfileScreen> {
                         );
                       },
                     ),
+
                     const SizedBox(height: 12),
+
                     _buildManagementCard(
                       icon: Icons.calendar_today,
-                      title: 'إدارة المواعيد',
-                      subtitle: 'تحديد الأوقات المتاحة للحجز',
+                      title: 'الأوقات المتاحة',
+                      subtitle: 'إدارة جدول المواعيد',
                       color: Colors.green,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const AvailabilityManagementScreen(),
+                            builder: (_) =>
+                                const AvailabilityManagementScreen(),
                           ),
                         );
                       },
                     ),
+
                     const SizedBox(height: 12),
+
                     _buildManagementCard(
                       icon: Icons.edit,
-                      title: 'تحديث البيانات الأساسية',
-                      subtitle: 'تحديث الاسم، النبذة، والتخصص',
+                      title: 'تعديل البيانات',
+                      subtitle: 'تحديث الاسم والتخصص والسيرة',
                       color: Colors.orange,
-                      onTap: () {
-                        _showUpdateBasicInfoDialog(context, user.uid, data);
-                      },
+                      onTap: () => _showUpdateBasicInfoDialog(
+                        context,
+                        user.uid,
+                        data,
+                      ),
                     ),
+
                     const SizedBox(height: 24),
                   ],
 
-                  // Password reset button
+                  // ===== PASSWORD RESET BUTTON =====
                   ElevatedButton.icon(
                     onPressed: () async {
                       if (email.isEmpty) return;
-                      await FirebaseAuth.instance
-                          .sendPasswordResetEmail(email: email);
+
+                      await FirebaseAuth.instance.sendPasswordResetEmail(
+                        email: email,
+                      );
+
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text(
-                            'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
-                          ),
+                          content: Text('تم إرسال رابط إعادة تعيين كلمة المرور'),
                         ),
                       );
                     },
@@ -383,15 +472,33 @@ class ProfileScreenState extends State<ProfileScreen> {
                     label: const Text('إعادة تعيين كلمة المرور'),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
-                  // Address section for Mohaffez
+                  // ===== CACHE MANAGEMENT BUTTON =====
+                  OutlinedButton.icon(
+                    onPressed: () => _showCacheDialog(context),
+                    icon: Icon(
+                      Icons.cleaning_services,
+                      color: Colors.orange.shade700,
+                    ),
+                    label: const Text('إدارة الذاكرة المؤقتة'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange.shade700,
+                      side: BorderSide(color: Colors.orange.shade300),
+                    ),
+                  ),
+
+                  // ===== ADDRESS SECTION (MOHAFFEZ ONLY) =====
                   if (isMohaffez) ...[
+                    const SizedBox(height: 24),
                     const Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                        'عنوان المحفظ',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        'العنوان',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -399,14 +506,12 @@ class ProfileScreenState extends State<ProfileScreen> {
                       child: ListTile(
                         leading: const Icon(Icons.location_on),
                         title: Text(
-                          hasAddress ? addressText : 'لم يتم تسجيل العنوان بعد',
+                          hasAddress ? addressText : 'لم يتم تحديد العنوان',
                         ),
                         trailing: TextButton.icon(
                           onPressed: pickAndSaveImamAddress,
                           icon: const Icon(Icons.edit_location_alt),
-                          label: Text(
-                            hasAddress ? 'تعديل العنوان' : 'تسجيل العنوان',
-                          ),
+                          label: Text(hasAddress ? 'تعديل' : 'إضافة'),
                         ),
                       ),
                     ),
@@ -420,6 +525,29 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Build stat column (followers/following)
+  Widget _buildStatColumn(String label, int count) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        Text(
+          count.toString(),
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build management card for Mohaffez
   Widget _buildManagementCard({
     required IconData icon,
     required String title,
@@ -486,6 +614,64 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Show completion details dialog
+  void _showCompletionDialog(
+    BuildContext context,
+    ProfileCompletionData completionData,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('اكتمال الملف الشخصي'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${completionData.percentage.toInt()}% مكتمل',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (completionData.missingFields.isNotEmpty) ...[
+                const Text(
+                  'الحقول المفقودة:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...completionData.missingFields.map((field) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.circle, size: 8),
+                        const SizedBox(width: 8),
+                        Text(field),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Show update basic info dialog
   void _showUpdateBasicInfoDialog(
     BuildContext context,
     String userId,
@@ -506,7 +692,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: const Text('تحديث البيانات الأساسية'),
+          title: const Text('تعديل البيانات'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -522,7 +708,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                 TextField(
                   controller: bioController,
                   decoration: const InputDecoration(
-                    labelText: 'نبذة تعريفية',
+                    labelText: 'نبذة عنك',
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
@@ -532,7 +718,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                   controller: specializationController,
                   decoration: const InputDecoration(
                     labelText: 'التخصص',
-                    hintText: 'مثال: تحفيظ القرآن الكريم',
+                    hintText: 'مثال: متخصص في التجويد',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -565,7 +751,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('حدث خطأ: $e')),
+                      SnackBar(content: Text('خطأ: $e')),
                     );
                   }
                 }

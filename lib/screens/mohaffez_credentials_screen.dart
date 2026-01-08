@@ -6,6 +6,14 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/credential_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
+import '../shared/widgets/cached_avatar.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class MohaffezCredentialsScreen extends StatefulWidget {
   const MohaffezCredentialsScreen({super.key});
@@ -323,6 +331,7 @@ class _MohaffezCredentialsScreenState
                     ],
                   ),
                 ],
+                // In buildCredentialCard method
                 if (imageUrls.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   SizedBox(
@@ -342,10 +351,19 @@ class _MohaffezCredentialsScreenState
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                imageUrls[index],
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrls[index],
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
+                                placeholder: (context, url) => Shimmer.fromColors(
+                                  baseColor: Colors.grey[300]!,
+                                  highlightColor: Colors.grey[100]!,
+                                  child: Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: Colors.grey[300],
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => const Icon(
                                   Icons.broken_image,
                                   color: Colors.grey,
                                 ),
@@ -357,6 +375,7 @@ class _MohaffezCredentialsScreenState
                     ),
                   ),
                 ],
+
                 if (status == 'rejected' && data['rejectionReason'] != null) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -667,11 +686,16 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
   }
 }
 
+
 class ImageGalleryScreen extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;
 
-  const ImageGalleryScreen({super.key, required this.imageUrls, this.initialIndex = 0});
+  const ImageGalleryScreen({
+    super.key,
+    required this.imageUrls,
+    this.initialIndex = 0,
+  });
 
   @override
   State<ImageGalleryScreen> createState() => _ImageGalleryScreenState();
@@ -680,61 +704,403 @@ class ImageGalleryScreen extends StatefulWidget {
 class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
   late PageController _pageController;
   late int _currentIndex;
+  bool _isVisible = true;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
+    
+    // Set full screen (hide status bar)
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    // Restore system UI
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
     super.dispose();
+  }
+
+  void _toggleUI() {
+    setState(() {
+      _isVisible = !_isVisible;
+    });
+  }
+
+  Future<void> _shareImage() async {
+    try {
+      final url = widget.imageUrls[_currentIndex];
+      
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('جاري التحضير للمشاركة...')),
+      );
+      
+      // Download image temporarily
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/share_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      await Dio().download(url, filePath);
+      
+      // Share
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        text: 'شهادة من تطبيق محفظ القرآن',
+      );
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشلت المشاركة: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadImage() async {
+    try {
+      // Request storage permission
+      final status = await Permission.storage.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('يرجى منح إذن التخزين')),
+          );
+        }
+        return;
+      }
+      
+      final url = widget.imageUrls[_currentIndex];
+      
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('جاري التحميل...')),
+      );
+      
+      // Get downloads directory
+      final dir = await getExternalStorageDirectory();
+      final fileName = 'credential_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = '${dir!.path}/$fileName';
+      
+      // Download
+      await Dio().download(url, filePath);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تم الحفظ في: $filePath')),
+        );
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('فشل التحميل: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        title: Text('${_currentIndex + 1} / ${widget.imageUrls.length}', style: const TextStyle(color: Colors.white)),
-      ),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: widget.imageUrls.length,
-        onPageChanged: (index) => setState(() => _currentIndex = index),
-        itemBuilder: (context, index) {
-          return InteractiveViewer(
-            panEnabled: true,
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: Image.network(
-                widget.imageUrls[index],
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                          : null,
-                      color: Colors.white,
+      body: Stack(
+        children: [
+          // Main image viewer
+          GestureDetector(
+            onTap: _toggleUI,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.imageUrls.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return Center(
+                  child: InteractiveViewer(
+                    minScale: 0.1,  // More zoom out
+                    maxScale: 10.0, // More zoom in
+                    child: CachedNetworkImage(
+                      imageUrl: widget.imageUrls[index],
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) => Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'جاري التحميل...',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.broken_image,
+                              color: Colors.white54,
+                              size: 80,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'فشل تحميل الصورة',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {}); // Retry by rebuilding
+                              },
+                              icon: const Icon(
+                                Icons.refresh,
+                                color: Colors.white,
+                              ),
+                              label: const Text(
+                                'إعادة المحاولة',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => const Center(
-                  child: Icon(Icons.broken_image, color: Colors.white, size: 80),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Top app bar
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            top: _isVisible ? 0 : -100,
+            left: 0,
+            right: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.7),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      // Close button
+                      IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      
+                      const Spacer(),
+                      
+                      // Image counter
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${_currentIndex + 1} / ${widget.imageUrls.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      
+                      const Spacer(),
+                      
+                      // Share button
+                      IconButton(
+                        icon: const Icon(
+                          Icons.share,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        onPressed: _shareImage,
+                      ),
+                      
+                      // Download button
+                      IconButton(
+                        icon: const Icon(
+                          Icons.download,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        onPressed: _downloadImage,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          );
-        },
+          ),
+
+          // Bottom thumbnail strip
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            bottom: _isVisible ? 0 : -120,
+            left: 0,
+            right: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.7),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: SafeArea(
+                child: SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    itemCount: widget.imageUrls.length,
+                    itemBuilder: (context, index) {
+                      final isSelected = index == _currentIndex;
+                      return GestureDetector(
+                        onTap: () {
+                          _pageController.animateToPage(
+                            index,
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.transparent,
+                              width: 3,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: CachedNetworkImage(
+                              imageUrl: widget.imageUrls[index],
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey.shade800,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey.shade800,
+                                child: const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.white54,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Zoom hint (shows on first launch)
+          if (_isVisible && _currentIndex == widget.initialIndex)
+            Positioned(
+              bottom: 110,
+              left: 16,
+              right: 16,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.zoom_in,
+                        color: Colors.white.withOpacity(0.8),
+                        size: 13,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'اضغط مرتين للتكبير',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

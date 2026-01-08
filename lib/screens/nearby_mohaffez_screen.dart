@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:mohaffez_finder_app/shared/widgets/verification_badge.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../shared/utils/location_utils.dart';
 import '../shared/widgets/shimmer_widgets.dart';
+import '../screens/mohaffez_profile_screen.dart';
+import '../shared/widgets/cached_avatar.dart';
 
 class NearbyMohaffezScreen extends StatefulWidget {
   final double? userLat;
@@ -310,17 +313,245 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
   }
 
   Widget _buildMohaffezCard(MohaffezWithDistance mohaffez) {
-    // Your card implementation here
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        title: Text(mohaffez.mohaffezName ?? 'محفظ'),
-        subtitle: Text('${mohaffez.distance.toStringAsFixed(1)} كم'),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
         onTap: () {
-          // Navigate to profile
+          // Navigate to mohaffez profile
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MohaffezProfileScreen(
+                mohaffezId: mohaffez.mohaffezId,
+                mohaffezName: mohaffez.mohaffezName ?? 'محفظ',
+              ),
+            ),
+          );
         },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: Avatar + Name + Badges
+              Row(
+                children: [
+                  // Avatar with cached image
+                  CachedAvatar(
+                    imageUrl: mohaffez.mohaffezPhotoUrl,
+                    radius: 35,
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // Name and specialization
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Name with badges
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                mohaffez.mohaffezName ?? 'محفظ',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // Verification badges
+                            if (mohaffez.badges.isNotEmpty)
+                              VerificationBadgesRow(
+                                badges: mohaffez.badges,
+                                size: 18,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        
+                        // Specialization
+                        if (mohaffez.specialization.isNotEmpty)
+                          Text(
+                            mohaffez.specialization,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Distance badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.blue.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${mohaffez.distance.toStringAsFixed(1)} كم',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Rating and review count
+              Row(
+                children: [
+                  ...List.generate(5, (index) {
+                    return Icon(
+                      index < mohaffez.rating.round()
+                          ? Icons.star
+                          : Icons.star_border,
+                      size: 18,
+                      color: Colors.amber,
+                    );
+                  }),
+                  const SizedBox(width: 6),
+                  Text(
+                    mohaffez.rating.toStringAsFixed(1),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '(${mohaffez.reviewCount})',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Address
+              if (mohaffez.addressText.isNotEmpty)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.place,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        mohaffez.addressText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              
+              const SizedBox(height: 12),
+              
+              // Action buttons
+              Row(
+                children: [
+                  // View Profile button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => MohaffezProfileScreen(
+                              mohaffezId: mohaffez.mohaffezId,
+                              mohaffezName: mohaffez.mohaffezName ?? 'محفظ',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.person, size: 18),
+                      label: const Text('عرض الملف'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 8),
+                  
+                  // Show on map button
+                  OutlinedButton(
+                    onPressed: () => _showLocationOnMap(mohaffez),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.all(10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Icon(Icons.map, size: 20),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  // Helper method to show location on map
+  Future<void> _showLocationOnMap(MohaffezWithDistance mohaffez) async {
+    final url = 'https://www.google.com/maps/search/?api=1&query=${mohaffez.addressLat},${mohaffez.addressLng}';
+    final uri = Uri.parse(url);
+    
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح الخريطة')),
+        );
+      }
+    }
   }
 }
 

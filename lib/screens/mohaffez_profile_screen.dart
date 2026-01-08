@@ -7,6 +7,7 @@ import '../services/follow_service.dart';
 import '../providers/booking_provider.dart';
 import '../shared/widgets/verification_badge.dart';
 import '../shared/widgets/availability_calendar_widget.dart';
+import '../shared/widgets/cached_avatar.dart';
 
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -568,13 +569,9 @@ class _MohaffezProfileScreenState
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        CircleAvatar(
+                        CachedAvatar(
+                          imageUrl: photoUrl,
                           radius: 45,
-                          backgroundImage:
-                              photoUrl != null ? NetworkImage(photoUrl) : null,
-                          child: photoUrl == null
-                              ? const Icon(Icons.person, size: 40)
-                              : null,
                         ),
                         const SizedBox(width: 16),
                         Expanded(

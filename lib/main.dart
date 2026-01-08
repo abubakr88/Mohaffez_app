@@ -9,25 +9,26 @@ import 'services/notification_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/cache_service.dart';
 import 'shared/constants/app_theme.dart';
+import 'config/image_cache_config.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-
+  
+  await dotenv.load(fileName: '.env');
   await Firebase.initializeApp();
-
-  // Enable Firestore offline persistence
+  
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
-
+  
   await NotificationService.initialize();
   await ConnectivityService.instance.initialize();
   await CacheService.initialize();
-
+  
+  // Initialize image cache configuration
+  ImageCacheConfig.configure(); // Add this line
+  
   runApp(
     const ProviderScope(
       child: MyApp(),

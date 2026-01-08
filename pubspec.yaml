@@ -56,6 +56,11 @@ dependencies:
   connectivity_plus: ^6.0.5
   http: ^1.2.0
 
+  share_plus: ^7.2.1
+  permission_handler: ^11.0.1
+  path_provider: ^2.1.1
+  dio: ^5.4.0
+
   # UI & Fonts
   google_fonts: ^6.2.1
 
