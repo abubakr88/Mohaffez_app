@@ -7,6 +7,7 @@ import '../shared/widgets/session_card.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
 
 class AcceptedSessionsScreen extends StatefulWidget {
   const AcceptedSessionsScreen({super.key});
@@ -70,10 +71,18 @@ class _AcceptedSessionsScreenState extends State<AcceptedSessionsScreen> {
 
             // Show empty state
             if (docs.isEmpty) {
-              return const EmptyState(
-                icon: Icons.event_busy_rounded,
+              return IllustratedEmptyState(
+                illustration: EmptyStateIllustrations.noSessions(),
                 title: 'لا توجد جلسات',
-                message: 'لم تقبل أي جلسات بعد',
+                message: 'لم تقبل أي جلسات بعد. ابدأ بالبحث عن محفظين قريبين.',
+                action: ElevatedButton.icon(
+                  onPressed: () {
+                    // Navigate to search screen
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.search),
+                  label: const Text('ابحث عن محفظ'),
+                ),
               );
             }
 

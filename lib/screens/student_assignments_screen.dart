@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../shared/widgets/assignment_card.dart';
 import '../shared/widgets/empty_state.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
 
 class StudentAssignmentsScreen extends StatelessWidget {
   const StudentAssignmentsScreen({super.key});
@@ -47,10 +48,10 @@ class StudentAssignmentsScreen extends StatelessWidget {
             }).toList();
 
             if (assignmentDocs.isEmpty) {
-              return const EmptyState(
-                icon: Icons.assignment_outlined,
-                title: 'لا توجد تكليفات حالياً',
-                message: 'سيظهر هنا ورد الحفظ والمراجعة بعد جلستك الأولى',
+              return IllustratedEmptyState(
+                illustration: EmptyStateIllustrations.noAssignments(),
+                title: 'لا توجد واجبات',
+                message: 'سيظهر هنا الحفظ والمراجعة المطلوبة منك بعد كل جلسة.',
               );
             }
 

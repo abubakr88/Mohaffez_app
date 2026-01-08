@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/shimmer_widgets.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
 
 class StudentRequestsScreen extends StatelessWidget {
   const StudentRequestsScreen({super.key});
@@ -61,10 +62,17 @@ class StudentRequestsScreen extends StatelessWidget {
 
             final docs = snapshot.data!.docs;
             if (docs.isEmpty) {
-              return const EmptyState(
-                icon: Icons.pending_actions_outlined,
-                title: 'لا توجد طلبات حتى الآن',
-                message: 'ابحث عن محفظ قريب واحجز جلسة',
+              return IllustratedEmptyState(
+                illustration: EmptyStateIllustrations.noRequests(),
+                title: 'لا توجد طلبات',
+                message: 'قم بالبحث عن محفظين قريبين وأرسل طلب جلسة للبدء.',
+                action: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.search),
+                  label: const Text('ابحث عن محفظ'),
+                ),
               );
             }
 

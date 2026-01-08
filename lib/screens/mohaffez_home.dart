@@ -97,8 +97,9 @@ class _MohaffezHomeState extends State<MohaffezHome>
         if (docs.isEmpty) {
           return const EmptyState(
             icon: Icons.inbox_outlined,
-            title: 'لا توجد طلبات جديدة',
-            message: 'ستظهر هنا طلبات الحجز من الطلاب',
+            title: 'لا توجد طلبات جلسات',
+            message: 'سيظهر هنا طلبات الجلسات من الطلاب عندما يرسلون لك طلباً.',
+            animated: true,
           );
         }
 
@@ -243,7 +244,8 @@ class _MohaffezHomeState extends State<MohaffezHome>
           return const EmptyState(
             icon: Icons.school_outlined,
             title: 'لا توجد جلسات مقبولة',
-            message: 'ستظهر هنا الجلسات بعد قبول طلبات الطلاب',
+            message: 'بعد قبول طلبات الجلسات، ستظهر هنا لإدارتها وإضافة الواجبات.',
+            animated: true,
           );
         }
 

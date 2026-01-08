@@ -9,6 +9,8 @@ import '../shared/widgets/shimmer_widgets.dart';
 import '../screens/mohaffez_profile_screen.dart';
 import '../shared/widgets/cached_avatar.dart';
 import '../shared/widgets/error_widgets.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
+import '../shared/widgets/empty_state.dart';
 
 class NearbyMohaffezScreen extends StatefulWidget {
   final double? userLat;
@@ -239,7 +241,7 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
 
   Widget _buildBody() {
     // Show shimmer loading
-    if (loading) {
+    if (_loading) {
       return ShimmerWidgets.list(
         itemCount: 5,
         itemBuilder: () => ShimmerWidgets.card(),
@@ -247,57 +249,41 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
     }
 
     // Show error state with appropriate error type
-    if (errorMessage != null) {
+    if (_errorMessage != null) {
       // Check if it's a permission error
-      if (errorMessage!.contains('إذن') || 
-          errorMessage!.contains('permission') ||
-          errorMessage!.contains('denied')) {
+      if (_errorMessage!.contains('إذن') || 
+          _errorMessage!.contains('permission') ||
+          _errorMessage!.contains('denied')) {
         return ErrorDisplay.permission(
           permissionName: 'الموقع',
-          onRetry: getCurrentLocation,
+          onRetry: _getCurrentLocation,
         );
       }
       
       // Check if location services are disabled
-      if (errorMessage!.contains('معطلة') || 
-          errorMessage!.contains('disabled')) {
+      if (_errorMessage!.contains('معطلة') || 
+          _errorMessage!.contains('disabled')) {
         return ErrorDisplay.locationDisabled(
-          onRetry: getCurrentLocation,
+          onRetry: _getCurrentLocation,
         );
       }
       
       // Default to data load error
       return ErrorDisplay.dataLoad(
-        onRetry: getCurrentLocation,
+        onRetry: _getCurrentLocation,
       );
     }
 
     // Show empty state
-    if (mohaffezList.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 80, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text(
-              'لا يوجد محفظين قريبين',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'لم نجد أي محفظين في منطقتك',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+    if (_mohaffezList.isEmpty) {
+      return IllustratedEmptyState(
+        illustration: EmptyStateIllustrations.noMohaffezNearby(),
+        title: 'لا يوجد محفظين قريبين',
+        message: 'لم نجد أي محفظين في منطقتك. حاول توسيع نطاق البحث.',
+        action: ElevatedButton.icon(
+          onPressed: _getCurrentLocation,
+          icon: const Icon(Icons.refresh),
+          label: const Text('إعادة البحث'),
         ),
       );
     }
@@ -305,9 +291,9 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
     // Show loaded data
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: mohaffezList.length,
+      itemCount: _mohaffezList.length,
       itemBuilder: (context, index) {
-        final mohaffez = mohaffezList[index];
+        final mohaffez = _mohaffezList[index];
         return _buildMohaffezCard(mohaffez);
       },
     );

@@ -14,6 +14,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
+import '../shared/widgets/empty_state.dart';
 
 class MohaffezCredentialsScreen extends StatefulWidget {
   const MohaffezCredentialsScreen({super.key});
@@ -111,43 +113,14 @@ class _MohaffezCredentialsScreenState
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.workspace_premium,
-                      size: 80,
-                      color: Colors.grey.shade300,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لا توجد شهادات',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'أضف شهاداتك ومؤهلاتك لزيادة ثقة الطلاب',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: _showAddCredentialDialog,
-                      icon: const Icon(Icons.add),
-                      label: const Text('إضافة شهادة'),
-                    ),
-                  ],
-                ),
+            return IllustratedEmptyState(
+              illustration: EmptyStateIllustrations.noCredentials(),
+              title: 'لا توجد شهادات',
+              message: 'أضف شهاداتك وإجازاتك لزيادة مصداقيتك وثقة الطلاب بك.',
+              action: ElevatedButton.icon(
+                onPressed: _showAddCredentialDialog,
+                icon: const Icon(Icons.add),
+                label: const Text('إضافة شهادة'),
               ),
             );
           }

@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
+import '../shared/widgets/empty_state.dart';
+
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -80,35 +83,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
             // Check if data exists
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.notifications_off,
-                      size: 80,
-                      color: Colors.grey.shade300,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لا توجد إشعارات',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'ستظهر الإشعارات هنا عند وصولها',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+              return IllustratedEmptyState(
+                illustration: EmptyStateIllustrations.noNotifications(),
+                title: 'لا توجد إشعارات',
+                message: 'ستظهر الإشعارات هنا عندما يتم قبول جلساتك أو عند متابعة محفظين جدد.',
               );
             }
 
