@@ -7,6 +7,7 @@ import 'accepted_sessions_screen.dart';
 import 'student_assignments_screen.dart';
 import 'student_requests_screen.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/widgets/error_widgets.dart';
 
 class StudentHome extends StatefulWidget {
   const StudentHome({super.key});
@@ -276,6 +277,17 @@ Widget build(BuildContext context) {
                   color: Colors.grey.shade300,
                 ),
                 const SizedBox(height: 16),
+
+                // Warning banner if location is not enabled
+                if (currentPosition == null && !loadingLocation)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: WarningBanner(
+                      message: 'تفعيل الموقع سيساعدك في العثور على محفظين قريبين',
+                      actionLabel: 'تفعيل',
+                      onAction: getCurrentLocation,
+                    ),
+                  ),
                 Text(
                   'لا توجد جلسات اليوم',
                   style: TextStyle(

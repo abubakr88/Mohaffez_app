@@ -14,6 +14,7 @@ import '../services/profile_completion_service.dart';
 import '../config/image_cache_config.dart';
 import 'mohaffez_credentials_screen.dart';
 import 'availability_management_screen.dart';
+import '../shared/widgets/error_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -245,16 +246,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .collection('users')
               .doc(user.uid)
               .snapshots(),
-          builder: (context, snapshot) {
-            // Show shimmer while loading
-            if (!snapshot.hasData) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: ShimmerWidgets.base(
-                  child: ShimmerWidgets.profile(),
-                ),
-              );
-            }
+              builder: (context, snapshot) {
+                // Show error if any
+                if (snapshot.hasError) {
+                  return ErrorDisplay.dataLoad(
+                    onRetry: () {
+                      setState(() {}); // Trigger rebuild
+                    },
+                  );
+                }
+
+                // Show shimmer while loading
+                if (!snapshot.hasData) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: ShimmerWidgets.base(
+                      child: ShimmerWidgets.profile(),
+                    ),
+                  );
+                }
 
             final data = snapshot.data!.data() ?? {};
             final name = data['name'] as String? ?? 'مستخدم';

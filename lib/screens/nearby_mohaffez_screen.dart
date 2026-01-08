@@ -8,6 +8,7 @@ import '../shared/utils/location_utils.dart';
 import '../shared/widgets/shimmer_widgets.dart';
 import '../screens/mohaffez_profile_screen.dart';
 import '../shared/widgets/cached_avatar.dart';
+import '../shared/widgets/error_widgets.dart';
 
 class NearbyMohaffezScreen extends StatefulWidget {
   final double? userLat;
@@ -238,42 +239,41 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
 
   Widget _buildBody() {
     // Show shimmer loading
-    if (_loading) {
+    if (loading) {
       return ShimmerWidgets.list(
         itemCount: 5,
         itemBuilder: () => ShimmerWidgets.card(),
       );
     }
 
-    // Show error state
-    if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _getCurrentLocation,
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
+    // Show error state with appropriate error type
+    if (errorMessage != null) {
+      // Check if it's a permission error
+      if (errorMessage!.contains('إذن') || 
+          errorMessage!.contains('permission') ||
+          errorMessage!.contains('denied')) {
+        return ErrorDisplay.permission(
+          permissionName: 'الموقع',
+          onRetry: getCurrentLocation,
+        );
+      }
+      
+      // Check if location services are disabled
+      if (errorMessage!.contains('معطلة') || 
+          errorMessage!.contains('disabled')) {
+        return ErrorDisplay.locationDisabled(
+          onRetry: getCurrentLocation,
+        );
+      }
+      
+      // Default to data load error
+      return ErrorDisplay.dataLoad(
+        onRetry: getCurrentLocation,
       );
     }
 
     // Show empty state
-    if (_mohaffezList.isEmpty) {
+    if (mohaffezList.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -295,6 +295,7 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
                 fontSize: 14,
                 color: Colors.grey.shade500,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -304,9 +305,9 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
     // Show loaded data
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: _mohaffezList.length,
+      itemCount: mohaffezList.length,
       itemBuilder: (context, index) {
-        final mohaffez = _mohaffezList[index];
+        final mohaffez = mohaffezList[index];
         return _buildMohaffezCard(mohaffez);
       },
     );

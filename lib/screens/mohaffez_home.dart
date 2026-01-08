@@ -6,6 +6,7 @@ import '../shared/widgets/session_card.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/shimmer_widgets.dart';
+import '../shared/widgets/error_widgets.dart';
 
 class MohaffezHome extends StatefulWidget {
   const MohaffezHome({super.key});
@@ -73,16 +74,24 @@ class _MohaffezHomeState extends State<MohaffezHome>
           .where('status', isEqualTo: 'pending')
           .orderBy('createdAt', descending: true)
           .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return ShimmerWidgets.list(
-            itemCount: 3,
-            itemBuilder: () => ShimmerWidgets.listItem(
-              showAvatar: true,
-              lines: 3,
-            ),
-          );
-        }
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return ErrorDisplay.dataLoad(
+                onRetry: () {
+                  setState(() {}); // Trigger rebuild
+                },
+              );
+            }
+
+            if (!snapshot.hasData) {
+              return ShimmerWidgets.list(
+                itemCount: 3,
+                itemBuilder: () => ShimmerWidgets.listItem(
+                  showAvatar: true,
+                  lines: 3,
+                ),
+              );
+            }
         
         final docs = snapshot.data!.docs;
         if (docs.isEmpty) {
