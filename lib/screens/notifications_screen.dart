@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../main.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/widgets/shimmer_widgets.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -42,9 +42,14 @@ class NotificationsScreen extends StatelessWidget {
               .snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return ShimmerWidgets.list(
+                itemCount: 6,
+                itemBuilder: () => ShimmerWidgets.listItem(
+                  showAvatar: true,
+                  lines: 2,
+                ),
+              );
             }
-
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return Center(
                 child: Column(

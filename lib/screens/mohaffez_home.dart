@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../shared/widgets/session_card.dart';
 import '../shared/widgets/empty_state.dart';
-import '../main.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/widgets/shimmer_widgets.dart';
 
 class MohaffezHome extends StatefulWidget {
   const MohaffezHome({super.key});
@@ -75,9 +75,15 @@ class _MohaffezHomeState extends State<MohaffezHome>
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return ShimmerWidgets.list(
+            itemCount: 3,
+            itemBuilder: () => ShimmerWidgets.listItem(
+              showAvatar: true,
+              lines: 3,
+            ),
+          );
         }
-
+        
         final docs = snapshot.data!.docs;
         if (docs.isEmpty) {
           return const EmptyState(
@@ -215,9 +221,14 @@ class _MohaffezHomeState extends State<MohaffezHome>
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return ShimmerWidgets.list(
+            itemCount: 4,
+            itemBuilder: () => ShimmerWidgets.listItem(
+              showAvatar: true,
+              lines: 3,
+            ),
+          );
         }
-
         final docs = snapshot.data!.docs;
         if (docs.isEmpty) {
           return const EmptyState(

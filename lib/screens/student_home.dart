@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 // import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
-import '../main.dart';
 import 'nearby_mohaffez_screen.dart';
 import 'accepted_sessions_screen.dart';
 import 'student_assignments_screen.dart';
@@ -244,7 +243,7 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _buildLatestSessions() {
+  Widget buildLatestSessions() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 

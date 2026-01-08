@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../shared/widgets/session_card.dart';
 import '../shared/widgets/empty_state.dart';
+import '../shared/widgets/shimmer_widgets.dart';
 
 class AcceptedSessionsScreen extends StatelessWidget {
   const AcceptedSessionsScreen({super.key});
@@ -28,7 +29,13 @@ class AcceptedSessionsScreen extends StatelessWidget {
               .snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return ShimmerWidgets.list(
+                itemCount: 4,
+                itemBuilder: () => ShimmerWidgets.listItem(
+                  showAvatar: true,
+                  lines: 3,
+                ),
+              );
             }
 
             final docs = snapshot.data!.docs;

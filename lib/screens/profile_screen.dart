@@ -11,6 +11,7 @@ import '../services/profile_completion_service.dart';
 import '../shared/widgets/verification_badge.dart';
 import 'mohaffez_credentials_screen.dart';
 import 'availability_management_screen.dart';
+import '../shared/widgets/shimmer_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -134,7 +135,12 @@ class ProfileScreenState extends State<ProfileScreen> {
               .snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: ShimmerWidgets.base(
+                  child: ShimmerWidgets.profile(),
+                ),
+              );
             }
 
             final data = snapshot.data!.data() ?? {};

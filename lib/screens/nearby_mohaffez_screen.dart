@@ -3,9 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../shared/widgets/verification_badge.dart';
 import '../shared/utils/location_utils.dart';
-import 'mohaffez_profile_screen.dart';
+import '../shared/widgets/shimmer_widgets.dart';
 
 class NearbyMohaffezScreen extends StatefulWidget {
   final double? userLat;
@@ -163,7 +162,7 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
     });
   }
 
-  Future<void> _showLocationOnMap(MohaffezWithDistance mohaffez) async {
+  Future<void> showLocationOnMap(MohaffezWithDistance mohaffez) async {
     final url =
         'https://www.google.com/maps/search/?api=1&query=${mohaffez.addressLat},${mohaffez.addressLng}';
     final uri = Uri.parse(url);
@@ -235,10 +234,15 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
   }
 
   Widget _buildBody() {
+    // Show shimmer loading
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return ShimmerWidgets.list(
+        itemCount: 5,
+        itemBuilder: () => ShimmerWidgets.card(),
+      );
     }
 
+    // Show error state
     if (_errorMessage != null) {
       return Center(
         child: Column(
@@ -246,23 +250,55 @@ class _NearbyMohaffezScreenState extends State<NearbyMohaffezScreen> {
           children: [
             Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
-            Text(_errorMessage!),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade700,
+              ),
+            ),
             const SizedBox(height: 16),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: _getCurrentLocation,
-              child: const Text('إعادة المحاولة'),
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة'),
             ),
           ],
         ),
       );
     }
 
+    // Show empty state
     if (_mohaffezList.isEmpty) {
-      return const Center(
-        child: Text('لا يوجد محفظون قريبون منك'),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text(
+              'لا يوجد محفظين قريبين',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'لم نجد أي محفظين في منطقتك',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
+    // Show loaded data
     return ListView.builder(
       padding: const EdgeInsets.all(12),
       itemCount: _mohaffezList.length,

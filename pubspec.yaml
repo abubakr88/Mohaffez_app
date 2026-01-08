@@ -23,6 +23,9 @@ dependencies:
   flutter_riverpod: ^2.4.9
   provider: ^6.1.1
 
+  shimmer: ^3.0.0
+  cached_network_image: ^3.3.0
+
   # Storage & Cache
   shared_preferences: ^2.2.2
   hive: ^2.2.3

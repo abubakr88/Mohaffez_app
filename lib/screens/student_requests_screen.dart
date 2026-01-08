@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../shared/widgets/empty_state.dart';
+import '../shared/widgets/shimmer_widgets.dart';
 
 class StudentRequestsScreen extends StatelessWidget {
   const StudentRequestsScreen({super.key});
@@ -49,7 +50,13 @@ class StudentRequestsScreen extends StatelessWidget {
               .snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return ShimmerWidgets.list(
+                itemCount: 3,
+                itemBuilder: () => ShimmerWidgets.listItem(
+                  showAvatar: true,
+                  lines: 3,
+                ),
+              );
             }
 
             final docs = snapshot.data!.docs;
