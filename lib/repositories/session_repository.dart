@@ -96,16 +96,16 @@ class SessionRepository {
     try {
       return await _firestore.runTransaction<BookingResult>((transaction) async {
         // Check for conflicts
-        final conflicts = await _firestore
-            .collection('sessionRequests')
-            .where('mohaffezId', isEqualTo: mohaffezId)
-            .where('slotStart', isEqualTo: Timestamp.fromDate(slotStart))
-            .where('status', whereIn: ['pending', 'accepted'])
-            .get();
+        // final conflicts = await _firestore
+        //     .collection('sessionRequests')
+        //     .where('mohaffezId', isEqualTo: mohaffezId)
+        //     .where('slotStart', isEqualTo: Timestamp.fromDate(slotStart))
+        //     .where('status', whereIn: ['pending', 'accepted'])
+        //     .get();
 
-        if (conflicts.docs.isNotEmpty) {
-          return BookingResult.failure('هذا الموعد محجوز بالفعل');
-        }
+        // if (conflicts.docs.isNotEmpty) {
+        //   return BookingResult.failure('هذا الموعد محجوز بالفعل');
+        // }
 
         // Create request atomically
         final requestRef = _firestore.collection('sessionRequests').doc();

@@ -313,8 +313,8 @@ class _AuthenticatedShell extends ConsumerWidget {
   Future<void> _logout(WidgetRef ref) async {
     await FirebaseAuth.instance.signOut();
     await CacheService.clearAll();
-    ref.invalidate(currentUserProvider);
-    ref.read(bottomNavIndexProvider.notifier).reset();
+    // ref.invalidate(currentUserProvider);
+    // ref.read(bottomNavIndexProvider.notifier).reset();
   }
 }
 

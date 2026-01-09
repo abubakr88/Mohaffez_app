@@ -8,42 +8,48 @@ part 'user_model.g.dart';
 class UserModel with _$UserModel {
   const factory UserModel({
     required String uid,
-    required String email,
     required String name,
-    required String role, // 'mohaffez' or 'student'
+    required String email,
+    required String role,
     String? photoUrl,
-    String? phone,
-    String? mobile,
+    String? bio,
     String? specialization,
+    String? phoneNumber,
+    @Default(0) int followerCount,
+    @Default(0) int followingCount,
+    @Default(0.0) double rating,
+    @Default(0) int reviewCount,
     String? addressText,
     double? addressLat,
     double? addressLng,
-    @Default(0) int followerCount,
-    @Default(0) int followingCount,
-    @Default(0) int reviewCount,
-    @Default(4.5) double rating,
     @TimestampConverter() DateTime? createdAt,
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>
       _$UserModelFromJson(json);
+
+  factory UserModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return UserModel.fromJson({
+      ...data,
+      'uid': doc.id,
+    });
+  }
 }
 
-// Timestamp converter for Firestore
-class TimestampConverter implements JsonConverter<DateTime?, dynamic> {
+class TimestampConverter implements JsonConverter<DateTime?, Object?> {
   const TimestampConverter();
 
   @override
-  DateTime? fromJson(dynamic timestamp) {
-    if (timestamp == null) return null;
-    if (timestamp is Timestamp) return timestamp.toDate();
-    if (timestamp is int) return DateTime.fromMillisecondsSinceEpoch(timestamp);
+  DateTime? fromJson(Object? json) {
+    if (json == null) return null;
+    if (json is Timestamp) return json.toDate();
+    if (json is String) return DateTime.parse(json);
     return null;
   }
 
   @override
-  dynamic toJson(DateTime? date) {
-    if (date == null) return null;
-    return Timestamp.fromDate(date);
+  Object? toJson(DateTime? object) {
+    return object != null ? Timestamp.fromDate(object) : null;
   }
 }
