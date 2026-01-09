@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import '../services/credential_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
-import '../shared/widgets/cached_avatar.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';

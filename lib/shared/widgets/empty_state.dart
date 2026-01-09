@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_theme.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -35,22 +36,26 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Animated icon with scale and fade
+            // ⭐ FIXED: Animated icon with safe scale and fade
             if (animated)
               TweenAnimationBuilder<double>(
                 duration: const Duration(milliseconds: 800),
                 tween: Tween(begin: 0.0, end: 1.0),
-                curve: Curves.elasticOut,
+                curve: Curves.easeOutBack, // ⭐ Changed from elasticOut
                 builder: (context, value, child) {
                   return Transform.scale(
-                    scale: value,
+                    scale: (0.5 + (0.5 * value)).clamp(0.5, 1.0), // ⭐ Safe scale range
                     child: Opacity(
-                      opacity: value,
+                      opacity: value.clamp(0.0, 1.0), // ⭐ Safe opacity
                       child: child,
                     ),
                   );
                 },
-                child: iconWidget,
+                child: Icon(
+                  icon,
+                  size: iconSize,
+                  color: iconColor ?? AppTheme.primaryAmber,
+                ),
               )
             else
               iconWidget,
@@ -64,7 +69,7 @@ class EmptyState extends StatelessWidget {
               curve: Curves.easeIn,
               builder: (context, value, child) {
                 return Opacity(
-                  opacity: animated ? value : 1.0,
+                  opacity: animated ? value.clamp(0.0, 1.0) : 1.0, // ⭐ Safe opacity
                   child: child,
                 );
               },
@@ -88,7 +93,7 @@ class EmptyState extends StatelessWidget {
                 curve: Curves.easeIn,
                 builder: (context, value, child) {
                   return Opacity(
-                    opacity: animated ? value : 1.0,
+                    opacity: animated ? value.clamp(0.0, 1.0) : 1.0, // ⭐ Safe opacity
                     child: child,
                   );
                 },
@@ -117,7 +122,7 @@ class EmptyState extends StatelessWidget {
                   return Transform.translate(
                     offset: animated ? value * 20 : Offset.zero,
                     child: Opacity(
-                      opacity: animated ? (1 - value.dy / 0.3) : 1.0,
+                      opacity: animated ? (1 - value.dy / 0.3).clamp(0.0, 1.0) : 1.0, // ⭐ Safe opacity
                       child: child,
                     ),
                   );
@@ -195,16 +200,16 @@ class IllustratedEmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Animated illustration
+            // ⭐ FIXED: Animated illustration with safe values
             TweenAnimationBuilder<double>(
               duration: const Duration(milliseconds: 1000),
               tween: Tween(begin: 0.0, end: 1.0),
               curve: Curves.easeOutBack,
               builder: (context, value, child) {
                 return Transform.scale(
-                  scale: value,
+                  scale: (0.5 + (0.5 * value)).clamp(0.5, 1.0), // ⭐ Safe scale
                   child: Opacity(
-                    opacity: value,
+                    opacity: value.clamp(0.0, 1.0), // ⭐ Safe opacity
                     child: child,
                   ),
                 );

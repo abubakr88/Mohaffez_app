@@ -21,6 +21,8 @@ dependencies:
 
   # State Management
   flutter_riverpod: ^2.4.9
+  riverpod_annotation: ^2.3.3
+
   provider: ^6.1.1
 
   shimmer: ^3.0.0
@@ -78,6 +80,10 @@ dev_dependencies:
   freezed: ^2.4.6
   json_serializable: ^6.7.1
 
+  riverpod_generator: ^2.3.9
+  custom_lint: ^0.5.7
+  riverpod_lint: ^2.3.7
+ 
   # Linting
   flutter_lints: ^4.0.0
 

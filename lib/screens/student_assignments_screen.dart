@@ -1,91 +1,100 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/widgets/assignment_card.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/empty_state_illustrations.dart';
+import '../shared/widgets/shimmer_widgets.dart';
+import '../shared/widgets/error_widgets.dart';
+import '../providers/session_provider.dart';
+import '../providers/user_provider.dart';
 
-class StudentAssignmentsScreen extends StatelessWidget {
+class StudentAssignmentsScreen extends ConsumerWidget {
   const StudentAssignmentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('يجب تسجيل الدخول أولاً')),
-      );
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
+
+    return userAsync.when(
+      data: (user) {
+        if (user == null) {
+          return const Scaffold(
+            body: Center(child: Text('يرجى تسجيل الدخول')),
+          );
+        }
+        return _buildContent(context, ref, user.uid);
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        body: ErrorDisplay.dataLoad(
+          onRetry: () => ref.invalidate(currentUserProvider),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, WidgetRef ref, String studentId) {
+    final sessionsAsync = ref.watch(studentSessionsProvider(studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('تكليفات الحفظ والمراجعة')),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('hafizSessions')
-              .where('studentId', isEqualTo: user.uid)
-              .orderBy('sessionDate', descending: true)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final docs = snapshot.data!.docs;
-
-            // Filter docs with assignments
-            final assignmentDocs = docs.where((doc) {
-              final data = doc.data();
-              final hifz = (data['hifzAssignment'] as String?) ?? '';
-              final muraja = (data['murajaAssignment'] as String?) ?? '';
-              final rating = (data['sessionRating'] as num?)?.toInt() ?? 0;
-              final notes = (data['sessionNotes'] as String?) ?? '';
+        appBar: AppBar(title: const Text('تكليفاتي')),
+        body: sessionsAsync.when(
+          data: (sessions) {
+            // Filter sessions with assignments - handle nullable fields safely
+            final assignmentSessions = sessions.where((session) {
+              final hifz = session.hifzAssignment ?? '';
+              final muraja = session.murajaAssignment ?? '';
+              final notes = session.sessionNotes ?? '';
+              final rating = session.sessionRating ?? 0;
+              
               return hifz.isNotEmpty ||
                   muraja.isNotEmpty ||
                   rating > 0 ||
                   notes.isNotEmpty;
             }).toList();
 
-            if (assignmentDocs.isEmpty) {
+            if (assignmentSessions.isEmpty) {
               return IllustratedEmptyState(
                 illustration: EmptyStateIllustrations.noAssignments(),
-                title: 'لا توجد واجبات',
-                message: 'سيظهر هنا الحفظ والمراجعة المطلوبة منك بعد كل جلسة.',
+                title: 'لا توجد تكليفات',
+                message: 'لم تستلم أي تكليفات من المحفظين بعد.',
               );
             }
 
             return ListView.builder(
               padding: const EdgeInsets.all(12),
-              itemCount: assignmentDocs.length,
+              itemCount: assignmentSessions.length,
               itemBuilder: (context, index) {
-                final data = assignmentDocs[index].data();
-                final mohaffezName = (data['mohaffezName'] as String?) ?? '';
-                final location = (data['location'] as String?) ?? '';
-                final sessionType = (data['sessionType'] as String?) ?? '';
-                final slotLabel =
-                    (data['preferredTimeSlot'] as String?) ?? '';
-                final ts = data['sessionDate'] as Timestamp?;
-                final date = ts?.toDate();
-                final hifz = (data['hifzAssignment'] as String?) ?? '';
-                final muraja = (data['murajaAssignment'] as String?) ?? '';
-                final rating = (data['sessionRating'] as num?)?.toInt() ?? 0;
-                final notes = (data['sessionNotes'] as String?) ?? '';
-
+                final session = assignmentSessions[index];
+                
                 return AssignmentCard(
-                  mohaffezName: mohaffezName,
-                  location: location,
-                  sessionType: sessionType,
-                  slotLabel: slotLabel,
-                  sessionDate: date,
-                  hifz: hifz,
-                  muraja: muraja,
-                  rating: rating,
-                  notes: notes,
+                  mohaffezName: session.mohaffezName ?? 'محفظ',
+                  location: session.location ?? '',
+                  sessionType: session.sessionType ?? '',
+                  slotLabel: session.preferredTimeSlot ?? '',
+                  sessionDate: session.sessionDate,
+                  hifz: session.hifzAssignment ?? '',
+                  muraja: session.murajaAssignment ?? '',
+                  rating: session.sessionRating ?? 0,
+                  notes: session.sessionNotes ?? '',
                 );
               },
             );
           },
+          loading: () => ShimmerWidgets.list(
+            itemCount: 4,
+            itemBuilder: () => ShimmerWidgets.listItem(
+              showAvatar: true,
+              lines: 3,
+            ),
+          ),
+          error: (e, _) => ErrorDisplay.dataLoad(
+            onRetry: () => ref.invalidate(studentSessionsProvider(studentId)),
+          ),
         ),
       ),
     );

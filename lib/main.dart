@@ -1,39 +1,93 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'firebase_options.dart';
 import 'screens/home_shell.dart';
-import 'services/notification_service.dart';
-import 'services/connectivity_service.dart';
-import 'services/cache_service.dart';
 import 'shared/constants/app_theme.dart';
-import 'config/image_cache_config.dart'; // Add this import
+import 'services/cache_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await dotenv.load(fileName: '.env');
-  await Firebase.initializeApp();
-  
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-  );
-  
-  await NotificationService.initialize();
-  await ConnectivityService.instance.initialize();
-  await CacheService.initialize();
-  
-  // Initialize image cache configuration
-  ImageCacheConfig.configure(); // Add this line
-  
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+  try {
+    // Initialize Firebase
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+    
+    // Initialize CacheService
+    await CacheService.initialize();
+    
+    // Set system UI overlay style
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+    
+    // Set preferred orientations (portrait only)
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    
+    // Run app with ProviderScope for Riverpod
+    runApp(
+      const ProviderScope(
+        child: MyApp(),
+      ),
+    );
+  } catch (e, stackTrace) {
+    // Print error for debugging
+    debugPrint('❌ Initialization error: $e');
+    debugPrint('Stack trace: $stackTrace');
+    
+    // Show error screen
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'خطأ في تهيئة التطبيق',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    e.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -42,15 +96,73 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'محفظي القريب',
+      title: 'محفظ القرآن',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      
+      locale: const Locale('ar'),
+      supportedLocales: const [
+        Locale('ar', 'SA'),
+        Locale('ar', 'EG'),
+        Locale('ar'),
+        Locale('en'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppTheme.primaryAmber,
+          primary: AppTheme.primaryAmber,
+          secondary: AppTheme.accentGreen,
+        ),
+        scaffoldBackgroundColor: Colors.grey.shade50,
+        
+        appBarTheme: const AppBarTheme(
+          elevation: 0,
+          centerTitle: true,
+          backgroundColor: AppTheme.primaryAmber,
+          foregroundColor: Colors.white,
+        ),
+        
+        // ⭐ ADD THIS - TabBar Theme
+        tabBarTheme: const TabBarThemeData(
+          labelColor: Colors.white, // Selected tab text color
+          unselectedLabelColor: Colors.white70, // Unselected tab text color
+          indicatorColor: Colors.white, // Indicator line color
+          indicatorSize: TabBarIndicatorSize.tab,
+          labelStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.normal,
+          ),
+        ),
+        
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryAmber,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(88, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
+      
+      // Start with SplashScreen
       home: const SplashScreen(),
     );
   }
 }
 
-// شاشة Splash Screen
+// ===== SPLASH SCREEN WITH FIXED ANIMATION =====
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -58,8 +170,7 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -67,27 +178,39 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    
+    // Create animation controller
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    // Fade animation
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeIn,
       ),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+    // Scale animation
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOutBack,
       ),
     );
 
+    // Start animation
     _animationController.forward();
 
+    // Navigate after delay
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -123,6 +246,7 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Animated Logo
                 FadeTransition(
                   opacity: _fadeAnimation,
                   child: ScaleTransition(
@@ -145,8 +269,7 @@ class _SplashScreenState extends State<SplashScreen>
                         width: 120,
                         height: 120,
                         fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(
+                        errorBuilder: (_, __, ___) => const Icon(
                           Icons.school,
                           size: 120,
                           color: AppTheme.primaryAmber,
@@ -156,18 +279,20 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 const SizedBox(height: 30),
+                
+                // App Title
                 FadeTransition(
                   opacity: _fadeAnimation,
-                  child: Text(
-                    'محفظي القريب',
-                    style: GoogleFonts.cairo(
+                  child: const Text(
+                    'معلم القرآن',
+                    style: TextStyle(
                       fontSize: 36,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                       shadows: [
                         Shadow(
-                          color: Colors.black.withOpacity(0.3),
-                          offset: const Offset(0, 2),
+                          color: Colors.black26,
+                          offset: Offset(0, 2),
                           blurRadius: 4,
                         ),
                       ],
@@ -175,17 +300,21 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 const SizedBox(height: 10),
+                
+                // Subtitle
                 FadeTransition(
                   opacity: _fadeAnimation,
-                  child: Text(
-                    'ابحث عن محفظ لحفظ القرآن الكريم',
-                    style: GoogleFonts.cairo(
+                  child: const Text(
+                    'منصة تحفيظ القرآن الكريم',
+                    style: TextStyle(
                       fontSize: 16,
                       color: Colors.white70,
                     ),
                   ),
                 ),
                 const SizedBox(height: 50),
+                
+                // Loading Indicator
                 FadeTransition(
                   opacity: _fadeAnimation,
                   child: SizedBox(

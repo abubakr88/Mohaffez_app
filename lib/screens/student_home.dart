@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'nearby_mohaffez_screen.dart';
 import 'accepted_sessions_screen.dart';
@@ -8,173 +7,151 @@ import 'student_assignments_screen.dart';
 import 'student_requests_screen.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
+import '../providers/session_provider.dart';
+import '../providers/user_provider.dart';
 
-class StudentHome extends StatefulWidget {
+// Location provider
+final userLocationProvider = FutureProvider<Position?>((ref) async {
+  try {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return null;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return null;
+    }
+
+    return await Geolocator.getCurrentPosition();
+  } catch (e) {
+    return null;
+  }
+});
+
+class StudentHome extends ConsumerWidget {
   const StudentHome({super.key});
 
   @override
-  State<StudentHome> createState() => _StudentHomeState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locationAsync = ref.watch(userLocationProvider);
 
-class _StudentHomeState extends State<StudentHome> {
-  Position? currentPosition;
-  bool loadingLocation = false;
-
-  @override
-  void initState() {
-    super.initState();
-    getCurrentLocation();
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'مرحباً بك',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+          ),
+          const SizedBox(height: 16),
+          _buildSearchCard(context, ref, locationAsync),
+          const SizedBox(height: 24),
+          Text(
+            'إدارة الجلسات',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+          ),
+          const SizedBox(height: 12),
+          _buildActionCard(
+            context: context,
+            icon: Icons.event_available_rounded,
+            title: 'الجلسات المقبولة',
+            subtitle: 'عرض جلساتك المحجوزة',
+            color: AppTheme.accentGreen,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AcceptedSessionsScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildActionCard(
+            context: context,
+            icon: Icons.assignment_rounded,
+            title: 'التكليفات',
+            subtitle: 'مراجعة تكليفاتك',
+            color: AppTheme.warning,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const StudentAssignmentsScreen()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildActionCard(
+            context: context,
+            icon: Icons.pending_actions_rounded,
+            title: 'طلباتي',
+            subtitle: 'متابعة حالة الطلبات',
+            color: Colors.blueAccent,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const StudentRequestsScreen()),
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildUpcomingSessions(ref),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
   }
 
-  Future<void> getCurrentLocation() async {
-    setState(() {
-      loadingLocation = true;
-    });
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('خدمة تحديد الموقع غير مفعلة'),
-            ),
+  Widget _buildSearchCard(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<Position?> locationAsync,
+  ) {
+    return locationAsync.when(
+      data: (position) {
+        if (position == null) {
+          return WarningBanner(
+            message: 'يرجى تفعيل خدمات الموقع للبحث عن محفظين قريبين',
+            actionLabel: 'تحديث',
+            onAction: () => ref.invalidate(userLocationProvider),
           );
         }
-        setState(() {
-          loadingLocation = false;
-        });
-        return;
-      }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission != LocationPermission.whileInUse &&
-            permission != LocationPermission.always) {
-          setState(() {
-            loadingLocation = false;
-          });
-          return;
-        }
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-      setState(() {
-        currentPosition = position;
-        loadingLocation = false;
-      });
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
-        );
-      }
-      setState(() {
-        loadingLocation = false;
-      });
-    }
-  }
-
-@override
-Widget build(BuildContext context) {
-  return SingleChildScrollView(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'ابحث واحجز',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-        ),
-        const SizedBox(height: 16),
-        _buildActionCard(
+        return _buildActionCard(
           context: context,
           icon: Icons.search_rounded,
           title: 'ابحث عن محفظ قريب',
-          subtitle: 'اعثر على محفظ في منطقتك',
+          subtitle: 'اعثر على أفضل محفظ في منطقتك',
           color: AppTheme.primaryAmber,
-          onTap: () {
-            if (currentPosition == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content:
-                      Text('جاري الحصول على موقعك، برجاء المحاولة لاحقًا'),
-                ),
-              );
-              return;
-            }
-
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => NearbyMohaffezScreen(
-                  userLat: currentPosition!.latitude,
-                  userLng: currentPosition!.longitude,
-                ),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => NearbyMohaffezScreen(
+                userLat: position.latitude,
+                userLng: position.longitude,
               ),
-            );
-          },
+            ),
+          ),
+        );
+      },
+      loading: () => Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        const SizedBox(height: 24),
-        Text(
-          'جلساتي وتكليفاتي',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
         ),
-        const SizedBox(height: 12),
-        _buildActionCard(
-          context: context,
-          icon: Icons.event_available_rounded,
-          title: 'جلساتي المقبولة',
-          subtitle: 'عرض الجلسات المؤكدة',
-          color: AppTheme.accentGreen,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const AcceptedSessionsScreen(),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildActionCard(
-          context: context,
-          icon: Icons.assignment_rounded,
-          title: 'تكليفات الحفظ والمراجعة',
-          subtitle: 'ورد الحفظ والمراجعة والتقييمات',
-          color: AppTheme.warning,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const StudentAssignmentsScreen(),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildActionCard(
-          context: context,
-          icon: Icons.pending_actions_rounded,
-          title: 'طلبات الجلسات',
-          subtitle: 'تتبع حالة طلباتك',
-          color: Colors.blueAccent,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const StudentRequestsScreen(),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 16), // Add some bottom padding
-      ],
-    ),
-  );
-}
+      ),
+      error: (e, _) => WarningBanner(
+        message: 'تعذر الحصول على موقعك. يرجى التحقق من الأذونات.',
+        actionLabel: 'إعادة المحاولة',
+        onAction: () => ref.invalidate(userLocationProvider),
+      ),
+    );
+  }
 
   Widget _buildActionCard({
     required BuildContext context,
@@ -244,99 +221,73 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget buildLatestSessions() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+  Widget _buildUpcomingSessions(WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('hafizSessions')
-          .where('sessionDate', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
-          .orderBy('sessionDate')
-          .limit(5)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return userAsync.when(
+      data: (user) {
+        if (user == null) return const SizedBox.shrink();
 
-        final docs = snapshot.data!.docs;
-        if (docs.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
+        final sessionsAsync = ref.watch(studentSessionsProvider(user.uid));
+
+        return sessionsAsync.when(
+          data: (sessions) {
+            if (sessions.isEmpty) return const SizedBox.shrink();
+
+            // Get upcoming sessions (next 3)
+            final now = DateTime.now();
+            final upcoming = sessions
+                .where((s) {
+                  final date = s.sessionDate ?? s.slotStart;
+                  return date != null && date.isAfter(now);
+                })
+                .take(3)
+                .toList();
+
+            if (upcoming.isEmpty) return const SizedBox.shrink();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.event_busy_rounded,
-                  size: 64,
-                  color: Colors.grey.shade300,
+                Text(
+                  'الجلسات القادمة',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                ...upcoming.map((session) {
+                  final date = session.sessionDate ?? session.slotStart;
+                  final dateStr = date != null
+                      ? '${date.day}/${date.month}/${date.year} - ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
+                      : '';
 
-                // Warning banner if location is not enabled
-                if (currentPosition == null && !loadingLocation)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: WarningBanner(
-                      message: 'تفعيل الموقع سيساعدك في العثور على محفظين قريبين',
-                      actionLabel: 'تفعيل',
-                      onAction: getCurrentLocation,
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.primaryAmber.withOpacity(0.2),
+                        child: const Icon(
+                          Icons.school,
+                          color: AppTheme.primaryAmber,
+                        ),
+                      ),
+                      title: Text(session.location),
+                      subtitle: Text(
+                          '${session.juzCount} جزء - $dateStr'),
                     ),
-                  ),
-                Text(
-                  'لا توجد جلسات اليوم',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'ابحث عن محفظ قريب لحجز جلسة',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
+                  );
+                }).toList(),
               ],
-            ),
-          );
-        }
-
-        return Column(
-          children: docs.map((doc) {
-            final data = doc.data();
-            final location = data['location'] as String? ?? '';
-            final juzCount = data['juzCount'] as int? ?? 1;
-            final ts = data['sessionDate'] as Timestamp?;
-            final date = ts?.toDate();
-            final dateStr = date != null
-                ? '${date.day}/${date.month}/${date.year} - ${date.hour}:${date.minute.toString().padLeft(2, '0')}'
-                : '';
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppTheme.primaryAmber.withOpacity(0.2),
-                  child: const Icon(
-                    Icons.school,
-                    color: AppTheme.primaryAmber,
-                  ),
-                ),
-                title: Text(location),
-                subtitle: Text('أجزاء: $juzCount - $dateStr'),
-              ),
             );
-          }).toList(),
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (e, _) => const SizedBox.shrink(),
         );
       },
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
     );
   }
 }

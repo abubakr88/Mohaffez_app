@@ -11,6 +11,9 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF78909C);
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFF9800);
+  // Add these missing colors:
+  static final Color complementaryBlue = Colors.blue.shade400;
+  static final Color backgroundLight = Colors.grey.shade50;
 
   static ThemeData get lightTheme {
     final base = ThemeData(useMaterial3: true);

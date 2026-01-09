@@ -1,45 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state_illustrations.dart';
 import '../shared/widgets/empty_state.dart';
+import '../providers/notification_provider.dart';
+import '../providers/user_provider.dart';
+import '../shared/utils/error_handler.dart';
 
-
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
-}
-
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  int _rebuildKey = 0;
-
-  void _retry() {
-    setState(() {
-      _rebuildKey++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('الإشعارات')),
-        body: const Center(
-          child: Text(
-            'يرجى تسجيل الدخول',
-            style: TextStyle(fontSize: 16),
-          ),
-        ),
-      );
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notificationsAsync = ref.watch(notificationsProvider);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -49,101 +24,89 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           actions: [
             IconButton(
               icon: const Icon(Icons.done_all),
-              onPressed: () => _markAllAsRead(user.uid),
-              tooltip: 'تعليم الكل كمقروء',
+              onPressed: () => _markAllAsRead(context, ref),
+              tooltip: 'تحديد الكل كمقروء',
             ),
           ],
         ),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          key: ValueKey(_rebuildKey),
-          stream: FirebaseFirestore.instance
-              .collection('notifications')
-              .where('userId', isEqualTo: user.uid)
-              .orderBy('createdAt', descending: true)
-              .limit(50)
-              .snapshots(),
-          builder: (context, snapshot) {
-            // Show error state
-            if (snapshot.hasError) {
-              return ErrorDisplay.dataLoad(
-                onRetry: _retry,
-              );
-            }
-
-            // Show shimmer loading
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return ShimmerWidgets.list(
-                itemCount: 6,
-                itemBuilder: () => ShimmerWidgets.listItem(
-                  showAvatar: true,
-                  lines: 2,
-                ),
-              );
-            }
-
-            // Check if data exists
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        body: notificationsAsync.when(
+          data: (notifications) {
+            if (notifications.isEmpty) {
               return IllustratedEmptyState(
                 illustration: EmptyStateIllustrations.noNotifications(),
                 title: 'لا توجد إشعارات',
-                message: 'ستظهر الإشعارات هنا عندما يتم قبول جلساتك أو عند متابعة محفظين جدد.',
+                message: 'سنرسل لك إشعارات عند حدوث أي تحديثات.',
               );
             }
-
-            final notifications = snapshot.data!.docs;
 
             return ListView.builder(
               padding: const EdgeInsets.all(8),
               itemCount: notifications.length,
               itemBuilder: (context, index) {
-                final notif = notifications[index];
-                final data = notif.data();
-                final isRead = data['isRead'] as bool? ?? false;
-                final type = data['type'] as String? ?? '';
-                final title = data['title'] as String? ?? '';
-                final body = data['body'] as String? ?? '';
-                final mohaffezName = data['mohaffezName'] as String? ?? '';
-                final timestamp = data['createdAt'] as Timestamp?;
-                final timeStr = timestamp != null
-                    ? _formatTimestamp(timestamp.toDate())
-                    : '';
-
-                return _buildNotificationCard(
-                  notificationId: notif.id,
-                  isRead: isRead,
-                  type: type,
-                  title: title,
-                  body: body,
-                  mohaffezName: mohaffezName,
-                  timeStr: timeStr,
+                final notification = notifications[index];
+                return _NotificationCard(
+                  notification: notification,
+                  onTap: () => _markAsRead(ref, notification.id!),
                 );
               },
             );
           },
+          loading: () => ShimmerWidgets.list(
+            itemCount: 6,
+            itemBuilder: () => ShimmerWidgets.listItem(
+              showAvatar: true,
+              lines: 2,
+            ),
+          ),
+          error: (e, _) => ErrorDisplay.dataLoad(
+            onRetry: () => ref.invalidate(notificationsProvider),
+          ),
         ),
       ),
     );
   }
 
-  /// Build notification card
-  Widget _buildNotificationCard({
-    required String notificationId,
-    required bool isRead,
-    required String type,
-    required String title,
-    required String body,
-    required String mohaffezName,
-    required String timeStr,
-  }) {
+  Future<void> _markAsRead(WidgetRef ref, String notificationId) async {
+    final notifier = ref.read(notificationActionsProvider.notifier);
+    await notifier.markAsRead(notificationId);
+  }
+
+  Future<void> _markAllAsRead(BuildContext context, WidgetRef ref) async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null) return;
+
+    final notifier = ref.read(notificationActionsProvider.notifier);
+    await notifier.markAllAsRead(user.uid);
+
+    if (context.mounted) {
+      ErrorHandler.showSuccess(context, 'تم تحديد جميع الإشعارات كمقروءة');
+    }
+  }
+}
+
+class _NotificationCard extends StatelessWidget {
+  final notification;
+  final VoidCallback onTap;
+
+  const _NotificationCard({
+    required this.notification,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isRead = notification.isRead;
+    final type = notification.type;
+    final title = notification.title;
+    final body = notification.body;
+    final mohaffezName = notification.mohaffezName ?? '';
+    final createdAt = notification.createdAt;
+
     return Card(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 4,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       color: isRead ? Colors.white : Colors.amber.shade50,
       elevation: isRead ? 0.5 : 2,
       child: ListTile(
-        // Leading icon
         leading: CircleAvatar(
           backgroundColor: _getTypeColor(type),
           child: Icon(
@@ -152,8 +115,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             size: 20,
           ),
         ),
-
-        // Title
         title: Text(
           title,
           style: TextStyle(
@@ -161,8 +122,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             fontSize: 15,
           ),
         ),
-
-        // Subtitle with body, mohaffez name, and time
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -174,7 +133,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             const SizedBox(height: 4),
             Row(
               children: [
-                // Mohaffez name
                 if (mohaffezName.isNotEmpty) ...[
                   Icon(
                     Icons.person,
@@ -191,8 +149,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                   const SizedBox(width: 12),
                 ],
-
-                // Time
                 Icon(
                   Icons.access_time,
                   size: 14,
@@ -200,7 +156,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  timeStr,
+                  _formatTimestamp(createdAt),
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade600,
@@ -210,8 +166,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           ],
         ),
-
-        // Unread indicator
         trailing: !isRead
             ? Container(
                 width: 8,
@@ -222,14 +176,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
               )
             : null,
-
-        // On tap - mark as read
-        onTap: () => _markAsRead(notificationId),
+        onTap: onTap,
       ),
     );
   }
 
-  /// Get icon color based on notification type
   Color _getTypeColor(String type) {
     switch (type) {
       case 'session':
@@ -243,7 +194,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  /// Get icon based on notification type
   IconData _getTypeIcon(String type) {
     switch (type) {
       case 'session':
@@ -257,90 +207,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  /// Mark single notification as read
-  Future<void> _markAsRead(String notificationId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .doc(notificationId)
-          .update({'isRead': true});
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
-        );
-      }
-    }
-  }
+  String _formatTimestamp(DateTime? dateTime) {
+    if (dateTime == null) return '';
 
-  /// Mark all notifications as read
-  Future<void> _markAllAsRead(String userId) async {
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-
-      final notifications = await FirebaseFirestore.instance
-          .collection('notifications')
-          .where('userId', isEqualTo: userId)
-          .where('isRead', isEqualTo: false)
-          .get();
-
-      if (notifications.docs.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('جميع الإشعارات مقروءة بالفعل')),
-          );
-        }
-        return;
-      }
-
-      for (final doc in notifications.docs) {
-        batch.update(doc.reference, {'isRead': true});
-      }
-
-      await batch.commit();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('تم تعليم جميع الإشعارات كمقروءة'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
-        );
-      }
-    }
-  }
-
-  /// Format timestamp to relative time
-  String _formatTimestamp(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
     if (difference.inDays >= 7) {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     } else if (difference.inDays > 0) {
-      return difference.inDays == 1
-          ? 'منذ يوم'
-          : 'منذ ${difference.inDays} أيام';
+      return difference.inDays == 1 ? 'أمس' : 'منذ ${difference.inDays} أيام';
     } else if (difference.inHours > 0) {
-      return difference.inHours == 1
-          ? 'منذ ساعة'
-          : 'منذ ${difference.inHours} ساعات';
+      return difference.inHours == 1 ? 'منذ ساعة' : 'منذ ${difference.inHours} ساعات';
     } else if (difference.inMinutes > 0) {
-      return difference.inMinutes == 1
-          ? 'منذ دقيقة'
-          : 'منذ ${difference.inMinutes} دقائق';
+      return difference.inMinutes == 1 ? 'منذ دقيقة' : 'منذ ${difference.inMinutes} دقائق';
     } else {
       return 'الآن';
     }

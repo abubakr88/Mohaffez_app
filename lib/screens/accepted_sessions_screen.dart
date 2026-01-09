@@ -1,40 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import '../shared/widgets/session_card.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/widgets/empty_state_illustrations.dart';
+import '../providers/session_provider.dart';
+import '../providers/user_provider.dart';
 
-class AcceptedSessionsScreen extends StatefulWidget {
+class AcceptedSessionsScreen extends ConsumerWidget {
   const AcceptedSessionsScreen({super.key});
 
   @override
-  State<AcceptedSessionsScreen> createState() => _AcceptedSessionsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
 
-class _AcceptedSessionsScreenState extends State<AcceptedSessionsScreen> {
-  // Add a key to force rebuild on retry
-  int _rebuildKey = 0;
-
-  void _retry() {
-    setState(() {
-      _rebuildKey++;
-    });
+    return userAsync.when(
+      data: (user) {
+        if (user == null) {
+          return const Scaffold(
+            body: Center(child: Text('يرجى تسجيل الدخول')),
+          );
+        }
+        return _buildContent(context, ref, user.uid);
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        body: ErrorDisplay.dataLoad(
+          onRetry: () => ref.invalidate(currentUserProvider),
+        ),
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('يرجى تسجيل الدخول')),
-      );
-    }
+  Widget _buildContent(BuildContext context, WidgetRef ref, String studentId) {
+    final sessionsAsync = ref.watch(studentSessionsProvider(studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -42,92 +45,50 @@ class _AcceptedSessionsScreenState extends State<AcceptedSessionsScreen> {
         appBar: AppBar(
           title: const Text('الجلسات المقبولة'),
         ),
-        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          key: ValueKey(_rebuildKey), // Force rebuild on retry
-          stream: FirebaseFirestore.instance
-              .collection('hafizSessions')
-              .where('studentId', isEqualTo: user.uid)
-              .snapshots(),
-          builder: (context, snapshot) {
-            // Show error if any
-            if (snapshot.hasError) {
-              return ErrorDisplay.dataLoad(
-                onRetry: _retry,
-              );
-            }
-
-            // Show shimmer while loading
-            if (!snapshot.hasData) {
-              return ShimmerWidgets.list(
-                itemCount: 4,
-                itemBuilder: () => ShimmerWidgets.listItem(
-                  showAvatar: true,
-                  lines: 3,
-                ),
-              );
-            }
-
-            final docs = snapshot.data!.docs;
-
-            // Show empty state
-            if (docs.isEmpty) {
+        body: sessionsAsync.when(
+          data: (sessions) {
+            if (sessions.isEmpty) {
               return IllustratedEmptyState(
                 illustration: EmptyStateIllustrations.noSessions(),
                 title: 'لا توجد جلسات',
                 message: 'لم تقبل أي جلسات بعد. ابدأ بالبحث عن محفظين قريبين.',
                 action: ElevatedButton.icon(
-                  onPressed: () {
-                    // Navigate to search screen
-                    Navigator.pop(context);
-                  },
+                  onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.search),
                   label: const Text('ابحث عن محفظ'),
                 ),
               );
             }
 
-            // Show list of sessions
             return ListView.builder(
               padding: const EdgeInsets.all(12),
-              itemCount: docs.length,
+              itemCount: sessions.length,
               itemBuilder: (context, index) {
-                final data = docs[index].data();
-                final location = data['location'] as String? ?? '';
-                final sessionType = data['sessionType'] as String? ?? '';
-                final slotLabel = data['preferredTimeSlot'] as String? ?? '';
-                final mohaffezName = data['mohaffezName'] as String? ?? '';
-                final slotStartTs = data['slotStart'] as Timestamp?;
-                final sessionDateTs = data['sessionDate'] as Timestamp?;
-                final slotStart = slotStartTs?.toDate();
-                final baseDate = slotStart ?? sessionDateTs?.toDate();
-                final lat = (data['imamAddressLat'] as num?)?.toDouble();
-                final lng = (data['imamAddressLng'] as num?)?.toDouble();
-                final phone = data['mohaffezPhone'] as String? ?? '';
-                final hifz = data['hifzAssignment'] as String? ?? '';
-                final muraja = data['murajaAssignment'] as String? ?? '';
-                final rating = (data['sessionRating'] as num?)?.toInt() ?? 0;
-                final notes = data['sessionNotes'] as String? ?? '';
-
+                final session = sessions[index];
+                
+                // Handle nullable fields safely
+                final sessionType = session.sessionType ?? '';
+                final timeSlot = session.preferredTimeSlot ?? '';
+                final hasValidSubtitle = sessionType.isNotEmpty && timeSlot.isNotEmpty;
+                
                 return SessionCard(
-                  title: mohaffezName,
-                  subtitle: sessionType.isNotEmpty && slotLabel.isNotEmpty
-                      ? '$sessionType - $slotLabel'
-                      : null,
-                  location: location,
-                  dateTime: baseDate,
-                  hifz: hifz,
-                  muraja: muraja,
-                  rating: rating,
-                  notes: notes,
+                  title: session.mohaffezName ?? 'محفظ',
+                  subtitle: hasValidSubtitle ? '$sessionType - $timeSlot' : null,
+                  location: session.location ?? '',
+                  dateTime: session.sessionDate ?? session.slotStart,
+                  hifz: session.hifzAssignment ?? '',
+                  muraja: session.murajaAssignment ?? '',
+                  rating: session.sessionRating ?? 0,
+                  notes: session.sessionNotes ?? '',
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Map button
-                      if (lat != null && lng != null)
+                      if (session.imamAddressLat != null &&
+                          session.imamAddressLng != null)
                         TextButton.icon(
                           onPressed: () async {
                             final uri = Uri.parse(
-                              'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+                              'https://www.google.com/maps/search/?api=1&query=${session.imamAddressLat},${session.imamAddressLng}',
                             );
                             await launchUrl(
                               uri,
@@ -137,13 +98,13 @@ class _AcceptedSessionsScreenState extends State<AcceptedSessionsScreen> {
                           icon: const Icon(Icons.map, size: 16),
                           label: const Text('خريطة'),
                         ),
-
-                      // WhatsApp button
-                      if (phone.isNotEmpty) ...[
+                      if (session.mohaffezPhone != null && 
+                          session.mohaffezPhone!.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         TextButton.icon(
                           onPressed: () async {
-                            final uri = Uri.parse('https://wa.me/$phone');
+                            final uri =
+                                Uri.parse('https://wa.me/${session.mohaffezPhone}');
                             await launchUrl(
                               uri,
                               mode: LaunchMode.externalApplication,
@@ -163,6 +124,16 @@ class _AcceptedSessionsScreenState extends State<AcceptedSessionsScreen> {
               },
             );
           },
+          loading: () => ShimmerWidgets.list(
+            itemCount: 4,
+            itemBuilder: () => ShimmerWidgets.listItem(
+              showAvatar: true,
+              lines: 3,
+            ),
+          ),
+          error: (e, _) => ErrorDisplay.dataLoad(
+            onRetry: () => ref.invalidate(studentSessionsProvider(studentId)),
+          ),
         ),
       ),
     );

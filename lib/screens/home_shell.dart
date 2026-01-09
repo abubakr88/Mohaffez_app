@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'student_home.dart';
 import 'mohaffez_home.dart';
@@ -9,154 +8,61 @@ import 'notifications_screen.dart';
 import 'nearby_mohaffez_screen.dart';
 import 'auth_screen.dart';
 import '../shared/widgets/offline_banner.dart';
-import '../services/cache_service.dart';
 import '../shared/constants/app_theme.dart';
+import '../providers/user_provider.dart';
+import '../providers/navigation_provider.dart';
+import '../providers/notification_provider.dart';
+import '../services/cache_service.dart';
 
-// Bottom nav index provider
-final bottomNavIndexProvider = StateProvider<int>((ref) => 0);
-
-class HomeShell extends ConsumerStatefulWidget {
+class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
 
   @override
-  ConsumerState<HomeShell> createState() => _HomeShellState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
+
+    return userAsync.when(
+      data: (user) {
+        if (user == null) {
+          return const AuthScreen();
+        }
+        return _AuthenticatedShell(user: user);
+      },
+      loading: () => _LoadingScreen(),
+      error: (error, stackTrace) => _ErrorScreen(
+        onRetry: () => ref.invalidate(currentUserProvider),
+      ),
+    );
+  }
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
-  User? user;
-  String? role;
-  String? name;
-  bool loadingUser = true;
-  double? userLat;
-  double? userLng;
+class _AuthenticatedShell extends ConsumerWidget {
+  final user;
+
+  const _AuthenticatedShell({required this.user});
 
   @override
-  void initState() {
-    super.initState();
-    loadCurrentUser();
-  }
-
-  Future<void> loadCurrentUser() async {
-    final current = FirebaseAuth.instance.currentUser;
-    if (current == null) {
-      setState(() {
-        user = null;
-        role = null;
-        name = null;
-        loadingUser = false;
-      });
-      return;
-    }
-
-    // Fast: Load from cache first for instant UI
-    final cachedRole = CacheService.getUserRole();
-    final cachedName = CacheService.getUserName();
-    final cachedLocation = CacheService.getLastLocation();
-
-    if (cachedRole != null && cachedName != null) {
-      setState(() {
-        user = current;
-        role = cachedRole;
-        name = cachedName;
-        if (cachedLocation != null) {
-          userLat = cachedLocation.$1;
-          userLng = cachedLocation.$2;
-        }
-        loadingUser = false;
-      });
-    }
-
-    // Then fetch from Firestore to sync any updates
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(current.uid)
-          .get();
-
-      final data = doc.data();
-      if (data != null) {
-        setState(() {
-          user = current;
-          role = data['role'] as String?;
-          name = data['name'] as String?;
-          userLat = (data['addressLat'] as num?)?.toDouble() ?? 30.0444;
-          userLng = (data['addressLng'] as num?)?.toDouble() ?? 31.2357;
-          loadingUser = false;
-        });
-
-        // Update cache with fresh data
-        if (role != null) await CacheService.saveUserRole(role!);
-        if (name != null) await CacheService.saveUserName(name!);
-        await CacheService.saveUserId(current.uid);
-        if (userLat != null && userLng != null) {
-          await CacheService.saveLastLocation(userLat!, userLng!);
-        }
-      }
-    } catch (e) {
-      // If offline and no cache, show loading state ended
-      if (!mounted) return;
-      setState(() {
-        loadingUser = false;
-      });
-    }
-  }
-
-  Future<void> logout() async {
-    await FirebaseAuth.instance.signOut();
-    await CacheService.clearAll();
-    setState(() {
-      user = null;
-      role = null;
-      name = null;
-    });
-    ref.read(bottomNavIndexProvider.notifier).state = 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (loadingUser) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppTheme.primaryAmber),
-              const SizedBox(height: 16),
-              Text(
-                'جاري تحميل بيانات المستخدم...',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (user == null) {
-      return const AuthScreen();
-    }
-
-    final isMohaffez = role == 'mohaffez';
+  Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(bottomNavIndexProvider);
+    final isMohaffez = user.role == 'mohaffez';
 
-    // Define screens for bottom navigation
-    final List<Widget> screens = isMohaffez
-        ? [
-            const MohaffezHome(),
-            const NotificationsScreen(),
-            const ProfileScreen(),
+    final screens = isMohaffez
+        ? const [
+            MohaffezHome(),
+            NotificationsScreen(),
+            ProfileScreen(),
           ]
-        : [
-            const StudentHome(),
-            const NearbyMohaffezScreen(),
-            const NotificationsScreen(),
-            const ProfileScreen(),
+        : const [
+            StudentHome(),
+            NearbyMohaffezScreen(),
+            NotificationsScreen(),
+            ProfileScreen(),
           ];
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: _buildAppBar(context, isMohaffez, currentIndex),
+        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex),
         body: Column(
           children: [
             const OfflineBanner(),
@@ -168,18 +74,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             ),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavBar(isMohaffez, currentIndex),
-        drawer: buildDrawer(context),
+        bottomNavigationBar: _buildBottomNavBar(ref, isMohaffez, currentIndex),
+        drawer: _buildDrawer(context, ref),
       ),
     );
   }
 
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
+    WidgetRef ref,
     bool isMohaffez,
     int currentIndex,
   ) {
-    // Dynamic title based on current tab
     String getTitle() {
       if (isMohaffez) {
         switch (currentIndex) {
@@ -240,9 +146,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                   height: 32,
                   width: 32,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.school,
-                          color: AppTheme.primaryAmber, size: 32),
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.school,
+                    color: AppTheme.primaryAmber,
+                    size: 32,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -252,72 +160,61 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
-            // Notification badge in app bar
-            if (currentIndex != (isMohaffez ? 1 : 2))
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications),
-                    tooltip: 'الإشعارات',
-                    onPressed: () {
-                      ref.read(bottomNavIndexProvider.notifier).state =
-                          isMohaffez ? 1 : 2;
-                    },
-                  ),
-                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
-                        .collection('notifications')
-                        .where('userId', isEqualTo: user!.uid)
-                        .where('isRead', isEqualTo: false)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      final unreadCount = snapshot.data?.docs.length ?? 0;
-                      if (unreadCount == 0) {
-                        return const SizedBox.shrink();
-                      }
-
-                      return Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            unreadCount > 9 ? '9+' : '$unreadCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
+            // Notification badge
+            if (currentIndex != (isMohaffez ? 1 : 2)) _buildNotificationBadge(ref),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBottomNavBar(bool isMohaffez, int currentIndex) {
+  Widget _buildNotificationBadge(WidgetRef ref) {
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
+
+    return Stack(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.notifications),
+          tooltip: 'الإشعارات',
+          onPressed: () {
+            final isMohaffez = user.role == 'mohaffez';
+            ref.read(bottomNavIndexProvider.notifier).setIndex(isMohaffez ? 1 : 2);
+          },
+        ),
+        if (unreadCount > 0)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Text(
+                unreadCount > 9 ? '9+' : '$unreadCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavBar(WidgetRef ref, bool isMohaffez, int currentIndex) {
     if (isMohaffez) {
-      // Mohaffez bottom nav: Home, Notifications, Profile
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) {
-          ref.read(bottomNavIndexProvider.notifier).state = index;
-        },
+        onTap: (index) => ref.read(bottomNavIndexProvider.notifier).setIndex(index),
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
@@ -332,17 +229,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'الحساب',
+            label: 'الملف الشخصي',
           ),
         ],
       );
     } else {
-      // Student bottom nav: Home, Search, Notifications, Profile
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) {
-          ref.read(bottomNavIndexProvider.notifier).state = index;
-        },
+        onTap: (index) => ref.read(bottomNavIndexProvider.notifier).setIndex(index),
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
@@ -361,14 +255,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'الحساب',
+            label: 'الملف',
           ),
         ],
       );
     }
   }
 
-  Widget buildDrawer(BuildContext context) {
+  Widget _buildDrawer(BuildContext context, WidgetRef ref) {
     return Drawer(
       child: ListView(
         children: [
@@ -383,7 +277,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
-                  name ?? '',
+                  user.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -392,7 +286,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  role == 'mohaffez' ? 'محفظ' : 'طالب',
+                  user.role == 'mohaffez' ? 'محفظ' : 'طالب',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
@@ -404,12 +298,83 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('تسجيل الخروج'),
-            onTap: () {
-              logout();
-              Navigator.pop(context);
+            onTap: () async {
+              await _logout(ref);
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _logout(WidgetRef ref) async {
+    await FirebaseAuth.instance.signOut();
+    await CacheService.clearAll();
+    ref.invalidate(currentUserProvider);
+    ref.read(bottomNavIndexProvider.notifier).reset();
+  }
+}
+
+class _LoadingScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primaryAmber),
+            const SizedBox(height: 16),
+            Text(
+              'جاري تحميل بيانات المستخدم...',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorScreen extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _ErrorScreen({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'خطأ في تحميل البيانات',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

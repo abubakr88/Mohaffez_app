@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 
-/// A circular avatar that caches network images with shimmer loading placeholder
 class CachedAvatar extends StatelessWidget {
   final String? imageUrl;
   final double radius;
   final IconData fallbackIcon;
   final Color? backgroundColor;
   final Color? iconColor;
+  final String? semanticLabel; // NEW
 
   const CachedAvatar({
     super.key,
@@ -17,52 +17,60 @@ class CachedAvatar extends StatelessWidget {
     this.fallbackIcon = Icons.person,
     this.backgroundColor,
     this.iconColor,
+    this.semanticLabel, // NEW
   });
 
   @override
   Widget build(BuildContext context) {
-    // Show fallback icon if no URL
+    // Fallback with semantic label
     if (imageUrl == null || imageUrl!.isEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundColor: backgroundColor ?? Colors.grey.shade200,
-        child: Icon(
-          fallbackIcon,
-          size: radius * 0.8,
-          color: iconColor ?? Colors.grey.shade600,
+      return Semantics(
+        label: semanticLabel ?? 'صورة المستخدم',
+        image: true,
+        child: CircleAvatar(
+          radius: radius,
+          backgroundColor: backgroundColor ?? Colors.grey.shade200,
+          child: Icon(
+            fallbackIcon,
+            size: radius * 0.8,
+            color: iconColor ?? Colors.grey.shade600,
+          ),
         ),
       );
     }
 
-    return CachedNetworkImage(
-      imageUrl: imageUrl!,
-      imageBuilder: (context, imageProvider) => CircleAvatar(
-        radius: radius,
-        backgroundImage: imageProvider,
-        backgroundColor: backgroundColor,
-      ),
-      placeholder: (context, url) => Shimmer.fromColors(
-        baseColor: Colors.grey[300]!,
-        highlightColor: Colors.grey[100]!,
-        child: CircleAvatar(
+    return Semantics(
+      label: semanticLabel ?? 'صورة المستخدم',
+      image: true,
+      child: CachedNetworkImage(
+        imageUrl: imageUrl!,
+        imageBuilder: (context, imageProvider) => CircleAvatar(
           radius: radius,
-          backgroundColor: Colors.grey[300],
+          backgroundImage: imageProvider,
+          backgroundColor: backgroundColor,
         ),
-      ),
-      errorWidget: (context, url, error) => CircleAvatar(
-        radius: radius,
-        backgroundColor: backgroundColor ?? Colors.grey.shade200,
-        child: Icon(
-          fallbackIcon,
-          size: radius * 0.8,
-          color: iconColor ?? Colors.grey.shade600,
+        placeholder: (context, url) => Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: CircleAvatar(
+            radius: radius,
+            backgroundColor: Colors.grey[300],
+          ),
         ),
+        errorWidget: (context, url, error) => CircleAvatar(
+          radius: radius,
+          backgroundColor: backgroundColor ?? Colors.grey.shade200,
+          child: Icon(
+            fallbackIcon,
+            size: radius * 0.8,
+            color: iconColor ?? Colors.grey.shade600,
+          ),
+        ),
+        maxWidthDiskCache: (radius * 4).toInt(),
+        maxHeightDiskCache: (radius * 4).toInt(),
+        memCacheWidth: (radius * 4).toInt(),
+        memCacheHeight: (radius * 4).toInt(),
       ),
-      // Cache configuration
-      maxWidthDiskCache: (radius * 4).toInt(), // 4x radius for retina displays
-      maxHeightDiskCache: (radius * 4).toInt(),
-      memCacheWidth: (radius * 4).toInt(),
-      memCacheHeight: (radius * 4).toInt(),
     );
   }
 }

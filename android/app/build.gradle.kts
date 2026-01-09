@@ -10,7 +10,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.imam.mohaffez_app"   // ✅ this is actually correct in Kotlin DSL
+        applicationId = "com.imam.mohaffez_app"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = 1
@@ -31,7 +31,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "17"  // ⚠ only a warning, can keep for now
+        jvmTarget = "17"
     }
 }
 
@@ -42,4 +42,7 @@ flutter {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    
+    // Firebase AppCheck - Changed to Kotlin DSL syntax with parentheses
+    implementation("com.google.firebase:firebase-appcheck-playintegrity:17.0.1")
 }
