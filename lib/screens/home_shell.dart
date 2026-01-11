@@ -1,3 +1,5 @@
+// lib/screens/home_shell.dart (FIXED - Line 172)
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +13,7 @@ import '../shared/widgets/offline_banner.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../providers/notification_provider.dart';
+import '../providers/notification_provider.dart'; // ADD THIS IMPORT
 import '../services/cache_service.dart';
 
 class HomeShell extends ConsumerWidget {
@@ -26,20 +28,20 @@ class HomeShell extends ConsumerWidget {
         if (user == null) {
           return const AuthScreen();
         }
-        return _AuthenticatedShell(user: user);
+        return AuthenticatedShell(user: user);
       },
-      loading: () => _LoadingScreen(),
-      error: (error, stackTrace) => _ErrorScreen(
+      loading: () => const LoadingScreen(),
+      error: (error, stackTrace) => ErrorScreen(
         onRetry: () => ref.invalidate(currentUserProvider),
       ),
     );
   }
 }
 
-class _AuthenticatedShell extends ConsumerWidget {
+class AuthenticatedShell extends ConsumerWidget {
   final user;
 
-  const _AuthenticatedShell({required this.user});
+  const AuthenticatedShell({required this.user});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -62,7 +64,7 @@ class _AuthenticatedShell extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex),
+        appBar: buildAppBar(context, ref, isMohaffez, currentIndex),
         body: Column(
           children: [
             const OfflineBanner(),
@@ -74,13 +76,13 @@ class _AuthenticatedShell extends ConsumerWidget {
             ),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavBar(ref, isMohaffez, currentIndex),
-        drawer: _buildDrawer(context, ref),
+        bottomNavigationBar: buildBottomNavBar(ref, isMohaffez, currentIndex),
+        drawer: buildDrawer(context, ref),
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(
+  PreferredSizeWidget buildAppBar(
     BuildContext context,
     WidgetRef ref,
     bool isMohaffez,
@@ -90,26 +92,26 @@ class _AuthenticatedShell extends ConsumerWidget {
       if (isMohaffez) {
         switch (currentIndex) {
           case 0:
-            return 'لوحة المحفظ';
+            return 'الرئيسية';
           case 1:
             return 'الإشعارات';
           case 2:
             return 'الملف الشخصي';
           default:
-            return 'محفظي القريب';
+            return 'محفظ';
         }
       } else {
         switch (currentIndex) {
           case 0:
             return 'الرئيسية';
           case 1:
-            return 'ابحث عن محفظ';
+            return 'البحث عن محفظين';
           case 2:
             return 'الإشعارات';
           case 3:
             return 'الملف الشخصي';
           default:
-            return 'محفظي القريب';
+            return 'طالب';
         }
       }
     }
@@ -160,61 +162,88 @@ class _AuthenticatedShell extends ConsumerWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
-            // Notification badge
-            if (currentIndex != (isMohaffez ? 1 : 2)) _buildNotificationBadge(ref),
+            // Notification badge - only show when not on notifications screen
+            if (currentIndex != (isMohaffez ? 1 : 2))
+              buildNotificationBadge(ref, isMohaffez),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNotificationBadge(WidgetRef ref) {
-    final unreadCount = ref.watch(unreadNotificationCountProvider);
+  Widget buildNotificationBadge(WidgetRef ref, bool isMohaffez) {
+    // FIXED: Use the correct provider with user ID
+    final unreadCountAsync = ref.watch(
+      unreadCountProvider(user.uid), // Pass user ID
+    );
 
-    return Stack(
-      children: [
-        IconButton(
-          icon: const Icon(Icons.notifications),
-          tooltip: 'الإشعارات',
-          onPressed: () {
-            final isMohaffez = user.role == 'mohaffez';
-            ref.read(bottomNavIndexProvider.notifier).setIndex(isMohaffez ? 1 : 2);
-          },
-        ),
-        if (unreadCount > 0)
-          Positioned(
-            right: 8,
-            top: 8,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
-              child: Text(
-                unreadCount > 9 ? '9+' : '$unreadCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
+    return unreadCountAsync.when(
+      data: (unreadCount) {
+        return Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications),
+              tooltip: 'الإشعارات',
+              onPressed: () {
+                ref.read(bottomNavIndexProvider.notifier).setIndex(
+                      isMohaffez ? 1 : 2,
+                    );
+              },
             ),
-          ),
-      ],
+            if (unreadCount > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+      loading: () => IconButton(
+        icon: const Icon(Icons.notifications),
+        onPressed: () {
+          ref.read(bottomNavIndexProvider.notifier).setIndex(
+                isMohaffez ? 1 : 2,
+              );
+        },
+      ),
+      error: (_, __) => IconButton(
+        icon: const Icon(Icons.notifications),
+        onPressed: () {
+          ref.read(bottomNavIndexProvider.notifier).setIndex(
+                isMohaffez ? 1 : 2,
+              );
+        },
+      ),
     );
   }
 
-  Widget _buildBottomNavBar(WidgetRef ref, bool isMohaffez, int currentIndex) {
+  Widget buildBottomNavBar(WidgetRef ref, bool isMohaffez, int currentIndex) {
     if (isMohaffez) {
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) => ref.read(bottomNavIndexProvider.notifier).setIndex(index),
+        onTap: (index) {
+          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+        },
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
@@ -236,7 +265,9 @@ class _AuthenticatedShell extends ConsumerWidget {
     } else {
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) => ref.read(bottomNavIndexProvider.notifier).setIndex(index),
+        onTap: (index) {
+          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+        },
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
@@ -255,14 +286,14 @@ class _AuthenticatedShell extends ConsumerWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'الملف',
+            label: 'الملف الشخصي',
           ),
         ],
       );
     }
   }
 
-  Widget _buildDrawer(BuildContext context, WidgetRef ref) {
+  Widget buildDrawer(BuildContext context, WidgetRef ref) {
     return Drawer(
       child: ListView(
         children: [
@@ -299,7 +330,7 @@ class _AuthenticatedShell extends ConsumerWidget {
             leading: const Icon(Icons.logout),
             title: const Text('تسجيل الخروج'),
             onTap: () async {
-              await _logout(ref);
+              await logout(ref);
               if (context.mounted) {
                 Navigator.pop(context);
               }
@@ -310,15 +341,17 @@ class _AuthenticatedShell extends ConsumerWidget {
     );
   }
 
-  Future<void> _logout(WidgetRef ref) async {
+  Future<void> logout(WidgetRef ref) async {
     await FirebaseAuth.instance.signOut();
     await CacheService.clearAll();
-    // ref.invalidate(currentUserProvider);
-    // ref.read(bottomNavIndexProvider.notifier).reset();
+    ref.invalidate(currentUserProvider);
+    ref.read(bottomNavIndexProvider.notifier).reset();
   }
 }
 
-class _LoadingScreen extends StatelessWidget {
+class LoadingScreen extends StatelessWidget {
+  const LoadingScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -329,7 +362,7 @@ class _LoadingScreen extends StatelessWidget {
             CircularProgressIndicator(color: AppTheme.primaryAmber),
             const SizedBox(height: 16),
             Text(
-              'جاري تحميل بيانات المستخدم...',
+              'جاري التحميل...',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
@@ -339,10 +372,10 @@ class _LoadingScreen extends StatelessWidget {
   }
 }
 
-class _ErrorScreen extends StatelessWidget {
+class ErrorScreen extends StatelessWidget {
   final VoidCallback onRetry;
 
-  const _ErrorScreen({required this.onRetry});
+  const ErrorScreen({required this.onRetry, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +393,7 @@ class _ErrorScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'خطأ في تحميل البيانات',
+                'حدث خطأ أثناء تحميل البيانات',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

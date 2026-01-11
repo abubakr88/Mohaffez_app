@@ -1,42 +1,19 @@
+// lib/screens/mohaffez_home.dart (FIXED)
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../shared/widgets/session_card.dart';
-import '../shared/widgets/empty_state.dart';
 import '../shared/constants/app_theme.dart';
-import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/session_provider_paginated.dart'; // ADD THIS
-import '../models/session_request_model.dart'; // ADD THIS
 import '../shared/utils/error_handler.dart';
 
-class MohaffezHome extends ConsumerStatefulWidget {
+class MohaffezHome extends ConsumerWidget {
   const MohaffezHome({super.key});
 
   @override
-  ConsumerState<MohaffezHome> createState() => _MohaffezHomeState();
-}
-
-class _MohaffezHomeState extends ConsumerState<MohaffezHome>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
 
     return userAsync.when(
@@ -46,364 +23,412 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
             body: Center(child: Text('يرجى تسجيل الدخول')),
           );
         }
-        return _buildContent(user.uid);
+        return _MohaffezHomeContent(mohaffezId: user.uid);
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorDisplay.dataLoad(
-        onRetry: () => ref.invalidate(currentUserProvider),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        body: ErrorDisplay.dataLoad(
+          onRetry: () => ref.invalidate(currentUserProvider),
+        ),
+      ),
+    );
+  }
+}
+
+class _MohaffezHomeContent extends ConsumerStatefulWidget {
+  final String mohaffezId;
+
+  const _MohaffezHomeContent({required this.mohaffezId});
+
+  @override
+  ConsumerState<_MohaffezHomeContent> createState() => _MohaffezHomeState();
+}
+
+class _MohaffezHomeState extends ConsumerState<_MohaffezHomeContent> {
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Welcome section
+          _buildWelcomeSection(),
+          const SizedBox(height: 24),
+
+          // Statistics cards
+          _buildStatisticsSection(),
+          const SizedBox(height: 24),
+
+          // Pending requests section
+          Text(
+            'طلبات الحجز المعلقة',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+          ),
+          const SizedBox(height: 12),
+          _buildPendingRequests(),
+
+          const SizedBox(height: 24),
+
+          // Upcoming sessions section
+          Text(
+            'الجلسات القادمة',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+          ),
+          const SizedBox(height: 12),
+          _buildUpcomingSessions(),
+        ],
       ),
     );
   }
 
-  Widget _buildContent(String mohaffezId) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          title: const Text('لوحة المحفظ'),
-          bottom: TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(text: 'طلبات الجلسات'),
-              Tab(text: 'الجلسات المقبولة'),
-            ],
+  Widget _buildWelcomeSection() {
+    final userAsync = ref.watch(currentUserProvider);
+
+    return userAsync.when(
+      data: (user) {
+        if (user == null) return const SizedBox.shrink();
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.waving_hand,
+                  size: 40,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'مرحباً، ${user.name}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'لديك طلبات جديدة تنتظر الموافقة',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildStatisticsSection() {
+    // FIXED: Use correct provider
+    final sessionCountAsync = ref.watch(
+      mohaffezSessionCountProvider(widget.mohaffezId),
+    );
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            icon: Icons.event_available,
+            title: 'الجلسات المكتملة',
+            value: sessionCountAsync.when(
+              data: (count) => count.toString(),
+              loading: () => '...',
+              error: (_, __) => '0',
+            ),
+            color: AppTheme.accentGreen,
           ),
         ),
-        body: TabBarView(
-          controller: _tabController,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            icon: Icons.pending_actions,
+            title: 'الطلبات المعلقة',
+            value: _getPendingRequestsCount(),
+            color: Colors.orange,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getPendingRequestsCount() {
+    // FIXED: Use paginated provider
+    final requestsAsync = ref.watch(
+      paginatedPendingRequestsProvider(widget.mohaffezId),
+    );
+    return requestsAsync.items.length.toString();
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildRequestsTab(mohaffezId), // FIXED: Removed ref parameter
-            _buildAcceptedTab(mohaffezId),
+            Icon(icon, size: 32, color: color),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // FIXED: Removed WidgetRef parameter (it's already available via ConsumerState)
-  Widget _buildRequestsTab(String mohaffezId) {
-    final firstPageAsync = ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
-    final paginatedState = ref.watch(paginatedPendingRequestsProvider(mohaffezId));
+  Widget _buildPendingRequests() {
+    // FIXED: Use paginated provider
+    final firstPageAsync = ref.watch(
+      pendingRequestsFirstPageProvider(widget.mohaffezId),
+    );
 
     return firstPageAsync.when(
-      data: (_) {
-        final requests = paginatedState.items;
-
-        if (requests.isEmpty && !paginatedState.isLoadingMore) {
-          return const Center(
-            child: EmptyState(
-              icon: Icons.pending_actions,
-              title: 'لا توجد طلبات معلقة',
-              message: 'ستظهر هنا الطلبات الجديدة',
+      data: (requests) {
+        if (requests.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'لا توجد طلبات معلقة',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: requests.length + (paginatedState.hasMore ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (index == requests.length) {
-              // Load More Button
-              if (paginatedState.isLoadingMore) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (paginatedState.error != null) {
-                return Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(
-                        'حدث خطأ: ${paginatedState.error}',
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          ref.read(paginatedPendingRequestsProvider(mohaffezId).notifier).loadMore();
-                        },
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('إعادة المحاولة'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      ref.read(paginatedPendingRequestsProvider(mohaffezId).notifier).loadMore();
-                    },
-                    icon: const Icon(Icons.expand_more),
-                    label: const Text('تحميل المزيد'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                    ),
+        return Column(
+          children: requests.take(3).map((request) {
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.primaryAmber.withOpacity(0.2),
+                  child: const Icon(
+                    Icons.person,
+                    color: AppTheme.primaryAmber,
                   ),
                 ),
-              );
-            }
-
-            final request = requests[index];
-            return _buildRequestCard(request);
-          },
+                title: Text(request.studentName),
+                subtitle: Text(
+                  '${request.sessionType} - ${request.preferredTimeSlot}',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.check, color: Colors.green),
+                      onPressed: () => _acceptRequest(request.id!),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      onPressed: () => _rejectRequest(request.id!),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
         );
       },
-      loading: () => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: List.generate(
-            3,
-            (index) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: ShimmerWidgets.listItem(showAvatar: true, lines: 3),
-            ),
-          ),
-        ),
-      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => ErrorDisplay.dataLoad(
-        onRetry: () => ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId)),
-      ),
-    );
-  }
-
-  Widget _buildRequestCard(SessionRequestModel request) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                const Icon(Icons.person, size: 18),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    request.studentName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            // Details
-            if (request.sessionType.isNotEmpty && request.preferredTimeSlot.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                '${request.sessionType} - ${request.preferredTimeSlot}',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-            ],
-            if (request.imamAddressText?.isNotEmpty ?? false) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.location_on, size: 14, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      request.imamAddressText!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (request.slotStart != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${request.slotStart!.day}/${request.slotStart!.month}/${request.slotStart!.year} - ${request.slotStart!.hour.toString().padLeft(2, '0')}:${request.slotStart!.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _rejectRequest(request.id!),
-                    icon: const Icon(Icons.close, size: 16),
-                    label: const Text('رفض'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _acceptRequest(request),
-                    icon: const Icon(Icons.check, size: 16),
-                    label: const Text('قبول'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.accentGreen,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        onRetry: () => ref.invalidate(
+          pendingRequestsFirstPageProvider(widget.mohaffezId),
         ),
       ),
     );
   }
 
-  Widget _buildAcceptedTab(String mohaffezId) {
-    final sessionsAsync = ref.watch(acceptedSessionsProvider(mohaffezId));
+  Widget _buildUpcomingSessions() {
+    final sessionsAsync = ref.watch(
+      upcomingSessionsProvider(widget.mohaffezId),
+    );
 
     return sessionsAsync.when(
       data: (sessions) {
         if (sessions.isEmpty) {
-          return const EmptyState(
-            icon: Icons.school_outlined,
-            title: 'لا توجد جلسات',
-            message: 'لم تقبل أي جلسات بعد.',
-            animated: true,
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.event_busy,
+                      size: 48,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'لا توجد جلسات قادمة',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: sessions.length,
-          itemBuilder: (context, index) {
-            final session = sessions[index];
-            
-            // Handle nullable fields
-            final sessionType = session.sessionType ?? '';
-            final timeSlot = session.preferredTimeSlot ?? '';
-            final hasValidSubtitle = sessionType.isNotEmpty && timeSlot.isNotEmpty;
-            
-            return SessionCard(
-              title: session.studentName ?? 'طالب',
-              subtitle: hasValidSubtitle ? '$sessionType - $timeSlot' : null,
-              location: session.location ?? '',
-              dateTime: session.sessionDate,
-              hifz: session.hifzAssignment ?? '',
-              muraja: session.murajaAssignment ?? '',
-              rating: session.sessionRating ?? 0,
-              notes: session.sessionNotes ?? '',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 20),
-                    onPressed: () => _showAssignmentDialog(session),
-                    tooltip: 'تحرير التكليف',
+        return Column(
+          children: sessions.map((session) {
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.accentGreen.withOpacity(0.2),
+                  child: const Icon(
+                    Icons.school,
+                    color: AppTheme.accentGreen,
                   ),
-                  if (session.imamAddressLat != null && session.imamAddressLng != null)
-                    IconButton(
-                      icon: const Icon(Icons.map, size: 20),
-                      onPressed: () async {
-                        final uri = Uri.parse(
-                          'https://www.google.com/maps/search/?api=1&query=${session.imamAddressLat},${session.imamAddressLng}',
-                        );
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      },
-                      tooltip: 'خريطة',
-                    ),
-                ],
+                ),
+                title: Text(session.studentName),
+                subtitle: Text(
+                  session.sessionDate != null
+                      ? '${session.sessionDate!.day}/${session.sessionDate!.month} - ${session.preferredTimeSlot ?? ''}'
+                      : session.preferredTimeSlot ?? '',
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => _showAssignmentDialog(session.id!),
+                ),
               ),
             );
-          },
+          }).toList(),
         );
       },
-      loading: () => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: List.generate(
-            4,
-            (index) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: ShimmerWidgets.listItem(showAvatar: true, lines: 3),
-            ),
-          ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => ErrorDisplay.dataLoad(
+        onRetry: () => ref.invalidate(
+          upcomingSessionsProvider(widget.mohaffezId),
         ),
       ),
-      error: (e, _) => ErrorDisplay.dataLoad(
-        onRetry: () => ref.invalidate(acceptedSessionsProvider(mohaffezId)),
-      ),
     );
   }
 
-  Future<void> _acceptRequest(SessionRequestModel request) async {
-    final notifier = ref.read(sessionBookingProvider.notifier);
-    
-    await notifier.acceptRequest(
-      request.id!,
-      {
-        'mohaffezId': request.mohaffezId,
-        'studentId': request.studentId,
-        'mohaffezName': request.mohaffezName,
-        'studentName': request.studentName,
-        'sessionType': request.sessionType,
-        'imamAddressText': request.imamAddressText,
-        'imamAddressLat': request.imamAddressLat,
-        'imamAddressLng': request.imamAddressLng,
-        'mohaffezPhone': request.mohaffezPhone,
-        'preferredTimeSlot': request.preferredTimeSlot,
-        'slotStart': request.slotStart,
-        'slotEnd': request.slotEnd,
-      },
-    );
-
-    if (mounted) {
-      ErrorHandler.showSuccess(context, 'تم قبول الطلب بنجاح');
+  // FIXED: Use sessionActionsProvider instead of sessionBookingProvider
+  Future<void> _acceptRequest(String requestId) async {
+    try {
+      await ref.read(sessionActionsProvider.notifier).acceptRequest(requestId);
+      
+      if (mounted) {
+        ErrorHandler.showSuccess(context, 'تم قبول الطلب بنجاح');
+        // Refresh the list
+        ref.invalidate(pendingRequestsFirstPageProvider(widget.mohaffezId));
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, 'فشل قبول الطلب: $e');
+      }
     }
   }
 
+  // FIXED: Use sessionActionsProvider instead of sessionBookingProvider
   Future<void> _rejectRequest(String requestId) async {
-    final notifier = ref.read(sessionBookingProvider.notifier);
-    await notifier.rejectRequest(requestId);
-
-    if (mounted) {
-      ErrorHandler.showSuccess(context, 'تم رفض الطلب');
+    try {
+      await ref.read(sessionActionsProvider.notifier).rejectRequest(requestId);
+      
+      if (mounted) {
+        ErrorHandler.showSuccess(context, 'تم رفض الطلب');
+        // Refresh the list
+        ref.invalidate(pendingRequestsFirstPageProvider(widget.mohaffezId));
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, 'فشل رفض الطلب: $e');
+      }
     }
   }
 
-  void _showAssignmentDialog(session) {
-    final hifzController = TextEditingController(text: session.hifzAssignment);
-    final murajaController = TextEditingController(text: session.murajaAssignment);
-    final notesController = TextEditingController(text: session.sessionNotes);
-    int rating = session.sessionRating;
+  void _showAssignmentDialog(String sessionId) {
+    final hifzController = TextEditingController();
+    final murajaController = TextEditingController();
+    int rating = 0;
+    final notesController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (context) => StatefulBuilder(
         builder: (context, setState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            title: const Text('تحرير التكليف'),
+            title: const Text('تحديث معلومات الجلسة'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -411,8 +436,8 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
                   TextField(
                     controller: hifzController,
                     decoration: const InputDecoration(
-                      labelText: 'تكليف الحفظ',
-                      hintText: 'مثال: من آية 1 إلى آية 10',
+                      labelText: 'الحفظ',
+                      hintText: 'مثال: من آية 1 إلى 10 من سورة البقرة',
                     ),
                     maxLines: 2,
                   ),
@@ -420,73 +445,55 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
                   TextField(
                     controller: murajaController,
                     decoration: const InputDecoration(
-                      labelText: 'تكليف المراجعة',
-                      hintText: 'مثال: سورة البقرة كاملة',
+                      labelText: 'المراجعة',
+                      hintText: 'مثال: سورة آل عمران كاملة',
                     ),
                     maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('التقييم:'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(10, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < rating ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                        ),
+                        onPressed: () {
+                          setState(() => rating = index + 1);
+                        },
+                      );
+                    }),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: notesController,
                     decoration: const InputDecoration(
                       labelText: 'ملاحظات',
+                      hintText: 'أضف ملاحظات إضافية...',
                     ),
                     maxLines: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'التقييم',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(10, (index) {
-                      return GestureDetector(
-                        onTap: () => setState(() => rating = index + 1),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: rating >= index + 1
-                                ? AppTheme.accentGreen
-                                : Colors.grey.shade200,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${index + 1}',
-                            style: TextStyle(
-                              color: rating >= index + 1 ? Colors.white : Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
                   ),
                 ],
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () => Navigator.pop(context),
                 child: const Text('إلغاء'),
               ),
               ElevatedButton(
                 onPressed: () async {
-                  final notifier = ref.read(sessionBookingProvider.notifier);
-                  await notifier.updateAssignment(
-                    sessionId: session.id!,
-                    hifzAssignment: hifzController.text.trim(),
-                    murajaAssignment: murajaController.text.trim(),
+                  await _updateAssignment(
+                    sessionId: sessionId,
+                    hifz: hifzController.text.trim(),
+                    muraja: murajaController.text.trim(),
                     rating: rating,
                     notes: notesController.text.trim(),
                   );
-
                   if (context.mounted) {
-                    Navigator.pop(ctx);
-                    ErrorHandler.showSuccess(context, 'تم تحديث التكليف بنجاح');
+                    Navigator.pop(context);
                   }
                 },
                 child: const Text('حفظ'),
@@ -496,5 +503,34 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
         ),
       ),
     );
+  }
+
+  // FIXED: Use sessionActionsProvider
+  Future<void> _updateAssignment({
+    required String sessionId,
+    required String hifz,
+    required String muraja,
+    required int rating,
+    required String notes,
+  }) async {
+    try {
+      await ref.read(sessionActionsProvider.notifier).updateAssignment(
+            sessionId: sessionId,
+            hifzAssignment: hifz,
+            murajaAssignment: muraja,
+            rating: rating,
+            notes: notes,
+          );
+
+      if (mounted) {
+        ErrorHandler.showSuccess(context, 'تم تحديث معلومات الجلسة بنجاح');
+        // Refresh sessions
+        ref.invalidate(upcomingSessionsProvider(widget.mohaffezId));
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, 'فشل تحديث الجلسة: $e');
+      }
+    }
   }
 }

@@ -1,199 +1,94 @@
-// lib/providers/session_provider_paginated.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
+// lib/providers/session_provider_paginated.dart (COMPLETE - ~300 lines)
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/session_model.dart';
 import '../models/session_request_model.dart';
 import '../models/pagination_state.dart';
 import '../repositories/session_repository.dart';
-import 'session_provider.dart';
+import 'auth_provider.dart';
 
-// Paginated Accepted Sessions Notifier
-class PaginatedAcceptedSessionsNotifier extends StateNotifier<PaginationState<SessionModel>> {
-  final SessionRepository _repository;
-  final String _mohaffezId;
+// ============================================================================
+// REPOSITORY PROVIDER
+// ============================================================================
 
-  PaginatedAcceptedSessionsNotifier(this._repository, this._mohaffezId)
-      : super(const PaginationState(hasMore: true));
-
-  Future<void> loadMore() async {
-    if (state.isLoadingMore || !state.hasMore) return;
-
-    state = state.copyWith(isLoadingMore: true, error: null);
-
-    try {
-      if (state.lastDocument == null) {
-        // This shouldn't happen as first page is loaded via Stream
-        state = state.copyWith(isLoadingMore: false);
-        return;
-      }
-
-      final result = await _repository.getAcceptedSessionsNextPage(
-        _mohaffezId,
-        state.lastDocument!,
-      );
-
-      state = state.copyWith(
-        items: [...state.items, ...result.sessions],
-        lastDocument: result.lastDoc,
-        hasMore: result.hasMore,
-        isLoadingMore: false,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoadingMore: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  void updateFirstPage(List<SessionModel> sessions, DocumentSnapshot? lastDoc) {
-    state = state.copyWith(
-      items: sessions,
-      lastDocument: lastDoc,
-      hasMore: sessions.length >= SessionRepository.pageSize,
-    );
-  }
-}
-
-// Provider for paginated accepted sessions
-final paginatedAcceptedSessionsProvider = StateNotifierProvider.family<
-    PaginatedAcceptedSessionsNotifier,
-    PaginationState<SessionModel>,
-    String>((ref, mohaffezId) {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return PaginatedAcceptedSessionsNotifier(repository, mohaffezId);
+final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
+  return SessionRepository(FirebaseFirestore.instance);
 });
 
-// Stream provider for first page (real-time updates)
-final acceptedSessionsFirstPageProvider = StreamProvider.family<
-    ({List<SessionModel> sessions, DocumentSnapshot? lastDoc}),
-    String>((ref, mohaffezId) async* {
+// ============================================================================
+// PENDING REQUESTS PAGINATION (MOHAFFEZ)
+// ============================================================================
+
+/// First page provider for real-time updates
+final pendingRequestsFirstPageProvider = StreamProvider.family<
+    List<SessionRequestModel>, 
+    String
+>((ref, mohaffezId) {
   final repository = ref.watch(sessionRepositoryProvider);
-  
-  await for (final sessions in repository.watchAcceptedSessionsFirstPage(mohaffezId)) {
-    // Get the last document for pagination
-    final snapshot = await FirebaseFirestore.instance
-        .collection('hafizSessions')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .orderBy('sessionDate', descending: true)
-        .limit(SessionRepository.pageSize)
-        .get();
-
-    final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
-
-    // Update the paginated state
-    ref.read(paginatedAcceptedSessionsProvider(mohaffezId).notifier)
-        .updateFirstPage(sessions, lastDoc);
-
-    yield (sessions: sessions, lastDoc: lastDoc);
-  }
+  return repository.watchPendingRequestsFirstPage(mohaffezId);
 });
 
-// Paginated Student Sessions Notifier
-class PaginatedStudentSessionsNotifier extends StateNotifier<PaginationState<SessionModel>> {
-  final SessionRepository _repository;
-  final String _studentId;
-
-  PaginatedStudentSessionsNotifier(this._repository, this._studentId)
-      : super(const PaginationState(hasMore: true));
-
-  Future<void> loadMore() async {
-    if (state.isLoadingMore || !state.hasMore) return;
-
-    state = state.copyWith(isLoadingMore: true, error: null);
-
-    try {
-      if (state.lastDocument == null) {
-        state = state.copyWith(isLoadingMore: false);
-        return;
-      }
-
-      final result = await _repository.getStudentSessionsNextPage(
-        _studentId,
-        state.lastDocument!,
-      );
-
-      state = state.copyWith(
-        items: [...state.items, ...result.sessions],
-        lastDocument: result.lastDoc,
-        hasMore: result.hasMore,
-        isLoadingMore: false,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoadingMore: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  void updateFirstPage(List<SessionModel> sessions, DocumentSnapshot? lastDoc) {
-    state = state.copyWith(
-      items: sessions,
-      lastDocument: lastDoc,
-      hasMore: sessions.length >= SessionRepository.pageSize,
-    );
-  }
-}
-
-// Provider for paginated student sessions
-final paginatedStudentSessionsProvider = StateNotifierProvider.family<
-    PaginatedStudentSessionsNotifier,
-    PaginationState<SessionModel>,
-    String>((ref, studentId) {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return PaginatedStudentSessionsNotifier(repository, studentId);
-});
-
-// Stream provider for first page
-final studentSessionsFirstPageProvider = StreamProvider.family<
-    ({List<SessionModel> sessions, DocumentSnapshot? lastDoc}),
-    String>((ref, studentId) async* {
-  final repository = ref.watch(sessionRepositoryProvider);
-  
-  await for (final sessions in repository.watchStudentSessionsFirstPage(studentId)) {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('hafizSessions')
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('sessionDate', descending: true)
-        .limit(SessionRepository.pageSize)
-        .get();
-
-    final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
-
-    ref.read(paginatedStudentSessionsProvider(studentId).notifier)
-        .updateFirstPage(sessions, lastDoc);
-
-    yield (sessions: sessions, lastDoc: lastDoc);
-  }
-});
-
-// Paginated Pending Requests Notifier
+/// Paginated state notifier for pending requests
 class PaginatedPendingRequestsNotifier extends StateNotifier<PaginationState<SessionRequestModel>> {
   final SessionRepository _repository;
   final String _mohaffezId;
+  bool _isLoadingMore = false;
 
   PaginatedPendingRequestsNotifier(this._repository, this._mohaffezId)
-      : super(const PaginationState(hasMore: true));
+      : super(const PaginationState());
 
+  /// Initialize with first page from stream
+  void initializeWithFirstPage(List<SessionRequestModel> firstPage) {
+    if (state.items.isEmpty && firstPage.isNotEmpty) {
+      state = PaginationState(
+        items: firstPage,
+        lastDocument: null, // Will be set on first loadMore
+        hasMore: firstPage.length >= 20, // Assume more if full page
+        isLoadingMore: false,
+      );
+    }
+  }
+
+  /// Load next page
   Future<void> loadMore() async {
-    if (state.isLoadingMore || !state.hasMore) return;
+    if (!state.hasMore || _isLoadingMore) return;
 
+    // Get last document if we don't have it yet
+    if (state.lastDocument == null && state.items.isNotEmpty) {
+      // Need to fetch to get DocumentSnapshot
+      final result = await _repository.getPendingRequestsNextPage(
+        mohaffezId: _mohaffezId,
+        lastDocument: null, // Will internally handle this
+      );
+      
+      state = state.copyWith(
+        lastDocument: result.lastDoc,
+        hasMore: result.hasMore,
+      );
+      
+      if (!result.hasMore) return;
+    }
+
+    if (state.lastDocument == null) return;
+
+    _isLoadingMore = true;
     state = state.copyWith(isLoadingMore: true, error: null);
 
     try {
-      if (state.lastDocument == null) {
-        state = state.copyWith(isLoadingMore: false);
-        return;
-      }
-
       final result = await _repository.getPendingRequestsNextPage(
-        _mohaffezId,
-        state.lastDocument!,
+        mohaffezId: _mohaffezId,
+        lastDocument: state.lastDocument!,
       );
 
+      // Merge with existing items, avoiding duplicates
+      final existingIds = state.items.map((e) => e.id).toSet();
+      final newItems = result.notifications
+          .where((item) => !existingIds.contains(item.id))
+          .toList();
+
       state = state.copyWith(
-        items: [...state.items, ...result.requests],
+        items: [...state.items, ...newItems],
         lastDocument: result.lastDoc,
         hasMore: result.hasMore,
         isLoadingMore: false,
@@ -201,47 +96,386 @@ class PaginatedPendingRequestsNotifier extends StateNotifier<PaginationState<Ses
     } catch (e) {
       state = state.copyWith(
         isLoadingMore: false,
-        error: e.toString(),
+        error: 'فشل تحميل المزيد: ${e.toString()}',
       );
+    } finally {
+      _isLoadingMore = false;
     }
   }
 
-  void updateFirstPage(List<SessionRequestModel> requests, DocumentSnapshot? lastDoc) {
-    state = state.copyWith(
-      items: requests,
-      lastDocument: lastDoc,
-      hasMore: requests.length >= SessionRepository.pageSize,
-    );
+  /// Check scroll position and auto-load
+  Future<void> checkScrollPosition(double scrollPercentage) async {
+    if (scrollPercentage >= 0.8 && state.hasMore && !_isLoadingMore) {
+      await loadMore();
+    }
+  }
+
+  /// Refresh from beginning
+  Future<void> refresh() async {
+    state = const PaginationState();
+    _isLoadingMore = false;
   }
 }
 
 final paginatedPendingRequestsProvider = StateNotifierProvider.family<
     PaginatedPendingRequestsNotifier,
     PaginationState<SessionRequestModel>,
-    String>((ref, mohaffezId) {
+    String
+>((ref, mohaffezId) {
   final repository = ref.watch(sessionRepositoryProvider);
-  return PaginatedPendingRequestsNotifier(repository, mohaffezId);
+  final notifier = PaginatedPendingRequestsNotifier(repository, mohaffezId);
+  
+  // Listen to first page stream and initialize
+  ref.listen(
+    pendingRequestsFirstPageProvider(mohaffezId),
+    (previous, next) {
+      next.whenData((firstPage) {
+        notifier.initializeWithFirstPage(firstPage);
+      });
+    },
+  );
+  
+  return notifier;
 });
 
-final pendingRequestsFirstPageProvider = StreamProvider.family<
-    ({List<SessionRequestModel> requests, DocumentSnapshot? lastDoc}),
-    String>((ref, mohaffezId) async* {
+// ============================================================================
+// ACCEPTED SESSIONS PAGINATION (MOHAFFEZ)
+// ============================================================================
+
+/// First page provider for accepted sessions
+final acceptedSessionsFirstPageProvider = StreamProvider.family<
+    List<SessionModel>,
+    String
+>((ref, mohaffezId) {
   final repository = ref.watch(sessionRepositoryProvider);
-  
-  await for (final requests in repository.watchPendingRequestsFirstPage(mohaffezId)) {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('sessionRequests')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending')
-        .orderBy('createdAt', descending: true)
-        .limit(SessionRepository.pageSize)
-        .get();
+  return repository.watchAcceptedSessions(mohaffezId);
+});
 
-    final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+/// Paginated state notifier for accepted sessions
+class PaginatedAcceptedSessionsNotifier extends StateNotifier<PaginationState<SessionModel>> {
+  final SessionRepository _repository;
+  final String _mohaffezId;
+  bool _isLoadingMore = false;
 
-    ref.read(paginatedPendingRequestsProvider(mohaffezId).notifier)
-        .updateFirstPage(requests, lastDoc);
+  PaginatedAcceptedSessionsNotifier(this._repository, this._mohaffezId)
+      : super(const PaginationState());
 
-    yield (requests: requests, lastDoc: lastDoc);
+  void initializeWithFirstPage(List<SessionModel> firstPage) {
+    if (state.items.isEmpty && firstPage.isNotEmpty) {
+      state = PaginationState(
+        items: firstPage,
+        lastDocument: null,
+        hasMore: firstPage.length >= 20,
+        isLoadingMore: false,
+      );
+    }
   }
+
+  Future<void> loadMore() async {
+    if (!state.hasMore || _isLoadingMore) return;
+
+    if (state.lastDocument == null && state.items.isNotEmpty) {
+      final result = await _repository.getAcceptedSessionsNextPage(
+        mohaffezId: _mohaffezId,
+        lastDocument: null,
+      );
+      
+      state = state.copyWith(
+        lastDocument: result.lastDoc,
+        hasMore: result.hasMore,
+      );
+      
+      if (!result.hasMore) return;
+    }
+
+    if (state.lastDocument == null) return;
+
+    _isLoadingMore = true;
+    state = state.copyWith(isLoadingMore: true, error: null);
+
+    try {
+      final result = await _repository.getAcceptedSessionsNextPage(
+        mohaffezId: _mohaffezId,
+        lastDocument: state.lastDocument!,
+      );
+
+      final existingIds = state.items.map((e) => e.id).toSet();
+      final newItems = result.sessions
+          .where((item) => !existingIds.contains(item.id))
+          .toList();
+
+      state = state.copyWith(
+        items: [...state.items, ...newItems],
+        lastDocument: result.lastDoc,
+        hasMore: result.hasMore,
+        isLoadingMore: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoadingMore: false,
+        error: 'فشل تحميل المزيد: ${e.toString()}',
+      );
+    } finally {
+      _isLoadingMore = false;
+    }
+  }
+
+  Future<void> checkScrollPosition(double scrollPercentage) async {
+    if (scrollPercentage >= 0.8 && state.hasMore && !_isLoadingMore) {
+      await loadMore();
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const PaginationState();
+    _isLoadingMore = false;
+  }
+}
+
+final paginatedAcceptedSessionsProvider = StateNotifierProvider.family<
+    PaginatedAcceptedSessionsNotifier,
+    PaginationState<SessionModel>,
+    String
+>((ref, mohaffezId) {
+  final repository = ref.watch(sessionRepositoryProvider);
+  final notifier = PaginatedAcceptedSessionsNotifier(repository, mohaffezId);
+  
+  ref.listen(
+    acceptedSessionsFirstPageProvider(mohaffezId),
+    (previous, next) {
+      next.whenData((firstPage) {
+        notifier.initializeWithFirstPage(firstPage);
+      });
+    },
+  );
+  
+  return notifier;
+});
+
+// ============================================================================
+// STUDENT SESSIONS PAGINATION
+// ============================================================================
+
+/// First page provider for student sessions
+final studentSessionsFirstPageProvider = StreamProvider.family<
+    List<SessionModel>,
+    String
+>((ref, studentId) {
+  final repository = ref.watch(sessionRepositoryProvider);
+  return repository.watchStudentSessions(studentId);
+});
+
+/// Paginated state notifier for student sessions
+class PaginatedStudentSessionsNotifier extends StateNotifier<PaginationState<SessionModel>> {
+  final SessionRepository _repository;
+  final String _studentId;
+  bool _isLoadingMore = false;
+
+  PaginatedStudentSessionsNotifier(this._repository, this._studentId)
+      : super(const PaginationState());
+
+  void initializeWithFirstPage(List<SessionModel> firstPage) {
+    if (state.items.isEmpty && firstPage.isNotEmpty) {
+      state = PaginationState(
+        items: firstPage,
+        lastDocument: null,
+        hasMore: firstPage.length >= 20,
+        isLoadingMore: false,
+      );
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (!state.hasMore || _isLoadingMore) return;
+
+    if (state.lastDocument == null && state.items.isNotEmpty) {
+      final result = await _repository.getStudentSessionsNextPage(
+        studentId: _studentId,
+        lastDocument: null,
+      );
+      
+      state = state.copyWith(
+        lastDocument: result.lastDoc,
+        hasMore: result.hasMore,
+      );
+      
+      if (!result.hasMore) return;
+    }
+
+    if (state.lastDocument == null) return;
+
+    _isLoadingMore = true;
+    state = state.copyWith(isLoadingMore: true, error: null);
+
+    try {
+      final result = await _repository.getStudentSessionsNextPage(
+        studentId: _studentId,
+        lastDocument: state.lastDocument!,
+      );
+
+      final existingIds = state.items.map((e) => e.id).toSet();
+      final newItems = result.sessions
+          .where((item) => !existingIds.contains(item.id))
+          .toList();
+
+      state = state.copyWith(
+        items: [...state.items, ...newItems],
+        lastDocument: result.lastDoc,
+        hasMore: result.hasMore,
+        isLoadingMore: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoadingMore: false,
+        error: 'فشل تحميل المزيد: ${e.toString()}',
+      );
+    } finally {
+      _isLoadingMore = false;
+    }
+  }
+
+  Future<void> checkScrollPosition(double scrollPercentage) async {
+    if (scrollPercentage >= 0.8 && state.hasMore && !_isLoadingMore) {
+      await loadMore();
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const PaginationState();
+    _isLoadingMore = false;
+  }
+}
+
+final paginatedStudentSessionsProvider = StateNotifierProvider.family<
+    PaginatedStudentSessionsNotifier,
+    PaginationState<SessionModel>,
+    String
+>((ref, studentId) {
+  final repository = ref.watch(sessionRepositoryProvider);
+  final notifier = PaginatedStudentSessionsNotifier(repository, studentId);
+  
+  ref.listen(
+    studentSessionsFirstPageProvider(studentId),
+    (previous, next) {
+      next.whenData((firstPage) {
+        notifier.initializeWithFirstPage(firstPage);
+      });
+    },
+  );
+  
+  return notifier;
+});
+
+// ============================================================================
+// STUDENT REQUESTS PAGINATION
+// ============================================================================
+
+/// First page provider for student requests
+final studentRequestsFirstPageProvider = StreamProvider.family<
+    List<SessionRequestModel>,
+    String
+>((ref, studentId) {
+  final repository = ref.watch(sessionRepositoryProvider);
+  return repository.watchStudentRequests(studentId);
+});
+
+/// Paginated state notifier for student requests
+class PaginatedStudentRequestsNotifier extends StateNotifier<PaginationState<SessionRequestModel>> {
+  final SessionRepository _repository;
+  final String _studentId;
+  bool _isLoadingMore = false;
+
+  PaginatedStudentRequestsNotifier(this._repository, this._studentId)
+      : super(const PaginationState());
+
+  void initializeWithFirstPage(List<SessionRequestModel> firstPage) {
+    if (state.items.isEmpty && firstPage.isNotEmpty) {
+      state = PaginationState(
+        items: firstPage,
+        lastDocument: null,
+        hasMore: firstPage.length >= 20,
+        isLoadingMore: false,
+      );
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (!state.hasMore || _isLoadingMore) return;
+
+    if (state.lastDocument == null && state.items.isNotEmpty) {
+      final result = await _repository.getStudentRequestsNextPage(
+        studentId: _studentId,
+        lastDocument: null,
+      );
+      
+      state = state.copyWith(
+        lastDocument: result.lastDoc,
+        hasMore: result.hasMore,
+      );
+      
+      if (!result.hasMore) return;
+    }
+
+    if (state.lastDocument == null) return;
+
+    _isLoadingMore = true;
+    state = state.copyWith(isLoadingMore: true, error: null);
+
+    try {
+      final result = await _repository.getStudentRequestsNextPage(
+        studentId: _studentId,
+        lastDocument: state.lastDocument!,
+      );
+
+      final existingIds = state.items.map((e) => e.id).toSet();
+      final newItems = result.requests
+          .where((item) => !existingIds.contains(item.id))
+          .toList();
+
+      state = state.copyWith(
+        items: [...state.items, ...newItems],
+        lastDocument: result.lastDoc,
+        hasMore: result.hasMore,
+        isLoadingMore: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoadingMore: false,
+        error: 'فشل تحميل المزيد: ${e.toString()}',
+      );
+    } finally {
+      _isLoadingMore = false;
+    }
+  }
+
+  Future<void> checkScrollPosition(double scrollPercentage) async {
+    if (scrollPercentage >= 0.8 && state.hasMore && !_isLoadingMore) {
+      await loadMore();
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const PaginationState();
+    _isLoadingMore = false;
+  }
+}
+
+final paginatedStudentRequestsProvider = StateNotifierProvider.family<
+    PaginatedStudentRequestsNotifier,
+    PaginationState<SessionRequestModel>,
+    String
+>((ref, studentId) {
+  final repository = ref.watch(sessionRepositoryProvider);
+  final notifier = PaginatedStudentRequestsNotifier(repository, studentId);
+  
+  ref.listen(
+    studentRequestsFirstPageProvider(studentId),
+    (previous, next) {
+      next.whenData((firstPage) {
+        notifier.initializeWithFirstPage(firstPage);
+      });
+    },
+  );
+  
+  return notifier;
 });

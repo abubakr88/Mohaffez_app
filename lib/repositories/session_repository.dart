@@ -1,21 +1,8 @@
-// lib/repositories/session_repository.dart
+// lib/repositories/session_repository.dart (COMPLETE FIXED VERSION)
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/session_model.dart';
 import '../models/session_request_model.dart';
-
-class BookingResult {
-  final bool success;
-  final String? requestId;
-  final String? errorMessage;
-
-  BookingResult.success(this.requestId)
-      : success = true,
-        errorMessage = null;
-
-  BookingResult.failure(this.errorMessage)
-      : success = false,
-        requestId = null;
-}
 
 class SessionRepository {
   final FirebaseFirestore _firestore;
@@ -23,83 +10,11 @@ class SessionRepository {
 
   SessionRepository(this._firestore);
 
-  // ==================== PAGINATED METHODS ====================
+  // ============================================================================
+  // STREAM METHODS (Real-time first page)
+  // ============================================================================
 
-  /// PAGINATED: Watch accepted sessions for mohaffez (first page only - real-time)
-  Stream<List<SessionModel>> watchAcceptedSessionsFirstPage(String mohaffezId) {
-    return _firestore
-        .collection('hafizSessions')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .orderBy('sessionDate', descending: true)
-        .limit(pageSize)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => SessionModel.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
-  }
-
-  /// PAGINATED: Get next page of accepted sessions
-  Future<({List<SessionModel> sessions, DocumentSnapshot? lastDoc, bool hasMore})> 
-      getAcceptedSessionsNextPage(
-    String mohaffezId,
-    DocumentSnapshot lastDocument,
-  ) async {
-    final query = _firestore
-        .collection('hafizSessions')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .orderBy('sessionDate', descending: true)
-        .startAfterDocument(lastDocument)
-        .limit(pageSize);
-
-    final snapshot = await query.get();
-    
-    return (
-      sessions: snapshot.docs
-          .map((doc) => SessionModel.fromJson({...doc.data(), 'id': doc.id}))
-          .toList(),
-      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      hasMore: snapshot.docs.length == pageSize,
-    );
-  }
-
-  /// PAGINATED: Watch student sessions (first page only - real-time)
-  Stream<List<SessionModel>> watchStudentSessionsFirstPage(String studentId) {
-    return _firestore
-        .collection('hafizSessions')
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('sessionDate', descending: true)
-        .limit(pageSize)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => SessionModel.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
-  }
-
-  /// PAGINATED: Get next page of student sessions
-  Future<({List<SessionModel> sessions, DocumentSnapshot? lastDoc, bool hasMore})> 
-      getStudentSessionsNextPage(
-    String studentId,
-    DocumentSnapshot lastDocument,
-  ) async {
-    final query = _firestore
-        .collection('hafizSessions')
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('sessionDate', descending: true)
-        .startAfterDocument(lastDocument)
-        .limit(pageSize);
-
-    final snapshot = await query.get();
-    
-    return (
-      sessions: snapshot.docs
-          .map((doc) => SessionModel.fromJson({...doc.data(), 'id': doc.id}))
-          .toList(),
-      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      hasMore: snapshot.docs.length == pageSize,
-    );
-  }
-
-  /// PAGINATED: Watch pending requests (first page only - real-time)
+  /// Watch first page of pending requests (real-time)
   Stream<List<SessionRequestModel>> watchPendingRequestsFirstPage(String mohaffezId) {
     return _firestore
         .collection('sessionRequests')
@@ -113,85 +28,13 @@ class SessionRepository {
             .toList());
   }
 
-  /// PAGINATED: Get next page of pending requests
-  Future<({List<SessionRequestModel> requests, DocumentSnapshot? lastDoc, bool hasMore})> 
-      getPendingRequestsNextPage(
-    String mohaffezId,
-    DocumentSnapshot lastDocument,
-  ) async {
-    final query = _firestore
-        .collection('sessionRequests')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending')
-        .orderBy('createdAt', descending: true)
-        .startAfterDocument(lastDocument)
-        .limit(pageSize);
+// lib/repositories/session_repository.dart (ADD THESE METHODS)
 
-    final snapshot = await query.get();
-    
-    return (
-      requests: snapshot.docs
-          .map((doc) => SessionRequestModel.fromJson({...doc.data(), 'id': doc.id}))
-          .toList(),
-      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      hasMore: snapshot.docs.length == pageSize,
-    );
-  }
+  // ============================================================================
+  // WATCH METHODS (Real-time, all items - for backward compatibility)
+  // ============================================================================
 
-  /// PAGINATED: Watch student requests (first page only - real-time)
-  Stream<List<SessionRequestModel>> watchStudentRequestsFirstPage(String studentId) {
-    return _firestore
-        .collection('sessionRequests')
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('createdAt', descending: true)
-        .limit(pageSize)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => SessionRequestModel.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
-  }
-
-  /// PAGINATED: Get next page of student requests
-  Future<({List<SessionRequestModel> requests, DocumentSnapshot? lastDoc, bool hasMore})> 
-      getStudentRequestsNextPage(
-    String studentId,
-    DocumentSnapshot lastDocument,
-  ) async {
-    final query = _firestore
-        .collection('sessionRequests')
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('createdAt', descending: true)
-        .startAfterDocument(lastDocument)
-        .limit(pageSize);
-
-    final snapshot = await query.get();
-    
-    return (
-      requests: snapshot.docs
-          .map((doc) => SessionRequestModel.fromJson({...doc.data(), 'id': doc.id}))
-          .toList(),
-      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      hasMore: snapshot.docs.length == pageSize,
-    );
-  }
-
-  // ==================== ORIGINAL NON-PAGINATED METHODS ====================
-  // Keep these for backward compatibility and simple use cases
-
-  /// Watch pending session requests for a mohaffez (all items - non-paginated)
-  Stream<List<SessionRequestModel>> watchPendingRequests(String mohaffezId) {
-    return _firestore
-        .collection('sessionRequests')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => SessionRequestModel.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
-  }
-
-  /// Watch accepted sessions for a mohaffez (all items - non-paginated)
+  /// Watch all accepted sessions for mohaffez (real-time)
   Stream<List<SessionModel>> watchAcceptedSessions(String mohaffezId) {
     return _firestore
         .collection('hafizSessions')
@@ -199,22 +42,29 @@ class SessionRepository {
         .orderBy('sessionDate', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => SessionModel.fromJson({...doc.data(), 'id': doc.id}))
+            .map((doc) => SessionModel.fromJson({
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id
+                }))
             .toList());
   }
 
-  /// Watch accepted sessions for a student (all items - non-paginated)
+  /// Watch all sessions for student (real-time)
   Stream<List<SessionModel>> watchStudentSessions(String studentId) {
     return _firestore
         .collection('hafizSessions')
         .where('studentId', isEqualTo: studentId)
+        .orderBy('sessionDate', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => SessionModel.fromJson({...doc.data(), 'id': doc.id}))
+            .map((doc) => SessionModel.fromJson({
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id
+                }))
             .toList());
   }
 
-  /// Watch session requests for a student (all items - non-paginated)
+  /// Watch all requests for student (real-time)
   Stream<List<SessionRequestModel>> watchStudentRequests(String studentId) {
     return _firestore
         .collection('sessionRequests')
@@ -222,14 +72,15 @@ class SessionRepository {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => SessionRequestModel.fromJson({...doc.data(), 'id': doc.id}))
+            .map((doc) => SessionRequestModel.fromJson({
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id
+                }))
             .toList());
   }
 
-  // ==================== TRANSACTION & WRITE METHODS ====================
-
-  /// Create a new session request with conflict checking
-  Future<BookingResult> createSessionRequest({
+  /// Create a new session request
+  Future<String> createSessionRequest({
     required String mohaffezId,
     required String studentId,
     required String studentName,
@@ -240,70 +91,249 @@ class SessionRepository {
     required String timeSlot,
     required Map<String, dynamic> additionalData,
   }) async {
-    try {
-      return await _firestore.runTransaction<BookingResult>((transaction) async {
-        // Check for conflicts
-        final conflicts = await _firestore
-            .collection('sessionRequests')
-            .where('mohaffezId', isEqualTo: mohaffezId)
-            .where('slotStart', isEqualTo: Timestamp.fromDate(slotStart))
-            .where('status', whereIn: ['pending', 'accepted'])
-            .get();
-
-        if (conflicts.docs.isNotEmpty) {
-          return BookingResult.failure('هذا الموعد محجوز بالفعل. يرجى اختيار موعد آخر.');
-        }
-
-        // Create request atomically
-        final requestRef = _firestore.collection('sessionRequests').doc();
-        transaction.set(requestRef, {
-          'studentId': studentId,
-          'studentName': studentName,
-          'mohaffezId': mohaffezId,
-          'mohaffezName': mohaffezName,
-          'sessionType': sessionType,
-          'preferredTimeSlot': timeSlot,
-          'status': 'pending',
-          'createdAt': FieldValue.serverTimestamp(),
-          'slotStart': Timestamp.fromDate(slotStart),
-          'slotEnd': Timestamp.fromDate(slotEnd),
-          ...additionalData,
-        });
-
-        return BookingResult.success(requestRef.id);
-      });
-    } catch (e) {
-      return BookingResult.failure(e.toString());
-    }
+    final docRef = _firestore.collection('sessionRequests').doc();
+    
+    await docRef.set({
+      'mohaffezId': mohaffezId,
+      'studentId': studentId,
+      'studentName': studentName,
+      'mohaffezName': mohaffezName,
+      'slotStart': Timestamp.fromDate(slotStart),
+      'slotEnd': Timestamp.fromDate(slotEnd),
+      'sessionType': sessionType,
+      'preferredTimeSlot': timeSlot,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+      ...additionalData,
+    });
+    
+    return docRef.id;
   }
 
-  /// Accept a session request and create a session
-  Future<void> acceptRequest(String requestId, Map<String, dynamic> requestData) async {
-    // Create session document
-    final sessionRef = _firestore.collection('hafizSessions').doc();
-    await sessionRef.set({
-      'mohaffezId': requestData['mohaffezId'],
-      'studentId': requestData['studentId'],
-      'mohaffezName': requestData['mohaffezName'],
-      'studentName': requestData['studentName'],
-      'sessionType': requestData['sessionType'],
-      'location': requestData['imamAddressText'] ?? '',
-      'mohaffezPhone': requestData['mohaffezPhone'],
-      'imamAddressLat': requestData['imamAddressLat'],
-      'imamAddressLng': requestData['imamAddressLng'],
-      'preferredTimeSlot': requestData['preferredTimeSlot'],
-      'sessionDate': requestData['slotStart'],
-      'slotStart': requestData['slotStart'],
-      'slotEnd': requestData['slotEnd'],
-      'createdAt': FieldValue.serverTimestamp(),
-      'juzCount': 1,
-      'hifzAssignment': '',
-      'murajaAssignment': '',
-      'sessionRating': 0,
-      'sessionNotes': '',
-    });
+  // ============================================================================
+  // PAGINATED METHODS (Load more)
+  // ============================================================================
 
-    // Update request status
+  /// Get next page of pending requests
+  Future<({
+    List<SessionRequestModel> notifications,
+    DocumentSnapshot? lastDoc,
+    bool hasMore
+  })> getPendingRequestsNextPage({
+    required String mohaffezId,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    Query query = _firestore
+        .collection('sessionRequests')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true);
+
+    if (lastDocument != null) {
+      query = query.startAfterDocument(lastDocument);
+    }
+
+    final snapshot = await query.limit(pageSize).get();
+
+    return (
+      notifications: snapshot.docs
+          .map((doc) => SessionRequestModel.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id
+              }))
+          .toList(),
+      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      hasMore: snapshot.docs.length == pageSize,
+    );
+  }
+
+  /// Get next page of accepted sessions
+  Future<({
+    List<SessionModel> sessions,
+    DocumentSnapshot? lastDoc,
+    bool hasMore
+  })> getAcceptedSessionsNextPage({
+    required String mohaffezId,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    Query query = _firestore
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .orderBy('sessionDate', descending: true);
+
+    if (lastDocument != null) {
+      query = query.startAfterDocument(lastDocument);
+    }
+
+    final snapshot = await query.limit(pageSize).get();
+
+    return (
+      sessions: snapshot.docs
+          .map((doc) => SessionModel.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id
+              }))
+          .toList(),
+      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      hasMore: snapshot.docs.length == pageSize,
+    );
+  }
+
+  /// Get next page of student sessions
+  Future<({
+    List<SessionModel> sessions,
+    DocumentSnapshot? lastDoc,
+    bool hasMore
+  })> getStudentSessionsNextPage({
+    required String studentId,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    Query query = _firestore
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('sessionDate', descending: true);
+
+    if (lastDocument != null) {
+      query = query.startAfterDocument(lastDocument);
+    }
+
+    final snapshot = await query.limit(pageSize).get();
+
+    return (
+      sessions: snapshot.docs
+          .map((doc) => SessionModel.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id
+              }))
+          .toList(),
+      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      hasMore: snapshot.docs.length == pageSize,
+    );
+  }
+
+  /// Get next page of student requests
+  Future<({
+    List<SessionRequestModel> requests,
+    DocumentSnapshot? lastDoc,
+    bool hasMore
+  })> getStudentRequestsNextPage({
+    required String studentId,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    Query query = _firestore
+        .collection('sessionRequests')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('createdAt', descending: true);
+
+    if (lastDocument != null) {
+      query = query.startAfterDocument(lastDocument);
+    }
+
+    final snapshot = await query.limit(pageSize).get();
+
+    return (
+      requests: snapshot.docs
+          .map((doc) => SessionRequestModel.fromJson({
+                ...doc.data() as Map<String, dynamic>,
+                'id': doc.id
+              }))
+          .toList(),
+      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      hasMore: snapshot.docs.length == pageSize,
+    );
+  }
+
+  // ============================================================================
+  // NON-PAGINATED METHODS (For compatibility with existing code)
+  // ============================================================================
+
+  /// Get all pending requests for a mohaffez (non-paginated)
+  Future<List<SessionRequestModel>> getPendingRequests(String mohaffezId) async {
+    final snapshot = await _firestore
+        .collection('sessionRequests')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => SessionRequestModel.fromJson({
+              ...doc.data(),
+              'id': doc.id
+            }))
+        .toList();
+  }
+
+  /// Watch pending requests (real-time, all)
+  Stream<List<SessionRequestModel>> watchPendingRequests(String mohaffezId) {
+    return _firestore
+        .collection('sessionRequests')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => SessionRequestModel.fromJson({
+                  ...doc.data(),
+                  'id': doc.id
+                }))
+            .toList());
+  }
+
+  /// Get all sessions for a mohaffez (non-paginated)
+  Future<List<SessionModel>> getMohaffezSessions(String mohaffezId) async {
+    final snapshot = await _firestore
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .orderBy('sessionDate', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => SessionModel.fromJson({
+              ...doc.data(),
+              'id': doc.id
+            }))
+        .toList();
+  }
+
+  /// Get all sessions for a student (non-paginated)
+  Future<List<SessionModel>> getStudentSessions(String studentId) async {
+    final snapshot = await _firestore
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('sessionDate', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => SessionModel.fromJson({
+              ...doc.data(),
+              'id': doc.id
+            }))
+        .toList();
+  }
+
+  /// Get all requests for a student (non-paginated)
+  Future<List<SessionRequestModel>> getStudentRequests(String studentId) async {
+    final snapshot = await _firestore
+        .collection('sessionRequests')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => SessionRequestModel.fromJson({
+              ...doc.data(),
+              'id': doc.id
+            }))
+        .toList();
+  }
+
+  // ============================================================================
+  // WRITE METHODS
+  // ============================================================================
+
+  /// Accept a session request
+  Future<void> acceptRequest(String requestId) async {
     await _firestore
         .collection('sessionRequests')
         .doc(requestId)
@@ -334,13 +364,15 @@ class SessionRepository {
     });
   }
 
-  // ==================== QUERY METHODS ====================
+  // ============================================================================
+  // QUERY METHODS
+  // ============================================================================
 
   /// Get upcoming sessions for a mohaffez (next 3 sessions)
   Future<List<SessionModel>> getUpcomingSessions(String mohaffezId) async {
     final today = DateTime.now();
     final todayStart = DateTime(today.year, today.month, today.day);
-    
+
     final snapshot = await _firestore
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
@@ -350,7 +382,10 @@ class SessionRepository {
         .get();
 
     return snapshot.docs
-        .map((doc) => SessionModel.fromJson({...doc.data(), 'id': doc.id}))
+        .map((doc) => SessionModel.fromJson({
+              ...doc.data(),
+              'id': doc.id
+            }))
         .toList();
   }
 
@@ -360,7 +395,10 @@ class SessionRepository {
     
     if (!doc.exists) return null;
     
-    return SessionModel.fromJson({...doc.data()!, 'id': doc.id});
+    return SessionModel.fromJson({
+      ...doc.data()!,
+      'id': doc.id
+    });
   }
 
   /// Get a single request by ID
@@ -369,7 +407,10 @@ class SessionRepository {
     
     if (!doc.exists) return null;
     
-    return SessionRequestModel.fromJson({...doc.data()!, 'id': doc.id});
+    return SessionRequestModel.fromJson({
+      ...doc.data()!,
+      'id': doc.id
+    });
   }
 
   /// Get total session count for a mohaffez
@@ -394,12 +435,16 @@ class SessionRepository {
     return snapshot.count ?? 0;
   }
 
-  /// Delete a session (admin/cleanup purposes)
+  // ============================================================================
+  // DELETE METHODS (Admin/cleanup purposes)
+  // ============================================================================
+
+  /// Delete a session
   Future<void> deleteSession(String sessionId) async {
     await _firestore.collection('hafizSessions').doc(sessionId).delete();
   }
 
-  /// Delete a session request (admin/cleanup purposes)
+  /// Delete a session request
   Future<void> deleteRequest(String requestId) async {
     await _firestore.collection('sessionRequests').doc(requestId).delete();
   }

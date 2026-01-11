@@ -1,11 +1,13 @@
-// lib/screens/accepted_sessions_screen.dart (FIXED)
+// lib/screens/accepted_sessions_screen.dart (COMPLETE - ~220 lines)
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../shared/widgets/paginated_list_view.dart';
 import '../shared/widgets/session_card.dart';
 import '../shared/widgets/empty_state.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
 import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../shared/widgets/empty_state_illustrations.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
 
@@ -19,11 +21,15 @@ class AcceptedSessionsScreen extends ConsumerWidget {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('مستخدم غير معروف')));
+          return const Scaffold(
+            body: Center(child: Text('يرجى تسجيل الدخول')),
+          );
         }
         return _buildContent(context, ref, user.uid);
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
       error: (e, _) => Scaffold(
         body: ErrorDisplay.dataLoad(
           onRetry: () => ref.invalidate(currentUserProvider),
@@ -39,64 +45,134 @@ class AcceptedSessionsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('الجلسات المقبولة')),
+        appBar: AppBar(
+          title: const Text('الجلسات المقبولة'),
+          actions: [
+            // Show total count
+            if (paginatedState.items.isNotEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Chip(
+                    label: Text(
+                      '${paginatedState.items.length}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                  ),
+                ),
+              ),
+          ],
+        ),
         body: firstPageAsync.when(
           data: (_) {
             final sessions = paginatedState.items;
 
+            // Empty state
             if (sessions.isEmpty && !paginatedState.isLoadingMore) {
               return IllustratedEmptyState(
                 illustration: EmptyStateIllustrations.noSessions(),
                 title: 'لا توجد جلسات',
-                message: 'لم تقم بحجز أي جلسات بعد. ابحث عن محفظ الآن!',
+                message: 'لم يتم قبول أي جلسات بعد. ابحث عن محفظين في منطقتك!',
                 action: ElevatedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.search),
-                  label: const Text('ابحث عن محفظ'),
+                  label: const Text('البحث عن محفظين'),
                 ),
               );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: sessions.length + (paginatedState.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                // Show "Load More" button at the end
-                if (index == sessions.length) {
-                  return _buildLoadMoreButton(ref, studentId, paginatedState);
-                }
-
-                final session = sessions[index];
+            // List with pagination
+            return PaginatedListView(
+              items: sessions,
+              hasMore: paginatedState.hasMore,
+              isLoadingMore: paginatedState.isLoadingMore,
+              error: paginatedState.error,
+              scrollThreshold: 0.75,
+              
+              // Item builder
+              itemBuilder: (context, session, index) {
                 final sessionType = session.sessionType ?? '';
                 final timeSlot = session.preferredTimeSlot ?? '';
                 final hasValidSubtitle = sessionType.isNotEmpty && timeSlot.isNotEmpty;
 
                 return SessionCard(
-                  title: session.mohaffezName ?? 'محفظ',
+                  title: session.mohaffezName ?? 'غير محدد',
                   subtitle: hasValidSubtitle ? '$sessionType - $timeSlot' : null,
-                  location: session.location ?? '',
+                  location: session.location ?? 'غير محدد',
                   dateTime: session.sessionDate ?? session.slotStart,
                   hifz: session.hifzAssignment ?? '',
                   muraja: session.murajaAssignment ?? '',
                   rating: session.sessionRating ?? 0,
                   notes: session.sessionNotes ?? '',
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  trailing: _buildTrailingActions(context, session),
+                );
+              },
+              
+              // Load more callback
+              onLoadMore: () {
+                return ref
+                    .read(paginatedStudentSessionsProvider(studentId).notifier)
+                    .loadMore();
+              },
+              
+              // Refresh callback
+              onRefresh: () {
+                return ref
+                    .read(paginatedStudentSessionsProvider(studentId).notifier)
+                    .refresh();
+              },
+              
+              // Custom loading widget
+              loadingWidget: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 8),
+                  Text(
+                    'جاري تحميل المزيد من الجلسات...',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              
+              // Custom error builder
+              errorBuilder: (error, retry) {
+                return Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Column(
                     children: [
-                      if (session.imamAddressLat != null && session.imamAddressLng != null)
-                        TextButton.icon(
-                          onPressed: () async {
-                            // Map navigation logic
-                          },
-                          icon: const Icon(Icons.map, size: 16),
-                          label: const Text('خريطة'),
+                      const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                      const SizedBox(height: 8),
+                      Text(
+                        error,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: retry,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('إعادة المحاولة'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
                         ),
+                      ),
                     ],
                   ),
                 );
               },
             );
           },
+          
+          // Loading first page
           loading: () => Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -109,6 +185,8 @@ class AcceptedSessionsScreen extends ConsumerWidget {
               ),
             ),
           ),
+          
+          // Error loading first page
           error: (e, _) => ErrorDisplay.dataLoad(
             onRetry: () => ref.invalidate(studentSessionsFirstPageProvider(studentId)),
           ),
@@ -117,51 +195,17 @@ class AcceptedSessionsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLoadMoreButton(WidgetRef ref, String studentId, paginatedState) {
-    if (paginatedState.isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
+  Widget? _buildTrailingActions(BuildContext context, session) {
+    // Add actions like navigation to map, call mohaffez, etc.
+    if (session.imamAddressLat != null && session.imamAddressLng != null) {
+      return IconButton(
+        icon: const Icon(Icons.map, size: 20),
+        onPressed: () {
+          // Navigate to map or open Google Maps
+        },
+        tooltip: 'عرض الموقع على الخريطة',
       );
     }
-
-    if (paginatedState.error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(
-              'حدث خطأ: ${paginatedState.error}',
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () {
-                ref.read(paginatedStudentSessionsProvider(studentId).notifier).loadMore();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: ElevatedButton.icon(
-          onPressed: () {
-            ref.read(paginatedStudentSessionsProvider(studentId).notifier).loadMore();
-          },
-          icon: const Icon(Icons.expand_more),
-          label: const Text('تحميل المزيد'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-          ),
-        ),
-      ),
-    );
+    return null;
   }
 }
