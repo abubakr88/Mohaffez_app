@@ -67,6 +67,11 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
+  
+  # ✅ Image Processing - أضفتها هنا في المكان الصحيح
+  flutter_image_compress: ^2.1.0
+  path: ^1.8.3
+  image: ^4.1.3  # اختياري كـ backup
 
 dev_dependencies:
   flutter_test:
@@ -78,13 +83,17 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.8.0
   
-  # Riverpod code generation - UPDATED VERSIONS
+  # Riverpod code generation
   custom_lint: ^0.7.3
   riverpod_generator: ^2.4.3
   riverpod_lint: ^2.3.13
 
   # Icons
   flutter_launcher_icons: ^0.13.1
+
+dependency_overrides:
+  analyzer: 7.3.0
+  analyzer_plugin: 0.13.4
 
 flutter:
   uses-material-design: true
@@ -101,7 +110,3 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/images/icon.png"
   min_sdk_android: 21
   remove_alpha_ios: true
-
-dependency_overrides:
-  analyzer: 7.3.0
-  analyzer_plugin: 0.13.4

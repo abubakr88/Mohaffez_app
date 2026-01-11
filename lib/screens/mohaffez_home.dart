@@ -8,6 +8,8 @@ import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider.dart';
+import '../providers/session_provider_paginated.dart'; // ADD THIS
+import '../models/session_request_model.dart'; // ADD THIS
 import '../shared/utils/error_handler.dart';
 
 class MohaffezHome extends ConsumerStatefulWidget {
@@ -71,7 +73,7 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
         body: TabBarView(
           controller: _tabController,
           children: [
-            _buildRequestsTab(mohaffezId),
+            _buildRequestsTab(mohaffezId), // FIXED: Removed ref parameter
             _buildAcceptedTab(mohaffezId),
           ],
         ),
@@ -79,43 +81,102 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
     );
   }
 
+  // FIXED: Removed WidgetRef parameter (it's already available via ConsumerState)
   Widget _buildRequestsTab(String mohaffezId) {
-    final requestsAsync = ref.watch(pendingRequestsProvider(mohaffezId));
+    final firstPageAsync = ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
+    final paginatedState = ref.watch(paginatedPendingRequestsProvider(mohaffezId));
 
-    return requestsAsync.when(
-      data: (requests) {
-        if (requests.isEmpty) {
-          return const EmptyState(
-            icon: Icons.inbox_outlined,
-            title: 'لا توجد طلبات',
-            message: 'لا توجد طلبات جلسات جديدة في الوقت الحالي.',
-            animated: true,
+    return firstPageAsync.when(
+      data: (_) {
+        final requests = paginatedState.items;
+
+        if (requests.isEmpty && !paginatedState.isLoadingMore) {
+          return const Center(
+            child: EmptyState(
+              icon: Icons.pending_actions,
+              title: 'لا توجد طلبات معلقة',
+              message: 'ستظهر هنا الطلبات الجديدة',
+            ),
           );
         }
 
         return ListView.builder(
           padding: const EdgeInsets.all(12),
-          itemCount: requests.length,
+          itemCount: requests.length + (paginatedState.hasMore ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index == requests.length) {
+              // Load More Button
+              if (paginatedState.isLoadingMore) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (paginatedState.error != null) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        'حدث خطأ: ${paginatedState.error}',
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          ref.read(paginatedPendingRequestsProvider(mohaffezId).notifier).loadMore();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('إعادة المحاولة'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      ref.read(paginatedPendingRequestsProvider(mohaffezId).notifier).loadMore();
+                    },
+                    icon: const Icon(Icons.expand_more),
+                    label: const Text('تحميل المزيد'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    ),
+                  ),
+                ),
+              );
+            }
+
             final request = requests[index];
             return _buildRequestCard(request);
           },
         );
       },
-      loading: () => ShimmerWidgets.list(
-        itemCount: 3,
-        itemBuilder: () => ShimmerWidgets.listItem(
-          showAvatar: true,
-          lines: 3,
+      loading: () => Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: List.generate(
+            3,
+            (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ShimmerWidgets.listItem(showAvatar: true, lines: 3),
+            ),
+          ),
         ),
       ),
       error: (e, _) => ErrorDisplay.dataLoad(
-        onRetry: () => ref.invalidate(pendingRequestsProvider(mohaffezId)),
+        onRetry: () => ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId)),
       ),
     );
   }
 
-  Widget _buildRequestCard(request) {
+  Widget _buildRequestCard(SessionRequestModel request) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -277,11 +338,16 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
           },
         );
       },
-      loading: () => ShimmerWidgets.list(
-        itemCount: 4,
-        itemBuilder: () => ShimmerWidgets.listItem(
-          showAvatar: true,
-          lines: 3,
+      loading: () => Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: List.generate(
+            4,
+            (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ShimmerWidgets.listItem(showAvatar: true, lines: 3),
+            ),
+          ),
         ),
       ),
       error: (e, _) => ErrorDisplay.dataLoad(
@@ -289,7 +355,8 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome>
       ),
     );
   }
-  Future<void> _acceptRequest(request) async {
+
+  Future<void> _acceptRequest(SessionRequestModel request) async {
     final notifier = ref.read(sessionBookingProvider.notifier);
     
     await notifier.acceptRequest(

@@ -1,3 +1,4 @@
+// lib/screens/notifications_screen.dart (UPDATED)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/widgets/shimmer_widgets.dart';
@@ -5,6 +6,7 @@ import '../shared/widgets/error_widgets.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state_illustrations.dart';
 import '../shared/widgets/empty_state.dart';
+import '../providers/notification_provider_paginated.dart';
 import '../providers/notification_provider.dart';
 import '../providers/user_provider.dart';
 import '../shared/utils/error_handler.dart';
@@ -14,7 +16,25 @@ class NotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notificationsAsync = ref.watch(notificationsProvider);
+    final userAsync = ref.watch(currentUserProvider);
+
+    return userAsync.when(
+      data: (user) {
+        if (user == null) return const Scaffold(body: Center(child: Text('غير مصرح')));
+        return _buildContent(context, ref, user.uid);
+      },
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(
+        body: ErrorDisplay.dataLoad(
+          onRetry: () => ref.invalidate(currentUserProvider),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, WidgetRef ref, String userId) {
+    final firstPageAsync = ref.watch(notificationsFirstPageProvider(userId));
+    final paginatedState = ref.watch(paginatedNotificationsProvider(userId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -24,25 +44,31 @@ class NotificationsScreen extends ConsumerWidget {
           actions: [
             IconButton(
               icon: const Icon(Icons.done_all),
-              onPressed: () => _markAllAsRead(context, ref),
-              tooltip: 'تحديد الكل كمقروء',
+              onPressed: () => _markAllAsRead(context, ref, userId),
+              tooltip: 'تعليم الكل كمقروء',
             ),
           ],
         ),
-        body: notificationsAsync.when(
-          data: (notifications) {
-            if (notifications.isEmpty) {
+        body: firstPageAsync.when(
+          data: (_) {
+            final notifications = paginatedState.items;
+
+            if (notifications.isEmpty && !paginatedState.isLoadingMore) {
               return IllustratedEmptyState(
-                illustration: EmptyStateIllustrations.noNotifications(),
+                illustration: EmptyStateIllustrations.noNotifications(), // Add parentheses ()
                 title: 'لا توجد إشعارات',
-                message: 'سنرسل لك إشعارات عند حدوث أي تحديثات.',
+                message: 'لم تتلق أي إشعارات حتى الآن.',
               );
             }
 
             return ListView.builder(
               padding: const EdgeInsets.all(8),
-              itemCount: notifications.length,
+              itemCount: notifications.length + (paginatedState.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == notifications.length) {
+                  return _buildLoadMoreButton(ref, userId, paginatedState);
+                }
+
                 final notification = notifications[index];
                 return _NotificationCard(
                   notification: notification,
@@ -55,11 +81,58 @@ class NotificationsScreen extends ConsumerWidget {
             itemCount: 6,
             itemBuilder: () => ShimmerWidgets.listItem(
               showAvatar: true,
-              lines: 2,
-            ),
+              lines: 2),
           ),
           error: (e, _) => ErrorDisplay.dataLoad(
-            onRetry: () => ref.invalidate(notificationsProvider),
+            onRetry: () => ref.invalidate(notificationsFirstPageProvider(userId)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadMoreButton(WidgetRef ref, String userId, paginatedState) {
+    if (paginatedState.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (paginatedState.error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text(
+              'حدث خطأ: ${paginatedState.error}',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () {
+                ref.read(paginatedNotificationsProvider(userId).notifier).loadMore();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ElevatedButton.icon(
+          onPressed: () {
+            ref.read(paginatedNotificationsProvider(userId).notifier).loadMore();
+          },
+          icon: const Icon(Icons.expand_more),
+          label: const Text('تحميل المزيد'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
           ),
         ),
       ),
@@ -71,15 +144,11 @@ class NotificationsScreen extends ConsumerWidget {
     await notifier.markAsRead(notificationId);
   }
 
-  Future<void> _markAllAsRead(BuildContext context, WidgetRef ref) async {
-    final user = ref.read(currentUserProvider).value;
-    if (user == null) return;
-
+  Future<void> _markAllAsRead(BuildContext context, WidgetRef ref, String userId) async {
     final notifier = ref.read(notificationActionsProvider.notifier);
-    await notifier.markAllAsRead(user.uid);
-
+    await notifier.markAllAsRead(userId);
     if (context.mounted) {
-      ErrorHandler.showSuccess(context, 'تم تحديد جميع الإشعارات كمقروءة');
+      ErrorHandler.showSuccess(context, 'تم تعليم جميع الإشعارات كمقروءة');
     }
   }
 }
@@ -126,41 +195,21 @@ class _NotificationCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text(
-              body,
-              style: const TextStyle(fontSize: 13),
-            ),
+            Text(body, style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 4),
             Row(
               children: [
                 if (mohaffezName.isNotEmpty) ...[
-                  Icon(
-                    Icons.person,
-                    size: 14,
-                    color: Colors.grey.shade600,
-                  ),
+                  Icon(Icons.person, size: 14, color: Colors.grey.shade600),
                   const SizedBox(width: 4),
-                  Text(
-                    mohaffezName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
+                  Text(mohaffezName, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                   const SizedBox(width: 12),
                 ],
-                Icon(
-                  Icons.access_time,
-                  size: 14,
-                  color: Colors.grey.shade600,
-                ),
+                Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
                 Text(
                   _formatTimestamp(createdAt),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -209,7 +258,6 @@ class _NotificationCard extends StatelessWidget {
 
   String _formatTimestamp(DateTime? dateTime) {
     if (dateTime == null) return '';
-
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 

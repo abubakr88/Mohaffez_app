@@ -1,3 +1,4 @@
+// lib/providers/notification_provider.dart (UPDATED)
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
@@ -9,19 +10,19 @@ final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return NotificationRepository(FirebaseFirestore.instance);
 });
 
-// Notifications stream
+// Notifications stream (using first page for backward compatibility)
 final notificationsProvider = StreamProvider<List<NotificationModel>>((ref) async* {
   final authUser = await ref.watch(authStateProvider.future);
-  
   if (authUser == null) {
     yield [];
     return;
   }
-
-  yield* ref.watch(notificationRepositoryProvider).watchNotifications(authUser.uid);
+  
+  // Use first page method instead of watchNotifications
+  yield* ref.watch(notificationRepositoryProvider).watchNotificationsFirstPage(authUser.uid);
 });
 
-// Unread count provider (derived from notifications)
+// Unread count provider derived from notifications
 final unreadNotificationCountProvider = Provider<int>((ref) {
   final notifications = ref.watch(notificationsProvider).value ?? [];
   return notifications.where((n) => !n.isRead).length;
@@ -39,14 +40,12 @@ class NotificationActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
   Future<void> markAllAsRead(String userId) async {
     state = const AsyncValue.loading();
-
     state = await AsyncValue.guard(() async {
       await _repository.markAllAsRead(userId);
     });
   }
 }
 
-final notificationActionsProvider =
-    StateNotifierProvider<NotificationActionsNotifier, AsyncValue<void>>((ref) {
+final notificationActionsProvider = StateNotifierProvider<NotificationActionsNotifier, AsyncValue<void>>((ref) {
   return NotificationActionsNotifier(ref.watch(notificationRepositoryProvider));
 });
