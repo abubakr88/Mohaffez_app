@@ -50,7 +50,6 @@ dependencies:
   google_maps_flutter: ^2.9.0
   geolocator: ^13.0.1
   geocoding: ^3.0.0
-  geoflutterfire_plus: ^0.0.32
   flutter_google_maps_webservices: ^1.1.1
 
   # Network & Connectivity
@@ -68,10 +67,10 @@ dependencies:
   # Media
   image_picker: ^1.1.2
   
-  # ✅ Image Processing - أضفتها هنا في المكان الصحيح
+  # Image Processing
   flutter_image_compress: ^2.1.0
   path: ^1.8.3
-  image: ^4.1.3  # اختياري كـ backup
+  image: ^4.1.3
 
 dev_dependencies:
   flutter_test:
@@ -79,9 +78,9 @@ dev_dependencies:
   flutter_lints: ^3.0.1
   
   # Code generation tools
-  build_runner: ^2.4.13
-  freezed: ^2.5.7
-  json_serializable: ^6.8.0
+  build_runner: ^2.4.0
+  freezed: ^2.4.0
+  json_serializable: ^6.7.0
   
   # Riverpod code generation
   custom_lint: ^0.7.3
@@ -91,9 +90,9 @@ dev_dependencies:
   # Icons
   flutter_launcher_icons: ^0.13.1
 
+# ✅ FIX: Override incompatible analyzer_plugin version
 dependency_overrides:
-  analyzer: 7.3.0
-  analyzer_plugin: 0.13.4
+  analyzer_plugin: ^0.13.4
 
 flutter:
   uses-material-design: true

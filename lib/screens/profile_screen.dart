@@ -14,7 +14,6 @@ import '../providers/user_provider.dart';
 import '../providers/auth_provider.dart';
 import '../shared/utils/error_handler.dart';
 import '../services/profile_completion_service.dart';
-
 import 'mohaffez_credentials_screen.dart';
 import 'availability_management_screen.dart';
 import 'privacy_settings_screen.dart';
@@ -61,7 +60,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("لم يتم تسجيل الدخول"),
+                    const Text('لم يتم تسجيل الدخول'),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
@@ -70,7 +69,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           (route) => false,
                         );
                       },
-                      child: const Text("تسجيل الدخول"),
+                      child: const Text('تسجيل الدخول'),
                     ),
                   ],
                 ),
@@ -85,24 +84,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 SliverList(
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 16),
-
+                    
                     // Profile completion card (Mohaffez only)
                     if (isMohaffez) _buildProfileCompletion(user.uid),
-
+                    
                     // Basic info
                     _buildBasicInfo(user),
                     const SizedBox(height: 16),
-
+                    
                     // Mohaffez management
                     if (isMohaffez) ...[
                       _buildMohaffezManagement(),
                       const SizedBox(height: 16),
                     ],
-
+                    
                     // Account management
                     _buildManagementSection(),
                     const SizedBox(height: 16),
-
+                    
                     // Logout button
                     _buildLogoutButton(),
                     const SizedBox(height: 32),
@@ -118,7 +117,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
                       ),
@@ -142,7 +141,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   // ==================== App Bar ====================
-
   Widget _buildAppBar(user) {
     return SliverAppBar(
       expandedHeight: 200,
@@ -153,7 +151,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             // Gradient background
             Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
                   begin: Alignment.topLeft,
@@ -161,7 +159,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
             ),
-
+            
             // Profile info
             Positioned(
               bottom: 20,
@@ -200,7 +198,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-
+                  
                   // Name
                   Text(
                     user.name,
@@ -210,10 +208,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       color: Colors.white,
                     ),
                   ),
-
+                  
                   // Role
                   Text(
-                    user.role == 'mohaffez' ? "محفظ" : "طالب",
+                    user.role == 'mohaffez' ? 'محفظ' : 'طالب',
                     style: const TextStyle(
                       fontSize: 14,
                       color: Colors.white70,
@@ -229,7 +227,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   // ==================== Profile Completion ====================
-
   Widget _buildProfileCompletion(String userId) {
     return FutureBuilder<ProfileCompletionData>(
       future: ProfileCompletionService.calculateCompletion(userId),
@@ -267,7 +264,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(width: 8),
                   const Text(
-                    "اكتمال الملف الشخصي",
+                    'اكتمال الملف الشخصي',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -275,7 +272,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    "${percentage.toInt()}%",
+                    '${percentage.toInt()}%',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -285,7 +282,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-
+              
               // Progress bar
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -298,12 +295,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
               ),
-
+              
               // Missing fields
               if (!isComplete && data.missingFields.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
-                  "الحقول المفقودة:",
+                  'الحقول المطلوبة:',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -344,31 +341,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   String _getFieldLabel(String field) {
     switch (field) {
-      case 'name':
-        return "الاسم";
-      case 'email':
-        return "البريد الإلكتروني";
-      case 'photo':
-        return "الصورة الشخصية";
-      case 'bio':
-        return "النبذة التعريفية";
-      case 'location':
-        return "الموقع";
-      case 'specialization':
-        return "التخصص";
-      case 'credentials':
-        return "الشهادات";
-      case 'availability':
-        return "الأوقات المتاحة";
-      case 'phoneVerified':
-        return "تأكيد الهاتف";
-      default:
-        return field;
+      case 'name': return 'الاسم';
+      case 'email': return 'البريد الإلكتروني';
+      case 'photo': return 'الصورة الشخصية';
+      case 'bio': return 'نبذة تعريفية';
+      case 'location': return 'الموقع';
+      case 'specialization': return 'التخصص';
+      case 'credentials': return 'المؤهلات';
+      case 'availability': return 'الأوقات المتاحة';
+      case 'phoneVerified': return 'تأكيد رقم الهاتف';
+      default: return field;
     }
   }
 
   // ==================== Basic Info ====================
-
   Widget _buildBasicInfo(user) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -388,33 +374,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "المعلومات الأساسية",
+            'المعلومات الأساسية',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const Divider(height: 24),
-
+          
           // Email
           _buildInfoRow(
             icon: Icons.email,
-            label: "البريد الإلكتروني",
-            value: user.email ?? "غير متوفر",
+            label: 'البريد الإلكتروني',
+            value: user.email ?? '',
           ),
           const SizedBox(height: 12),
-
+          
           // Bio (Mohaffez only)
           if (user.role == 'mohaffez') ...[
             _buildEditableField(
               icon: Icons.description,
-              label: "النبذة التعريفية",
-              value: user.bio ?? "لا توجد نبذة",
+              label: 'نبذة تعريفية',
+              value: user.bio ?? 'لم يتم الإضافة',
               controller: bioController,
               isEditing: isEditingBio,
               onEdit: () {
                 setState(() {
-                  bioController.text = user.bio ?? "";
+                  bioController.text = user.bio ?? '';
                   isEditingBio = true;
                 });
               },
@@ -429,17 +415,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 12),
           ],
-
+          
           // Phone
           _buildEditableField(
             icon: Icons.phone,
-            label: "رقم الهاتف",
-            value: user.phoneNumber ?? "غير متوفر",
+            label: 'رقم الهاتف',
+            value: user.phoneNumber ?? 'لم يتم الإضافة',
             controller: phoneController,
             isEditing: isEditingPhone,
             onEdit: () {
               setState(() {
-                phoneController.text = user.phoneNumber ?? "";
+                phoneController.text = user.phoneNumber ?? '';
                 isEditingPhone = true;
               });
             },
@@ -451,19 +437,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               setState(() => isEditingPhone = false);
             },
           ),
-
+          
           // Specialization (Mohaffez only)
           if (user.role == 'mohaffez') ...[
             const SizedBox(height: 12),
             _buildEditableField(
               icon: Icons.book,
-              label: "التخصص",
-              value: user.specialization ?? "غير محدد",
+              label: 'التخصص',
+              value: user.specialization ?? 'لم يتم الإضافة',
               controller: specializationController,
               isEditing: isEditingSpecialization,
               onEdit: () {
                 setState(() {
-                  specializationController.text = user.specialization ?? "";
+                  specializationController.text = user.specialization ?? '';
                   isEditingSpecialization = true;
                 });
               },
@@ -479,19 +465,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               },
             ),
           ],
-
+          
           // Location
           const SizedBox(height: 12),
           _buildInfoRow(
             icon: Icons.location_on,
-            label: "الموقع",
-            value: user.addressText ?? "غير محدد",
+            label: 'الموقع',
+            value: user.addressText ?? 'لم يتم الإضافة',
             trailing: IconButton(
               icon: const Icon(Icons.edit, size: 18),
               onPressed: () => _updateLocation(user.uid),
             ),
           ),
-
+          
           // Follower/Following counts (Mohaffez only)
           if (user.role == 'mohaffez') ...[
             const SizedBox(height: 12),
@@ -499,15 +485,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 Expanded(
                   child: _buildStatCard(
-                    label: "المتابعون",
-                    value: "${user.followerCount ?? 0}",
+                    label: 'المتابعون',
+                    value: '${user.followerCount ?? 0}',
                     icon: Icons.people,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
-                    label: "التقييم",
+                    label: 'التقييم',
                     value: (user.rating ?? 0.0).toStringAsFixed(1),
                     icon: Icons.star,
                   ),
@@ -604,12 +590,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               TextButton(
                 onPressed: onCancel,
-                child: const Text("إلغاء"),
+                child: const Text('إلغاء'),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: onSave,
-                child: const Text("حفظ"),
+                child: const Text('حفظ'),
               ),
             ],
           ),
@@ -671,7 +657,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   // ==================== Mohaffez Management ====================
-
   Widget _buildMohaffezManagement() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -691,19 +676,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "إدارة الحساب المهني",
+            'إدارة المحفظ',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const Divider(height: 24),
-
+          
           // Credentials
           _buildManagementCard(
             icon: Icons.verified_user,
-            title: "الشهادات والمؤهلات",
-            subtitle: "إضافة أو تعديل الشهادات",
+            title: 'المؤهلات والشهادات',
+            subtitle: 'إدارة الإجازات والشهادات',
             color: Colors.blue,
             onTap: () {
               Navigator.of(context).push(
@@ -712,12 +697,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             },
           ),
           const SizedBox(height: 12),
-
+          
           // Availability
           _buildManagementCard(
             icon: Icons.access_time,
-            title: "الأوقات المتاحة",
-            subtitle: "تحديد جدولك الأسبوعي",
+            title: 'الأوقات المتاحة',
+            subtitle: 'تحديث جدول المواعيد',
             color: AppTheme.accentGreen,
             onTap: () {
               Navigator.of(context).push(
@@ -731,7 +716,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   // ==================== Account Management ====================
-
   Widget _buildManagementSection() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -751,29 +735,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "إعدادات الحساب",
+            'إعدادات الحساب',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
           const Divider(height: 24),
-
+          
           // Change password
           _buildManagementCard(
             icon: Icons.lock,
-            title: "تغيير كلمة المرور",
-            subtitle: "تحديث كلمة المرور الخاصة بك",
+            title: 'تغيير كلمة المرور',
+            subtitle: 'تحديث كلمة مرور حسابك',
             color: Colors.orange,
             onTap: _showChangePasswordDialog,
           ),
           const SizedBox(height: 12),
-
-          // Privacy settings - ✅ FIXED
+          
+          // Privacy settings
           _buildManagementCard(
             icon: Icons.privacy_tip,
-            title: "إعدادات الخصوصية",
-            subtitle: "التحكم في ظهور بياناتك",
+            title: 'إعدادات الخصوصية',
+            subtitle: 'التحكم في البيانات المرئية',
             color: Colors.purple,
             onTap: () {
               Navigator.of(context).push(
@@ -843,7 +827,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   // ==================== Logout Button ====================
-
   Widget _buildLogoutButton() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -851,7 +834,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: OutlinedButton.icon(
         onPressed: _handleLogout,
         icon: const Icon(Icons.logout),
-        label: const Text("تسجيل الخروج"),
+        label: const Text('تسجيل الخروج'),
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.red,
           side: const BorderSide(color: Colors.red),
@@ -862,7 +845,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   // ==================== Actions ====================
-
+  
   Future<void> _pickAndUploadPhoto(String userId) async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -892,7 +875,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (!mounted) return;
       Navigator.pop(context); // Close loading
-      ErrorHandler.showSuccess(context, "تم تحديث الصورة الشخصية بنجاح");
+      ErrorHandler.showSuccess(context, 'تم تحديث الصورة بنجاح');
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // Close loading
@@ -909,7 +892,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.invalidate(currentUserProvider);
 
       if (!mounted) return;
-      ErrorHandler.showSuccess(context, "تم تحديث البيانات بنجاح");
+      ErrorHandler.showSuccess(context, 'تم التحديث بنجاح');
     } catch (e) {
       if (!mounted) return;
       ErrorHandler.showError(context, e);
@@ -929,7 +912,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final position = await Geolocator.getCurrentPosition();
 
       // For demo, use coordinates as address (in production, use geocoding)
-      final addressText = "${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}";
+      final addressText = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
 
       final repository = ref.read(userRepositoryProvider);
       await repository.updateLocation(
@@ -944,7 +927,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (!mounted) return;
       Navigator.pop(context); // Close loading
-      ErrorHandler.showSuccess(context, "تم تحديث الموقع بنجاح");
+      ErrorHandler.showSuccess(context, 'تم تحديث الموقع بنجاح');
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // Close loading
@@ -962,7 +945,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: const Text("تغيير كلمة المرور"),
+          title: const Text('تغيير كلمة المرور'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -970,7 +953,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextField(
                   controller: currentPasswordController,
                   decoration: const InputDecoration(
-                    labelText: "كلمة المرور الحالية",
+                    labelText: 'كلمة المرور الحالية',
                     prefixIcon: Icon(Icons.lock_outline),
                   ),
                   obscureText: true,
@@ -979,7 +962,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextField(
                   controller: newPasswordController,
                   decoration: const InputDecoration(
-                    labelText: "كلمة المرور الجديدة",
+                    labelText: 'كلمة المرور الجديدة',
                     prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
@@ -988,7 +971,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextField(
                   controller: confirmPasswordController,
                   decoration: const InputDecoration(
-                    labelText: "تأكيد كلمة المرور",
+                    labelText: 'تأكيد كلمة المرور',
                     prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
@@ -999,17 +982,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text("إلغاء"),
+              child: const Text('إلغاء'),
             ),
             ElevatedButton(
               onPressed: () async {
                 if (newPasswordController.text != confirmPasswordController.text) {
-                  ErrorHandler.showError(context, "كلمة المرور غير متطابقة");
+                  ErrorHandler.showError(context, 'كلمات المرور غير متطابقة');
                   return;
                 }
 
                 if (newPasswordController.text.length < 8) {
-                  ErrorHandler.showError(context, "كلمة المرور يجب أن تكون 8 أحرف على الأقل");
+                  ErrorHandler.showError(context, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل');
                   return;
                 }
 
@@ -1025,13 +1008,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
-                    ErrorHandler.showSuccess(context, "تم تغيير كلمة المرور بنجاح");
+                    ErrorHandler.showSuccess(context, 'تم تغيير كلمة المرور بنجاح');
                   }
                 } catch (e) {
                   if (mounted) ErrorHandler.showError(context, e);
                 }
               },
-              child: const Text("حفظ"),
+              child: const Text('تغيير'),
             ),
           ],
         ),
@@ -1045,17 +1028,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: const Text("تسجيل الخروج"),
-          content: const Text("هل أنت متأكد من تسجيل الخروج؟"),
+          title: const Text('تسجيل الخروج'),
+          content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text("إلغاء"),
+              child: const Text('إلغاء'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text("تسجيل الخروج"),
+              child: const Text('تسجيل الخروج'),
             ),
           ],
         ),

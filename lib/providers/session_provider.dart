@@ -1,221 +1,436 @@
-// lib/providers/session_provider.dart (FIX LINES 57 & 98)
+// providers/session_provider.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/session_model.dart';
-import '../models/session_request_model.dart';
-import '../models/booking_result.dart';
 import '../repositories/session_repository.dart';
 
-// ============================================================================
-// REPOSITORY PROVIDER
-// ============================================================================
+// ==================== REPOSITORY PROVIDER ====================
 
+/// Repository provider for session operations
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
   return SessionRepository(FirebaseFirestore.instance);
 });
 
-// ============================================================================
-// STREAM PROVIDERS (Real-time data)
-// ============================================================================
+// ==================== SESSION PROVIDERS ====================
 
-/// Watch accepted sessions for mohaffez
-final mohaffezAcceptedSessionsProvider = StreamProvider.family<
-    List<SessionModel>,
-    String
->((ref, mohaffezId) {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return repository.watchAcceptedSessions(mohaffezId);
-});
+/// Get all sessions for a mohaffez
+final mohaffezSessionsProvider = StreamProvider.family<List<SessionModel>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')  // ✅ FIXED: Changed from 'sessions' to 'hafizSessions'
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => SessionModel.fromFirestore(doc)).toList());
+  },
+);
 
-/// Watch sessions for student
-final studentSessionsProvider = StreamProvider.family<
-    List<SessionModel>,
-    String
->((ref, studentId) {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return repository.watchStudentSessions(studentId);
-});
+/// Get total session count for a mohaffez
+final mohaffezSessionCountProvider = StreamProvider.family<int, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  },
+);
 
-/// Watch requests for student
-final studentRequestsProvider = StreamProvider.family<
-    List<SessionRequestModel>,
-    String
->((ref, studentId) {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return repository.watchStudentRequests(studentId);
-});
+/// Get completed sessions (past sessions with status = 'completed')
+final completedSessionsProvider = StreamProvider.family<List<SessionModel>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'completed')
+        .orderBy('sessionDate', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => SessionModel.fromFirestore(doc)).toList());
+  },
+);
 
-// ============================================================================
-// SESSION BOOKING NOTIFIER
-// ============================================================================
+/// Get count of completed sessions
+final completedSessionsCountProvider = StreamProvider.family<int, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'completed')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  },
+);
 
-class SessionBookingNotifier extends StateNotifier<AsyncValue<BookingResult>> {
-  final SessionRepository _repository;
+/// Get upcoming sessions (accepted sessions within next 7 days)
+final upcomingSessionsProvider = StreamProvider.family<List<SessionModel>, String>(
+  (ref, mohaffezId) {
+    final now = DateTime.now();
+    final weekFromNow = now.add(const Duration(days: 7));
+    
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'accepted')
+        .where('sessionDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
+        .where('sessionDate', isLessThanOrEqualTo: Timestamp.fromDate(weekFromNow))
+        .orderBy('sessionDate', descending: false)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => SessionModel.fromFirestore(doc)).toList());
+  },
+);
 
-  // FIXED LINE 57: Removed const
-  SessionBookingNotifier(this._repository) : super(AsyncValue.data(
-    BookingResult(success: false, sessionId: null, errorMessage: null)
-  ));
+/// Get pending session requests for a mohaffez
+final pendingSessionRequestsProvider = StreamProvider.family<List<SessionModel>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => SessionModel.fromFirestore(doc)).toList());
+  },
+);
 
-  Future<BookingResult> requestSession({
-    required String mohaffezId,
-    required String studentId,
-    required String studentName,
-    required String mohaffezName,
-    required DateTime slotStart,
-    required DateTime slotEnd,
-    required String sessionType,
-    required String timeSlot,
-    required Map<String, dynamic> additionalData,
-  }) async {
-    state = const AsyncValue.loading();
+/// Get sessions for a student
+final studentSessionsProvider = StreamProvider.family<List<SessionModel>, String>(
+  (ref, studentId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => SessionModel.fromFirestore(doc)).toList());
+  },
+);
 
-    try {
-      final sessionId = await _repository.createSessionRequest(
-        mohaffezId: mohaffezId,
-        studentId: studentId,
-        studentName: studentName,
-        mohaffezName: mohaffezName,
-        slotStart: slotStart,
-        slotEnd: slotEnd,
-        sessionType: sessionType,
-        timeSlot: timeSlot,
-        additionalData: additionalData,
-      );
+/// Get accepted sessions for a student
+final acceptedStudentSessionsProvider = StreamProvider.family<List<SessionModel>, String>(
+  (ref, studentId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: studentId)
+        .where('status', isEqualTo: 'accepted')
+        .orderBy('sessionDate', descending: false)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => SessionModel.fromFirestore(doc)).toList());
+  },
+);
 
-      final result = BookingResult.success(sessionId);
-      state = AsyncValue.data(result);
-      return result;
-    } catch (e, stack) {
-      final result = BookingResult.failure('فشل إنشاء الطلب: ${e.toString()}');
-      state = AsyncValue.error(e, stack);
-      return result;
-    }
-  }
+/// Get single session by ID
+final sessionByIdProvider = StreamProvider.family<SessionModel?, String>(
+  (ref, sessionId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .doc(sessionId)
+        .snapshots()
+        .map((snapshot) {
+      if (!snapshot.exists) return null;
+      return SessionModel.fromFirestore(snapshot);
+    });
+  },
+);
 
-  // FIXED LINE 98: Removed const
-  void reset() {
-    state = AsyncValue.data(
-      BookingResult(success: false, sessionId: null, errorMessage: null)
-    );
-  }
-}
+// ==================== SESSION ACTIONS PROVIDER ====================
 
-final sessionBookingProvider = StateNotifierProvider<
-    SessionBookingNotifier,
-    AsyncValue<BookingResult>
->((ref) {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return SessionBookingNotifier(repository);
-});
+/// Provider for session actions (accept, reject, complete, etc.)
+final sessionActionsProvider = StateNotifierProvider<SessionActionsNotifier, AsyncValue<void>>(
+  (ref) {
+    final repository = ref.watch(sessionRepositoryProvider);
+    return SessionActionsNotifier(repository);
+  },
+);
 
-// ============================================================================
-// SESSION ACTIONS NOTIFIER
-// ============================================================================
-
+/// Session actions notifier - handles all session state changes
 class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   final SessionRepository _repository;
 
   SessionActionsNotifier(this._repository) : super(const AsyncValue.data(null));
 
-  Future<void> acceptRequest(String requestId) async {
+  /// Accept a session request
+  Future<void> acceptRequest(String sessionId) async {
     state = const AsyncValue.loading();
-    try {
-      await _repository.acceptRequest(requestId);
-      state = const AsyncValue.data(null);
-    } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
-      rethrow;
-    }
+    state = await AsyncValue.guard(() async {
+      await _repository.acceptRequest(sessionId);
+    });
   }
 
-  Future<void> rejectRequest(String requestId) async {
+  /// Reject a session request
+  Future<void> rejectRequest(String sessionId) async {
     state = const AsyncValue.loading();
-    try {
-      await _repository.rejectRequest(requestId);
-      state = const AsyncValue.data(null);
-    } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
-      rethrow;
-    }
+    state = await AsyncValue.guard(() async {
+      await _repository.rejectRequest(sessionId);
+    });
   }
 
+  /// Complete a session
+  Future<void> completeSession(String sessionId) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await FirebaseFirestore.instance.collection('hafizSessions').doc(sessionId).update({
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// Cancel a session
+  Future<void> cancelSession(String sessionId, String reason) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await FirebaseFirestore.instance.collection('hafizSessions').doc(sessionId).update({
+        'status': 'cancelled',
+        'cancellationReason': reason,
+        'cancelledAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// Update session assignment (hifz, muraja, rating, notes)
   Future<void> updateAssignment({
     required String sessionId,
-    required String hifzAssignment,
-    required String murajaAssignment,
-    required int rating,
-    required String notes,
+    String? hifzAssignment,
+    String? murajaAssignment,
+    int? rating,
+    String? notes,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await _repository.updateSessionAssignment(
+        sessionId: sessionId,
+        hifzAssignment: hifzAssignment ?? '',
+        murajaAssignment: murajaAssignment ?? '',
+        rating: rating ?? 0,
+        notes: notes ?? '',
+      );
+    });
+  }
+
+  /// Update session date
+  Future<void> updateSessionDate({
+    required String sessionId,
+    required DateTime sessionDate,
+    required DateTime slotStart,
+    required DateTime slotEnd,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await FirebaseFirestore.instance.collection('hafizSessions').doc(sessionId).update({
+        'sessionDate': Timestamp.fromDate(sessionDate),
+        'slotStart': Timestamp.fromDate(slotStart),
+        'slotEnd': Timestamp.fromDate(slotEnd),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// Book a new session (for students)
+  Future<String> bookSession({
+    required String mohaffezId,
+    required String studentId,
+    required String studentName,
+    required String mohaffezName,
+    required String sessionType,
+    required String preferredTimeSlot,
+    String? location,
+    String? notes,
+    double? imamAddressLat,
+    double? imamAddressLng,
   }) async {
     state = const AsyncValue.loading();
     try {
-      await _repository.updateSessionAssignment(
-        sessionId: sessionId,
-        hifzAssignment: hifzAssignment,
-        murajaAssignment: murajaAssignment,
-        rating: rating,
-        notes: notes,
-      );
+      final docRef = await FirebaseFirestore.instance.collection('hafizSessions').add({
+        'mohaffezId': mohaffezId,
+        'studentId': studentId,
+        'studentName': studentName,
+        'mohaffezName': mohaffezName,
+        'sessionType': sessionType,
+        'preferredTimeSlot': preferredTimeSlot,
+        'location': location ?? '',
+        'sessionNotes': notes,
+        'imamAddressLat': imamAddressLat,
+        'imamAddressLng': imamAddressLng,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'hifzAssignment': null,
+        'murajaAssignment': null,
+        'sessionRating': 0,
+        'juzCount': 1,
+      });
       state = const AsyncValue.data(null);
+      return docRef.id;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
       rethrow;
     }
   }
+
+  /// Rate a completed session (for students)
+  Future<void> rateSession({
+    required String sessionId,
+    required int rating,
+    String? feedback,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await FirebaseFirestore.instance.collection('hafizSessions').doc(sessionId).update({
+        'studentRating': rating,
+        'studentFeedback': feedback,
+        'ratedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
 }
 
-final sessionActionsProvider = StateNotifierProvider<
-    SessionActionsNotifier,
-    AsyncValue<void>
->((ref) {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return SessionActionsNotifier(repository);
+// ==================== SESSION BOOKING PROVIDER (Alternative Service) ====================
+
+/// Alternative booking service provider
+final sessionBookingProvider = Provider((ref) {
+  return SessionBookingService();
 });
 
-// ============================================================================
-// FUTURE PROVIDERS (One-time queries)
-// ============================================================================
+/// Session booking service for creating and managing sessions
+class SessionBookingService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-/// Get upcoming sessions for mohaffez
-final upcomingSessionsProvider = FutureProvider.family<
-    List<SessionModel>,
-    String
->((ref, mohaffezId) async {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return repository.getUpcomingSessions(mohaffezId);
-});
+  /// Create a new session request
+  Future<String> createSession({
+    required String mohaffezId,
+    required String studentId,
+    required String studentName,
+    required String mohaffezName,
+    required String sessionType,
+    required String preferredTimeSlot,
+    String? location,
+    String? notes,
+    double? imamAddressLat,
+    double? imamAddressLng,
+  }) async {
+    final docRef = await _firestore.collection('hafizSessions').add({
+      'mohaffezId': mohaffezId,
+      'studentId': studentId,
+      'studentName': studentName,
+      'mohaffezName': mohaffezName,
+      'sessionType': sessionType,
+      'preferredTimeSlot': preferredTimeSlot,
+      'location': location ?? '',
+      'sessionNotes': notes,
+      'imamAddressLat': imamAddressLat,
+      'imamAddressLng': imamAddressLng,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
 
-/// Get session by ID
-final sessionByIdProvider = FutureProvider.family<
-    SessionModel?,
-    String
->((ref, sessionId) async {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return repository.getSessionById(sessionId);
-});
+  /// Accept a session request
+  Future<void> acceptSession(String sessionId) async {
+    await _firestore.collection('hafizSessions').doc(sessionId).update({
+      'status': 'accepted',
+      'acceptedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
-/// Get request by ID
-final requestByIdProvider = FutureProvider.family<
-    SessionRequestModel?,
-    String
->((ref, requestId) async {
-  final repository = ref.watch(sessionRepositoryProvider);
-  return repository.getRequestById(requestId);
-});
+  /// Reject a session request
+  Future<void> rejectSession(String sessionId) async {
+    await _firestore.collection('hafizSessions').doc(sessionId).update({
+      'status': 'rejected',
+      'rejectedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
-/// Get mohaffez session count
-final mohaffezSessionCountProvider = FutureProvider.family<int, String>(
-  (ref, mohaffezId) async {
-    final repository = ref.watch(sessionRepositoryProvider);
-    return repository.getMohaffezSessionCount(mohaffezId);
+  /// Complete a session
+  Future<void> completeSession(String sessionId) async {
+    await _firestore.collection('hafizSessions').doc(sessionId).update({
+      'status': 'completed',
+      'completedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Cancel a session
+  Future<void> cancelSession(String sessionId, String reason) async {
+    await _firestore.collection('hafizSessions').doc(sessionId).update({
+      'status': 'cancelled',
+      'cancellationReason': reason,
+      'cancelledAt': FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+// ==================== SESSION STATISTICS PROVIDER ====================
+
+/// Get session statistics for a mohaffez
+final sessionStatsProvider = StreamProvider.family<SessionStats, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .snapshots()
+        .map((snapshot) {
+      int total = snapshot.docs.length;
+      int pending = 0;
+      int accepted = 0;
+      int completed = 0;
+      int rejected = 0;
+      int cancelled = 0;
+
+      for (var doc in snapshot.docs) {
+        final status = doc.data()['status'] as String?;
+        switch (status) {
+          case 'pending':
+            pending++;
+            break;
+          case 'accepted':
+            accepted++;
+            break;
+          case 'completed':
+            completed++;
+            break;
+          case 'rejected':
+            rejected++;
+            break;
+          case 'cancelled':
+            cancelled++;
+            break;
+        }
+      }
+
+      return SessionStats(
+        total: total,
+        pending: pending,
+        accepted: accepted,
+        completed: completed,
+        rejected: rejected,
+        cancelled: cancelled,
+      );
+    });
   },
 );
 
-/// Get student session count
-final studentSessionCountProvider = FutureProvider.family<int, String>(
-  (ref, studentId) async {
-    final repository = ref.watch(sessionRepositoryProvider);
-    return repository.getStudentSessionCount(studentId);
-  },
-);
+/// Session statistics model
+class SessionStats {
+  final int total;
+  final int pending;
+  final int accepted;
+  final int completed;
+  final int rejected;
+  final int cancelled;
+
+  SessionStats({
+    required this.total,
+    required this.pending,
+    required this.accepted,
+    required this.completed,
+    required this.rejected,
+    required this.cancelled,
+  });
+}

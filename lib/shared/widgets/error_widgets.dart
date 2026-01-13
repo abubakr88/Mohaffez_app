@@ -137,17 +137,21 @@ class ErrorDisplay extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Animated icon with scale and fade
+              // ✅ FIXED: Animated icon with safe scale and opacity
               ExcludeSemantics(
                 child: TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 600),
+                  duration: const Duration(milliseconds: 680),
                   tween: Tween(begin: 0.0, end: 1.0),
                   curve: Curves.elasticOut,
-                  builder: (context, value, child) {
+                  builder: (context, animationValue, child) {
+                    // Separate scale and opacity calculations
+                    final scaleValue = animationValue;
+                    final opacityValue = animationValue.clamp(0.0, 1.0);
+                    
                     return Transform.scale(
-                      scale: value,
+                      scale: scaleValue,
                       child: Opacity(
-                        opacity: value,
+                        opacity: opacityValue, // ✅ FIXED: Safe opacity
                         child: child,
                       ),
                     );
@@ -159,7 +163,6 @@ class ErrorDisplay extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
 
               // Title (excluded from semantics as it's in main label)
@@ -180,7 +183,7 @@ class ErrorDisplay extends StatelessWidget {
                 const SizedBox(height: 8),
                 ExcludeSemantics(
                   child: Text(
-                    message!,
+                    message!, // ✅ FIXED: Non-null assertion
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -240,6 +243,7 @@ class ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ FIX: Define local variables instead of undefined ones
     final bgColor = backgroundColor ?? Colors.red.shade50;
     final txtColor = textColor ?? Colors.red.shade700;
 

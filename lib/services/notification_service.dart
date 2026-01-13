@@ -9,12 +9,12 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   // Notification channel ID - matches AndroidManifest.xml
-  static const String _channelId = 'mohaffez_finder_channel';
-  static const String _channelName = 'Mohaffez Finder Notifications';
-  static const String _channelDescription =
+  static const String channelId = 'mohaffez_finder_channel';
+  static const String channelName = 'Mohaffez Finder Notifications';
+  static const String channelDescription =
       'Notifications for Quran sessions and lessons';
 
-  // Initialize notifications
+  /// Initialize notifications
   static Future<void> initialize() async {
     // Request permission for iOS
     NotificationSettings settings = await _messaging.requestPermission(
@@ -55,15 +55,15 @@ class NotificationService {
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         // Handle notification tap
         print('Notification tapped: ${response.payload}');
-        _handleNotificationTap(response.payload);
+        handleNotificationTap(response.payload);
       },
     );
 
     // Create notification channel for Android 8.0+
-    await _createNotificationChannel();
+    await createNotificationChannel();
 
     // Get and save FCM token
-    await _saveFCMToken();
+    await saveFCMToken();
 
     // Listen for token refresh
     _messaging.onTokenRefresh.listen(_updateFCMToken);
@@ -75,12 +75,12 @@ class NotificationService {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
 
-  // Create Android notification channel
-  static Future<void> _createNotificationChannel() async {
+  /// Create Android notification channel
+  static Future<void> createNotificationChannel() async {
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      _channelId,
-      _channelName,
-      description: _channelDescription,
+      channelId,
+      channelName,
+      description: channelDescription,
       importance: Importance.high,
       playSound: true,
     );
@@ -91,8 +91,8 @@ class NotificationService {
         ?.createNotificationChannel(channel);
   }
 
-  // Save FCM token to Firestore
-  static Future<void> _saveFCMToken() async {
+  /// Save FCM token to Firestore
+  static Future<void> saveFCMToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -105,10 +105,11 @@ class NotificationService {
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       });
+      print('FCM Token saved: $token');
     }
   }
 
-  // Update FCM token when it refreshes
+  /// Update FCM token when it refreshes
   static Future<void> _updateFCMToken(String token) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -124,7 +125,7 @@ class NotificationService {
     print('FCM Token updated: $token');
   }
 
-  // Handle foreground messages
+  /// Handle foreground messages
   static Future<void> _handleForegroundMessage(RemoteMessage message) async {
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
@@ -136,9 +137,9 @@ class NotificationService {
         notification.body,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
+            channelId,
+            channelName,
+            channelDescription: channelDescription,
             importance: Importance.max,
             priority: Priority.high,
             icon: '@mipmap/ic_launcher',
@@ -156,8 +157,8 @@ class NotificationService {
     }
   }
 
-  // Handle notification tap
-  static void _handleNotificationTap(String? payload) {
+  /// Handle notification tap
+  static void handleNotificationTap(String? payload) {
     if (payload != null) {
       print('Notification payload: $payload');
       // Handle navigation based on payload
@@ -165,7 +166,7 @@ class NotificationService {
     }
   }
 
-  // Send notification to followers (Stores in Firestore, actual push via Cloud Functions)
+  /// Send notification to followers (Stores in Firestore, actual push via Cloud Functions)
   static Future<void> notifyFollowers({
     required String mohaffezId,
     required String title,
@@ -190,17 +191,15 @@ class NotificationService {
           .collection('users')
           .doc(mohaffezId)
           .get();
-      final mohaffezName =
-          mohaffezDoc.data()?['name'] as String? ?? 'الشيخ';
+
+      final mohaffezName = mohaffezDoc.data()?['name'] as String? ?? '';
 
       // Create notification document for each follower
       for (final doc in followersSnapshot.docs) {
         final studentId = doc.data()['studentId'] as String;
 
         // Save notification to Firestore
-        await FirebaseFirestore.instance
-            .collection('notifications')
-            .add({
+        await FirebaseFirestore.instance.collection('notifications').add({
           'userId': studentId,
           'mohaffezId': mohaffezId,
           'mohaffezName': mohaffezName,
@@ -217,8 +216,8 @@ class NotificationService {
             .collection('users')
             .doc(studentId)
             .get();
-        final fcmToken = userDoc.data()?['fcmToken'] as String?;
 
+        final fcmToken = userDoc.data()?['fcmToken'] as String?;
         if (fcmToken != null) {
           print('Would send push to FCM token: $fcmToken');
           // TODO: Send actual push notification via Cloud Functions or backend
@@ -237,7 +236,7 @@ class NotificationService {
     }
   }
 
-  // Send notification to specific user
+  /// Send notification to specific user
   static Future<void> notifyUser({
     required String userId,
     required String title,
@@ -248,9 +247,7 @@ class NotificationService {
     String? mohaffezName,
   }) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('notifications')
-          .add({
+      await FirebaseFirestore.instance.collection('notifications').add({
         'userId': userId,
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
@@ -269,7 +266,7 @@ class NotificationService {
   }
 }
 
-// Background message handler (must be top-level function)
+/// Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('Handling background message: ${message.messageId}');

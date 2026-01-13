@@ -1,5 +1,3 @@
-// lib/screens/home_shell.dart (FIXED - Line 172)
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,12 +6,12 @@ import 'mohaffez_home.dart';
 import 'profile_screen.dart';
 import 'notifications_screen.dart';
 import 'nearby_mohaffez_screen.dart';
-import 'auth_screen.dart';
+import 'login_screen.dart';
 import '../shared/widgets/offline_banner.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../providers/notification_provider.dart'; // ADD THIS IMPORT
+import '../providers/notification_provider.dart';
 import '../services/cache_service.dart';
 
 class HomeShell extends ConsumerWidget {
@@ -26,7 +24,7 @@ class HomeShell extends ConsumerWidget {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const AuthScreen();
+          return const LoginScreen();
         }
         return AuthenticatedShell(user: user);
       },
@@ -41,7 +39,7 @@ class HomeShell extends ConsumerWidget {
 class AuthenticatedShell extends ConsumerWidget {
   final user;
 
-  const AuthenticatedShell({required this.user});
+  const AuthenticatedShell({super.key, required this.user});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,22 +47,22 @@ class AuthenticatedShell extends ConsumerWidget {
     final isMohaffez = user.role == 'mohaffez';
 
     final screens = isMohaffez
-        ? const [
-            MohaffezHome(),
-            NotificationsScreen(),
-            ProfileScreen(),
+        ? [
+            const MohaffezHome(),
+            const NotificationsScreen(),
+            const ProfileScreen(),
           ]
-        : const [
-            StudentHome(),
-            NearbyMohaffezScreen(),
-            NotificationsScreen(),
-            ProfileScreen(),
+        : [
+            const StudentHome(),
+            const NearbyMohaffezScreen(),
+            const NotificationsScreen(),
+            const ProfileScreen(),
           ];
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: buildAppBar(context, ref, isMohaffez, currentIndex),
+        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex),
         body: Column(
           children: [
             const OfflineBanner(),
@@ -76,13 +74,13 @@ class AuthenticatedShell extends ConsumerWidget {
             ),
           ],
         ),
-        bottomNavigationBar: buildBottomNavBar(ref, isMohaffez, currentIndex),
-        drawer: buildDrawer(context, ref),
+        bottomNavigationBar: _buildBottomNavBar(ref, isMohaffez, currentIndex),
+        drawer: _buildDrawer(context, ref),
       ),
     );
   }
 
-  PreferredSizeWidget buildAppBar(
+  PreferredSizeWidget _buildAppBar(
     BuildContext context,
     WidgetRef ref,
     bool isMohaffez,
@@ -98,20 +96,20 @@ class AuthenticatedShell extends ConsumerWidget {
           case 2:
             return 'الملف الشخصي';
           default:
-            return 'محفظ';
+            return 'محفظي';
         }
       } else {
         switch (currentIndex) {
           case 0:
             return 'الرئيسية';
           case 1:
-            return 'البحث عن محفظين';
+            return 'البحث عن محفظ';
           case 2:
             return 'الإشعارات';
           case 3:
             return 'الملف الشخصي';
           default:
-            return 'طالب';
+            return 'محفظي';
         }
       }
     }
@@ -164,18 +162,15 @@ class AuthenticatedShell extends ConsumerWidget {
           actions: [
             // Notification badge - only show when not on notifications screen
             if (currentIndex != (isMohaffez ? 1 : 2))
-              buildNotificationBadge(ref, isMohaffez),
+              _buildNotificationBadge(ref, isMohaffez),
           ],
         ),
       ),
     );
   }
 
-  Widget buildNotificationBadge(WidgetRef ref, bool isMohaffez) {
-    // FIXED: Use the correct provider with user ID
-    final unreadCountAsync = ref.watch(
-      unreadCountProvider(user.uid), // Pass user ID
-    );
+  Widget _buildNotificationBadge(WidgetRef ref, bool isMohaffez) {
+    final unreadCountAsync = ref.watch(unreadCountProvider(user.uid));
 
     return unreadCountAsync.when(
       data: (unreadCount) {
@@ -184,11 +179,9 @@ class AuthenticatedShell extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.notifications),
               tooltip: 'الإشعارات',
-              onPressed: () {
-                ref.read(bottomNavIndexProvider.notifier).setIndex(
-                      isMohaffez ? 1 : 2,
-                    );
-              },
+              onPressed: () => ref
+                  .read(bottomNavIndexProvider.notifier)
+                  .setIndex(isMohaffez ? 1 : 2),
             ),
             if (unreadCount > 0)
               Positioned(
@@ -220,30 +213,25 @@ class AuthenticatedShell extends ConsumerWidget {
       },
       loading: () => IconButton(
         icon: const Icon(Icons.notifications),
-        onPressed: () {
-          ref.read(bottomNavIndexProvider.notifier).setIndex(
-                isMohaffez ? 1 : 2,
-              );
-        },
+        onPressed: () => ref
+            .read(bottomNavIndexProvider.notifier)
+            .setIndex(isMohaffez ? 1 : 2),
       ),
       error: (_, __) => IconButton(
         icon: const Icon(Icons.notifications),
-        onPressed: () {
-          ref.read(bottomNavIndexProvider.notifier).setIndex(
-                isMohaffez ? 1 : 2,
-              );
-        },
+        onPressed: () => ref
+            .read(bottomNavIndexProvider.notifier)
+            .setIndex(isMohaffez ? 1 : 2),
       ),
     );
   }
 
-  Widget buildBottomNavBar(WidgetRef ref, bool isMohaffez, int currentIndex) {
+  Widget _buildBottomNavBar(WidgetRef ref, bool isMohaffez, int currentIndex) {
     if (isMohaffez) {
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) {
-          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
-        },
+        onTap: (index) =>
+            ref.read(bottomNavIndexProvider.notifier).setIndex(index),
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
@@ -258,16 +246,15 @@ class AuthenticatedShell extends ConsumerWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'الملف الشخصي',
+            label: 'الحساب',
           ),
         ],
       );
     } else {
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) {
-          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
-        },
+        onTap: (index) =>
+            ref.read(bottomNavIndexProvider.notifier).setIndex(index),
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
@@ -286,14 +273,14 @@ class AuthenticatedShell extends ConsumerWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'الملف الشخصي',
+            label: 'الحساب',
           ),
         ],
       );
     }
   }
 
-  Widget buildDrawer(BuildContext context, WidgetRef ref) {
+  Widget _buildDrawer(BuildContext context, WidgetRef ref) {
     return Drawer(
       child: ListView(
         children: [
@@ -330,10 +317,8 @@ class AuthenticatedShell extends ConsumerWidget {
             leading: const Icon(Icons.logout),
             title: const Text('تسجيل الخروج'),
             onTap: () async {
-              await logout(ref);
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
+              Navigator.pop(context); // Close drawer first
+              await _logout(ref, context);
             },
           ),
         ],
@@ -341,11 +326,32 @@ class AuthenticatedShell extends ConsumerWidget {
     );
   }
 
-  Future<void> logout(WidgetRef ref) async {
-    await FirebaseAuth.instance.signOut();
-    await CacheService.clearAll();
-    ref.invalidate(currentUserProvider);
-    ref.read(bottomNavIndexProvider.notifier).reset();
+  Future<void> _logout(WidgetRef ref, BuildContext context) async {
+    try {
+      // Invalidate providers BEFORE logout
+      ref.invalidate(currentUserProvider);
+      ref.read(bottomNavIndexProvider.notifier).reset();
+
+      // Sign out from Firebase
+      await FirebaseAuth.instance.signOut();
+
+      // Clear cache
+      await CacheService.clearAll();
+
+      // Navigate to login screen
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ في تسجيل الخروج: $e')),
+        );
+      }
+    }
   }
 }
 
@@ -375,7 +381,7 @@ class LoadingScreen extends StatelessWidget {
 class ErrorScreen extends StatelessWidget {
   final VoidCallback onRetry;
 
-  const ErrorScreen({required this.onRetry, super.key});
+  const ErrorScreen({super.key, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -393,7 +399,7 @@ class ErrorScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'حدث خطأ أثناء تحميل البيانات',
+                'حدث خطأ',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

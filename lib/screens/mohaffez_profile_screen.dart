@@ -13,61 +13,49 @@ import '../providers/user_provider.dart';
 import '../providers/session_provider.dart';
 import '../services/follow_service.dart';
 import '../shared/utils/error_handler.dart';
+import '../models/booking_result.dart'; // ADD THIS IMPORT
 
 // Provider for mohaffez profile data
-final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>(
-  (ref, mohaffezId) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(mohaffezId)
-        .get();
-
-    if (!doc.exists) {
-      throw Exception('المحفظ غير موجود');
-    }
-
-    return {
-      ...doc.data()!,
-      'uid': doc.id,
-    };
-  },
-);
+final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, mohaffezId) async {
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(mohaffezId)
+      .get();
+  
+  if (!doc.exists) throw Exception('المحفظ غير موجود');
+  
+  return {...doc.data()!, 'uid': doc.id};
+});
 
 // Provider for follow status
-final followStatusProvider = StreamProvider.family<bool, String>(
-  (ref, mohaffezId) async* {
-    final currentUser = ref.watch(currentUserProvider).value;
-    if (currentUser == null) {
-      yield false;
-      return;
-    }
-
-    yield* FirebaseFirestore.instance
-        .collection('follows')
-        .where('studentId', isEqualTo: currentUser.uid)
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.isNotEmpty);
-  },
-);
+final followStatusProvider = StreamProvider.family<bool, String>((ref, mohaffezId) async* {
+  final currentUser = ref.watch(currentUserProvider).value;
+  
+  if (currentUser == null) {
+    yield false;
+    return;
+  }
+  
+  yield* FirebaseFirestore.instance
+      .collection('follows')
+      .where('studentId', isEqualTo: currentUser.uid)
+      .where('mohaffezId', isEqualTo: mohaffezId)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.isNotEmpty);
+});
 
 // Provider for credentials
-final credentialsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, mohaffezId) {
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(mohaffezId)
-        .collection('credentials')
-        .where('status', isEqualTo: 'approved')
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  ...doc.data(),
-                  'id': doc.id,
-                })
-            .toList());
-  },
-);
+final credentialsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, mohaffezId) {
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(mohaffezId)
+      .collection('credentials')
+      .where('status', isEqualTo: 'approved')
+      .snapshots()
+      .map((snapshot) => snapshot.docs
+          .map((doc) => {...doc.data(), 'id': doc.id})
+          .toList());
+});
 
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -86,8 +74,8 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
-  bool _isFollowing = false;
-  bool _loadingFollow = false;
+  bool isFollowing = false;
+  bool loadingFollow = false;
 
   @override
   Widget build(BuildContext context) {
@@ -96,10 +84,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
     // Update local follow state
     followStatusAsync.whenData((isFollowing) {
-      if (_isFollowing != isFollowing) {
+      if (this.isFollowing != isFollowing) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            setState(() => _isFollowing = isFollowing);
+            setState(() {
+              this.isFollowing = isFollowing;
+            });
           }
         });
       }
@@ -145,7 +135,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 
   Widget _buildContent(Map<String, dynamic> profile) {
-    final name = profile['name'] as String? ?? 'بدون اسم';
+    final name = profile['name'] as String? ?? 'غير متوفر';
     final photoUrl = profile['photoUrl'] as String?;
     final bio = profile['bio'] as String?;
     final specialization = profile['specialization'] as String?;
@@ -158,10 +148,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
     // Calculate distance if user location is available
     String? distanceText;
-    if (widget.userLat != null &&
-        widget.userLng != null &&
-        addressLat != null &&
-        addressLng != null) {
+    if (widget.userLat != null && widget.userLng != null && addressLat != null && addressLng != null) {
       final distance = LocationUtils.calculateDistance(
         widget.userLat!,
         widget.userLng!,
@@ -169,7 +156,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         addressLng,
       );
       distanceText = distance < 1
-          ? '${(distance * 1000).round()} م'
+          ? '${(distance * 1000).round()} متر'
           : '${distance.toStringAsFixed(1)} كم';
     }
 
@@ -224,7 +211,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   CachedAvatar(
                     imageUrl: photoUrl,
                     radius: 50,
-                    semanticLabel: 'صورة $name',
+                    semanticLabel: name,
                   ),
                 ],
               ),
@@ -342,11 +329,11 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _loadingFollow ? null : _toggleFollow,
-        icon: Icon(_isFollowing ? Icons.person_remove : Icons.person_add),
-        label: Text(_isFollowing ? 'إلغاء المتابعة' : 'متابعة'),
+        onPressed: loadingFollow ? null : _toggleFollow,
+        icon: Icon(isFollowing ? Icons.person_remove : Icons.person_add),
+        label: Text(isFollowing ? 'إلغاء المتابعة' : 'متابعة'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: _isFollowing ? Colors.grey : AppTheme.accentGreen,
+          backgroundColor: isFollowing ? Colors.grey : AppTheme.accentGreen,
           padding: const EdgeInsets.symmetric(vertical: 12),
         ),
       ),
@@ -376,7 +363,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               Icon(Icons.info_outline, color: AppTheme.primaryAmber, size: 20),
               SizedBox(width: 8),
               Text(
-                'نبذة عني',
+                'نبذة تعريفية',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -443,9 +430,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  final uri = Uri.parse(
-                    'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
-                  );
+                  final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 },
                 icon: const Icon(Icons.map, size: 18),
@@ -460,13 +445,11 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   Widget _buildCredentialsSection() {
     final credentialsAsync = ref.watch(credentialsProvider(widget.mohaffezId));
-
+    
     return credentialsAsync.when(
       data: (credentials) {
-        if (credentials.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
+        if (credentials.isEmpty) return const SizedBox.shrink();
+        
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           padding: const EdgeInsets.all(16),
@@ -499,10 +482,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ),
               const SizedBox(height: 12),
               ...credentials.map((cred) {
-                final title = cred['title'] as String? ?? '';
-                final organization = cred['organization'] as String? ?? '';
+                final title = cred['title'] as String? ?? 'غير محدد';
+                final organization = cred['organization'] as String? ?? 'غير محدد';
                 final type = cred['type'] as String? ?? '';
-
+                
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
@@ -544,7 +527,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     ],
                   ),
                 );
-              }),
+              }).toList(),
             ],
           ),
         );
@@ -637,7 +620,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 },
                 icon: Icon(Icons.phone, color: Colors.green.shade600),
-                label: const Text('تواصل عبر واتساب'),
+                label: const Text('التواصل عبر واتساب'),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: Colors.green.shade600),
                   foregroundColor: Colors.green.shade600,
@@ -652,31 +635,25 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 
   Future<void> _toggleFollow() async {
-    setState(() => _loadingFollow = true);
-
+    setState(() => loadingFollow = true);
+    
     try {
-      if (_isFollowing) {
+      if (isFollowing) {
         await FollowService.unfollowMohaffez(widget.mohaffezId);
-        if (mounted) {
-          ErrorHandler.showSuccess(context, 'تم إلغاء المتابعة');
-        }
+        if (mounted) ErrorHandler.showSuccess(context, 'تم إلغاء المتابعة');
       } else {
         await FollowService.followMohaffez(widget.mohaffezId);
-        if (mounted) {
-          ErrorHandler.showSuccess(context, 'تمت المتابعة بنجاح');
-        }
+        if (mounted) ErrorHandler.showSuccess(context, 'تمت المتابعة بنجاح');
       }
-
+      
       // Refresh profile and follow status
       ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
       ref.invalidate(followStatusProvider(widget.mohaffezId));
     } catch (e) {
-      if (mounted) {
-        ErrorHandler.showError(context, e);
-      }
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
-        setState(() => _loadingFollow = false);
+        setState(() => loadingFollow = false);
       }
     }
   }
@@ -685,17 +662,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     final currentUser = ref.read(currentUserProvider).value;
     
     if (currentUser == null) {
-      ErrorHandler.showError(context, 'يجب تسجيل الدخول أولاً');
+      ErrorHandler.showError(context, 'يرجى تسجيل الدخول أولاً');
       return;
     }
-
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => _BookingSheet(
+      builder: (context) => BookingSheet(
         mohaffezId: widget.mohaffezId,
         studentId: currentUser.uid,
         studentName: currentUser.name,
@@ -704,31 +681,32 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 }
 
-class _BookingSheet extends ConsumerStatefulWidget {
+class BookingSheet extends ConsumerStatefulWidget {
   final String mohaffezId;
   final String studentId;
   final String studentName;
 
-  const _BookingSheet({
+  const BookingSheet({
+    super.key,
     required this.mohaffezId,
     required this.studentId,
     required this.studentName,
   });
 
   @override
-  ConsumerState<_BookingSheet> createState() => _BookingSheetState();
+  ConsumerState<BookingSheet> createState() => _BookingSheetState();
 }
 
-class _BookingSheetState extends ConsumerState<_BookingSheet> {
-  String _sessionType = 'حفظ';
-  String _selectedTimeSlot = '08:00';
-  DateTime _selectedDate = DateTime.now();
-  bool _submitting = false;
+class _BookingSheetState extends ConsumerState<BookingSheet> {
+  String sessionType = 'منزل';
+  String selectedTimeSlot = '08:00';
+  DateTime selectedDate = DateTime.now();
+  bool submitting = false;
 
   @override
   Widget build(BuildContext context) {
     final mohaffezProfile = ref.watch(mohaffezProfileProvider(widget.mohaffezId)).value;
-
+    
     return Directionality(
       textDirection: TextDirection.rtl,
       child: DraggableScrollableSheet(
@@ -753,13 +731,14 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
+                
                 // Title
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       const Text(
-                        'حجز جلسة',
+                        'حجز جلسة جديدة',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -773,7 +752,9 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
                     ],
                   ),
                 ),
+                
                 const Divider(height: 1),
+                
                 // Content
                 Expanded(
                   child: SingleChildScrollView(
@@ -793,24 +774,26 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
-                          children: ['حفظ', 'مراجعة', 'حفظ ومراجعة'].map((type) {
+                          children: ['منزل', 'مسجد'].map((type) {
                             return ChoiceChip(
                               label: Text(type),
-                              selected: _sessionType == type,
+                              selected: sessionType == type,
                               onSelected: (selected) {
-                                setState(() => _sessionType = type);
+                                setState(() => sessionType = type);
                               },
                               selectedColor: AppTheme.primaryAmber,
                               labelStyle: TextStyle(
-                                color: _sessionType == type ? Colors.white : null,
+                                color: sessionType == type ? Colors.white : null,
                               ),
                             );
                           }).toList(),
                         ),
+                        
                         const SizedBox(height: 24),
+                        
                         // Date
                         const Text(
-                          'اختر التاريخ',
+                          'التاريخ',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -830,17 +813,19 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
                                 const Icon(Icons.calendar_today),
                                 const SizedBox(width: 12),
                                 Text(
-                                  '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                                   style: const TextStyle(fontSize: 16),
                                 ),
                               ],
                             ),
                           ),
                         ),
+                        
                         const SizedBox(height: 24),
+                        
                         // Time Slot
                         const Text(
-                          'اختر الوقت',
+                          'الوقت',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -850,24 +835,26 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: ScheduleConstants.quickSlots.map((slot) {
-                            return ChoiceChip(
-                              label: Text(slot),
-                              selected: _selectedTimeSlot == slot,
-                              onSelected: (selected) {
-                                setState(() => _selectedTimeSlot = slot);
-                              },
-                              selectedColor: AppTheme.accentGreen,
-                              labelStyle: TextStyle(
-                                color: _selectedTimeSlot == slot ? Colors.white : null,
-                              ),
-                            );
-                          }).toList(),
+                          children: ScheduleConstants.quickSlots
+                              .map((slot) {
+                                return ChoiceChip(
+                                  label: Text(slot),
+                                  selected: selectedTimeSlot == slot,
+                                  onSelected: (selected) {
+                                    setState(() => selectedTimeSlot = slot);
+                                  },
+                                  selectedColor: AppTheme.accentGreen,
+                                  labelStyle: TextStyle(
+                                    color: selectedTimeSlot == slot ? Colors.white : null,
+                                  ),
+                                );
+                              }).toList(),
                         ),
                       ],
                     ),
                   ),
                 ),
+                
                 // Submit Button
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -884,12 +871,12 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _submitting ? null : () => _submitBooking(mohaffezProfile),
+                      onPressed: submitting ? null : () => _submitBooking(mohaffezProfile),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryAmber,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: _submitting
+                      child: submitting
                           ? const SizedBox(
                               height: 20,
                               width: 20,
@@ -899,7 +886,7 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
                               ),
                             )
                           : const Text(
-                              'إرسال طلب الحجز',
+                              'تأكيد الحجز',
                               style: TextStyle(fontSize: 16),
                             ),
                     ),
@@ -916,68 +903,86 @@ class _BookingSheetState extends ConsumerState<_BookingSheet> {
   Future<void> _selectDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: selectedDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
     );
-
+    
     if (date != null) {
-      setState(() => _selectedDate = date);
+      setState(() => selectedDate = date);
     }
   }
 
   Future<void> _submitBooking(Map<String, dynamic>? mohaffezProfile) async {
     if (mohaffezProfile == null) return;
-
-    setState(() => _submitting = true);
-
+    
+    setState(() => submitting = true);
+    
     try {
-      // Parse time slot
-      final parts = _selectedTimeSlot.split(':');
-      final slotStart = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        int.parse(parts[0]),
-        int.parse(parts[1]),
-      );
-      final slotEnd = slotStart.add(const Duration(minutes: 45));
-
-      // Submit booking request
-      final notifier = ref.read(sessionBookingProvider.notifier);
-      final result = await notifier.requestSession(
+      final service = ref.read(sessionBookingProvider);
+      
+      // ✅ Make sure you're calling createSession (which uses .add())
+      // ❌ NOT calling an update method
+      final sessionId = await service.createSession(
         mohaffezId: widget.mohaffezId,
         studentId: widget.studentId,
         studentName: widget.studentName,
         mohaffezName: mohaffezProfile['name'] as String,
-        slotStart: slotStart,
-        slotEnd: slotEnd,
-        sessionType: _sessionType,
-        timeSlot: _selectedTimeSlot,
-        additionalData: {
-          'imamAddressText': mohaffezProfile['addressText'],
-          'imamAddressLat': mohaffezProfile['addressLat'],
-          'imamAddressLng': mohaffezProfile['addressLng'],
-          'mohaffezPhone': mohaffezProfile['phoneNumber'],
-        },
+        sessionType: sessionType,
+        preferredTimeSlot: selectedTimeSlot,
+        location: mohaffezProfile['addressText'],
+        imamAddressLat: mohaffezProfile['addressLat'],
+        imamAddressLng: mohaffezProfile['addressLng'],
       );
-
+      
+      print('✅ New session created: $sessionId');
+      
       if (!mounted) return;
-
-      if (result.success) {
-        Navigator.pop(context);
-        ErrorHandler.showSuccess(context, 'تم إرسال طلب الحجز بنجاح');
-      } else {
-        ErrorHandler.showError(context, result.errorMessage ?? 'فشل في إرسال الطلب');
-      }
+      
+      Navigator.pop(context);
+      ErrorHandler.showSuccess(context, 'تم إرسال طلب الحجز بنجاح');
     } catch (e) {
+      print('❌ Error creating session: $e');
       if (mounted) {
         ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
-        setState(() => _submitting = false);
+        setState(() => submitting = false);
       }
+    }
+  }
+}
+
+// ADD requestSession method to SessionBookingService in session_provider.dart
+extension SessionBookingServiceExtension on SessionBookingService {
+  Future<BookingResult> requestSession({
+    required String mohaffezId,
+    required String studentId,
+    required String studentName,
+    required String mohaffezName,
+    required DateTime slotStart,
+    required DateTime slotEnd,
+    required String sessionType,
+    required String preferredTimeSlot,
+    required Map<String, dynamic> additionalData,
+  }) async {
+    try {
+      final sessionId = await createSession(
+        mohaffezId: mohaffezId,
+        studentId: studentId,
+        studentName: studentName,
+        mohaffezName: mohaffezName, // ✅ ADD THIS FIELD
+        sessionType: sessionType,
+        preferredTimeSlot: preferredTimeSlot,
+        location: additionalData['imamAddressText'],
+        imamAddressLat: additionalData['imamAddressLat'],
+        imamAddressLng: additionalData['imamAddressLng'],
+      );
+      
+      return BookingResult.success(sessionId);
+    } catch (e) {
+      return BookingResult.failure(e.toString());
     }
   }
 }

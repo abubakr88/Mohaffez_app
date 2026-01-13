@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/cache_service.dart';
+import '../services/notification_service.dart';
 
 // Auth state provider - watches Firebase auth changes
 final authStateProvider = StreamProvider<User?>((ref) {
@@ -15,20 +16,19 @@ final authServiceProvider = Provider<AuthService>((ref) {
 
 // Authentication notifier for sign in/sign up operations
 class AuthNotifier extends StateNotifier<AsyncValue<void>> {
-  final AuthService _authService;
-  final Ref _ref;
+  final AuthService authService;
+  final Ref ref;
 
-  AuthNotifier(this._authService, this._ref) : super(const AsyncValue.data(null));
+  AuthNotifier(this.authService, this.ref) : super(const AsyncValue.data(null));
 
   Future<void> signIn({
     required String email,
     required String password,
   }) async {
     state = const AsyncValue.loading();
-
     state = await AsyncValue.guard(() async {
       // Sign in with Firebase
-      final cred = await _authService.signInWithEmailAndPassword(
+      final cred = await authService.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -46,8 +46,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
         await CacheService.saveUserName(data['name'] as String);
       }
 
+      // Save FCM Token for notifications
+      await NotificationService.saveFCMToken();
+
       // Invalidate user provider to refresh
-      _ref.invalidate(authStateProvider);
+      ref.invalidate(authStateProvider);
     });
   }
 
@@ -58,10 +61,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     required String role,
   }) async {
     state = const AsyncValue.loading();
-
     state = await AsyncValue.guard(() async {
       // Create user with Firebase
-      final cred = await _authService.createUserWithEmailAndPassword(
+      final cred = await authService.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -85,34 +87,38 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       await CacheService.saveUserRole(role);
       await CacheService.saveUserName(name);
 
+      // Save FCM Token for notifications
+      await NotificationService.saveFCMToken();
+
       // Invalidate user provider to refresh
-      _ref.invalidate(authStateProvider);
+      ref.invalidate(authStateProvider);
     });
   }
 
   Future<void> logout() async {
     state = const AsyncValue.loading();
-
     state = await AsyncValue.guard(() async {
-      await _authService.logout();
+      await authService.logout();
       await CacheService.clearAll();
-      
       // Invalidate all providers
-      _ref.invalidate(authStateProvider);
+      ref.invalidate(authStateProvider);
     });
   }
 
   Future<void> resetPassword(String email) async {
     state = const AsyncValue.loading();
-
     state = await AsyncValue.guard(() async {
-      await _authService.sendPasswordResetEmail(email);
+      await authService.sendPasswordResetEmail(email);
     });
+    // Reset state to data(null) after success so loading spinner goes away
+    if (!state.hasError) {
+      state = const AsyncValue.data(null);
+    }
   }
 }
 
-// Auth notifier provider
-final authNotifierProvider = StateNotifierProvider<AuthNotifier, AsyncValue<void>>((ref) {
+final authNotifierProvider =
+    StateNotifierProvider<AuthNotifier, AsyncValue<void>>((ref) {
   return AuthNotifier(ref.watch(authServiceProvider), ref);
 });
 

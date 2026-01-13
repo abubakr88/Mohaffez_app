@@ -1,5 +1,6 @@
+// models/session_model.dart
 import 'package:freezed_annotation/freezed_annotation.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_model.dart'; // for TimestampConverter
 
 part 'session_model.freezed.dart';
@@ -28,8 +29,18 @@ class SessionModel with _$SessionModel {
     @TimestampConverter() DateTime? slotStart,
     @TimestampConverter() DateTime? slotEnd,
     @TimestampConverter() DateTime? createdAt,
+    String? status, // ADD THIS - 'pending', 'accepted', 'completed', 'rejected', 'cancelled'
   }) = _SessionModel;
 
   factory SessionModel.fromJson(Map<String, dynamic> json) =>
       _$SessionModelFromJson(json);
+
+  // ADD THIS METHOD - Required for Firestore integration
+  factory SessionModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return SessionModel.fromJson({
+      ...data,
+      'id': doc.id,
+    });
+  }
 }

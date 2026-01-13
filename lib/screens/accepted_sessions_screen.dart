@@ -1,5 +1,3 @@
-// lib/screens/accepted_sessions_screen.dart (COMPLETE - ~220 lines)
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/widgets/paginated_list_view.dart';
@@ -10,6 +8,7 @@ import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
+import 'session_details_screen.dart';
 
 class AcceptedSessionsScreen extends ConsumerWidget {
   const AcceptedSessionsScreen({super.key});
@@ -21,9 +20,7 @@ class AcceptedSessionsScreen extends ConsumerWidget {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(
-            body: Center(child: Text('يرجى تسجيل الدخول')),
-          );
+          return const Scaffold(body: Center(child: Text('غير مسجل')));
         }
         return _buildContent(context, ref, user.uid);
       },
@@ -39,16 +36,17 @@ class AcceptedSessionsScreen extends ConsumerWidget {
   }
 
   Widget _buildContent(BuildContext context, WidgetRef ref, String studentId) {
-    final firstPageAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
-    final paginatedState = ref.watch(paginatedStudentSessionsProvider(studentId));
+    final firstPageAsync =
+        ref.watch(studentSessionsFirstPageProvider(studentId));
+    final paginatedState =
+        ref.watch(paginatedStudentSessionsProvider(studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('الجلسات المقبولة'),
+          title: const Text('الجلسات المكتملة'),
           actions: [
-            // Show total count
             if (paginatedState.items.isNotEmpty)
               Center(
                 child: Padding(
@@ -73,11 +71,11 @@ class AcceptedSessionsScreen extends ConsumerWidget {
               return IllustratedEmptyState(
                 illustration: EmptyStateIllustrations.noSessions(),
                 title: 'لا توجد جلسات',
-                message: 'لم يتم قبول أي جلسات بعد. ابحث عن محفظين في منطقتك!',
+                message: 'لم تقم بإتمام أي جلسات بعد!',
                 action: ElevatedButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.search),
-                  label: const Text('البحث عن محفظين'),
+                  label: const Text('ابحث عن محفظ'),
                 ),
               );
             }
@@ -94,18 +92,27 @@ class AcceptedSessionsScreen extends ConsumerWidget {
               itemBuilder: (context, session, index) {
                 final sessionType = session.sessionType ?? '';
                 final timeSlot = session.preferredTimeSlot ?? '';
-                final hasValidSubtitle = sessionType.isNotEmpty && timeSlot.isNotEmpty;
+                final hasValidSubtitle =
+                    sessionType.isNotEmpty && timeSlot.isNotEmpty;
 
                 return SessionCard(
-                  title: session.mohaffezName ?? 'غير محدد',
+                  title: session.mohaffezName ?? '',
                   subtitle: hasValidSubtitle ? '$sessionType - $timeSlot' : null,
-                  location: session.location ?? 'غير محدد',
+                  location: session.location ?? '',
                   dateTime: session.sessionDate ?? session.slotStart,
                   hifz: session.hifzAssignment ?? '',
                   muraja: session.murajaAssignment ?? '',
                   rating: session.sessionRating ?? 0,
                   notes: session.sessionNotes ?? '',
                   trailing: _buildTrailingActions(context, session),
+                  // Added navigation on tap
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SessionDetailsScreen(session: session),
+                      ),
+                    );
+                  },
                 );
               },
               
@@ -117,12 +124,12 @@ class AcceptedSessionsScreen extends ConsumerWidget {
               },
               
               // Refresh callback
-              onRefresh: () {
+              onRefresh: () async {
                 return ref
                     .read(paginatedStudentSessionsProvider(studentId).notifier)
                     .refresh();
               },
-              
+
               // Custom loading widget
               loadingWidget: const Column(
                 mainAxisSize: MainAxisSize.min,
@@ -130,12 +137,12 @@ class AcceptedSessionsScreen extends ConsumerWidget {
                   CircularProgressIndicator(),
                   SizedBox(height: 8),
                   Text(
-                    'جاري تحميل المزيد من الجلسات...',
+                    'جاري تحميل المزيد...',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
-              
+
               // Custom error builder
               errorBuilder: (error, retry) {
                 return Container(
@@ -148,7 +155,8 @@ class AcceptedSessionsScreen extends ConsumerWidget {
                   ),
                   child: Column(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                      const Icon(Icons.error_outline,
+                          color: Colors.red, size: 32),
                       const SizedBox(height: 8),
                       Text(
                         error,
@@ -171,8 +179,6 @@ class AcceptedSessionsScreen extends ConsumerWidget {
               },
             );
           },
-          
-          // Loading first page
           loading: () => Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -185,17 +191,16 @@ class AcceptedSessionsScreen extends ConsumerWidget {
               ),
             ),
           ),
-          
-          // Error loading first page
           error: (e, _) => ErrorDisplay.dataLoad(
-            onRetry: () => ref.invalidate(studentSessionsFirstPageProvider(studentId)),
+            onRetry: () =>
+                ref.invalidate(studentSessionsFirstPageProvider(studentId)),
           ),
         ),
       ),
     );
   }
 
-  Widget? _buildTrailingActions(BuildContext context, session) {
+  Widget? _buildTrailingActions(BuildContext context, dynamic session) {
     // Add actions like navigation to map, call mohaffez, etc.
     if (session.imamAddressLat != null && session.imamAddressLng != null) {
       return IconButton(
@@ -203,7 +208,7 @@ class AcceptedSessionsScreen extends ConsumerWidget {
         onPressed: () {
           // Navigate to map or open Google Maps
         },
-        tooltip: 'عرض الموقع على الخريطة',
+        tooltip: 'الموقع على الخريطة',
       );
     }
     return null;
