@@ -5,9 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/widgets/empty_state.dart';
-import '../shared/widgets/empty_state_illustrations.dart';
 import '../providers/user_provider.dart';
-import '../providers/session_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../shared/utils/error_handler.dart';
 import 'pending_requests_screen.dart'; // NEW - Create this screen
@@ -396,15 +394,15 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHomeContent> {
                 color: AppTheme.accentGreen,
               ),
             ),
-            title: Text(session.studentName),
-            subtitle: Text(
-              session.sessionDate != null
-                  ? '${session.sessionDate!.day}/${session.sessionDate!.month} - ${session.preferredTimeSlot ?? ""}'
-                  : session.preferredTimeSlot ?? '',
-            ),
+              title: Text(session['studentName'] as String? ?? 'غير معروف'),
+              subtitle: Text(
+                session['sessionDate'] != null  // ✅ Use bracket notation
+                  ? '${(session['sessionDate'] as DateTime).day}/${(session['sessionDate'] as DateTime).month} - ${session['preferredTimeSlot'] ?? ""}'
+                  : session['preferredTimeSlot'] as String? ?? '',
+              ),
             trailing: IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () => _showAssignmentDialog(session.id!),
+              onPressed: () => _showAssignmentDialog(session['id!']),
             ),
           ),
         );

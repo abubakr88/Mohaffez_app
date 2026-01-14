@@ -1,10 +1,11 @@
+// lib/screens/mohaffez_credentials_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-
 import '../services/credential_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
@@ -15,6 +16,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../shared/widgets/empty_state_illustrations.dart';
 import '../shared/widgets/empty_state.dart';
+
+// ============================================================================
+// MAIN SCREEN
+// ============================================================================
 
 class MohaffezCredentialsScreen extends StatefulWidget {
   const MohaffezCredentialsScreen({super.key});
@@ -206,6 +211,7 @@ class _MohaffezCredentialsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Status Header
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -237,11 +243,14 @@ class _MohaffezCredentialsScreenState
               ],
             ),
           ),
+
+          // Content
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Type Badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -263,7 +272,10 @@ class _MohaffezCredentialsScreenState
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
+                // Title
                 Text(
                   title,
                   style: const TextStyle(
@@ -271,7 +283,10 @@ class _MohaffezCredentialsScreenState
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 4),
+
+                // Organization
                 Row(
                   children: [
                     Icon(Icons.business, size: 16, color: Colors.grey.shade600),
@@ -287,6 +302,8 @@ class _MohaffezCredentialsScreenState
                     ),
                   ],
                 ),
+
+                // Issue Date
                 if (issueDate != null) ...[
                   const SizedBox(height: 4),
                   Row(
@@ -303,7 +320,8 @@ class _MohaffezCredentialsScreenState
                     ],
                   ),
                 ],
-                // In buildCredentialCard method
+
+                // Images
                 if (imageUrls.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   SizedBox(
@@ -348,6 +366,7 @@ class _MohaffezCredentialsScreenState
                   ),
                 ],
 
+                // Rejection Reason
                 if (status == 'rejected' && data['rejectionReason'] != null) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -384,6 +403,10 @@ class _MohaffezCredentialsScreenState
   }
 }
 
+// ============================================================================
+// ADD CREDENTIAL SCREEN
+// ============================================================================
+
 class AddCredentialScreen extends StatefulWidget {
   const AddCredentialScreen({super.key});
 
@@ -395,7 +418,6 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _organizationController = TextEditingController();
-  
   String _selectedType = 'ijazah';
   DateTime? _issueDate;
   DateTime? _expiryDate;
@@ -426,12 +448,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
 
   Future<void> _submitCredential() async {
     if (!_formKey.currentState!.validate()) return;
-    // if (_selectedImagePaths.isEmpty) {
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     const SnackBar(content: Text('يرجى اختيار صورة واحدة على الأقل')),
-    //   );
-    //   return;
-    // }
+
     if (_issueDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('يرجى اختيار تاريخ الإصدار')),
@@ -444,7 +461,6 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser!;
       final imageFiles = _selectedImagePaths.map((path) => XFile(path)).toList();
-      
       final imageUrls = await CredentialService.uploadCredentialImages(imageFiles, user.uid);
 
       await CredentialService.addCredential(
@@ -500,7 +516,9 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                   _buildTypeChip('award', 'جائزة', Icons.emoji_events),
                 ],
               ),
+              
               const SizedBox(height: 24),
+              
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(
@@ -510,7 +528,9 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                 ),
                 validator: (value) => (value == null || value.isEmpty) ? 'هذا الحقل مطلوب' : null,
               ),
+              
               const SizedBox(height: 16),
+              
               TextFormField(
                 controller: _organizationController,
                 decoration: const InputDecoration(
@@ -520,7 +540,9 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                 ),
                 validator: (value) => (value == null || value.isEmpty) ? 'هذا الحقل مطلوب' : null,
               ),
+              
               const SizedBox(height: 16),
+              
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.date_range),
@@ -536,6 +558,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                   if (date != null) setState(() => _issueDate = date);
                 },
               ),
+              
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.event_busy),
@@ -557,11 +580,14 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                       )
                     : null,
               ),
+              
               const SizedBox(height: 16),
+              
               const Text('صور الشهادة *', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text('يمكنك اختيار حتى 3 صور (حد أقصى 5 ميجا لكل صورة)', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               const SizedBox(height: 12),
+              
               _selectedImagePaths.isEmpty
                   ? OutlinedButton.icon(
                       onPressed: _pickImages,
@@ -618,7 +644,9 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                         ],
                       ],
                     ),
+              
               const SizedBox(height: 24),
+              
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -658,6 +686,9 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
   }
 }
 
+// ============================================================================
+// IMAGE GALLERY SCREEN
+// ============================================================================
 
 class ImageGalleryScreen extends StatefulWidget {
   final List<String> imageUrls;
@@ -683,7 +714,6 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
-    
     // Set full screen (hide status bar)
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
@@ -708,24 +738,23 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
   Future<void> _shareImage() async {
     try {
       final url = widget.imageUrls[_currentIndex];
-      
+
       // Show loading
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('جاري التحضير للمشاركة...')),
       );
-      
+
       // Download image temporarily
       final tempDir = await getTemporaryDirectory();
       final filePath = '${tempDir.path}/share_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      
+
       await Dio().download(url, filePath);
-      
+
       // Share
       await Share.shareXFiles(
         [XFile(filePath)],
         text: 'شهادة من تطبيق محفظ القرآن',
       );
-      
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -747,28 +776,27 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
         }
         return;
       }
-      
+
       final url = widget.imageUrls[_currentIndex];
-      
+
       // Show loading
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('جاري التحميل...')),
       );
-      
+
       // Get downloads directory
       final dir = await getExternalStorageDirectory();
       final fileName = 'credential_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = '${dir!.path}/$fileName';
-      
+
       // Download
       await Dio().download(url, filePath);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('تم الحفظ في: $filePath')),
         );
       }
-      
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -798,7 +826,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
               itemBuilder: (context, index) {
                 return Center(
                   child: InteractiveViewer(
-                    minScale: 0.1,  // More zoom out
+                    minScale: 0.1, // More zoom out
                     maxScale: 10.0, // More zoom in
                     child: CachedNetworkImage(
                       imageUrl: widget.imageUrls[index],
@@ -897,9 +925,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
                         ),
                         onPressed: () => Navigator.pop(context),
                       ),
-                      
                       const Spacer(),
-                      
                       // Image counter
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -919,9 +945,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
                           ),
                         ),
                       ),
-                      
                       const Spacer(),
-                      
                       // Share button
                       IconButton(
                         icon: const Icon(
@@ -931,7 +955,6 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
                         ),
                         onPressed: _shareImage,
                       ),
-                      
                       // Download button
                       IconButton(
                         icon: const Icon(

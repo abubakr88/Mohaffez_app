@@ -1,12 +1,12 @@
-// screens/student_requests_screen.dart
+// lib/screens/student_requests_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../providers/session_provider_paginated.dart'; // FIXED IMPORT
-import '../providers/user_provider.dart';
-import '../shared/widgets/empty_state.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ ADDED: Import Timestamp
 import '../shared/widgets/error_widgets.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/widgets/empty_state.dart';
+import '../providers/session_provider_paginated.dart';
+import '../providers/user_provider.dart';
 
 class StudentRequestsScreen extends ConsumerWidget {
   const StudentRequestsScreen({super.key});
@@ -36,7 +36,6 @@ class StudentRequestsScreen extends ConsumerWidget {
   }
 
   Widget _buildContent(BuildContext context, WidgetRef ref, String studentId) {
-    // FIXED: Use correct provider
     final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
 
     return Directionality(
@@ -44,31 +43,45 @@ class StudentRequestsScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('طلباتي'),
-          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                ref.invalidate(studentRequestsFirstPageProvider(studentId));
+              },
+              tooltip: 'تحديث',
+            ),
+          ],
         ),
         body: requestsAsync.when(
           data: (requests) {
             if (requests.isEmpty) {
-              return const EmptyState(
-                icon: Icons.request_page,
-                title: 'لا توجد طلبات',
-                message: 'لم تقم بإرسال أي طلبات حتى الآن',
-                animated: false,
+              return const Center(
+                child: EmptyState(
+                  icon: Icons.inbox_outlined,
+                  title: 'لا توجد طلبات',
+                  message: 'جميع طلبات الجلسات ستظهر هنا',
+                  animated: true,
+                ),
               );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: requests.length,
-              itemBuilder: (context, index) {
-                final request = requests[index];
-                return _buildRequestCard(request);
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(studentRequestsFirstPageProvider(studentId));
               },
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: requests.length,
+                itemBuilder: (context, index) {
+                  final request = requests[index];
+                  return _buildRequestCard(request);
+                },
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => ErrorDisplay.dataLoad(
-            // FIXED: Use correct provider
             onRetry: () => ref.invalidate(studentRequestsFirstPageProvider(studentId)),
           ),
         ),
@@ -76,99 +89,120 @@ class StudentRequestsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRequestCard(dynamic request) {
-    Color statusColor;
-    String statusText;
-    IconData statusIcon;
-
-    switch (request.status.toString()) {
-      case 'SessionRequestStatus.pending':
-      case 'pending':
-        statusColor = Colors.orange;
-        statusText = 'قيد الانتظار';
-        statusIcon = Icons.pending;
-        break;
-      case 'SessionRequestStatus.accepted':
-      case 'accepted':
-        statusColor = Colors.green;
-        statusText = 'مقبول';
-        statusIcon = Icons.check_circle;
-        break;
-      case 'SessionRequestStatus.rejected':
-      case 'rejected':
-        statusColor = Colors.red;
-        statusText = 'مرفوض';
-        statusIcon = Icons.cancel;
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusText = 'غير معروف';
-        statusIcon = Icons.help;
+  Widget _buildRequestCard(Map<String, dynamic> request) {
+    final status = request['status'] as String? ?? 'pending';
+    final mohaffezName = request['mohaffezName'] as String? ?? 'غير معروف';
+    final sessionType = request['sessionType'] as String? ?? 'بيت';
+    final timeSlot = request['preferredTimeSlot'] as String? ?? '08:00';
+    final createdAt = request['createdAt'] as Timestamp?; // ✅ NOW WORKS
+    
+    String dateStr = 'غير محدد';
+    if (createdAt != null) {
+      final date = createdAt.toDate();
+      dateStr = '${date.day}/${date.month}/${date.year}';
     }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: _getStatusColor(status).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(statusIcon, size: 16, color: statusColor),
-                  const SizedBox(width: 6),
-                  Text(
-                    statusText,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            
-            // Mohaffez name
-            Text(
-              request.mohaffezName,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            
-            // Session type
+            // Header with status
             Row(
               children: [
-                const Icon(Icons.home, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
-                Text(
-                  request.sessionType == 'home' ? 'منزل' : 'مسجد',
-                  style: const TextStyle(fontSize: 14),
+                CircleAvatar(
+                  backgroundColor: _getStatusColor(status).withValues(alpha: 0.2),
+                  child: Icon(
+                    _getStatusIcon(status),
+                    color: _getStatusColor(status),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mohaffezName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        dateStr,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _getStatusLabel(status),
+                    style: TextStyle(
+                      color: _getStatusColor(status),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            
-            // Time slot
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            // Details
             Row(
               children: [
-                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                Icon(
+                  _getSessionTypeIcon(sessionType),
+                  size: 16,
+                  color: Colors.grey.shade600,
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  request.preferredTimeSlot,
-                  style: const TextStyle(fontSize: 14),
+                  _getSessionTypeLabel(sessionType),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Icon(
+                  Icons.access_time,
+                  size: 16,
+                  color: Colors.grey.shade600,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  timeSlot,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
               ],
             ),
@@ -176,5 +210,70 @@ class StudentRequestsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      case 'cancelled':
+        return Colors.grey;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return Icons.check_circle;
+      case 'rejected':
+        return Icons.cancel;
+      case 'cancelled':
+        return Icons.block;
+      default:
+        return Icons.pending;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return 'مقبول';
+      case 'rejected':
+        return 'مرفوض';
+      case 'cancelled':
+        return 'ملغي';
+      default:
+        return 'قيد الانتظار';
+    }
+  }
+
+  IconData _getSessionTypeIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'home':
+        return Icons.home;
+      case 'mosque':
+        return Icons.mosque;
+      case 'online':
+        return Icons.videocam;
+      default:
+        return Icons.location_on;
+    }
+  }
+
+  String _getSessionTypeLabel(String type) {
+    switch (type.toLowerCase()) {
+      case 'home':
+        return 'بيت';
+      case 'mosque':
+        return 'مسجد';
+      case 'online':
+        return 'أونلاين';
+      default:
+        return type;
+    }
   }
 }

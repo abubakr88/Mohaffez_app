@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/session_card.dart';
@@ -46,7 +45,7 @@ class CompletedSessionsScreen extends ConsumerWidget {
                 final session = sessions[index];
                 return SessionCard(
                   title: session.studentName ?? 'طالب',
-                  subtitle: session.sessionType,
+                  subtitle: session['sessionType'],
                   location: session.location ?? '',
                   dateTime: session.sessionDate,
                   hifz: session.hifzAssignment ?? '',

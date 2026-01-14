@@ -1,276 +1,269 @@
-// lib/screens/notifications_screen.dart (UPDATED)
+// lib/screens/notifications_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../shared/widgets/shimmer_widgets.dart';
-import '../shared/widgets/error_widgets.dart';
-import '../shared/constants/app_theme.dart';
-import '../shared/widgets/empty_state_illustrations.dart';
-import '../shared/widgets/empty_state.dart';
-import '../providers/notification_provider_paginated.dart';
-import '../providers/notification_provider.dart';
+import '../providers/notification_provider_paginated.dart'; // ✅ Only this one
 import '../providers/user_provider.dart';
-import '../shared/utils/error_handler.dart';
+import '../shared/widgets/paginated_list_view.dart';
+import '../shared/widgets/empty_state.dart';
+import '../shared/widgets/empty_state_illustrations.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
+    final user = ref.watch(currentUserProvider).value;
 
-    return userAsync.when(
-      data: (user) {
-        if (user == null) return const Scaffold(body: Center(child: Text('غير مصرح')));
-        return _buildContent(context, ref, user.uid);
-      },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(
-        body: ErrorDisplay.dataLoad(
-          onRetry: () => ref.invalidate(currentUserProvider),
-        ),
-      ),
-    );
-  }
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-  Widget _buildContent(BuildContext context, WidgetRef ref, String userId) {
-    final firstPageAsync = ref.watch(notificationsFirstPageProvider(userId));
-    final paginatedState = ref.watch(paginatedNotificationsProvider(userId));
+    final paginatedState = ref.watch(paginatedNotificationsProvider(user.uid));
+    final unreadCount = ref.watch(unreadNotificationsCountProvider(user.uid)).value ?? 0;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('الإشعارات'),
+          title: Text('الإشعارات ${unreadCount > 0 ? '($unreadCount)' : ''}'),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.done_all),
-              onPressed: () => _markAllAsRead(context, ref, userId),
-              tooltip: 'تعليم الكل كمقروء',
-            ),
-          ],
-        ),
-        body: firstPageAsync.when(
-          data: (_) {
-            final notifications = paginatedState.items;
-
-            if (notifications.isEmpty && !paginatedState.isLoadingMore) {
-              return IllustratedEmptyState(
-                illustration: EmptyStateIllustrations.noNotifications(), // Add parentheses ()
-                title: 'لا توجد إشعارات',
-                message: 'لم تتلق أي إشعارات حتى الآن.',
-              );
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: notifications.length + (paginatedState.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == notifications.length) {
-                  return _buildLoadMoreButton(ref, userId, paginatedState);
-                }
-
-                final notification = notifications[index];
-                return _NotificationCard(
-                  notification: notification,
-                  onTap: () => _markAsRead(ref, notification.id!),
-                );
+            // Mark all as read
+            if (paginatedState.items.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.done_all),
+                tooltip: 'تعليم الكل كمقروء',
+                onPressed: () {
+                  ref.read(notificationActionsProvider)
+                      .markAllAsRead(user.uid);
+                },
+              ),
+            // Filter menu
+            PopupMenuButton<NotificationFilter>(
+              icon: const Icon(Icons.filter_list),
+              onSelected: (filter) {
+                ref.read(notificationFilterProvider.notifier).state = filter;
               },
-            );
-          },
-          loading: () => ShimmerWidgets.list(
-            itemCount: 6,
-            itemBuilder: () => ShimmerWidgets.listItem(
-              showAvatar: true,
-              lines: 2),
-          ),
-          error: (e, _) => ErrorDisplay.dataLoad(
-            onRetry: () => ref.invalidate(notificationsFirstPageProvider(userId)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadMoreButton(WidgetRef ref, String userId, paginatedState) {
-    if (paginatedState.isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (paginatedState.error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(
-              'حدث خطأ: ${paginatedState.error}',
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () {
-                ref.read(paginatedNotificationsProvider(userId).notifier).loadMore();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: ElevatedButton.icon(
-          onPressed: () {
-            ref.read(paginatedNotificationsProvider(userId).notifier).loadMore();
-          },
-          icon: const Icon(Icons.expand_more),
-          label: const Text('تحميل المزيد'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _markAsRead(WidgetRef ref, String notificationId) async {
-    final notifier = ref.read(notificationActionsProvider.notifier);
-    await notifier.markAsRead(notificationId);
-  }
-
-  Future<void> _markAllAsRead(BuildContext context, WidgetRef ref, String userId) async {
-    final notifier = ref.read(notificationActionsProvider.notifier);
-    await notifier.markAllAsRead(userId);
-    if (context.mounted) {
-      ErrorHandler.showSuccess(context, 'تم تعليم جميع الإشعارات كمقروءة');
-    }
-  }
-}
-
-class _NotificationCard extends StatelessWidget {
-  final notification;
-  final VoidCallback onTap;
-
-  const _NotificationCard({
-    required this.notification,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isRead = notification.isRead;
-    final type = notification.type;
-    final title = notification.title;
-    final body = notification.body;
-    final mohaffezName = notification.mohaffezName ?? '';
-    final createdAt = notification.createdAt;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      color: isRead ? Colors.white : Colors.amber.shade50,
-      elevation: isRead ? 0.5 : 2,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: _getTypeColor(type),
-          child: Icon(
-            _getTypeIcon(type),
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-            fontSize: 15,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(body, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                if (mohaffezName.isNotEmpty) ...[
-                  Icon(Icons.person, size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(mohaffezName, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                  const SizedBox(width: 12),
-                ],
-                Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 4),
-                Text(
-                  _formatTimestamp(createdAt),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: NotificationFilter.all,
+                  child: Text('جميع الإشعارات'),
+                ),
+                const PopupMenuItem(
+                  value: NotificationFilter.sessionRequest,
+                  child: Text('طلبات الجلسات'),
+                ),
+                const PopupMenuItem(
+                  value: NotificationFilter.sessionAccepted,
+                  child: Text('جلسات مقبولة'),
+                ),
+                const PopupMenuItem(
+                  value: NotificationFilter.assignmentUpdated,
+                  child: Text('تحديث الواجبات'),
+                ),
+                const PopupMenuItem(
+                  value: NotificationFilter.follow,
+                  child: Text('متابعات جديدة'),
                 ),
               ],
             ),
           ],
         ),
-        trailing: !isRead
-            ? Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  shape: BoxShape.circle,
-                ),
+        body: paginatedState.items.isEmpty && !paginatedState.isLoadingMore
+            ? IllustratedEmptyState(
+                illustration: EmptyStateIllustrations.noNotifications(),
+                title: 'لا توجد إشعارات',
+                message: 'سيتم عرض الإشعارات الخاصة بك هنا',
               )
-            : null,
-        onTap: onTap,
+            : PaginatedListView(
+                items: paginatedState.items,
+                hasMore: paginatedState.hasMore,
+                isLoadingMore: paginatedState.isLoadingMore,
+                error: paginatedState.error,
+                itemBuilder: (context, notification, index) {
+                  return _NotificationTile(
+                    notification: notification,
+                    onTap: () {
+                      if (!notification.isRead) {
+                        ref.read(notificationActionsProvider)
+                            .markAsRead(user.uid, notification.id!);
+                      }
+                      // Navigate based on type
+                      _handleNotificationTap(context, notification);
+                    },
+                    onDismiss: () {
+                      ref.read(notificationActionsProvider)
+                          .deleteNotification(user.uid, notification.id!);
+                    },
+                  );
+                },
+                onLoadMore: () {
+                  return ref
+                      .read(paginatedNotificationsProvider(user.uid).notifier)
+                      .loadMore();
+                },
+                onRefresh: () async {
+                  return ref
+                      .read(paginatedNotificationsProvider(user.uid).notifier)
+                      .refresh();
+                },
+              ),
       ),
     );
   }
 
-  Color _getTypeColor(String type) {
-    switch (type) {
-      case 'session':
-        return AppTheme.primaryAmber;
+  void _handleNotificationTap(BuildContext context, notification) {
+    // Navigate based on notification type
+    switch (notification.type) {
+      case 'session_request':
+        // Navigate to pending requests screen
+        break;
+      case 'session_accepted':
+        // Navigate to session details
+        break;
+      case 'assignment_updated':
+        // Navigate to assignments
+        break;
       case 'follow':
+        // Navigate to profile
+        break;
+    }
+  }
+}
+
+// ============================================================================
+// NOTIFICATION TILE WIDGET
+// ============================================================================
+
+class _NotificationTile extends StatelessWidget {
+  final dynamic notification;
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  const _NotificationTile({
+    required this.notification,
+    required this.onTap,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: Key(notification.id!),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        color: Colors.red,
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      onDismissed: (_) => onDismiss(),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: notification.isRead ? Colors.white : Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: _getNotificationColor(notification.type),
+            child: Icon(
+              _getNotificationIcon(notification.type),
+              color: Colors.white,
+            ),
+          ),
+          title: Text(
+            notification.title ?? '',
+            style: TextStyle(
+              fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text(notification.body ?? ''),
+              const SizedBox(height: 4),
+              Text(
+                _formatTimestamp(notification.createdAt),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+          trailing: !notification.isRead
+              ? Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              : null,
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
+
+  Color _getNotificationColor(String? type) {
+    switch (type) {
+      case 'session_request':
+        return Colors.orange;
+      case 'session_accepted':
+        return Colors.green;
+      case 'assignment_updated':
         return Colors.blue;
-      case 'system':
+      case 'follow':
         return Colors.purple;
       default:
-        return AppTheme.accentGreen;
+        return Colors.grey;
     }
   }
 
-  IconData _getTypeIcon(String type) {
+  IconData _getNotificationIcon(String? type) {
     switch (type) {
-      case 'session':
-        return Icons.school;
+      case 'session_request':
+        return Icons.pending_actions;
+      case 'session_accepted':
+        return Icons.check_circle;
+      case 'assignment_updated':
+        return Icons.assignment;
       case 'follow':
         return Icons.person_add;
-      case 'system':
-        return Icons.info;
       default:
-        return Icons.menu_book;
+        return Icons.notifications;
     }
   }
 
-  String _formatTimestamp(DateTime? dateTime) {
-    if (dateTime == null) return '';
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
+  String _formatTimestamp(DateTime? timestamp) {
+    if (timestamp == null) return '';
 
-    if (difference.inDays >= 7) {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    } else if (difference.inDays > 0) {
-      return difference.inDays == 1 ? 'أمس' : 'منذ ${difference.inDays} أيام';
-    } else if (difference.inHours > 0) {
-      return difference.inHours == 1 ? 'منذ ساعة' : 'منذ ${difference.inHours} ساعات';
-    } else if (difference.inMinutes > 0) {
-      return difference.inMinutes == 1 ? 'منذ دقيقة' : 'منذ ${difference.inMinutes} دقائق';
-    } else {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
       return 'الآن';
+    } else if (difference.inHours < 1) {
+      return 'منذ ${difference.inMinutes} دقيقة';
+    } else if (difference.inDays < 1) {
+      return 'منذ ${difference.inHours} ساعة';
+    } else if (difference.inDays < 7) {
+      return 'منذ ${difference.inDays} يوم';
+    } else {
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
     }
   }
 }

@@ -1,14 +1,14 @@
+// lib/screens/accepted_sessions_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../shared/widgets/paginated_list_view.dart';
-import '../shared/widgets/session_card.dart';
-import '../shared/widgets/empty_state.dart';
-import '../shared/widgets/empty_state_illustrations.dart';
-import '../shared/widgets/shimmer_widgets.dart';
+import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
+import '../shared/widgets/empty_state.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
 import 'session_details_screen.dart';
+import '../models/session_model.dart';
 
 class AcceptedSessionsScreen extends ConsumerWidget {
   const AcceptedSessionsScreen({super.key});
@@ -20,13 +20,11 @@ class AcceptedSessionsScreen extends ConsumerWidget {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('غير مسجل')));
+          return const Scaffold(body: Center(child: Text('لم يتم تسجيل الدخول')));
         }
         return _buildContent(context, ref, user.uid);
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
         body: ErrorDisplay.dataLoad(
           onRetry: () => ref.invalidate(currentUserProvider),
@@ -36,181 +34,156 @@ class AcceptedSessionsScreen extends ConsumerWidget {
   }
 
   Widget _buildContent(BuildContext context, WidgetRef ref, String studentId) {
-    final firstPageAsync =
-        ref.watch(studentSessionsFirstPageProvider(studentId));
-    final paginatedState =
-        ref.watch(paginatedStudentSessionsProvider(studentId));
+    final firstPageAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
+    final paginatedState = ref.watch(paginatedStudentSessionsProvider(studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('الجلسات المكتملة'),
-          actions: [
-            if (paginatedState.items.isNotEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Chip(
-                    label: Text(
-                      '${paginatedState.items.length}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        appBar: AppBar(title: const Text('الجلسات المقبولة')),
         body: firstPageAsync.when(
           data: (_) {
-            final sessions = paginatedState.items;
+            final sessions = paginatedState.sessions; // ✅ FIXED: Use sessions instead of items
 
-            // Empty state
-            if (sessions.isEmpty && !paginatedState.isLoadingMore) {
-              return IllustratedEmptyState(
-                illustration: EmptyStateIllustrations.noSessions(),
-                title: 'لا توجد جلسات',
-                message: 'لم تقم بإتمام أي جلسات بعد!',
-                action: ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.search),
-                  label: const Text('ابحث عن محفظ'),
+            final acceptedSessions = sessions.where((session) {
+              final status = session['status'] as String? ?? '';
+              return status == 'accepted';
+            }).toList();
+
+            if (acceptedSessions.isEmpty && !paginatedState.isLoadingMore) {
+              return Container(
+                color: Colors.grey.withValues(alpha: 0.05), // ✅ FIXED
+                child: const EmptyState(
+                  icon: Icons.event_busy,
+                  title: 'لا توجد جلسات مقبولة',
+                  message: 'جميع الجلسات المقبولة ستظهر هنا',
                 ),
               );
             }
 
-            // List with pagination
-            return PaginatedListView(
-              items: sessions,
-              hasMore: paginatedState.hasMore,
-              isLoadingMore: paginatedState.isLoadingMore,
-              error: paginatedState.error,
-              scrollThreshold: 0.75,
-              
-              // Item builder
-              itemBuilder: (context, session, index) {
-                final sessionType = session.sessionType ?? '';
-                final timeSlot = session.preferredTimeSlot ?? '';
-                final hasValidSubtitle =
-                    sessionType.isNotEmpty && timeSlot.isNotEmpty;
+            return ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: acceptedSessions.length + (paginatedState.hasMore ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == acceptedSessions.length) {
+                  return _buildLoadMoreButton(ref, studentId, paginatedState);
+                }
 
-                return SessionCard(
-                  title: session.mohaffezName ?? '',
-                  subtitle: hasValidSubtitle ? '$sessionType - $timeSlot' : null,
-                  location: session.location ?? '',
-                  dateTime: session.sessionDate ?? session.slotStart,
-                  hifz: session.hifzAssignment ?? '',
-                  muraja: session.murajaAssignment ?? '',
-                  rating: session.sessionRating ?? 0,
-                  notes: session.sessionNotes ?? '',
-                  trailing: _buildTrailingActions(context, session),
-                  // Added navigation on tap
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SessionDetailsScreen(session: session),
-                      ),
-                    );
-                  },
+                final session = acceptedSessions[index];
+                
+                // ✅ FIXED: Create SessionModel properly
+                final sessionModel = SessionModel(
+                  id: session['id'] as String?,
+                  mohaffezId: session['mohaffezId'] as String? ?? '',
+                  studentId: session['studentId'] as String? ?? '',
+                  mohaffezName: session['mohaffezName'] as String? ?? 'غير معروف',
+                  studentName: session['studentName'] as String? ?? '',
+                  sessionType: session['sessionType'] as String? ?? 'بيت',
+                  preferredTimeSlot: session['preferredTimeSlot'] as String? ?? '08:00',
+                  location: session['location'] as String? ?? '',
+                  sessionDate: session['sessionDate'] as DateTime?,
+                  slotStart: session['sessionDate'] as DateTime?,
+                  slotEnd: session['sessionDate'] as DateTime?,
+                  hifzAssignment: session['hifzAssignment'] as String?,
+                  murajaAssignment: session['murajaAssignment'] as String?,
+                  sessionRating: session['sessionRating'] as int? ?? 0, // ✅ FIXED: Provide default
+                  sessionNotes: session['sessionNotes'] as String?,
+                  status: session['status'] as String? ?? 'accepted',
+                  createdAt: session['createdAt'] as DateTime?,
                 );
-              },
-              
-              // Load more callback
-              onLoadMore: () {
-                return ref
-                    .read(paginatedStudentSessionsProvider(studentId).notifier)
-                    .loadMore();
-              },
-              
-              // Refresh callback
-              onRefresh: () async {
-                return ref
-                    .read(paginatedStudentSessionsProvider(studentId).notifier)
-                    .refresh();
-              },
 
-              // Custom loading widget
-              loadingWidget: const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 8),
-                  Text(
-                    'جاري تحميل المزيد...',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-
-              // Custom error builder
-              errorBuilder: (error, retry) {
-                return Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade200),
-                  ),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.error_outline,
-                          color: Colors.red, size: 32),
-                      const SizedBox(height: 8),
-                      Text(
-                        error,
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: retry,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('إعادة المحاولة'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                return _buildSessionCard(context, sessionModel);
               },
             );
           },
-          loading: () => Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: List.generate(
-                4,
-                (index) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: ShimmerWidgets.listItem(showAvatar: true, lines: 3),
-                ),
-              ),
-            ),
-          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => ErrorDisplay.dataLoad(
-            onRetry: () =>
-                ref.invalidate(studentSessionsFirstPageProvider(studentId)),
+            onRetry: () => ref.invalidate(studentSessionsFirstPageProvider(studentId)),
           ),
         ),
       ),
     );
   }
 
-  Widget? _buildTrailingActions(BuildContext context, dynamic session) {
-    // Add actions like navigation to map, call mohaffez, etc.
-    if (session.imamAddressLat != null && session.imamAddressLng != null) {
-      return IconButton(
-        icon: const Icon(Icons.map, size: 20),
-        onPressed: () {
-          // Navigate to map or open Google Maps
-        },
-        tooltip: 'الموقع على الخريطة',
+  Widget _buildSessionCard(BuildContext context, SessionModel session) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.accentGreen.withValues(alpha: 0.2),
+          child: const Icon(Icons.school, color: AppTheme.accentGreen),
+        ),
+        title: Text(session.mohaffezName),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${session.sessionType} - ${session.preferredTimeSlot}'),
+            if (session.location.isNotEmpty) // ✅ FIXED: Remove ?? operator
+              Text(
+                session.location,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.arrow_forward_ios, size: 16),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SessionDetailsScreen(session: session),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadMoreButton(WidgetRef ref, String studentId, StudentSessionsState paginatedState) {
+    if (paginatedState.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
-    return null;
+
+    if (paginatedState.error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text(
+              paginatedState.error!,
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () {
+                ref.read(paginatedStudentSessionsProvider(studentId).notifier).loadMore();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ElevatedButton.icon(
+          onPressed: () {
+            ref.read(paginatedStudentSessionsProvider(studentId).notifier).loadMore();
+          },
+          icon: const Icon(Icons.expand_more),
+          label: const Text('تحميل المزيد'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+          ),
+        ),
+      ),
+    );
   }
 }

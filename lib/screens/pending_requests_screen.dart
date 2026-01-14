@@ -6,7 +6,6 @@ import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/widgets/empty_state.dart';
 import '../providers/session_provider_paginated.dart';
-import '../providers/session_provider.dart';
 import '../shared/utils/error_handler.dart';
 
 class PendingRequestsScreen extends ConsumerWidget {
@@ -98,13 +97,19 @@ class PendingRequestsScreen extends ConsumerWidget {
     );
   }
 
+  // في ملف lib/screens/pending_requests_screen.dart
   Future<void> _acceptRequest(BuildContext context, WidgetRef ref, String requestId) async {
     try {
-      await ref.read(sessionActionsProvider.notifier).acceptRequest(requestId);
+      // ✅ FIXED: Use the new method that creates a session
+      await ref.read(sessionActionsProvider.notifier).acceptRequestAndCreateSession(requestId);
+      
       if (context.mounted) {
-        ErrorHandler.showSuccess(context, 'تم قبول الطلب بنجاح');
+        ErrorHandler.showSuccess(context, 'تم قبول الطلب وإنشاء الجلسة بنجاح');
       }
+      
+      // Refresh both providers
       ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
+      ref.invalidate(upcomingSessionsProvider(mohaffezId));
     } catch (e) {
       if (context.mounted) {
         ErrorHandler.showError(context, e);

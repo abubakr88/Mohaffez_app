@@ -1,3 +1,5 @@
+// lib/screens/mohaffez_profile_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,12 +12,20 @@ import '../shared/constants/app_theme.dart';
 import '../shared/constants/schedule_constants.dart';
 import '../shared/utils/location_utils.dart';
 import '../providers/user_provider.dart';
-import '../providers/session_provider.dart';
 import '../services/follow_service.dart';
 import '../shared/utils/error_handler.dart';
-import '../models/booking_result.dart'; // ADD THIS IMPORT
+import '../repositories/notification_repository.dart';
 
-// Provider for mohaffez profile data
+// ============================================================================
+// PROVIDERS
+// ============================================================================
+
+/// Provider for notification repository
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
+  return NotificationRepository(FirebaseFirestore.instance);
+});
+
+/// Provider for mohaffez profile data
 final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, mohaffezId) async {
   final doc = await FirebaseFirestore.instance
       .collection('users')
@@ -27,7 +37,7 @@ final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, Stri
   return {...doc.data()!, 'uid': doc.id};
 });
 
-// Provider for follow status
+/// Provider for follow status
 final followStatusProvider = StreamProvider.family<bool, String>((ref, mohaffezId) async* {
   final currentUser = ref.watch(currentUserProvider).value;
   
@@ -44,7 +54,7 @@ final followStatusProvider = StreamProvider.family<bool, String>((ref, mohaffezI
       .map((snapshot) => snapshot.docs.isNotEmpty);
 });
 
-// Provider for credentials
+/// Provider for credentials
 final credentialsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, mohaffezId) {
   return FirebaseFirestore.instance
       .collection('users')
@@ -56,6 +66,10 @@ final credentialsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
           .map((doc) => {...doc.data(), 'id': doc.id})
           .toList());
 });
+
+// ============================================================================
+// MAIN SCREEN
+// ============================================================================
 
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -681,6 +695,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 }
 
+// ============================================================================
+// BOOKING SHEET
+// ============================================================================
+
 class BookingSheet extends ConsumerStatefulWidget {
   final String mohaffezId;
   final String studentId;
@@ -698,7 +716,7 @@ class BookingSheet extends ConsumerStatefulWidget {
 }
 
 class _BookingSheetState extends ConsumerState<BookingSheet> {
-  String sessionType = 'منزل';
+  String sessionType = 'بيت'; // 'home' in Arabic
   String selectedTimeSlot = '08:00';
   DateTime selectedDate = DateTime.now();
   bool submitting = false;
@@ -738,7 +756,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                   child: Row(
                     children: [
                       const Text(
-                        'حجز جلسة جديدة',
+                        'حجز جلسة',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -774,19 +792,20 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
-                          children: ['منزل', 'مسجد'].map((type) {
-                            return ChoiceChip(
-                              label: Text(type),
-                              selected: sessionType == type,
-                              onSelected: (selected) {
-                                setState(() => sessionType = type);
-                              },
-                              selectedColor: AppTheme.primaryAmber,
-                              labelStyle: TextStyle(
-                                color: sessionType == type ? Colors.white : null,
-                              ),
-                            );
-                          }).toList(),
+                          children: ['بيت', 'مسجد']
+                              .map((type) => ChoiceChip(
+                                    label: Text(type),
+                                    selected: sessionType == type,
+                                    onSelected: (selected) {
+                                      setState(() => sessionType = type);
+                                    },
+                                    selectedColor: AppTheme.primaryAmber,
+                                    labelStyle: TextStyle(
+                                      color:
+                                          sessionType == type ? Colors.white : null,
+                                    ),
+                                  ))
+                              .toList(),
                         ),
                         
                         const SizedBox(height: 24),
@@ -836,19 +855,20 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                           spacing: 8,
                           runSpacing: 8,
                           children: ScheduleConstants.quickSlots
-                              .map((slot) {
-                                return ChoiceChip(
-                                  label: Text(slot),
-                                  selected: selectedTimeSlot == slot,
-                                  onSelected: (selected) {
-                                    setState(() => selectedTimeSlot = slot);
-                                  },
-                                  selectedColor: AppTheme.accentGreen,
-                                  labelStyle: TextStyle(
-                                    color: selectedTimeSlot == slot ? Colors.white : null,
-                                  ),
-                                );
-                              }).toList(),
+                              .map((slot) => ChoiceChip(
+                                    label: Text(slot),
+                                    selected: selectedTimeSlot == slot,
+                                    onSelected: (selected) {
+                                      setState(() => selectedTimeSlot = slot);
+                                    },
+                                    selectedColor: AppTheme.accentGreen,
+                                    labelStyle: TextStyle(
+                                      color: selectedTimeSlot == slot
+                                          ? Colors.white
+                                          : null,
+                                    ),
+                                  ))
+                              .toList(),
                         ),
                       ],
                     ),
@@ -886,7 +906,7 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
                               ),
                             )
                           : const Text(
-                              'تأكيد الحجز',
+                              'إرسال الطلب',
                               style: TextStyle(fontSize: 16),
                             ),
                     ),
@@ -919,70 +939,62 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
     setState(() => submitting = true);
     
     try {
-      final service = ref.read(sessionBookingProvider);
-      
-      // ✅ Make sure you're calling createSession (which uses .add())
-      // ❌ NOT calling an update method
-      final sessionId = await service.createSession(
+      // Create datetime from selected values
+      final slotDateTime = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        int.parse(selectedTimeSlot.split(':')[0]),
+        int.parse(selectedTimeSlot.split(':')[1]),
+      );
+      final slotEndDateTime = slotDateTime.add(const Duration(hours: 1));
+
+      // Create request directly using Firestore
+      final docRef = await FirebaseFirestore.instance
+          .collection('sessionRequests')
+          .add({
+        'mohaffezId': widget.mohaffezId,
+        'studentId': widget.studentId,
+        'studentName': widget.studentName,
+        'mohaffezName': mohaffezProfile['name'] as String? ?? '',
+        'slotStart': Timestamp.fromDate(slotDateTime),
+        'slotEnd': Timestamp.fromDate(slotEndDateTime),
+        'sessionType': sessionType,
+        'preferredTimeSlot': selectedTimeSlot,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        // Additional data
+        'imamAddressText': mohaffezProfile['addressText'],
+        'imamAddressLat': mohaffezProfile['addressLat'],
+        'imamAddressLng': mohaffezProfile['addressLng'],
+        'mohaffezPhone': mohaffezProfile['phoneNumber'],
+      });
+
+      // Create notification for mohaffez
+      final notificationRepo = ref.read(notificationRepositoryProvider);
+      await notificationRepo.createSessionRequestNotification(
         mohaffezId: widget.mohaffezId,
-        studentId: widget.studentId,
         studentName: widget.studentName,
-        mohaffezName: mohaffezProfile['name'] as String,
         sessionType: sessionType,
         preferredTimeSlot: selectedTimeSlot,
-        location: mohaffezProfile['addressText'],
-        imamAddressLat: mohaffezProfile['addressLat'],
-        imamAddressLng: mohaffezProfile['addressLng'],
+        requestId: docRef.id,
       );
-      
-      print('✅ New session created: $sessionId');
+
+      print('✅ Session request created: ${docRef.id}');
       
       if (!mounted) return;
       
       Navigator.pop(context);
-      ErrorHandler.showSuccess(context, 'تم إرسال طلب الحجز بنجاح');
+      ErrorHandler.showSuccess(context, 'تم إرسال طلب الحجز بنجاح ✓');
     } catch (e) {
-      print('❌ Error creating session: $e');
+      print('❌ Error creating session request: $e');
       if (mounted) {
-        ErrorHandler.showError(context, e);
+        ErrorHandler.showError(context, e.toString());
       }
     } finally {
       if (mounted) {
         setState(() => submitting = false);
       }
-    }
-  }
-}
-
-// ADD requestSession method to SessionBookingService in session_provider.dart
-extension SessionBookingServiceExtension on SessionBookingService {
-  Future<BookingResult> requestSession({
-    required String mohaffezId,
-    required String studentId,
-    required String studentName,
-    required String mohaffezName,
-    required DateTime slotStart,
-    required DateTime slotEnd,
-    required String sessionType,
-    required String preferredTimeSlot,
-    required Map<String, dynamic> additionalData,
-  }) async {
-    try {
-      final sessionId = await createSession(
-        mohaffezId: mohaffezId,
-        studentId: studentId,
-        studentName: studentName,
-        mohaffezName: mohaffezName, // ✅ ADD THIS FIELD
-        sessionType: sessionType,
-        preferredTimeSlot: preferredTimeSlot,
-        location: additionalData['imamAddressText'],
-        imamAddressLat: additionalData['imamAddressLat'],
-        imamAddressLng: additionalData['imamAddressLng'],
-      );
-      
-      return BookingResult.success(sessionId);
-    } catch (e) {
-      return BookingResult.failure(e.toString());
     }
   }
 }

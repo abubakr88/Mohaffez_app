@@ -1,3 +1,5 @@
+// lib/screens/home_shell.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,8 +13,12 @@ import '../shared/widgets/offline_banner.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../providers/notification_provider.dart';
+import '../providers/notification_provider_paginated.dart';
 import '../services/cache_service.dart';
+
+// ============================================================================
+// MAIN HOME SHELL
+// ============================================================================
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
@@ -26,6 +32,7 @@ class HomeShell extends ConsumerWidget {
         if (user == null) {
           return const LoginScreen();
         }
+
         return AuthenticatedShell(user: user);
       },
       loading: () => const LoadingScreen(),
@@ -35,6 +42,10 @@ class HomeShell extends ConsumerWidget {
     );
   }
 }
+
+// ============================================================================
+// AUTHENTICATED SHELL
+// ============================================================================
 
 class AuthenticatedShell extends ConsumerWidget {
   final user;
@@ -79,6 +90,10 @@ class AuthenticatedShell extends ConsumerWidget {
       ),
     );
   }
+
+  // ==========================================================================
+  // APP BAR
+  // ==========================================================================
 
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
@@ -169,8 +184,13 @@ class AuthenticatedShell extends ConsumerWidget {
     );
   }
 
+  // ==========================================================================
+  // NOTIFICATION BADGE
+  // ==========================================================================
+
   Widget _buildNotificationBadge(WidgetRef ref, bool isMohaffez) {
-    final unreadCountAsync = ref.watch(unreadCountProvider(user.uid));
+    // ✅ FIX: Use unreadNotificationsCountProvider from notification_provider_paginated.dart
+    final unreadCountAsync = ref.watch(unreadNotificationsCountProvider(user.uid));
 
     return unreadCountAsync.when(
       data: (unreadCount) {
@@ -226,6 +246,10 @@ class AuthenticatedShell extends ConsumerWidget {
     );
   }
 
+  // ==========================================================================
+  // BOTTOM NAVIGATION BAR
+  // ==========================================================================
+
   Widget _buildBottomNavBar(WidgetRef ref, bool isMohaffez, int currentIndex) {
     if (isMohaffez) {
       return BottomNavigationBar(
@@ -280,6 +304,10 @@ class AuthenticatedShell extends ConsumerWidget {
     }
   }
 
+  // ==========================================================================
+  // DRAWER
+  // ==========================================================================
+
   Widget _buildDrawer(BuildContext context, WidgetRef ref) {
     return Drawer(
       child: ListView(
@@ -326,6 +354,10 @@ class AuthenticatedShell extends ConsumerWidget {
     );
   }
 
+  // ==========================================================================
+  // LOGOUT
+  // ==========================================================================
+
   Future<void> _logout(WidgetRef ref, BuildContext context) async {
     try {
       // Invalidate providers BEFORE logout
@@ -355,6 +387,10 @@ class AuthenticatedShell extends ConsumerWidget {
   }
 }
 
+// ============================================================================
+// LOADING SCREEN
+// ============================================================================
+
 class LoadingScreen extends StatelessWidget {
   const LoadingScreen({super.key});
 
@@ -377,6 +413,10 @@ class LoadingScreen extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// ERROR SCREEN
+// ============================================================================
 
 class ErrorScreen extends StatelessWidget {
   final VoidCallback onRetry;

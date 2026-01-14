@@ -1,4 +1,5 @@
-// lib/screens/student_assignments_screen.dart (UPDATED)
+// lib/screens/student_assignments_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/widgets/assignment_card.dart';
@@ -19,7 +20,7 @@ class StudentAssignmentsScreen extends ConsumerWidget {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('مستخدم غير معروف')));
+          return const Scaffold(body: Center(child: Text('لم يتم تسجيل الدخول')));
         }
         return _buildContent(context, ref, user.uid);
       },
@@ -39,25 +40,25 @@ class StudentAssignmentsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('التكليفات')),
+        appBar: AppBar(title: const Text('واجباتي')),
         body: firstPageAsync.when(
           data: (_) {
-            final sessions = paginatedState.items;
+            final sessions = paginatedState.sessions; // ✅ FIXED: Use sessions instead of items
 
             // Filter sessions with assignments
             final assignmentSessions = sessions.where((session) {
-              final hifz = session.hifzAssignment ?? '';
-              final muraja = session.murajaAssignment ?? '';
-              final notes = session.sessionNotes ?? '';
-              final rating = session.sessionRating ?? 0;
+              final hifz = session['hifzAssignment'] as String? ?? '';
+              final muraja = session['murajaAssignment'] as String? ?? '';
+              final notes = session['sessionNotes'] as String? ?? '';
+              final rating = session['sessionRating'] as int? ?? 0;
               return hifz.isNotEmpty || muraja.isNotEmpty || rating > 0 || notes.isNotEmpty;
             }).toList();
 
             if (assignmentSessions.isEmpty && !paginatedState.isLoadingMore) {
               return IllustratedEmptyState(
                 illustration: EmptyStateIllustrations.noAssignments(),
-                title: 'لا توجد تكليفات',
-                message: 'لم يتم تعيين أي تكليفات بعد.',
+                title: 'لا توجد واجبات',
+                message: 'جميع الواجبات والتقييمات ستظهر هنا.',
               );
             }
 
@@ -65,22 +66,21 @@ class StudentAssignmentsScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(12),
               itemCount: assignmentSessions.length + (paginatedState.hasMore ? 1 : 0),
               itemBuilder: (context, index) {
-                // Show "Load More" button
                 if (index == assignmentSessions.length) {
                   return _buildLoadMoreButton(ref, studentId, paginatedState);
                 }
 
                 final session = assignmentSessions[index];
                 return AssignmentCard(
-                  mohaffezName: session.mohaffezName ?? '',
-                  location: session.location ?? '',
-                  sessionType: session.sessionType ?? '',
-                  slotLabel: session.preferredTimeSlot ?? '',
-                  sessionDate: session.sessionDate,
-                  hifz: session.hifzAssignment ?? '',
-                  muraja: session.murajaAssignment ?? '',
-                  rating: session.sessionRating ?? 0,
-                  notes: session.sessionNotes ?? '',
+                  mohaffezName: session['mohaffezName'] as String? ?? 'غير معروف',
+                  location: session['location'] as String? ?? '',
+                  sessionType: session['sessionType'] as String? ?? 'بيت',
+                  slotLabel: session['preferredTimeSlot'] as String? ?? '08:00',
+                  sessionDate: session['sessionDate'] as DateTime?,
+                  hifz: session['hifzAssignment'] as String? ?? '',
+                  muraja: session['murajaAssignment'] as String? ?? '',
+                  rating: session['sessionRating'] as int? ?? 0,
+                  notes: session['sessionNotes'] as String? ?? '',
                 );
               },
             );
@@ -97,7 +97,7 @@ class StudentAssignmentsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLoadMoreButton(WidgetRef ref, String studentId, paginatedState) {
+  Widget _buildLoadMoreButton(WidgetRef ref, String studentId, StudentSessionsState paginatedState) {
     if (paginatedState.isLoadingMore) {
       return const Padding(
         padding: EdgeInsets.all(16),
@@ -111,7 +111,7 @@ class StudentAssignmentsScreen extends ConsumerWidget {
         child: Column(
           children: [
             Text(
-              'حدث خطأ: ${paginatedState.error}',
+              paginatedState.error!,
               style: const TextStyle(color: Colors.red),
               textAlign: TextAlign.center,
             ),

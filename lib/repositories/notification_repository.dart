@@ -1,4 +1,4 @@
-// lib/repositories/notification_repository.dart (COMPLETE - ~250 lines)
+// lib/repositories/notification_repository.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
@@ -30,13 +30,12 @@ class NotificationRepository {
   }
 
   /// Watch ALL notifications for user (real-time, non-paginated)
-  /// Use this for backward compatibility or simple cases
   Stream<List<NotificationModel>> watchNotifications(String userId) {
     return _firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
-        .limit(100) // Reasonable limit to prevent excessive data
+        .limit(100)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => NotificationModel.fromJson({
@@ -64,7 +63,6 @@ class NotificationRepository {
         .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true);
 
-    // Start after last document if provided
     if (lastDocument != null) {
       query = query.startAfterDocument(lastDocument);
     }
@@ -83,39 +81,11 @@ class NotificationRepository {
     );
   }
 
-  /// Get specific page (helper method for recovering pagination state)
-  Future<({
-    List<NotificationModel> notifications,
-    DocumentSnapshot? lastDoc,
-    bool hasMore
-  })> getNotificationsPage(
-    String userId, {
-    int limit = 20,
-  }) async {
-    final snapshot = await _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .get();
-
-    return (
-      notifications: snapshot.docs
-          .map((doc) => NotificationModel.fromJson({
-                ...doc.data() as Map<String, dynamic>,
-                'id': doc.id
-              }))
-          .toList(),
-      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      hasMore: snapshot.docs.length == limit,
-    );
-  }
-
   // ============================================================================
   // QUERY METHODS (Non-paginated)
   // ============================================================================
 
-  /// Get all notifications for user (non-paginated, one-time fetch)
+  /// Get all notifications for user
   Future<List<NotificationModel>> getNotifications(String userId) async {
     final snapshot = await _firestore
         .collection('notifications')
@@ -212,12 +182,12 @@ class NotificationRepository {
     await batch.commit();
   }
 
-  /// Create a notification (for admin/system use)
+  /// Create a notification (generic)
   Future<String> createNotification({
     required String userId,
     required String title,
     required String body,
-    required String type, // 'session', 'follow', 'system'
+    required String type,
     bool isRead = false,
     String? scheduleId,
     String? mohaffezId,
@@ -248,17 +218,6 @@ class NotificationRepository {
         .delete();
   }
 
-  /// Delete multiple notifications
-  Future<void> deleteMultipleNotifications(List<String> notificationIds) async {
-    final batch = _firestore.batch();
-
-    for (final id in notificationIds) {
-      batch.delete(_firestore.collection('notifications').doc(id));
-    }
-
-    await batch.commit();
-  }
-
   /// Delete all notifications for a user
   Future<void> deleteAllNotifications(String userId) async {
     final batch = _firestore.batch();
@@ -275,75 +234,90 @@ class NotificationRepository {
     await batch.commit();
   }
 
-  /// Delete old notifications (cleanup utility)
-  Future<int> deleteOldNotifications({
-    required String userId,
-    required Duration olderThan,
+  // ============================================================================
+  // SPECIALIZED NOTIFICATION CREATORS
+  // ============================================================================
+
+  /// Create notification when session request is created
+  Future<String> createSessionRequestNotification({
+    required String mohaffezId,
+    required String studentName,
+    required String sessionType,
+    required String preferredTimeSlot,
+    required String requestId,
   }) async {
-    final cutoffDate = DateTime.now().subtract(olderThan);
-    final batch = _firestore.batch();
-
-    final snapshot = await _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .where('createdAt', isLessThan: Timestamp.fromDate(cutoffDate))
-        .get();
-
-    for (final doc in snapshot.docs) {
-      batch.delete(doc.reference);
-    }
-
-    await batch.commit();
-    return snapshot.docs.length;
+    final docRef = _firestore.collection('notifications').doc();
+    
+    await docRef.set({
+      'userId': mohaffezId,
+      'title': 'طلب حجز جديد',
+      'body': 'لديك طلب حجز جديد من $studentName لجلسة $sessionType في $preferredTimeSlot',
+      'type': 'session_request',
+      'isRead': false,
+      'scheduleId': requestId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    
+    return docRef.id;
   }
 
-  // ============================================================================
-  // BATCH OPERATIONS
-  // ============================================================================
-
-  /// Get notifications for multiple users (admin use)
-  Future<Map<String, List<NotificationModel>>> getNotificationsForUsers(
-    List<String> userIds,
-  ) async {
-    final Map<String, List<NotificationModel>> results = {};
-
-    // Firestore 'in' query limit is 10
-    final chunks = _chunkList(userIds, 10);
-
-    for (final chunk in chunks) {
-      final snapshot = await _firestore
-          .collection('notifications')
-          .where('userId', whereIn: chunk)
-          .orderBy('createdAt', descending: true)
-          .limit(20)
-          .get();
-
-      for (final doc in snapshot.docs) {
-        final notification = NotificationModel.fromJson({
-          ...doc.data() as Map<String, dynamic>,
-          'id': doc.id
-        });
-
-        results.putIfAbsent(notification.userId, () => []);
-        results[notification.userId]!.add(notification);
-      }
-    }
-
-    return results;
+  /// Create notification when session is accepted
+  Future<String> createSessionAcceptedNotification({
+    required String studentId,
+    required String mohaffezName,
+    required String sessionType,
+    required DateTime sessionDate,
+    required String sessionId,
+  }) async {
+    final docRef = _firestore.collection('notifications').doc();
+    
+    await docRef.set({
+      'userId': studentId,
+      'mohaffezId': mohaffezName,
+      'mohaffezName': mohaffezName,
+      'title': 'تم قبول طلبك',
+      'body': 'تم قبول طلب الجلسة مع $mohaffezName في ${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
+      'type': 'session_accepted',
+      'isRead': false,
+      'scheduleId': sessionId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    
+    return docRef.id;
   }
 
-  // ============================================================================
-  // HELPER METHODS
-  // ============================================================================
-
-  /// Chunk list into smaller lists (for batch operations)
-  List<List<T>> _chunkList<T>(List<T> list, int chunkSize) {
-    final List<List<T>> chunks = [];
-    for (var i = 0; i < list.length; i += chunkSize) {
-      chunks.add(
-        list.sublist(i, i + chunkSize > list.length ? list.length : i + chunkSize),
-      );
-    }
-    return chunks;
+  /// Create notification when assignment is updated
+  Future<String> createAssignmentUpdatedNotification({
+    required String studentId,
+    required String mohaffezName,
+    required String sessionId,
+    required bool hasHifz,
+    required bool hasMuraja,
+    required int rating,
+  }) async {
+    final docRef = _firestore.collection('notifications').doc();
+    
+    String body = 'قام $mohaffezName بإضافة ';
+    final List<String> parts = [];
+    
+    if (hasHifz) parts.add('حفظ جديد');
+    if (hasMuraja) parts.add('مراجعة');
+    if (rating > 0) parts.add('تقييم ($rating/10)');
+    
+    body += parts.join(' و ');
+    
+    await docRef.set({
+      'userId': studentId,
+      'mohaffezId': mohaffezName,
+      'mohaffezName': mohaffezName,
+      'title': 'تحديث الواجبات',
+      'body': body,
+      'type': 'assignment_updated',
+      'isRead': false,
+      'scheduleId': sessionId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    
+    return docRef.id;
   }
 }

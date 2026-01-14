@@ -13,6 +13,7 @@
         android:label="Mohaffez Finder"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        android:enableOnBackInvokedCallback="true">  <!-- ✅ ADD THIS LINE -->
 
         <!-- Firebase Cloud Messaging Default Notification Channel -->
         <meta-data
