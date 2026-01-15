@@ -53,7 +53,7 @@ class PendingRequestsScreen extends ConsumerWidget {
                         color: AppTheme.primaryAmber,
                       ),
                     ),
-                    title: Text(request.studentName),
+                    title: Text(request['studentName'] as String? ?? ''),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

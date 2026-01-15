@@ -9,6 +9,7 @@ import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
 import 'session_details_screen.dart';
 import '../models/session_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AcceptedSessionsScreen extends ConsumerWidget {
   const AcceptedSessionsScreen({super.key});
@@ -89,7 +90,7 @@ class AcceptedSessionsScreen extends ConsumerWidget {
                   sessionRating: session['sessionRating'] as int? ?? 0, // ✅ FIXED: Provide default
                   sessionNotes: session['sessionNotes'] as String?,
                   status: session['status'] as String? ?? 'accepted',
-                  createdAt: session['createdAt'] as DateTime?,
+                  createdAt: (session['createdAt'] as Timestamp?)?.toDate(),
                 );
 
                 return _buildSessionCard(context, sessionModel);

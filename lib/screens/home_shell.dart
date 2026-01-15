@@ -1,105 +1,53 @@
-// lib/screens/home_shell.dart
-
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'student_home.dart';
 import 'mohaffez_home.dart';
 import 'profile_screen.dart';
 import 'notifications_screen.dart';
 import 'nearby_mohaffez_screen.dart';
-import 'login_screen.dart';
 import '../shared/widgets/offline_banner.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/notification_provider_paginated.dart';
-import '../services/cache_service.dart';
-
-// ============================================================================
-// MAIN HOME SHELL
-// ============================================================================
 
 class HomeShell extends ConsumerWidget {
-  const HomeShell({super.key});
+  final Widget child;
+
+  const HomeShell({super.key, required this.child});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
+    final user = ref.watch(currentUserProvider).value;
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-    return userAsync.when(
-      data: (user) {
-        if (user == null) {
-          return const LoginScreen();
-        }
-
-        return AuthenticatedShell(user: user);
-      },
-      loading: () => const LoadingScreen(),
-      error: (error, stackTrace) => ErrorScreen(
-        onRetry: () => ref.invalidate(currentUserProvider),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// AUTHENTICATED SHELL
-// ============================================================================
-
-class AuthenticatedShell extends ConsumerWidget {
-  final user;
-
-  const AuthenticatedShell({super.key, required this.user});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = ref.watch(bottomNavIndexProvider);
     final isMohaffez = user.role == 'mohaffez';
-
-    final screens = isMohaffez
-        ? [
-            const MohaffezHome(),
-            const NotificationsScreen(),
-            const ProfileScreen(),
-          ]
-        : [
-            const StudentHome(),
-            const NearbyMohaffezScreen(),
-            const NotificationsScreen(),
-            const ProfileScreen(),
-          ];
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex),
+        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex, user.uid),
         body: Column(
           children: [
             const OfflineBanner(),
-            Expanded(
-              child: IndexedStack(
-                index: currentIndex,
-                children: screens,
-              ),
-            ),
+            Expanded(child: child),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavBar(ref, isMohaffez, currentIndex),
-        drawer: _buildDrawer(context, ref),
+        bottomNavigationBar: _buildBottomNavBar(context, ref, isMohaffez, currentIndex),
       ),
     );
   }
-
-  // ==========================================================================
-  // APP BAR
-  // ==========================================================================
 
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     WidgetRef ref,
     bool isMohaffez,
     int currentIndex,
+    String userId,
   ) {
     String getTitle() {
       if (isMohaffez) {
@@ -111,20 +59,20 @@ class AuthenticatedShell extends ConsumerWidget {
           case 2:
             return 'الملف الشخصي';
           default:
-            return 'محفظي';
+            return 'محفظ';
         }
       } else {
         switch (currentIndex) {
           case 0:
             return 'الرئيسية';
           case 1:
-            return 'البحث عن محفظ';
+            return 'البحث';
           case 2:
             return 'الإشعارات';
           case 3:
             return 'الملف الشخصي';
           default:
-            return 'محفظي';
+            return 'محفظ';
         }
       }
     }
@@ -175,22 +123,21 @@ class AuthenticatedShell extends ConsumerWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
-            // Notification badge - only show when not on notifications screen
             if (currentIndex != (isMohaffez ? 1 : 2))
-              _buildNotificationBadge(ref, isMohaffez),
+              _buildNotificationBadge(context, ref, isMohaffez, userId),
           ],
         ),
       ),
     );
   }
 
-  // ==========================================================================
-  // NOTIFICATION BADGE
-  // ==========================================================================
-
-  Widget _buildNotificationBadge(WidgetRef ref, bool isMohaffez) {
-    // ✅ FIX: Use unreadNotificationsCountProvider from notification_provider_paginated.dart
-    final unreadCountAsync = ref.watch(unreadNotificationsCountProvider(user.uid));
+  Widget _buildNotificationBadge(
+    BuildContext context,
+    WidgetRef ref,
+    bool isMohaffez,
+    String userId,
+  ) {
+    final unreadCountAsync = ref.watch(unreadNotificationsCountProvider(userId));
 
     return unreadCountAsync.when(
       data: (unreadCount) {
@@ -199,9 +146,10 @@ class AuthenticatedShell extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.notifications),
               tooltip: 'الإشعارات',
-              onPressed: () => ref
-                  .read(bottomNavIndexProvider.notifier)
-                  .setIndex(isMohaffez ? 1 : 2),
+              onPressed: () {
+                ref.read(bottomNavIndexProvider.notifier).setIndex(isMohaffez ? 1 : 2);
+                context.go('/notifications');
+              },
             ),
             if (unreadCount > 0)
               Positioned(
@@ -233,228 +181,77 @@ class AuthenticatedShell extends ConsumerWidget {
       },
       loading: () => IconButton(
         icon: const Icon(Icons.notifications),
-        onPressed: () => ref
-            .read(bottomNavIndexProvider.notifier)
-            .setIndex(isMohaffez ? 1 : 2),
+        onPressed: () => context.go('/notifications'),
       ),
       error: (_, __) => IconButton(
         icon: const Icon(Icons.notifications),
-        onPressed: () => ref
-            .read(bottomNavIndexProvider.notifier)
-            .setIndex(isMohaffez ? 1 : 2),
+        onPressed: () => context.go('/notifications'),
       ),
     );
   }
 
-  // ==========================================================================
-  // BOTTOM NAVIGATION BAR
-  // ==========================================================================
-
-  Widget _buildBottomNavBar(WidgetRef ref, bool isMohaffez, int currentIndex) {
+  Widget _buildBottomNavBar(
+    BuildContext context,
+    WidgetRef ref,
+    bool isMohaffez,
+    int currentIndex,
+  ) {
     if (isMohaffez) {
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) =>
-            ref.read(bottomNavIndexProvider.notifier).setIndex(index),
+        onTap: (index) {
+          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+          switch (index) {
+            case 0:
+              context.go('/mohaffez-home');
+              break;
+            case 1:
+              context.go('/notifications');
+              break;
+            case 2:
+              context.go('/profile');
+              break;
+          }
+        },
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'الرئيسية',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'الإشعارات',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'الحساب',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'الإشعارات'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'الملف الشخصي'),
         ],
       );
     } else {
       return BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: (index) =>
-            ref.read(bottomNavIndexProvider.notifier).setIndex(index),
+        onTap: (index) {
+          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+          switch (index) {
+            case 0:
+              context.go('/home');
+              break;
+            case 1:
+              context.go('/nearby');
+              break;
+            case 2:
+              context.go('/notifications');
+              break;
+            case 3:
+              context.go('/profile');
+              break;
+          }
+        },
         selectedItemColor: AppTheme.primaryAmber,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'الرئيسية',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'بحث',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'الإشعارات',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'الحساب',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'البحث'),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'الإشعارات'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'الملف الشخصي'),
         ],
       );
     }
-  }
-
-  // ==========================================================================
-  // DRAWER
-  // ==========================================================================
-
-  Widget _buildDrawer(BuildContext context, WidgetRef ref) {
-    return Drawer(
-      child: ListView(
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  user.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user.role == 'mohaffez' ? 'محفظ' : 'طالب',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('تسجيل الخروج'),
-            onTap: () async {
-              Navigator.pop(context); // Close drawer first
-              await _logout(ref, context);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==========================================================================
-  // LOGOUT
-  // ==========================================================================
-
-  Future<void> _logout(WidgetRef ref, BuildContext context) async {
-    try {
-      // Invalidate providers BEFORE logout
-      ref.invalidate(currentUserProvider);
-      ref.read(bottomNavIndexProvider.notifier).reset();
-
-      // Sign out from Firebase
-      await FirebaseAuth.instance.signOut();
-
-      // Clear cache
-      await CacheService.clearAll();
-
-      // Navigate to login screen
-      if (context.mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ في تسجيل الخروج: $e')),
-        );
-      }
-    }
-  }
-}
-
-// ============================================================================
-// LOADING SCREEN
-// ============================================================================
-
-class LoadingScreen extends StatelessWidget {
-  const LoadingScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppTheme.primaryAmber),
-            const SizedBox(height: 16),
-            Text(
-              'جاري التحميل...',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// ERROR SCREEN
-// ============================================================================
-
-class ErrorScreen extends StatelessWidget {
-  final VoidCallback onRetry;
-
-  const ErrorScreen({super.key, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.red,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'حدث خطأ',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('إعادة المحاولة'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

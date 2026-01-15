@@ -1,37 +1,44 @@
-// lib/repositories/notification_repository.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
+import '../shared/pagination/firestore_pagination_mixin.dart';
+import '../shared/pagination/pagination_result.dart';
 
-class NotificationRepository {
-  final FirebaseFirestore _firestore;
+class NotificationRepository with FirestorePaginationMixin {
+  final FirebaseFirestore firestore;
   static const int pageSize = 20;
 
-  NotificationRepository(this._firestore);
+  NotificationRepository(this.firestore);
 
-  // ============================================================================
-  // STREAM METHODS (Real-time)
-  // ============================================================================
+  // ========== STREAM METHODS (Real-time first page) ==========
 
   /// Watch first page of notifications (real-time, paginated)
   Stream<List<NotificationModel>> watchNotificationsFirstPage(String userId) {
-    return _firestore
+    return watchFirstPage(
+      query: firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true),
+      fromFirestore: (doc) => NotificationModel.fromJson({
+        ...doc.data() as Map<String, dynamic>,
+        'id': doc.id,
+      }),
+      pageSize: pageSize,
+    );
+  }
+
+  /// Watch unread count (real-time)
+  Stream<int> watchUnreadCount(String userId) {
+    return firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .limit(pageSize)
+        .where('isRead', isEqualTo: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => NotificationModel.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id
-                }))
-            .toList());
+        .map((snapshot) => snapshot.docs.length);
   }
 
   /// Watch ALL notifications for user (real-time, non-paginated)
   Stream<List<NotificationModel>> watchNotifications(String userId) {
-    return _firestore
+    return firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
@@ -39,55 +46,38 @@ class NotificationRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => NotificationModel.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
-                  'id': doc.id
+                  ...doc.data(),
+                  'id': doc.id,
                 }))
             .toList());
   }
 
-  // ============================================================================
-  // PAGINATED METHODS
-  // ============================================================================
+  // ========== PAGINATED METHODS (REFACTORED using mixin) ==========
 
   /// Get next page of notifications
-  Future<({
-    List<NotificationModel> notifications,
-    DocumentSnapshot? lastDoc,
-    bool hasMore
-  })> getNotificationsNextPage(
-    String userId,
+  Future<PaginationResult<NotificationModel>> getNotificationsNextPage({
+    required String userId,
     DocumentSnapshot? lastDocument,
-  ) async {
-    Query query = _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true);
-
-    if (lastDocument != null) {
-      query = query.startAfterDocument(lastDocument);
-    }
-
-    final snapshot = await query.limit(pageSize).get();
-
-    return (
-      notifications: snapshot.docs
-          .map((doc) => NotificationModel.fromJson({
-                ...doc.data() as Map<String, dynamic>,
-                'id': doc.id
-              }))
-          .toList(),
-      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      hasMore: snapshot.docs.length == pageSize,
+  }) async {
+    return executePaginatedQuery(
+      query: firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true),
+      fromFirestore: (doc) => NotificationModel.fromJson({
+        ...doc.data() as Map<String, dynamic>,
+        'id': doc.id,
+      }),
+      lastDocument: lastDocument,
+      pageSize: pageSize,
     );
   }
 
-  // ============================================================================
-  // QUERY METHODS (Non-paginated)
-  // ============================================================================
+  // ========== QUERY METHODS (Non-paginated) ==========
 
-  /// Get all notifications for user
+  /// Get all notifications for user (non-paginated)
   Future<List<NotificationModel>> getNotifications(String userId) async {
-    final snapshot = await _firestore
+    final snapshot = await firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
@@ -96,56 +86,39 @@ class NotificationRepository {
 
     return snapshot.docs
         .map((doc) => NotificationModel.fromJson({
-              ...doc.data() as Map<String, dynamic>,
-              'id': doc.id
+              ...doc.data(),
+              'id': doc.id,
             }))
         .toList();
   }
 
   /// Get single notification by ID
   Future<NotificationModel?> getNotificationById(String notificationId) async {
-    final doc = await _firestore
+    final doc = await firestore
         .collection('notifications')
         .doc(notificationId)
         .get();
 
     if (!doc.exists) return null;
-
-    return NotificationModel.fromJson({
-      ...doc.data()! as Map<String, dynamic>,
-      'id': doc.id
-    });
+    return NotificationModel.fromJson({...doc.data()!, 'id': doc.id});
   }
 
   /// Get unread notification count
   Future<int> getUnreadCount(String userId) async {
-    final snapshot = await _firestore
+    final snapshot = await firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
         .count()
         .get();
-
     return snapshot.count ?? 0;
   }
 
-  /// Watch unread count (real-time)
-  Stream<int> watchUnreadCount(String userId) {
-    return _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: userId)
-        .where('isRead', isEqualTo: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
-  }
-
-  // ============================================================================
-  // WRITE METHODS
-  // ============================================================================
+  // ========== WRITE METHODS ==========
 
   /// Mark single notification as read
   Future<void> markAsRead(String notificationId) async {
-    await _firestore
+    await firestore
         .collection('notifications')
         .doc(notificationId)
         .update({'isRead': true});
@@ -153,23 +126,20 @@ class NotificationRepository {
 
   /// Mark multiple notifications as read
   Future<void> markMultipleAsRead(List<String> notificationIds) async {
-    final batch = _firestore.batch();
-
+    final batch = firestore.batch();
     for (final id in notificationIds) {
       batch.update(
-        _firestore.collection('notifications').doc(id),
+        firestore.collection('notifications').doc(id),
         {'isRead': true},
       );
     }
-
     await batch.commit();
   }
 
   /// Mark all notifications as read for a user
   Future<void> markAllAsRead(String userId) async {
-    final batch = _firestore.batch();
-
-    final snapshot = await _firestore
+    final batch = firestore.batch();
+    final snapshot = await firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
@@ -178,7 +148,6 @@ class NotificationRepository {
     for (final doc in snapshot.docs) {
       batch.update(doc.reference, {'isRead': true});
     }
-
     await batch.commit();
   }
 
@@ -193,8 +162,7 @@ class NotificationRepository {
     String? mohaffezId,
     String? mohaffezName,
   }) async {
-    final docRef = _firestore.collection('notifications').doc();
-
+    final docRef = firestore.collection('notifications').doc();
     await docRef.set({
       'userId': userId,
       'title': title,
@@ -206,23 +174,18 @@ class NotificationRepository {
       'mohaffezName': mohaffezName,
       'createdAt': FieldValue.serverTimestamp(),
     });
-
     return docRef.id;
   }
 
   /// Delete a single notification
   Future<void> deleteNotification(String notificationId) async {
-    await _firestore
-        .collection('notifications')
-        .doc(notificationId)
-        .delete();
+    await firestore.collection('notifications').doc(notificationId).delete();
   }
 
   /// Delete all notifications for a user
   Future<void> deleteAllNotifications(String userId) async {
-    final batch = _firestore.batch();
-
-    final snapshot = await _firestore
+    final batch = firestore.batch();
+    final snapshot = await firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .get();
@@ -230,13 +193,10 @@ class NotificationRepository {
     for (final doc in snapshot.docs) {
       batch.delete(doc.reference);
     }
-
     await batch.commit();
   }
 
-  // ============================================================================
-  // SPECIALIZED NOTIFICATION CREATORS
-  // ============================================================================
+  // ========== SPECIALIZED NOTIFICATION CREATORS ==========
 
   /// Create notification when session request is created
   Future<String> createSessionRequestNotification({
@@ -246,18 +206,16 @@ class NotificationRepository {
     required String preferredTimeSlot,
     required String requestId,
   }) async {
-    final docRef = _firestore.collection('notifications').doc();
-    
+    final docRef = firestore.collection('notifications').doc();
     await docRef.set({
       'userId': mohaffezId,
       'title': 'طلب حجز جديد',
-      'body': 'لديك طلب حجز جديد من $studentName لجلسة $sessionType في $preferredTimeSlot',
+      'body': '$studentName - $sessionType - $preferredTimeSlot',
       'type': 'session_request',
       'isRead': false,
       'scheduleId': requestId,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    
     return docRef.id;
   }
 
@@ -269,20 +227,19 @@ class NotificationRepository {
     required DateTime sessionDate,
     required String sessionId,
   }) async {
-    final docRef = _firestore.collection('notifications').doc();
-    
+    final docRef = firestore.collection('notifications').doc();
     await docRef.set({
       'userId': studentId,
       'mohaffezId': mohaffezName,
       'mohaffezName': mohaffezName,
       'title': 'تم قبول طلبك',
-      'body': 'تم قبول طلب الجلسة مع $mohaffezName في ${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
+      'body':
+          '$mohaffezName - ${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
       'type': 'session_accepted',
       'isRead': false,
       'scheduleId': sessionId,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    
     return docRef.id;
   }
 
@@ -295,29 +252,25 @@ class NotificationRepository {
     required bool hasMuraja,
     required int rating,
   }) async {
-    final docRef = _firestore.collection('notifications').doc();
-    
-    String body = 'قام $mohaffezName بإضافة ';
+    final docRef = firestore.collection('notifications').doc();
+    String body = '$mohaffezName - ';
     final List<String> parts = [];
-    
-    if (hasHifz) parts.add('حفظ جديد');
+    if (hasHifz) parts.add('حفظ');
     if (hasMuraja) parts.add('مراجعة');
-    if (rating > 0) parts.add('تقييم ($rating/10)');
-    
-    body += parts.join(' و ');
-    
+    if (rating > 0) parts.add('$rating/10');
+    body += parts.join(' - ');
+
     await docRef.set({
       'userId': studentId,
       'mohaffezId': mohaffezName,
       'mohaffezName': mohaffezName,
-      'title': 'تحديث الواجبات',
+      'title': 'تم تحديث الواجب',
       'body': body,
       'type': 'assignment_updated',
       'isRead': false,
       'scheduleId': sessionId,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    
     return docRef.id;
   }
 }

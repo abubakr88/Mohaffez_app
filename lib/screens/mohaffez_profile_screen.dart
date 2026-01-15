@@ -15,27 +15,30 @@ import '../providers/user_provider.dart';
 import '../services/follow_service.dart';
 import '../shared/utils/error_handler.dart';
 import '../repositories/notification_repository.dart';
+import '../models/notification_model.dart';
 
 // ============================================================================
 // PROVIDERS
 // ============================================================================
 
-/// Provider for notification repository
+// FIXED: Provider for notification repository
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return NotificationRepository(FirebaseFirestore.instance);
 });
 
-/// Provider for mohaffez profile data
-final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, mohaffezId) async {
-  final doc = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(mohaffezId)
-      .get();
-  
-  if (!doc.exists) throw Exception('المحفظ غير موجود');
-  
-  return {...doc.data()!, 'uid': doc.id};
-});
+// Provider for mohaffez profile data
+final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>(
+  (ref, mohaffezId) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(mohaffezId)
+        .get();
+
+    if (!doc.exists) throw Exception('المحفظ غير موجود');
+
+    return {...doc.data()!, 'uid': doc.id};
+  },
+);
 
 /// Provider for follow status
 final followStatusProvider = StreamProvider.family<bool, String>((ref, mohaffezId) async* {

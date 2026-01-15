@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'home_shell.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/widgets/offline_banner.dart';
 import '../services/cache_service.dart';
 import '../shared/utils/validation_utils.dart';
-import '../../shared/constants/app_theme.dart'; 
+import '../shared/constants/app_theme.dart';
 
 enum UserRole { mohaffez, student }
 
@@ -21,6 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+
   bool _isLogin = true;
   bool _isLoading = false;
   UserRole _selectedRole = UserRole.mohaffez;
@@ -40,7 +41,6 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _passwordController.text.trim(),
         );
 
-        // Load user data and cache it
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(cred.user!.uid)
@@ -58,13 +58,9 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _passwordController.text.trim(),
         );
 
-        final roleString =
-            _selectedRole == UserRole.mohaffez ? 'mohaffez' : 'student';
+        final roleString = _selectedRole == UserRole.mohaffez ? 'mohaffez' : 'student';
 
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(cred.user!.uid)
-            .set({
+        await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'role': roleString,
@@ -74,7 +70,6 @@ class _AuthScreenState extends State<AuthScreen> {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // Cache user data
         await CacheService.saveUserId(cred.user!.uid);
         await CacheService.saveUserRole(roleString);
         await CacheService.saveUserName(_nameController.text.trim());
@@ -84,37 +79,38 @@ class _AuthScreenState extends State<AuthScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isLogin ? 'تم تسجيل الدخول' : 'تم إنشاء الحساب'),
+          content: Text(_isLogin ? 'تم تسجيل الدخول بنجاح' : 'تم إنشاء الحساب بنجاح'),
+          backgroundColor: AppTheme.accentGreen,
         ),
       );
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-        (_) => false,
-      );
+      // FIXED: Use GoRouter navigation
+      context.go('/');
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      String message = 'خطأ في تسجيل الدخول';
+      String message;
       if (e.code == 'user-not-found') {
-        message = 'البريد الإلكتروني غير مسجل';
+        message = 'المستخدم غير موجود';
       } else if (e.code == 'wrong-password') {
         message = 'كلمة المرور غير صحيحة';
       } else if (e.code == 'email-already-in-use') {
         message = 'البريد الإلكتروني مستخدم بالفعل';
       } else if (e.code == 'weak-password') {
-        message = 'كلمة المرور ضعيفة جداً';
+        message = 'كلمة المرور ضعيفة';
       } else if (e.message != null) {
         message = e.message!;
+      } else {
+        message = 'حدث خطأ';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ: ${e.toString()}')),
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -129,129 +125,120 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-@override
-Widget build(BuildContext context) {
-  return Directionality(
-    textDirection: TextDirection.rtl,
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('تسجيل الدخول - محفظ القرآن'),
-      ),
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ADD LOGO HERE - NEW
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 20,
-                              offset: const Offset(0, 5),
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('محفظ - تسجيل الدخول')),
+        body: Column(
+          children: [
+            const OfflineBanner(),
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Logo
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 20,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Image.asset(
+                            'assets/images/icon.png',
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Icon(
+                              Icons.school,
+                              size: 100,
+                              color: AppTheme.primaryAmber,
                             ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          'assets/images/icon.png',
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(
-                            Icons.school,
-                            size: 100,
-                            color: AppTheme.primaryAmber,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'محفظي القريب',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: AppTheme.primaryAmber,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(height: 32),
-                      // END OF NEW LOGO SECTION
-                      
-                      if (!_isLogin)
-                        TextFormField(
-                          controller: _nameController,
-                          decoration:
-                              const InputDecoration(labelText: 'الاسم الكامل'),
-                          validator: (value) =>
-                              value == null || value.isEmpty ? 'مطلوب' : null,
+                        const SizedBox(height: 24),
+                        Text(
+                          'محفظ',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: AppTheme.primaryAmber,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
-                      const SizedBox(height: 12),
-                      // ... rest of the form fields
+                        const SizedBox(height: 32),
 
-                        const SizedBox(height: 12),
+                        if (!_isLogin) ...[
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(labelText: 'الاسم'),
+                            validator: (value) =>
+                                value == null || value.isEmpty ? 'الاسم مطلوب' : null,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
                         TextFormField(
                           controller: _emailController,
-                          decoration: const InputDecoration(
-                            labelText: 'البريد الإلكتروني',
-                          ),
+                          decoration: const InputDecoration(labelText: 'البريد الإلكتروني'),
                           keyboardType: TextInputType.emailAddress,
                           textDirection: TextDirection.ltr,
                           validator: ValidationUtils.email,
                         ),
                         const SizedBox(height: 12),
+
                         TextFormField(
                           controller: _passwordController,
-                          decoration: const InputDecoration(
-                            labelText: 'كلمة المرور',
-                          ),
+                          decoration: const InputDecoration(labelText: 'كلمة المرور'),
                           obscureText: true,
                           validator: ValidationUtils.password,
                         ),
                         const SizedBox(height: 12),
-                        if (!_isLogin)
+
+                        if (!_isLogin) ...[
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Text('أنا:'),
+                              const Text('نوع الحساب:'),
                               const SizedBox(width: 8),
                               ChoiceChip(
                                 label: const Text('محفظ'),
                                 selected: _selectedRole == UserRole.mohaffez,
-                                onSelected: (_) {
-                                  setState(
-                                      () => _selectedRole = UserRole.mohaffez);
-                                },
+                                onSelected: (_) =>
+                                    setState(() => _selectedRole = UserRole.mohaffez),
                               ),
                               const SizedBox(width: 8),
                               ChoiceChip(
                                 label: const Text('طالب'),
                                 selected: _selectedRole == UserRole.student,
-                                onSelected: (_) {
-                                  setState(
-                                      () => _selectedRole = UserRole.student);
-                                },
+                                onSelected: (_) =>
+                                    setState(() => _selectedRole = UserRole.student),
                               ),
                             ],
                           ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 16),
+                        ],
+
                         if (_isLoading)
                           const CircularProgressIndicator()
                         else
                           ElevatedButton(
                             onPressed: _submit,
-                            child: Text(_isLogin ? 'دخول' : 'إنشاء حساب'),
+                            child: Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'),
                           ),
                         const SizedBox(height: 8),
+
                         TextButton(
                           onPressed: () {
                             setState(() {
@@ -260,7 +247,9 @@ Widget build(BuildContext context) {
                             });
                           },
                           child: Text(
-                            _isLogin ? 'إنشاء حساب جديد' : 'لدي حساب بالفعل',
+                            _isLogin
+                                ? 'ليس لديك حساب؟ سجل الآن'
+                                : 'لديك حساب؟ سجل الدخول',
                           ),
                         ),
                       ],

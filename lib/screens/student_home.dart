@@ -1,5 +1,4 @@
 // lib/screens/student_home.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/constants/app_theme.dart';
@@ -54,15 +53,15 @@ class StudentHomeContent extends ConsumerWidget {
           // Welcome section
           _buildWelcomeSection(ref),
           const SizedBox(height: 24),
-          
+
           // Quick stats
           _buildQuickStats(ref),
           const SizedBox(height: 24),
-          
+
           // Recent assignments
           _buildRecentAssignments(ref),
           const SizedBox(height: 24),
-          
+
           // Quick actions
           _buildQuickActions(context),
         ],
@@ -70,13 +69,14 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
+  /// ==================== WELCOME SECTION - FIXED ====================
   Widget _buildWelcomeSection(WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
 
     return userAsync.when(
       data: (user) {
         if (user == null) return const SizedBox.shrink();
-        
+
         return Card(
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -94,7 +94,11 @@ class StudentHomeContent extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.waving_hand, size: 40, color: Colors.white),
+                const Icon(
+                  Icons.waving_hand,
+                  size: 40,
+                  color: Colors.white,
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -128,8 +132,8 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
+  /// ==================== QUICK STATS - FIXED ====================
   Widget _buildQuickStats(WidgetRef ref) {
-    // ✅ FIXED: Use studentSessionsFirstPageProvider instead of undefined studentSessionsProvider
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
     final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
 
@@ -137,7 +141,7 @@ class StudentHomeContent extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'إحصائيات سريعة',
+          'نظرة سريعة',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -152,11 +156,11 @@ class StudentHomeContent extends ConsumerWidget {
               child: sessionsAsync.when(
                 data: (sessions) {
                   final acceptedCount = sessions
-                      .where((s) => (s['status'] as String? ?? '') == 'accepted')
+                      .where((s) => (s['status'] as String?) == 'accepted')
                       .length;
                   return _buildStatCard(
                     icon: Icons.event_available,
-                    title: 'جلسات مقبولة',
+                    title: 'الجلسات المقبولة',
                     value: acceptedCount.toString(),
                     color: AppTheme.accentGreen,
                     onTap: () {
@@ -170,14 +174,14 @@ class StudentHomeContent extends ConsumerWidget {
                 },
                 loading: () => _buildStatCard(
                   icon: Icons.event_available,
-                  title: 'جلسات مقبولة',
+                  title: 'الجلسات المقبولة',
                   value: '...',
                   color: AppTheme.accentGreen,
                   onTap: () {},
                 ),
                 error: (_, __) => _buildStatCard(
                   icon: Icons.event_available,
-                  title: 'جلسات مقبولة',
+                  title: 'الجلسات المقبولة',
                   value: '0',
                   color: AppTheme.accentGreen,
                   onTap: () {},
@@ -185,13 +189,12 @@ class StudentHomeContent extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 12),
-            
             // Pending Requests
             Expanded(
               child: requestsAsync.when(
                 data: (requests) {
                   final pendingCount = requests
-                      .where((r) => (r['status'] as String? ?? '') == 'pending')
+                      .where((r) => (r['status'] as String?) == 'pending')
                       .length;
                   return _buildStatCard(
                     icon: Icons.pending_actions,
@@ -223,6 +226,7 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
+  /// ==================== STAT CARD - FIXED DESIGN ====================
   Widget _buildStatCard({
     required IconData icon,
     required String title,
@@ -243,17 +247,7 @@ class StudentHomeContent extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(icon, size: 32, color: color),
-                  const Spacer(),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: Colors.grey.shade400,
-                  ),
-                ],
-              ),
+              Icon(icon, size: 32, color: color),
               const SizedBox(height: 12),
               Text(
                 value,
@@ -267,9 +261,12 @@ class StudentHomeContent extends ConsumerWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   color: Colors.grey.shade600,
+                  height: 1.2,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -278,8 +275,8 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
+  /// ==================== RECENT ASSIGNMENTS - FIXED ====================
   Widget _buildRecentAssignments(WidgetRef ref) {
-    // ✅ FIXED: Use correct provider
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
 
     return Column(
@@ -288,7 +285,7 @@ class StudentHomeContent extends ConsumerWidget {
         Row(
           children: [
             const Text(
-              'الواجبات الأخيرة',
+              'التكاليف الأخيرة',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -312,16 +309,16 @@ class StudentHomeContent extends ConsumerWidget {
         sessionsAsync.when(
           data: (sessions) {
             final assignmentSessions = sessions.where((s) {
-              final hifz = s['hifzAssignment'] as String? ?? '';
-              final muraja = s['murajaAssignment'] as String? ?? '';
+              final hifz = (s['hifzAssignment'] as String?) ?? '';
+              final muraja = (s['murajaAssignment'] as String?) ?? '';
               return hifz.isNotEmpty || muraja.isNotEmpty;
             }).take(3).toList();
 
             if (assignmentSessions.isEmpty) {
               return const EmptyState(
                 icon: Icons.assignment_outlined,
-                title: 'لا توجد واجبات',
-                message: 'جميع الواجبات ستظهر هنا',
+                title: 'لا توجد تكاليف',
+                message: 'ستظهر التكاليف الخاصة بك هنا.',
                 animated: false,
               );
             }
@@ -329,39 +326,71 @@ class StudentHomeContent extends ConsumerWidget {
             return Column(
               children: assignmentSessions.map((session) {
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
                     leading: CircleAvatar(
-                      backgroundColor: AppTheme.primaryAmber.withValues(alpha: 0.2),
+                      backgroundColor: AppTheme.accentGreen.withOpacity(0.2),
                       child: const Icon(
-                        Icons.assignment,
-                        color: AppTheme.primaryAmber,
+                        Icons.school,
+                        color: AppTheme.accentGreen,
                       ),
                     ),
-                    title: Text(session['mohaffezName'] as String? ?? 'غير معروف'),
-                    subtitle: Text(
-                      session['hifzAssignment'] as String? ?? 
-                      session['murajaAssignment'] as String? ?? 
-                      '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    title: Text(
+                      (session['mohaffezName'] as String?) ?? 'غير معروف',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        if ((session['hifzAssignment'] as String?)?.isNotEmpty ?? false)
+                          Text(
+                            'حفظ: ${session['hifzAssignment']}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        if ((session['murajaAssignment'] as String?)?.isNotEmpty ?? false)
+                          Text(
+                            'مراجعة: ${session['murajaAssignment']}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing: Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Colors.grey.shade400,
                     ),
                   ),
                 );
               }).toList(),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const EmptyState(
-            icon: Icons.error_outline,
-            title: 'حدث خطأ',
-            message: 'تعذر تحميل الواجبات',
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (e, _) => ErrorDisplay.dataLoad(
+            onRetry: () =>
+                ref.invalidate(studentSessionsFirstPageProvider(studentId)),
           ),
         ),
       ],
     );
   }
 
+  /// ==================== QUICK ACTIONS - FIXED ====================
   Widget _buildQuickActions(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,10 +415,13 @@ class StudentHomeContent extends ConsumerWidget {
               );
             },
             icon: const Icon(Icons.search),
-            label: const Text('البحث عن محفظ'),
+            label: const Text('البحث عن محفظ قريب'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryAmber,
               padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),

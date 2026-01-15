@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'home_shell.dart';
-import '../../shared/widgets/offline_banner.dart';
-import '../../services/cache_service.dart';
-import '../../shared/utils/validation_utils.dart';
-import '../../shared/constants/app_theme.dart';
+import 'package:go_router/go_router.dart';
+import '../shared/widgets/offline_banner.dart';
+import '../services/cache_service.dart';
+import '../shared/utils/validation_utils.dart';
+import '../shared/constants/app_theme.dart';
 
 enum UserRole { mohaffez, student }
 
@@ -21,7 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
-  
+
   bool _isLogin = true;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -65,10 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final roleString = _selectedRole == UserRole.mohaffez ? 'mohaffez' : 'student';
 
         // Create user document
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(cred.user!.uid)
-            .set({
+        await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'role': roleString,
@@ -94,27 +91,24 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
 
-      // Navigate to home
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-        (route) => false,
-      );
+      // FIXED: Navigate to home using GoRouter
+      context.go('/');
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
       String message;
       if (e.code == 'user-not-found') {
-        message = 'لا يوجد مستخدم بهذا البريد الإلكتروني';
+        message = 'المستخدم غير موجود';
       } else if (e.code == 'wrong-password') {
         message = 'كلمة المرور غير صحيحة';
       } else if (e.code == 'email-already-in-use') {
         message = 'البريد الإلكتروني مستخدم بالفعل';
       } else if (e.code == 'weak-password') {
-        message = 'كلمة المرور ضعيفة جداً';
+        message = 'كلمة المرور ضعيفة';
       } else if (e.message != null) {
         message = e.message!;
       } else {
-        message = 'حدث خطأ، يرجى المحاولة مرة أخرى';
+        message = 'حدث خطأ';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -126,9 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
       );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -195,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'محفظ - منصة تحفيظ القرآن الكريم',
+                          'محفظ - منصة تحفيظ القرآن',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey.shade600,
@@ -208,11 +200,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _nameController,
                             decoration: const InputDecoration(
-                              labelText: 'الاسم الكامل',
+                              labelText: 'الاسم',
                               prefixIcon: Icon(Icons.person),
                             ),
                             validator: (value) =>
-                                value == null || value.isEmpty ? 'الرجاء إدخال الاسم' : null,
+                                value == null || value.isEmpty ? 'الاسم مطلوب' : null,
                           ),
                           const SizedBox(height: 16),
                         ],
@@ -240,9 +232,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               icon: Icon(
                                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
                               ),
-                              onPressed: () {
-                                setState(() => _obscurePassword = !_obscurePassword);
-                              },
+                              onPressed: () =>
+                                  setState(() => _obscurePassword = !_obscurePassword),
                             ),
                           ),
                           obscureText: _obscurePassword,
@@ -255,23 +246,21 @@ class _LoginScreenState extends State<LoginScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Text('أنا:'),
+                              const Text('نوع الحساب:'),
                               const SizedBox(width: 16),
                               ChoiceChip(
                                 label: const Text('محفظ'),
                                 selected: _selectedRole == UserRole.mohaffez,
-                                onSelected: (_) {
-                                  setState(() => _selectedRole = UserRole.mohaffez);
-                                },
+                                onSelected: (_) =>
+                                    setState(() => _selectedRole = UserRole.mohaffez),
                                 selectedColor: AppTheme.primaryAmber,
                               ),
                               const SizedBox(width: 8),
                               ChoiceChip(
                                 label: const Text('طالب'),
                                 selected: _selectedRole == UserRole.student,
-                                onSelected: (_) {
-                                  setState(() => _selectedRole = UserRole.student);
-                                },
+                                onSelected: (_) =>
+                                    setState(() => _selectedRole = UserRole.student),
                                 selectedColor: AppTheme.accentGreen,
                               ),
                             ],
@@ -290,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                               ),
-                              child: Text(_isLogin ? 'دخول' : 'إنشاء حساب'),
+                              child: Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'),
                             ),
                           ),
                         const SizedBox(height: 16),
@@ -306,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Text(
                             _isLogin
                                 ? 'ليس لديك حساب؟ سجل الآن'
-                                : 'لديك حساب بالفعل؟ سجل الدخول',
+                                : 'لديك حساب؟ سجل الدخول',
                           ),
                         ),
                       ],

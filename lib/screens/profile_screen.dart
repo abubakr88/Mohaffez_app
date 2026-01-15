@@ -18,6 +18,7 @@ import 'mohaffez_credentials_screen.dart';
 import 'availability_management_screen.dart';
 import 'privacy_settings_screen.dart';
 import 'login_screen.dart';
+import '../repositories/user_repository.dart'; // ✅ ADD THIS LINE
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -886,11 +887,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _updateProfile(String userId, Map<String, dynamic> updates) async {
     try {
       final repository = ref.read(userRepositoryProvider);
-      await repository.updateProfile(userId: userId, updates: updates);
-
+      // ✅ FIXED: Call updateUser (which exists) instead of updateProfile with wrong params
+      await repository.updateUser(userId, updates);
+      
       // Refresh user data
       ref.invalidate(currentUserProvider);
-
+      
       if (!mounted) return;
       ErrorHandler.showSuccess(context, 'تم التحديث بنجاح');
     } catch (e) {
@@ -914,13 +916,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       // For demo, use coordinates as address (in production, use geocoding)
       final addressText = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
 
+      // ✅ FIXED: Call updateUser instead of updateLocation
       final repository = ref.read(userRepositoryProvider);
-      await repository.updateLocation(
-        userId: userId,
-        addressText: addressText,
-        lat: position.latitude,
-        lng: position.longitude,
-      );
+      await repository.updateUser(userId, {
+        'addressLat': position.latitude,
+        'addressLng': position.longitude,
+        'addressText': addressText,
+      });
 
       // Refresh user data
       ref.invalidate(currentUserProvider);
