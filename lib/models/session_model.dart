@@ -23,7 +23,7 @@ class SessionModel with _$SessionModel {
     @Default(1) int juzCount,
     String? hifzAssignment,
     String? murajaAssignment,
-    @Default(0) int sessionRating,
+    @Default(5) int sessionRating,
     String? sessionNotes,
     @TimestampConverter() DateTime? sessionDate,
     @TimestampConverter() DateTime? slotStart,

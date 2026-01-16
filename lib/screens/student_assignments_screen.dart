@@ -159,8 +159,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                       final activeSessions = sessions
                           .where((s) =>
                               (s['status'] as String?) == 'accepted' &&
-                              (s['hifzAssignment'] as String?)?.isNotEmpty == true ||
-                              (s['murajaAssignment'] as String?)?.isNotEmpty == true)
+                              ((s['hifzAssignment'] as String?)?.isNotEmpty == true ||
+                              (s['murajaAssignment'] as String?)?.isNotEmpty == true))
                           .toList();
 
                       if (activeSessions.isEmpty) {
@@ -200,8 +200,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                     data: (sessions) {
                       final completedSessions = sessions
                           .where((s) =>
-                              (s['status'] as String?) == 'completed' &&
-                              (s['sessionRating'] as int? ?? 0) > 0)
+                              (s['status'] as String?) == 'completed')
                           .toList();
 
                       if (completedSessions.isEmpty) {
@@ -219,6 +218,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                         itemBuilder: (context, index) {
                           return _CompletedAssignmentCard(
                             session: completedSessions[index],
+                            studentId: widget.studentId,
                           );
                         },
                       );
@@ -364,7 +364,7 @@ class _ActiveAssignmentCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: LinearProgressIndicator(
-                      value: 0.6, // Calculate based on completion
+                      value: 0.6,
                       backgroundColor: Colors.grey.shade200,
                       color: AppTheme.accentGreen,
                       minHeight: 8,
@@ -390,19 +390,24 @@ class _ActiveAssignmentCard extends StatelessWidget {
   }
 }
 
-class _CompletedAssignmentCard extends StatelessWidget {
+class _CompletedAssignmentCard extends ConsumerWidget {
   final Map<String, dynamic> session;
+  final String studentId;
 
-  const _CompletedAssignmentCard({required this.session});
+  const _CompletedAssignmentCard({
+    required this.session,
+    required this.studentId,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final mohaffezName = session['mohaffezName'] as String? ?? 'محفظ';
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
-    final rating = session['sessionRating'] as int? ?? 0;
+    final rating = session['sessionRating'] as int? ?? 5;  // ✅ Default to 5
     final notes = session['sessionNotes'] as String? ?? '';
     final sessionDate = session['sessionDate'] as DateTime?;
+    final sessionId = session['id'] as String? ?? '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -477,41 +482,64 @@ class _CompletedAssignmentCard extends StatelessWidget {
                 content: muraja,
               ),
 
-            if (rating > 0) ...[
-              const Divider(height: 24),
-              // Rating
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'التقييم: $rating/10',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+            const Divider(height: 24),
+
+            // Rating Section - ✅ UPDATED
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'التقييم: $rating/10',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    ...List.generate(
-                      5,
-                      (index) => Icon(
-                        index < (rating / 2).round()
-                            ? Icons.star
-                            : Icons.star_border,
-                        color: Colors.amber,
-                        size: 20,
+                      const Spacer(),
+                      ...List.generate(
+                        5,
+                        (index) => Icon(
+                          index < (rating / 2).round()
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: Colors.amber,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // ✅ ADD RATE BUTTON if rating is default (5) and student hasn't rated
+                  if (rating == 5 && notes.isEmpty) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          _showRatingDialog(context, ref, sessionId, mohaffezName);
+                        },
+                        icon: const Icon(Icons.star),
+                        label: const Text('قيّم المحفظ'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: Colors.amber, width: 2),
+                          foregroundColor: Colors.amber,
+                        ),
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
+            ),
 
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -555,6 +583,168 @@ class _CompletedAssignmentCard extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ NEW METHOD: Show rating dialog
+  void _showRatingDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String sessionId,
+    String mohaffezName,
+  ) {
+    int rating = 5;  // Default to 5
+    final notesController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تقييم المحفظ'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Mohaffez Info
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentGreen.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.school, color: AppTheme.accentGreen),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            mohaffezName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Rating Stars
+                  const Text(
+                    'تقييمك للجلسة',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.center,
+                      children: List.generate(10, (index) {
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              rating = index + 1;
+                            });
+                          },
+                          child: Icon(
+                            index < rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 32,
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '$rating / 10',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Notes
+                  const Text(
+                    'ملاحظاتك (اختياري)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: notesController,
+                    maxLines: 4,
+                    maxLength: 500,
+                    decoration: InputDecoration(
+                      hintText: 'شاركنا رأيك حول الجلسة...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  try {
+                    await ref.read(sessionActionsProvider.notifier).updateAssignment(
+                      sessionId: sessionId,
+                      rating: rating,
+                      notes: notesController.text.trim(),
+                    );
+
+                    if (ctx.mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم إرسال التقييم بنجاح'),
+                          backgroundColor: AppTheme.accentGreen,
+                        ),
+                      );
+                      ref.invalidate(studentSessionsFirstPageProvider(studentId));
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('خطأ: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.send),
+                label: const Text('إرسال التقييم'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryAmber,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

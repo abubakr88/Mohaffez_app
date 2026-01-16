@@ -79,7 +79,7 @@ class UpcomingSessionsScreen extends ConsumerWidget {
 
     final hifzController = TextEditingController();
     final murajaController = TextEditingController();
-    int rating = 0;
+    int rating = 5;
     final notesController = TextEditingController();
 
     showDialog(

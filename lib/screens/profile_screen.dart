@@ -46,7 +46,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               slivers: [
                 // Profile Header
                 SliverAppBar(
-                  expandedHeight: 280,
+                  expandedHeight: 300,
                   pinned: true,
                   flexibleSpace: FlexibleSpaceBar(
                     background: Stack(

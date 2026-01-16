@@ -54,7 +54,7 @@ class _StudentHomeContent extends ConsumerWidget {
             slivers: [
               // App Bar
               SliverAppBar(
-                expandedHeight: 200,
+                expandedHeight: 120,
                 floating: false,
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
@@ -68,7 +68,7 @@ class _StudentHomeContent extends ConsumerWidget {
                     ),
                     child: SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.end,

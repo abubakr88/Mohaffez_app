@@ -22,7 +22,7 @@ class SessionDetailsScreen extends ConsumerWidget {
           slivers: [
             // Modern App Bar with Gradient
             SliverAppBar(
-              expandedHeight: 200,
+              expandedHeight: 120,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
@@ -35,7 +35,7 @@ class SessionDetailsScreen extends ConsumerWidget {
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         crossAxisAlignment: CrossAxisAlignment.start,

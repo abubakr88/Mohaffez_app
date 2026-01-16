@@ -44,7 +44,7 @@ class StudentRequestsScreen extends ConsumerWidget {
           slivers: [
             // Modern App Bar
             SliverAppBar(
-              expandedHeight: 160,
+              expandedHeight: 100,
               floating: true,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
@@ -58,7 +58,7 @@ class StudentRequestsScreen extends ConsumerWidget {
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,

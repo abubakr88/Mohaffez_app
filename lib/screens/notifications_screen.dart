@@ -43,7 +43,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           slivers: [
             // Modern App Bar
             SliverAppBar(
-              expandedHeight: 140,
+              expandedHeight: 100,
               floating: true,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
@@ -55,7 +55,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,

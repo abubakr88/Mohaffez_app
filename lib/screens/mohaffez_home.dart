@@ -55,7 +55,7 @@ class _MohaffezHomeContent extends ConsumerWidget {
             slivers: [
               // Modern App Bar
               SliverAppBar(
-                expandedHeight: 180,
+                expandedHeight: 100,
                 floating: false,
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
@@ -69,7 +69,7 @@ class _MohaffezHomeContent extends ConsumerWidget {
                     ),
                     child: SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.end,

@@ -68,27 +68,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
     }
 
+    // ✅ FIX: Check if mounted BEFORE accessing ref
+    if (!mounted) return;
+    
     final state = ref.read(authNotifierProvider);
 
-    if (mounted) {
-      if (state.hasError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(state.error.toString()),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      } else if (state.hasValue) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تسجيل الدخول بنجاح'),
-            backgroundColor: AppTheme.accentGreen,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        context.go('/');
-      }
+    if (state.hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.error.toString()),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (state.hasValue) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تسجيل الدخول بنجاح'),
+          backgroundColor: AppTheme.accentGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // Navigation is handled by GoRouter automatically
     }
   }
 
