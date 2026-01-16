@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
+import 'student_assignments_screen.dart';
+import 'student_requests_screen.dart';
 
 class StudentHome extends ConsumerWidget {
   const StudentHome({super.key});
@@ -43,6 +46,7 @@ class _StudentHomeContent extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
         body: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(currentUserProvider);
@@ -52,81 +56,31 @@ class _StudentHomeContent extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // App Bar
-              SliverAppBar(
-                expandedHeight: 120,
-                floating: false,
-                pinned: true,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.waving_hand, 
-                                    size: 32, color: Colors.white),
-                                SizedBox(width: 12),
-                                Text(
-                                  'السلام عليكم',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Consumer(
-                              builder: (context, ref, _) {
-                                final user = ref.watch(currentUserProvider).value;
-                                return Text(
-                                  user?.name ?? 'طالب',
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              // Modern App Bar
+              _buildAppBar(context, ref),
               
               // Content
               SliverPadding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
+                    // Welcome Message Card
+                    _buildWelcomeCard(ref),
+                    
+                    const SizedBox(height: 20),
+                    
                     // Quick Stats
                     _QuickStatsSection(studentId: studentId),
                     
                     const SizedBox(height: 24),
                     
-                    // Recent Assignments
-                    _RecentAssignmentsSection(studentId: studentId),
+                    // Quick Actions
+                    _QuickActionsSection(studentId: studentId),
                     
                     const SizedBox(height: 24),
                     
-                    // Quick Actions
-                    const _QuickActionsSection(),
+                    // Recent Assignments
+                    _RecentAssignmentsSection(studentId: studentId),
                     
                     const SizedBox(height: 32),
                   ]),
@@ -134,6 +88,146 @@ class _StudentHomeContent extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar(BuildContext context, WidgetRef ref) {
+    return SliverAppBar(
+      expandedHeight: 180,
+      floating: false,
+      pinned: true,
+      elevation: 0,
+      backgroundColor: AppTheme.primaryAmber,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.waving_hand,
+                          size: 28,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'السلام عليكم',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final user = ref.watch(currentUserProvider).value;
+                      return Text(
+                        user?.name ?? 'طالب',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeCard(WidgetRef ref) {
+    final now = DateTime.now();
+    final hour = now.hour;
+    String greeting;
+    IconData greetingIcon;
+
+    if (hour < 12) {
+      greeting = 'صباح الخير ☀️';
+      greetingIcon = Icons.wb_sunny;
+    } else if (hour < 17) {
+      greeting = 'مساء الخير 🌤️';
+      greetingIcon = Icons.wb_cloudy;
+    } else {
+      greeting = 'مساء الخير 🌙';
+      greetingIcon = Icons.nights_stay;
+    }
+
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.accentGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                greetingIcon,
+                size: 28,
+                color: AppTheme.accentGreen,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    greeting,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    DateFormat('EEEE، d MMMM yyyy', 'ar').format(now),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -156,7 +250,7 @@ class _QuickStatsSection extends ConsumerWidget {
         const Text(
           'إحصائياتك',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
             color: AppTheme.textPrimary,
           ),
@@ -178,7 +272,11 @@ class _QuickStatsSection extends ConsumerWidget {
                 ),
                 color: AppTheme.accentGreen,
                 onTap: () {
-                  // Navigate to accepted sessions
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StudentAssignmentsScreen(),
+                    ),
+                  );
                 },
               ),
             ),
@@ -197,7 +295,11 @@ class _QuickStatsSection extends ConsumerWidget {
                 ),
                 color: Colors.orange,
                 onTap: () {
-                  // Navigate to requests
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const StudentRequestsScreen(),
+                    ),
+                  );
                 },
               ),
             ),
@@ -226,54 +328,208 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: color.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withOpacity(0.1), Colors.white],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
+                      color: color.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(icon, size: 28, color: color),
                   ),
-                  const Spacer(),
-                  Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.grey.shade400,
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 32,
+                  fontSize: 36,
                   fontWeight: FontWeight.bold,
                   color: color,
+                  height: 1.1,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w500,
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionsSection extends StatelessWidget {
+  final String studentId;
+
+  const _QuickActionsSection({required this.studentId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'إجراءات سريعة',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.5,
+          children: [
+            _ActionCard(
+              icon: Icons.search,
+              title: 'ابحث عن محفظ',
+              gradient: const LinearGradient(
+                colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () {
+                // Navigate to search/nearby screen - implement when available
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('البحث عن محفظ قريب - قريباً'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+            _ActionCard(
+              icon: Icons.assignment,
+              title: 'واجباتي',
+              gradient: const LinearGradient(
+                colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const StudentAssignmentsScreen(),
+                  ),
+                );
+              },
+            ),
+            _ActionCard(
+              icon: Icons.send,
+              title: 'طلباتي',
+              gradient: LinearGradient(
+                colors: [Colors.orange, Colors.orange.shade300],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const StudentRequestsScreen(),
+                  ),
+                );
+              },
+            ),
+            _ActionCard(
+              icon: Icons.calendar_today,
+              title: 'الجدول',
+              gradient: LinearGradient(
+                colors: [Colors.blue, Colors.blue.shade300],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('جدول الحلقات - قريباً'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Gradient gradient;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: Colors.white),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -301,16 +557,24 @@ class _RecentAssignmentsSection extends ConsumerWidget {
             const Text(
               'آخر الواجبات',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.textPrimary,
               ),
             ),
-            TextButton(
+            TextButton.icon(
               onPressed: () {
-                // Navigate to all assignments
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const StudentAssignmentsScreen(),
+                  ),
+                );
               },
-              child: const Text('عرض الكل'),
+              icon: const Icon(Icons.arrow_forward, size: 18),
+              label: const Text('عرض الكل'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.primaryAmber,
+              ),
             ),
           ],
         ),
@@ -326,17 +590,44 @@ class _RecentAssignmentsSection extends ConsumerWidget {
 
             if (assignments.isEmpty) {
               return Card(
+                elevation: 0,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(40),
                   child: Center(
                     child: Column(
                       children: [
-                        Icon(Icons.assignment_outlined, 
-                            size: 48, color: Colors.grey.shade400),
-                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.assignment_outlined,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         Text(
                           'لا توجد واجبات حالياً',
-                          style: TextStyle(color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'ابحث عن محفظ لبدء رحلة الحفظ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                       ],
                     ),
@@ -347,11 +638,21 @@ class _RecentAssignmentsSection extends ConsumerWidget {
 
             return Column(
               children: assignments.map((session) {
+                final mohaffezName = session['mohaffezName'] as String? ?? '';
+                final hifz = session['hifzAssignment'] as String? ?? '';
+                final muraja = session['murajaAssignment'] as String? ?? '';
+                final sessionDate = session['sessionDate'] as DateTime?;
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 2,
+                  elevation: 0,
+                  color: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Colors.grey.shade200,
+                      width: 1,
+                    ),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -360,38 +661,70 @@ class _RecentAssignmentsSection extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
-                              backgroundColor: AppTheme.accentGreen.withOpacity(0.2),
-                              child: const Icon(Icons.school, 
-                                  color: AppTheme.accentGreen),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentGreen.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.school,
+                                color: AppTheme.accentGreen,
+                                size: 22,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                session['mohaffezName'] as String? ?? '',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    mohaffezName,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (sessionDate != null) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          size: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          DateFormat('dd/MM/yyyy', 'ar')
+                                              .format(sessionDate),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           ],
                         ),
-                        if ((session['hifzAssignment'] as String? ?? '').isNotEmpty ||
-                            (session['murajaAssignment'] as String? ?? '').isNotEmpty) ...[
+                        if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           const Divider(height: 1),
                           const SizedBox(height: 12),
-                          if ((session['hifzAssignment'] as String? ?? '').isNotEmpty)
+                          if (hifz.isNotEmpty)
                             _AssignmentRow(
                               label: 'حفظ',
-                              text: session['hifzAssignment'] as String,
+                              text: hifz,
                               color: Colors.green,
                             ),
-                          if ((session['murajaAssignment'] as String? ?? '').isNotEmpty)
+                          if (muraja.isNotEmpty)
                             _AssignmentRow(
                               label: 'مراجعة',
-                              text: session['murajaAssignment'] as String,
+                              text: muraja,
                               color: Colors.blue,
                             ),
                         ],
@@ -402,13 +735,34 @@ class _RecentAssignmentsSection extends ConsumerWidget {
               }).toList(),
             );
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Card(
+          loading: () => const Center(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'حدث خطأ: $e',
-                style: const TextStyle(color: Colors.red),
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (e, _) => Card(
+            elevation: 0,
+            color: Colors.red.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red.shade700),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'حدث خطأ في تحميل الواجبات',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -437,10 +791,14 @@ class _AssignmentRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Text(
               label,
@@ -451,115 +809,19 @@ class _AssignmentRow extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.4,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _QuickActionsSection extends StatelessWidget {
-  const _QuickActionsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'إجراءات سريعة',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _ActionCard(
-                icon: Icons.search,
-                title: 'ابحث عن محفظ',
-                gradient: const LinearGradient(
-                  colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-                ),
-                onTap: () {
-                  // Navigate to nearby mohaffez
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ActionCard(
-                icon: Icons.assignment,
-                title: 'واجباتي',
-                gradient: LinearGradient(
-                  colors: [AppTheme.accentGreen, AppTheme.accentGreen.withOpacity(0.7)],
-                ),
-                onTap: () {
-                  // Navigate to assignments
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Gradient gradient;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.gradient,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: gradient,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 48, color: Colors.white),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

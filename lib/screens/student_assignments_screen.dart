@@ -71,7 +71,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
           slivers: [
             // Modern App Bar with Tabs
             SliverAppBar(
-              expandedHeight: 160,
+              expandedHeight: 100,
               floating: true,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
@@ -85,7 +85,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                      padding: const EdgeInsets.fromLTRB(14, 16, 24, 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,

@@ -18,7 +18,7 @@ class StudentRequestsScreen extends ConsumerWidget {
       data: (user) {
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('الرجاء تسجيل الدخول')),
+            body: Center(child: Text('المستخدم غير موجود')),
           );
         }
         return _buildContent(context, ref, user.uid);
@@ -40,6 +40,7 @@ class StudentRequestsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
         body: CustomScrollView(
           slivers: [
             // Modern App Bar
@@ -47,6 +48,7 @@ class StudentRequestsScreen extends ConsumerWidget {
               expandedHeight: 100,
               floating: true,
               pinned: true,
+              elevation: 0,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -58,7 +60,7 @@ class StudentRequestsScreen extends ConsumerWidget {
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
+                      padding: const EdgeInsets.fromLTRB(14, 16, 24, 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -89,10 +91,7 @@ class StudentRequestsScreen extends ConsumerWidget {
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
-                                  Icons.refresh,
-                                  color: Colors.white,
-                                ),
+                                icon: const Icon(Icons.refresh, color: Colors.white),
                                 onPressed: () {
                                   ref.invalidate(
                                     studentRequestsFirstPageProvider(studentId),
@@ -118,7 +117,7 @@ class StudentRequestsScreen extends ConsumerWidget {
                     child: EmptyState(
                       icon: Icons.inbox_outlined,
                       title: 'لا توجد طلبات',
-                      message: 'ابحث عن محفظ وأرسل طلب جلسة',
+                      message: 'ستظهر طلباتك هنا',
                       animated: true,
                     ),
                   );
@@ -163,15 +162,29 @@ class _RequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = request['status'] as String? ?? 'pending';
-    final mohaffezName = request['mohaffezName'] as String? ?? 'محفظ';
+    final mohaffezName = request['mohaffezName'] as String? ?? '';
     final sessionType = request['sessionType'] as String? ?? '';
     final timeSlot = request['preferredTimeSlot'] as String? ?? '08:00';
-    final createdAt = request['createdAt'] as Timestamp?;
 
+    // ✅ FIXED: Handle both Timestamp and DateTime types
     String dateStr = '';
-    if (createdAt != null) {
-      final date = createdAt.toDate();
-      dateStr = DateFormat('dd/MM/yyyy').format(date);
+    final createdAtField = request['createdAt'];
+
+    if (createdAtField != null) {
+      DateTime? date;
+
+      // Check if it's a Timestamp
+      if (createdAtField is Timestamp) {
+        date = createdAtField.toDate();
+      }
+      // Check if it's already a DateTime
+      else if (createdAtField is DateTime) {
+        date = createdAtField;
+      }
+
+      if (date != null) {
+        dateStr = DateFormat('dd/MM/yyyy', 'ar').format(date);
+      }
     }
 
     final statusColor = _getStatusColor(status);
@@ -180,7 +193,8 @@ class _RequestCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 3,
+      elevation: 0,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
@@ -321,7 +335,13 @@ class _RequestCard extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    // Cancel request
+                    // TODO: Implement cancel request
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('إلغاء الطلب - قريباً'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.cancel),
                   label: const Text('إلغاء الطلب'),
@@ -394,11 +414,11 @@ class _RequestCard extends StatelessWidget {
   String _getSessionTypeLabel(String type) {
     switch (type.toLowerCase()) {
       case 'home':
-        return 'في المنزل';
+        return 'منزل';
       case 'mosque':
-        return 'في المسجد';
+        return 'مسجد';
       case 'online':
-        return 'عن بُعد';
+        return 'أونلاين';
       default:
         return type;
     }
