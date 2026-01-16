@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../shared/widgets/offline_banner.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/notification_provider_paginated.dart';
 
@@ -25,7 +26,8 @@ class HomeShell extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex, user.uid),
+        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex, user.uid, user.name),
+        drawer: _buildDrawer(context, ref, isMohaffez, user),
         body: Column(
           children: [
             const OfflineBanner(),
@@ -43,6 +45,7 @@ class HomeShell extends ConsumerWidget {
     bool isMohaffez,
     int currentIndex,
     String userId,
+    String userName,
   ) {
     String getTitle() {
       if (isMohaffez) {
@@ -117,6 +120,13 @@ class HomeShell extends ConsumerWidget {
           ),
           backgroundColor: Colors.transparent,
           elevation: 0,
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              tooltip: 'القائمة',
+            ),
+          ),
           actions: [
             if (currentIndex != (isMohaffez ? 1 : 2))
               _buildNotificationBadge(context, ref, isMohaffez, userId),
@@ -181,6 +191,169 @@ class HomeShell extends ConsumerWidget {
       error: (_, __) => IconButton(
         icon: const Icon(Icons.notifications),
         onPressed: () => context.go('/notifications'),
+      ),
+    );
+  }
+
+  Widget _buildDrawer(
+    BuildContext context,
+    WidgetRef ref,
+    bool isMohaffez,
+    dynamic user,
+  ) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // Drawer Header
+          DrawerHeader(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: Colors.white,
+                  child: Text(
+                    user.name.isNotEmpty ? user.name[0].toUpperCase() : 'م',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryAmber,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  user.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  user.email,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+
+          // Profile
+          ListTile(
+            leading: const Icon(Icons.person, color: AppTheme.primaryAmber),
+            title: const Text('الملف الشخصي'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/profile');
+            },
+          ),
+
+          // Mohaffez-only sections
+          if (isMohaffez) ...[
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.verified_user, color: Colors.purple),
+              title: const Text('الشهادات'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/credentials');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule, color: Colors.blue),
+              title: const Text('إدارة الأوقات'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/availability');
+              },
+            ),
+          ],
+
+          const Divider(),
+
+          // Settings
+          ListTile(
+            leading: const Icon(Icons.settings, color: Colors.grey),
+            title: const Text('الإعدادات'),
+            onTap: () {
+              Navigator.pop(context);
+              // TODO: Navigate to settings screen
+            },
+          ),
+
+          // Privacy
+          ListTile(
+            leading: const Icon(Icons.privacy_tip, color: Colors.grey),
+            title: const Text('الخصوصية'),
+            onTap: () {
+              Navigator.pop(context);
+              // TODO: Navigate to privacy settings
+            },
+          ),
+
+          const Divider(),
+
+          // Logout
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text(
+              'تسجيل الخروج',
+              style: TextStyle(color: Colors.red),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              _showLogoutDialog(context, ref);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تسجيل الخروج'),
+          content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await ref.read(authNotifierProvider.notifier).logout();
+                if (context.mounted) {
+                  context.go('/login');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              child: const Text('تسجيل الخروج'),
+            ),
+          ],
+        ),
       ),
     );
   }

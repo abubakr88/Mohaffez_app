@@ -1,10 +1,4 @@
 // FILE: lib/config/app_router.dart
-// CHANGES:
-// - Added redirectLimit to mitigate redirect loops at the router level.
-// - Tightened GoRouterNotifier listens to typed AsyncValue<UserModel?> (less rebuild noise).
-// - Hardened session-details route: avoids runtime cast crash when state.extra is missing/wrong.
-// - Kept routes & Arabic RTL behavior unchanged.
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../screens/availability_management_screen.dart';
 import '../screens/completed_sessions_screen.dart';
+import '../screens/home_shell.dart';
 import '../screens/login_screen.dart';
 import '../screens/mohaffez_credentials_screen.dart';
 import '../screens/mohaffez_home.dart';
@@ -39,7 +34,6 @@ class GoRouterNotifier extends ChangeNotifier {
   GoRouterNotifier(this.ref) {
     ref.listen(authStateProvider, (_, __) => notifyListeners());
 
-    // Notify on terminal states only (data/error), not loading.
     ref.listen<AsyncValue<UserModel?>>(currentUserProvider, (prev, next) {
       if (next.hasValue || next.hasError) {
         notifyListeners();
@@ -62,6 +56,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: notifier.redirect,
     routes: [
+      // Public routes (no shell)
       GoRoute(
         path: '/',
         name: 'splash',
@@ -73,125 +68,131 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
 
-      // STUDENT
-      GoRoute(
-        path: '/home',
-        name: 'student-home',
-        builder: (context, state) => const StudentHome(),
-      ),
-      GoRoute(
-        path: '/nearby',
-        name: 'nearby',
-        builder: (context, state) => const NearbyMohaffezScreen(),
-      ),
-      GoRoute(
-        path: '/mohaffez/:id',
-        name: 'mohaffez-profile',
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          final lat = state.uri.queryParameters['lat'];
-          final lng = state.uri.queryParameters['lng'];
-          return MohaffezProfileScreen(
-            mohaffezId: id,
-            userLat: lat != null ? double.tryParse(lat) : null,
-            userLng: lng != null ? double.tryParse(lng) : null,
-          );
-        },
-      ),
-      GoRoute(
-        path: '/session/:id',
-        name: 'session-details',
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is! SessionModel) {
-            return ErrorScreen(
-              error: 'بيانات الجلسة غير متوفرة',
-              onRetry: () => context.go('/'),
-            );
-          }
-          return SessionDetailsScreen(session: extra);
-        },
-      ),
-      GoRoute(
-        path: '/assignments',
-        name: 'assignments',
-        builder: (context, state) => const StudentAssignmentsScreen(),
-      ),
-      GoRoute(
-        path: '/requests',
-        name: 'requests',
-        builder: (context, state) => const StudentRequestsScreen(),
-      ),
+      // ✅ Authenticated routes wrapped in HomeShell
+      ShellRoute(
+        builder: (context, state, child) => HomeShell(child: child),
+        routes: [
+          // STUDENT ROUTES
+          GoRoute(
+            path: '/home',
+            name: 'student-home',
+            builder: (context, state) => const StudentHome(),
+          ),
+          GoRoute(
+            path: '/nearby',
+            name: 'nearby',
+            builder: (context, state) => const NearbyMohaffezScreen(),
+          ),
+          GoRoute(
+            path: '/mohaffez/:id',
+            name: 'mohaffez-profile',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              final lat = state.uri.queryParameters['lat'];
+              final lng = state.uri.queryParameters['lng'];
+              return MohaffezProfileScreen(
+                mohaffezId: id,
+                userLat: lat != null ? double.tryParse(lat) : null,
+                userLng: lng != null ? double.tryParse(lng) : null,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/session/:id',
+            name: 'session-details',
+            builder: (context, state) {
+              final extra = state.extra;
+              if (extra is! SessionModel) {
+                return ErrorScreen(
+                  error: 'بيانات الجلسة غير متوفرة',
+                  onRetry: () => context.go('/'),
+                );
+              }
+              return SessionDetailsScreen(session: extra);
+            },
+          ),
+          GoRoute(
+            path: '/assignments',
+            name: 'assignments',
+            builder: (context, state) => const StudentAssignmentsScreen(),
+          ),
+          GoRoute(
+            path: '/requests',
+            name: 'requests',
+            builder: (context, state) => const StudentRequestsScreen(),
+          ),
 
-      // SHARED
-      GoRoute(
-        path: '/notifications',
-        name: 'notifications',
-        builder: (context, state) => const NotificationsScreen(),
-      ),
-      GoRoute(
-        path: '/profile',
-        name: 'profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
+          // SHARED ROUTES
+          GoRoute(
+            path: '/notifications',
+            name: 'notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            name: 'profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
 
-      // MOHAFFEZ
-      GoRoute(
-        path: '/mohaffez-home',
-        name: 'mohaffez-home',
-        builder: (context, state) => const MohaffezHome(),
-      ),
-      GoRoute(
-        path: '/pending-requests',
-        name: 'pending-requests',
-        builder: (context, state) {
-          final mohaffezId = state.uri.queryParameters['mohaffezId'];
-          if (mohaffezId == null || mohaffezId.isEmpty) {
-            return ErrorScreen(
-              error: 'معرّف المحفظ غير موجود',
-              onRetry: () => context.go('/'),
-            );
-          }
-          return PendingRequestsScreen(mohaffezId: mohaffezId);
-        },
-      ),
-      GoRoute(
-        path: '/completed-sessions',
-        name: 'completed-sessions',
-        builder: (context, state) {
-          final mohaffezId = state.uri.queryParameters['mohaffezId'];
-          if (mohaffezId == null || mohaffezId.isEmpty) {
-            return ErrorScreen(
-              error: 'معرّف المحفظ غير موجود',
-              onRetry: () => context.go('/'),
-            );
-          }
-          return CompletedSessionsScreen(mohaffezId: mohaffezId);
-        },
-      ),
-      GoRoute(
-        path: '/upcoming-sessions',
-        name: 'upcoming-sessions',
-        builder: (context, state) {
-          final mohaffezId = state.uri.queryParameters['mohaffezId'];
-          if (mohaffezId == null || mohaffezId.isEmpty) {
-            return ErrorScreen(
-              error: 'معرّف المحفظ غير موجود',
-              onRetry: () => context.go('/'),
-            );
-          }
-          return UpcomingSessionsScreen(mohaffezId: mohaffezId);
-        },
-      ),
-      GoRoute(
-        path: '/credentials',
-        name: 'credentials',
-        builder: (context, state) => const MohaffezCredentialsScreen(),
-      ),
-      GoRoute(
-        path: '/availability',
-        name: 'availability',
-        builder: (context, state) => const AvailabilityManagementScreen(),
+          // MOHAFFEZ ROUTES
+          GoRoute(
+            path: '/mohaffez-home',
+            name: 'mohaffez-home',
+            builder: (context, state) => const MohaffezHome(),
+          ),
+          GoRoute(
+            path: '/pending-requests',
+            name: 'pending-requests',
+            builder: (context, state) {
+              final mohaffezId = state.uri.queryParameters['mohaffezId'];
+              if (mohaffezId == null || mohaffezId.isEmpty) {
+                return ErrorScreen(
+                  error: 'معرّف المحفظ غير موجود',
+                  onRetry: () => context.go('/'),
+                );
+              }
+              return PendingRequestsScreen(mohaffezId: mohaffezId);
+            },
+          ),
+          GoRoute(
+            path: '/completed-sessions',
+            name: 'completed-sessions',
+            builder: (context, state) {
+              final mohaffezId = state.uri.queryParameters['mohaffezId'];
+              if (mohaffezId == null || mohaffezId.isEmpty) {
+                return ErrorScreen(
+                  error: 'معرّف المحفظ غير موجود',
+                  onRetry: () => context.go('/'),
+                );
+              }
+              return CompletedSessionsScreen(mohaffezId: mohaffezId);
+            },
+          ),
+          GoRoute(
+            path: '/upcoming-sessions',
+            name: 'upcoming-sessions',
+            builder: (context, state) {
+              final mohaffezId = state.uri.queryParameters['mohaffezId'];
+              if (mohaffezId == null || mohaffezId.isEmpty) {
+                return ErrorScreen(
+                  error: 'معرّف المحفظ غير موجود',
+                  onRetry: () => context.go('/'),
+                );
+              }
+              return UpcomingSessionsScreen(mohaffezId: mohaffezId);
+            },
+          ),
+          GoRoute(
+            path: '/credentials',
+            name: 'credentials',
+            builder: (context, state) => const MohaffezCredentialsScreen(),
+          ),
+          GoRoute(
+            path: '/availability',
+            name: 'availability',
+            builder: (context, state) => const AvailabilityManagementScreen(),
+          ),
+        ],
       ),
     ],
     errorBuilder: (context, state) => ErrorScreen(
@@ -201,7 +202,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Splash UI kept as-is (guards decide navigation).
+// Splash Screen
 class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
@@ -294,6 +295,7 @@ class SplashScreen extends ConsumerWidget {
   }
 }
 
+// Error Screen
 class ErrorScreen extends StatelessWidget {
   final String error;
   final VoidCallback onRetry;
