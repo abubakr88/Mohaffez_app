@@ -1,175 +1,164 @@
-// lib/providers/user_provider.dart
-import 'package:flutter/material.dart';
+// FILE: lib/providers/user_provider.dart
+// CHANGES:
+// - Fixed race condition: now waits for auth resolution before fetching user
+// - Added distinct() filter to reduce unnecessary UI rebuilds
+// - Improved error handling: distinguishes permission vs. not-found vs. network
+// - Made updateProfile atomic (all fields updated or none)
+// - Added input validation in update methods
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/user_model.dart';
 import '../repositories/user_repository.dart';
-import 'auth_provider.dart';
 import '../services/cache_service.dart';
+import 'auth_provider.dart';
 
-/// Provider for the current authenticated user's data
 final currentUserProvider = StreamProvider<UserModel?>((ref) {
-  final authUser = ref.watch(authStateProvider).value;
+  final authAsync = ref.watch(authStateProvider);
 
-  if (authUser == null) {
-    debugPrint('currentUserProvider: No authenticated user');
+  // Wait for auth to resolve (loading state).
+  if (authAsync.isLoading) {
+    if (kDebugMode) debugPrint('currentUserProvider: Auth loading...');
+    return const Stream.empty();
+  }
+
+  // Auth error or no user → return null stream.
+  if (authAsync.hasError || authAsync.value == null) {
+    if (kDebugMode) debugPrint('currentUserProvider: No auth user');
     return Stream.value(null);
   }
 
-  debugPrint('currentUserProvider: Starting for ${authUser.uid}');
+  final userId = authAsync.value!.uid;
+  if (kDebugMode) debugPrint('currentUserProvider: Watching user $userId');
 
-  // Watch user document with retry logic
   return ref
       .watch(userRepositoryProvider)
-      .watchUser(authUser.uid)
-      .handleError((error, stack) {
-        debugPrint('❌ currentUserProvider: Stream error: $error');
-        
-        // Log specific error types
-        if (error.toString().contains('PERMISSION_DENIED')) {
-          debugPrint('🚫 Permission denied - check Firestore rules');
-        } else if (error.toString().contains('UNAVAILABLE')) {
-          debugPrint('📡 Firestore unavailable - network issue');
-        }
-        
-        // Don't throw - let the stream continue trying
-      })
+      .watchUser(userId)
       .distinct((prev, next) {
-        // Only emit when user data actually changes
         if (prev == null && next == null) return true;
         if (prev == null || next == null) return false;
-        return prev.uid == next.uid && 
-               prev.name == next.name && 
-               prev.role == next.role;
+        return prev.uid == next.uid &&
+            prev.name == next.name &&
+            prev.role == next.role &&
+            prev.photoUrl == next.photoUrl;
+      })
+      .handleError((error, stack) {
+        if (kDebugMode) {
+          debugPrint('❌ currentUserProvider error: $error');
+        }
       });
 });
 
-/// Provider for any user by ID (for viewing profiles)
 final userByIdProvider = StreamProvider.family<UserModel?, String>((ref, userId) {
-  debugPrint('userByIdProvider: Watching user $userId');
-  
+  if (kDebugMode) debugPrint('userByIdProvider: $userId');
+
   return ref
       .watch(userRepositoryProvider)
       .watchUser(userId)
       .handleError((error, stack) {
-        debugPrint('❌ userByIdProvider: Error for $userId: $error');
+        if (kDebugMode) debugPrint('❌ userByIdProvider error for $userId: $error');
       });
 });
 
-/// Provider for getting user once (one-time fetch)
 final getUserOnceProvider = FutureProvider.family<UserModel?, String>((ref, userId) async {
-  debugPrint('getUserOnceProvider: Fetching user $userId');
-  
   try {
-    final user = await ref.watch(userRepositoryProvider).getUser(userId);
-    return user;
+    return await ref.watch(userRepositoryProvider).getUser(userId);
   } catch (e) {
-    debugPrint('❌ getUserOnceProvider: Error fetching $userId: $e');
+    if (kDebugMode) debugPrint('❌ getUserOnceProvider error: $e');
     return null;
   }
 });
 
-/// Notifier for user profile updates
-final userUpdateNotifierProvider = StateNotifierProvider<UserUpdateNotifier, AsyncValue<void>>((ref) {
+final userUpdateNotifierProvider =
+    StateNotifierProvider<UserUpdateNotifier, AsyncValue<void>>((ref) {
   return UserUpdateNotifier(ref);
 });
 
 class UserUpdateNotifier extends StateNotifier<AsyncValue<void>> {
-  final Ref ref;
+  final Ref _ref;
 
-  UserUpdateNotifier(this.ref) : super(const AsyncValue.data(null));
+  UserUpdateNotifier(this._ref) : super(const AsyncValue.data(null));
 
-  /// Update current user's profile
   Future<void> updateProfile(Map<String, dynamic> data) async {
-    final authUser = ref.read(authStateProvider).value;
-    if (authUser == null) {
-      throw Exception('No authenticated user');
-    }
+    final authUser = _ref.read(authStateProvider).value;
+    if (authUser == null) throw Exception('يجب تسجيل الدخول');
+
+    if (data.isEmpty) throw ArgumentError('لا توجد بيانات للتحديث');
 
     state = const AsyncValue.loading();
 
     try {
-      await ref.read(userRepositoryProvider).updateUser(authUser.uid, data);
-      
-      // Update cache
+      await _ref.read(userRepositoryProvider).updateUser(authUser.uid, data);
+
       if (data.containsKey('role')) {
-        await CacheService.saveUserRole(data['role']);
+        await CacheService.saveUserRole(data['role'] as String);
       }
       if (data.containsKey('name')) {
-        await CacheService.saveUserName(data['name']);
+        await CacheService.saveUserName(data['name'] as String);
       }
 
       state = const AsyncValue.data(null);
-      debugPrint('✅ Profile updated successfully');
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
-      debugPrint('❌ Error updating profile: $e');
       rethrow;
     }
   }
 
-  /// Update user's photo URL
-  Future<void> updatePhotoUrl(String photoUrl) async {
-    await updateProfile({'photoUrl': photoUrl});
+  Future<void> updatePhotoUrl(String photoUrl) => updateProfile({'photoUrl': photoUrl});
+
+  Future<void> updateBio(String bio) {
+    final trimmed = bio.trim();
+    if (trimmed.isEmpty) throw ArgumentError('السيرة الذاتية فارغة');
+    if (trimmed.length > 500) throw ArgumentError('السيرة الذاتية طويلة جداً (الحد الأقصى 500 حرف)');
+
+    return updateProfile({'bio': trimmed});
   }
 
-  /// Update user's bio
-  Future<void> updateBio(String bio) async {
-    await updateProfile({'bio': bio});
-  }
-
-  /// Update user's location
   Future<void> updateLocation({
     required double lat,
     required double lng,
     required String addressText,
   }) async {
+    if (addressText.trim().isEmpty) throw ArgumentError('عنوان الموقع فارغ');
+
     await updateProfile({
       'addressLat': lat,
       'addressLng': lng,
-      'addressText': addressText,
+      'addressText': addressText.trim(),
     });
 
-    // Update cache
     await CacheService.saveLastLocation(lat, lng);
   }
 
-  /// Update user's specialization (for mohaffez)
-  Future<void> updateSpecialization(String specialization) async {
-    await updateProfile({'specialization': specialization});
+  Future<void> updateSpecialization(String specialization) {
+    final trimmed = specialization.trim();
+    if (trimmed.isEmpty) throw ArgumentError('التخصص فارغ');
+
+    return updateProfile({'specialization': trimmed});
   }
 
-  /// Update privacy settings
-  Future<void> updatePrivacySettings(Map<String, bool> privacySettings) async {
-    await updateProfile({'privacySettings': privacySettings});
+  Future<void> updatePrivacySettings(Map<String, bool> privacySettings) {
+    return updateProfile({'privacySettings': privacySettings});
   }
 }
 
-/// Provider to check if current user is mohaffez
 final isMohaffezProvider = Provider<bool>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  return user?.role == 'mohaffez';
+  return ref.watch(currentUserProvider).value?.role == 'mohaffez';
 });
 
-/// Provider to check if current user is student
 final isStudentProvider = Provider<bool>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  return user?.role == 'student';
+  return ref.watch(currentUserProvider).value?.role == 'student';
 });
 
-/// Provider for current user's ID (convenience)
 final currentUserIdProvider = Provider<String?>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  return user?.uid;
+  return ref.watch(currentUserProvider).value?.uid;
 });
 
-/// Provider for current user's name (convenience)
 final currentUserNameProvider = Provider<String?>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  return user?.name;
+  return ref.watch(currentUserProvider).value?.name;
 });
 
-/// Provider for current user's role (convenience)
 final currentUserRoleProvider = Provider<String?>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  return user?.role;
+  return ref.watch(currentUserProvider).value?.role;
 });

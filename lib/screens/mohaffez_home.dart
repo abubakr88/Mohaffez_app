@@ -1,16 +1,10 @@
-// screens/mohaffez_home.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../shared/widgets/empty_state.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
-import '../shared/utils/error_handler.dart';
-import 'pending_requests_screen.dart'; // NEW - Create this screen
-import 'completed_sessions_screen.dart'; // NEW - Create this screen
-import 'upcoming_sessions_screen.dart';
 
 class MohaffezHome extends ConsumerWidget {
   const MohaffezHome({super.key});
@@ -23,10 +17,10 @@ class MohaffezHome extends ConsumerWidget {
       data: (user) {
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('لم يتم تسجيل الدخول')),
+            body: Center(child: Text('المستخدم غير موجود')),
           );
         }
-        return MohaffezHomeContent(mohaffezId: user.uid);
+        return _MohaffezHomeContent(mohaffezId: user.uid);
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -40,114 +34,145 @@ class MohaffezHome extends ConsumerWidget {
   }
 }
 
-class MohaffezHomeContent extends ConsumerStatefulWidget {
+class _MohaffezHomeContent extends ConsumerWidget {
   final String mohaffezId;
 
-  const MohaffezHomeContent({
-    super.key,
-    required this.mohaffezId,
-  });
+  const _MohaffezHomeContent({required this.mohaffezId});
 
   @override
-  ConsumerState<MohaffezHomeContent> createState() => _MohaffezHomeState();
-}
-
-class _MohaffezHomeState extends ConsumerState<MohaffezHomeContent> {
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Welcome section - UPDATED
-          _buildWelcomeSection(),
-          const SizedBox(height: 24),
-
-          // Quick statistics (clickable cards) - UPDATED
-          _buildQuickStats(),
-          const SizedBox(height: 24),
-
-          // Upcoming sessions card - UPDATED
-          _buildUpcomingSessionsCard(),
-          const SizedBox(height: 24),
-
-          // REMOVED: Pending requests preview section
-        ],
-      ),
-    );
-  }
-
-  // ==================== Welcome Section - UPDATED ====================
-  Widget _buildWelcomeSection() {
-    final userAsync = ref.watch(currentUserProvider);
-
-    return userAsync.when(
-      data: (user) {
-        if (user == null) return const SizedBox.shrink();
-
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.waving_hand,
-                  size: 40,
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Center( // CENTERED
-                    child: Text(
-                      'مرحباً، ${user.name}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(currentUserProvider);
+            ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
+            ref.invalidate(upcomingSessionsProvider(mohaffezId));
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // Modern App Bar
+              SliverAppBar(
+                expandedHeight: 180,
+                floating: false,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      textAlign: TextAlign.center,
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.school,
+                                    size: 32,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Consumer(
+                                    builder: (context, ref, _) {
+                                      final user = ref.watch(currentUserProvider).value;
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'مرحباً',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                          Text(
+                                            user?.name ?? 'محفظ',
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 56), // Balance the icon space
-              ],
-            ),
+              ),
+
+              // Content
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // Quick Stats
+                    _QuickStatsSection(mohaffezId: mohaffezId),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Upcoming Sessions Preview
+                    _UpcomingSessionsSection(mohaffezId: mohaffezId),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Management Actions
+                    const _ManagementActionsSection(),
+                    
+                    const SizedBox(height: 32),
+                  ]),
+                ),
+              ),
+            ],
           ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+        ),
+      ),
     );
   }
+}
 
-  // ==================== Quick Stats - UPDATED ====================
-  Widget _buildQuickStats() {
-    // CHANGED: Use completed sessions count instead of all sessions
-    final completedSessionsAsync = ref.watch(
-      completedSessionsCountProvider(widget.mohaffezId),
-    );
-    final pendingRequestsAsync = ref.watch(
-      pendingRequestsFirstPageProvider(widget.mohaffezId),
-    );
+class _QuickStatsSection extends ConsumerWidget {
+  final String mohaffezId;
+
+  const _QuickStatsSection({required this.mohaffezId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requestsAsync = ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
+    final sessionsAsync = ref.watch(upcomingSessionsProvider(mohaffezId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'نظرة عامة',
+          'نظرة سريعة',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -157,75 +182,45 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHomeContent> {
         const SizedBox(height: 16),
         Row(
           children: [
-            // Completed Sessions Card - UPDATED
             Expanded(
-              child: completedSessionsAsync.when(
-                data: (count) => _buildStatCard(
-                  icon: Icons.event_available,
-                  title: 'الجلسات المكتملة',
-                  value: count.toString(),
-                  color: AppTheme.accentGreen,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => CompletedSessionsScreen(
-                          mohaffezId: widget.mohaffezId,
-                        ),
-                      ),
-                    );
-                  },
+              child: _StatCard(
+                icon: Icons.pending_actions,
+                title: 'طلبات جديدة',
+                value: requestsAsync.when(
+                  data: (requests) => requests.length.toString(),
+                  loading: () => '...',
+                  error: (_, __) => '0',
                 ),
-                loading: () => _buildStatCard(
-                  icon: Icons.event_available,
-                  title: 'الجلسات المكتملة',
-                  value: '...',
-                  color: AppTheme.accentGreen,
-                  onTap: () {},
+                color: Colors.orange,
+                gradient: LinearGradient(
+                  colors: [Colors.orange, Colors.orange.shade300],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                error: (_, __) => _buildStatCard(
-                  icon: Icons.event_available,
-                  title: 'الجلسات المكتملة',
-                  value: '0',
-                  color: AppTheme.accentGreen,
-                  onTap: () {},
-                ),
+                onTap: () {
+                  // Navigate to pending requests
+                },
               ),
             ),
             const SizedBox(width: 12),
-
-            // Pending Requests Card - UPDATED
             Expanded(
-              child: pendingRequestsAsync.when(
-                data: (requests) => _buildStatCard(
-                  icon: Icons.pending_actions,
-                  title: 'الطلبات المعلقة',
-                  value: requests.length.toString(),
-                  color: Colors.orange,
-                  onTap: () {
-                    // CHANGED: Navigate to dedicated screen
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PendingRequestsScreen(
-                          mohaffezId: widget.mohaffezId,
-                        ),
-                      ),
-                    );
-                  },
+              child: _StatCard(
+                icon: Icons.event_available,
+                title: 'جلسات قادمة',
+                value: sessionsAsync.when(
+                  data: (sessions) => sessions.length.toString(),
+                  loading: () => '...',
+                  error: (_, __) => '0',
                 ),
-                loading: () => _buildStatCard(
-                  icon: Icons.pending_actions,
-                  title: 'الطلبات المعلقة',
-                  value: '...',
-                  color: Colors.orange,
-                  onTap: () {},
+                color: AppTheme.accentGreen,
+                gradient: LinearGradient(
+                  colors: [AppTheme.accentGreen, AppTheme.accentGreen.withOpacity(0.7)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                error: (_, __) => _buildStatCard(
-                  icon: Icons.pending_actions,
-                  title: 'الطلبات المعلقة',
-                  value: '0',
-                  color: Colors.orange,
-                  onTap: () {},
-                ),
+                onTap: () {
+                  // Navigate to upcoming sessions
+                },
               ),
             ),
           ],
@@ -233,53 +228,58 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHomeContent> {
       ],
     );
   }
+}
 
-  Widget _buildStatCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+  final Gradient gradient;
+  final VoidCallback onTap;
+
+  const _StatCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(icon, size: 32, color: color),
-                  const Spacer(),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: Colors.grey.shade400,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+              Icon(icon, size: 32, color: Colors.white),
+              const SizedBox(height: 16),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 28,
+                style: const TextStyle(
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.grey.shade600,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -288,242 +288,221 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHomeContent> {
       ),
     );
   }
+}
 
-  // ==================== Upcoming Sessions Card - UPDATED ====================
-  Widget _buildUpcomingSessionsCard() {
-    // CHANGED: Get upcoming sessions for the next 7 days
-    final sessionsAsync = ref.watch(
-      upcomingSessionsProvider(widget.mohaffezId),
-    );
+class _UpcomingSessionsSection extends ConsumerWidget {
+  final String mohaffezId;
 
-    return Card(
-      elevation: 2,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  const _UpcomingSessionsSection({required this.mohaffezId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(upcomingSessionsProvider(mohaffezId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.schedule,
-                  color: AppTheme.primaryAmber,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'الجلسات القادمة',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'خلال الأسبوع القادم', // ADDED: Duration indicator
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // CHANGED: Navigate to upcoming sessions screen
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => UpcomingSessionsScreen(
-                          mohaffezId: widget.mohaffezId,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text('عرض الكل'),
-                ),
-              ],
+            const Text(
+              'الجلسات القادمة',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
             ),
-            const Divider(height: 24),
-            sessionsAsync.when(
-              data: (sessions) => _buildUpcomingSessionsList(sessions),
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              error: (e, _) => ErrorDisplay.dataLoad(
-                onRetry: () => ref.invalidate(
-                  upcomingSessionsProvider(widget.mohaffezId),
-                ),
-              ),
+            TextButton(
+              onPressed: () {
+                // Navigate to all sessions
+              },
+              child: const Text('عرض الكل'),
             ),
           ],
         ),
-      ),
-    );
-  }
+        const SizedBox(height: 12),
+        sessionsAsync.when(
+          data: (sessions) {
+            if (sessions.isEmpty) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.event_busy, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'لا توجد جلسات قادمة',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
 
-  Widget _buildUpcomingSessionsList(List<dynamic> sessions) {
-    if (sessions.isEmpty) {
-      return const EmptyState(
-        icon: Icons.event_busy,
-        title: 'لا توجد جلسات قادمة',
-        message: 'سيتم عرض جلساتك القادمة خلال الأسبوع هنا',
-        animated: false,
-      );
-    }
+            return Column(
+              children: sessions.take(3).map((session) {
+                final studentName = session['studentName'] as String? ?? 'طالب';
+                final sessionType = session['sessionType'] as String? ?? 'جلسة';
+                final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
+                final sessionDate = session['sessionDate'] as DateTime?;
 
-    return Column(
-      children: sessions.take(3).map((session) {
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppTheme.accentGreen.withOpacity(0.2),
-              child: const Icon(
-                Icons.school,
-                color: AppTheme.accentGreen,
+                String dateStr = '';
+                if (sessionDate != null) {
+                  dateStr = DateFormat('dd/MM').format(sessionDate);
+                }
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.accentGreen.withOpacity(0.2),
+                      child: const Icon(Icons.person, color: AppTheme.accentGreen),
+                    ),
+                    title: Text(
+                      studentName,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text('$dateStr - $sessionType - $timeSlot'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit, size: 20),
+                      onPressed: () {
+                        // Navigate to edit assignment
+                      },
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'حدث خطأ: $e',
+                style: const TextStyle(color: Colors.red),
               ),
-            ),
-              title: Text(session['studentName'] as String? ?? 'غير معروف'),
-              subtitle: Text(
-                session['sessionDate'] != null  // ✅ Use bracket notation
-                  ? '${(session['sessionDate'] as DateTime).day}/${(session['sessionDate'] as DateTime).month} - ${session['preferredTimeSlot'] ?? ""}'
-                  : session['preferredTimeSlot'] as String? ?? '',
-              ),
-            trailing: IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => _showAssignmentDialog(session['id!']),
             ),
           ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
+}
 
-  // ==================== Actions ====================
+class _ManagementActionsSection extends StatelessWidget {
+  const _ManagementActionsSection();
 
-  void _showAssignmentDialog(String sessionId) {
-    final hifzController = TextEditingController();
-    final murajaController = TextEditingController();
-    int rating = 0;
-    final notesController = TextEditingController();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'إدارة الحساب',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _ManagementCard(
+          icon: Icons.schedule,
+          title: 'إدارة الأوقات',
+          subtitle: 'تعديل الأوقات المتاحة',
+          color: Colors.blue,
+          onTap: () {
+            // Navigate to availability management
+          },
+        ),
+        const SizedBox(height: 12),
+        _ManagementCard(
+          icon: Icons.verified_user,
+          title: 'الشهادات والمؤهلات',
+          subtitle: 'إضافة وإدارة الشهادات',
+          color: Colors.purple,
+          onTap: () {
+            // Navigate to credentials
+          },
+        ),
+      ],
+    );
+  }
+}
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            title: const Text('إضافة تكليف'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: hifzController,
-                    decoration: const InputDecoration(
-                      labelText: 'تكليف الحفظ',
-                      hintText: 'مثال: من 1 إلى 10',
-                    ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: murajaController,
-                    decoration: const InputDecoration(
-                      labelText: 'تكليف المراجعة',
-                      hintText: 'مثال: الجزء الأول كاملاً',
-                    ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('التقييم:'),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(10, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                        ),
-                        onPressed: () {
-                          setState(() => rating = index + 1);
-                        },
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'ملاحظات',
-                      hintText: 'أضف ملاحظاتك هنا...',
-                    ),
-                    maxLines: 3,
-                  ),
-                ],
+class _ManagementCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ManagementCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('إلغاء'),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  await _updateAssignment(
-                    sessionId: sessionId,
-                    hifz: hifzController.text.trim(),
-                    muraja: murajaController.text.trim(),
-                    rating: rating,
-                    notes: notesController.text.trim(),
-                  );
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text('حفظ'),
-              ),
+              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Future<void> _updateAssignment({
-    required String sessionId,
-    required String hifz,
-    required String muraja,
-    required int rating,
-    required String notes,
-  }) async {
-    try {
-      await ref.read(sessionActionsProvider.notifier).updateAssignment(
-            sessionId: sessionId,
-            hifzAssignment: hifz,
-            murajaAssignment: muraja,
-            rating: rating,
-            notes: notes,
-          );
-      if (mounted) {
-        ErrorHandler.showSuccess(context, 'تم حفظ التكليف بنجاح');
-      }
-      ref.invalidate(upcomingSessionsProvider(widget.mohaffezId));
-    } catch (e) {
-      if (mounted) {
-        ErrorHandler.showError(context, e);
-      }
-    }
   }
 }

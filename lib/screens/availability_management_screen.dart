@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import '../shared/constants/app_theme.dart';
 import '../shared/constants/schedule_constants.dart';
 
 class AvailabilityManagementScreen extends StatefulWidget {
@@ -13,22 +13,27 @@ class AvailabilityManagementScreen extends StatefulWidget {
 }
 
 class _AvailabilityManagementScreenState
-    extends State<AvailabilityManagementScreen> {
+    extends State<AvailabilityManagementScreen>
+    with SingleTickerProviderStateMixin {
   final user = FirebaseAuth.instance.currentUser;
-  
-  final List<String> arabicDays = ScheduleConstants.arabicDays;
-  final List<Map<String, String>> timeSlots = ScheduleConstants.timeSlots;
-
-  Map<int, Map<String, dynamic>> _weeklySchedule = {};
-  bool _loading = true;
+  Map<int, Map<String, dynamic>> weeklySchedule = {};
+  bool loading = true;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _loadAvailability();
+    _tabController = TabController(length: 2, vsync: this);
+    loadAvailability();
   }
 
-  Future<void> _loadAvailability() async {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> loadAvailability() async {
     if (user == null) return;
 
     try {
@@ -46,15 +51,15 @@ class _AvailabilityManagementScreenState
       }
 
       setState(() {
-        _weeklySchedule = schedule;
-        _loading = false;
+        weeklySchedule = schedule;
+        loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      setState(() => loading = false);
     }
   }
 
-  Future<void> _toggleTimeSlot(
+  Future<void> toggleTimeSlot(
     int dayOfWeek,
     String startTime,
     String endTime,
@@ -67,9 +72,8 @@ class _AvailabilityManagementScreenState
           .collection('users')
           .doc(user!.uid)
           .collection('availability')
-          .doc('day_$dayOfWeek');
+          .doc('day$dayOfWeek');
 
-      // Get current schedule for this day
       final doc = await docRef.get();
       List<Map<String, dynamic>> timeSlots = [];
 
@@ -78,7 +82,6 @@ class _AvailabilityManagementScreenState
         timeSlots = List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
       }
 
-      // Check if this slot exists
       final slotIndex = timeSlots.indexWhere((slot) =>
           slot['startTime'] == startTime &&
           slot['endTime'] == endTime &&
@@ -97,15 +100,13 @@ class _AvailabilityManagementScreenState
         });
       }
 
-      // Save to Firestore
       await docRef.set({
         'dayOfWeek': dayOfWeek,
         'timeSlots': timeSlots,
         'recurringWeekly': true,
       });
 
-      // Reload
-      await _loadAvailability();
+      await loadAvailability();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,13 +116,12 @@ class _AvailabilityManagementScreenState
     }
   }
 
-  bool _isSlotEnabled(int dayOfWeek, String startTime, String sessionType) {
-    if (!_weeklySchedule.containsKey(dayOfWeek)) return false;
+  bool isSlotEnabled(int dayOfWeek, String startTime, String sessionType) {
+    if (!weeklySchedule.containsKey(dayOfWeek)) return false;
 
-    final daySchedule = _weeklySchedule[dayOfWeek]!;
-    final timeSlots = List<Map<String, dynamic>>.from(
-      daySchedule['timeSlots'] ?? [],
-    );
+    final daySchedule = weeklySchedule[dayOfWeek]!;
+    final timeSlots =
+        List<Map<String, dynamic>>.from(daySchedule['timeSlots'] ?? []);
 
     final slot = timeSlots.firstWhere(
       (s) =>
@@ -133,197 +133,188 @@ class _AvailabilityManagementScreenState
     return slot['enabled'] == true;
   }
 
-  void _showBlockDateDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => const BlockDateBottomSheet(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (user == null) {
       return const Scaffold(
-        body: Center(child: Text('يجب تسجيل الدخول')),
+        body: Center(child: Text('الرجاء تسجيل الدخول')),
       );
     }
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          title: const Text('إدارة المواعيد'),
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.event_busy),
-              onPressed: _showBlockDateDialog,
-              tooltip: 'حجب تواريخ محددة',
-            ),
-          ],
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Info card
-                    Card(
-                      elevation: 0,
-                      color: Colors.blue.shade50,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.blue.shade200),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Colors.blue.shade700),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'اضغط على الوقت لتفعيله أو إلغاء تفعيله. الأوقات المفعلة ستكون متاحة للحجز.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.blue.shade900,
+        body: CustomScrollView(
+          slivers: [
+            // Modern App Bar
+            SliverAppBar(
+              expandedHeight: 180,
+              floating: true,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue, Color(0xFF42A5F5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.calendar_today,
+                                  size: 28,
+                                  color: Colors.white,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Session type tabs
-                    DefaultTabController(
-                      length: 2,
-                      child: Column(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: TabBar(
-                              labelColor: Colors.white,
-                              unselectedLabelColor: Colors.grey.shade700,
-                              indicator: BoxDecoration(
-                                color: Theme.of(context).primaryColor,
-                                borderRadius: BorderRadius.circular(12),
+                              const SizedBox(width: 16),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'إدارة الأوقات',
+                                      style: TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'حدد الأوقات المتاحة لديك',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              tabs: const [
-                                Tab(text: 'في المنزل'),
-                                Tab(text: 'في المسجد'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.7,
-                            child: TabBarView(
-                              children: [
-                                _buildScheduleGrid('home'),
-                                _buildScheduleGrid('mosque'),
-                              ],
-                            ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.event_busy,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () {
+                                  // Show block date dialog
+                                },
+                                tooltip: 'حظر تاريخ',
+                              ),
+                            ],
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Container(
+                  color: Colors.white,
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: Colors.blue,
+                    unselectedLabelColor: Colors.grey.shade600,
+                    indicatorColor: Colors.blue,
+                    indicatorWeight: 3,
+                    tabs: const [
+                      Tab(
+                        icon: Icon(Icons.home, size: 20),
+                        text: 'في المنزل/المسجد',
+                      ),
+                      Tab(
+                        icon: Icon(Icons.videocam, size: 20),
+                        text: 'عن بُعد',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Info Card
+            SliverToBoxAdapter(
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'اضغط على اليوم لتفعيل أو إلغاء الوقت المتاح. التغييرات تُحفظ تلقائياً.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                          height: 1.4,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
+
+            // Content
+            SliverFillRemaining(
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildScheduleGrid('home'),
+                        _buildScheduleGrid('online'),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildScheduleGrid(String sessionType) {
-    return SingleChildScrollView(
-      child: Column(
+    return RefreshIndicator(
+      onRefresh: loadAvailability,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
         children: ScheduleConstants.timeSlots.map((slot) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 18,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${slot['start']} - ${slot['end']}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: List.generate(7, (index) {
-                      final dayOfWeek = index + 1; // 1 = Monday
-                      final isEnabled = _isSlotEnabled(
-                        dayOfWeek,
-                        slot['start']!,
-                        sessionType,
-                      );
-
-                      return GestureDetector(
-                        onTap: () => _toggleTimeSlot(
-                          dayOfWeek,
-                          slot['start']!,
-                          slot['end']!,
-                          sessionType,
-                        ),
-                        child: Container(
-                          width: 45,
-                          height: 45,
-                          decoration: BoxDecoration(
-                            color: isEnabled
-                                ? Colors.green
-                                : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isEnabled
-                                  ? Colors.green.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              ScheduleConstants.arabicDays[index].substring(0, 3),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: isEnabled ? Colors.white : Colors.grey.shade600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-            ),
+          return _TimeSlotCard(
+            startTime: slot['start']!,
+            endTime: slot['end']!,
+            sessionType: sessionType,
+            weeklySchedule: weeklySchedule,
+            onDayTap: (dayOfWeek) {
+              toggleTimeSlot(
+                dayOfWeek,
+                slot['start']!,
+                slot['end']!,
+                sessionType,
+              );
+            },
+            isSlotEnabled: isSlotEnabled,
           );
         }).toList(),
       ),
@@ -331,130 +322,138 @@ class _AvailabilityManagementScreenState
   }
 }
 
-// Block Date Bottom Sheet
-class BlockDateBottomSheet extends StatefulWidget {
-  const BlockDateBottomSheet({super.key});
+class _TimeSlotCard extends StatelessWidget {
+  final String startTime;
+  final String endTime;
+  final String sessionType;
+  final Map<int, Map<String, dynamic>> weeklySchedule;
+  final Function(int) onDayTap;
+  final bool Function(int, String, String) isSlotEnabled;
 
-  @override
-  State<BlockDateBottomSheet> createState() => _BlockDateBottomSheetState();
-}
-
-class _BlockDateBottomSheetState extends State<BlockDateBottomSheet> {
-  final _reasonController = TextEditingController();
-  DateTime? _selectedDate;
-  bool _allDay = true;
-
-  @override
-  void dispose() {
-    _reasonController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _blockDate() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _selectedDate == null) return;
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('unavailableDates')
-          .add({
-        'date': Timestamp.fromDate(_selectedDate!),
-        'reason': _reasonController.text.trim(),
-        'allDay': _allDay,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حجب التاريخ بنجاح')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
-        );
-      }
-    }
-  }
+  const _TimeSlotCard({
+    required this.startTime,
+    required this.endTime,
+    required this.sessionType,
+    required this.weeklySchedule,
+    required this.onDayTap,
+    required this.isSlotEnabled,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 20,
-          left: 16,
-          right: 16,
-        ),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'حجب تاريخ محدد',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('التاريخ'),
-              subtitle: Text(
-                _selectedDate != null
-                    ? DateFormat('yyyy/MM/dd').format(_selectedDate!)
-                    : 'لم يتم الاختيار',
-              ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (date != null) {
-                  setState(() => _selectedDate = date);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _reasonController,
-              decoration: const InputDecoration(
-                labelText: 'السبب (اختياري)',
-                hintText: 'مثال: إجازة، سفر',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('حجب اليوم بالكامل'),
-              value: _allDay,
-              onChanged: (value) {
-                setState(() => _allDay = value);
-              },
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _selectedDate != null ? _blockDate : null,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+            // Time Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.access_time,
+                    color: Colors.blue,
+                    size: 24,
+                  ),
                 ),
-                child: const Text('حجب التاريخ'),
+                const SizedBox(width: 12),
+                Text(
+                  '$startTime - $endTime',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Days Grid
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: List.generate(7, (index) {
+                final dayOfWeek = (index + 1) % 7 + 1; // Monday = 1
+                final isEnabled = isSlotEnabled(dayOfWeek, startTime, sessionType);
+
+                return _DayChip(
+                  day: ScheduleConstants.arabicDays[index],
+                  isEnabled: isEnabled,
+                  onTap: () => onDayTap(dayOfWeek),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DayChip extends StatelessWidget {
+  final String day;
+  final bool isEnabled;
+  final VoidCallback onTap;
+
+  const _DayChip({
+    required this.day,
+    required this.isEnabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 90,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isEnabled ? AppTheme.accentGreen : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isEnabled ? AppTheme.accentGreen : Colors.grey.shade300,
+            width: 2,
+          ),
+          boxShadow: isEnabled
+              ? [
+                  BoxShadow(
+                    color: AppTheme.accentGreen.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isEnabled ? Icons.check_circle : Icons.radio_button_unchecked,
+              size: 16,
+              color: isEnabled ? Colors.white : Colors.grey.shade600,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              day.substring(0, 3),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isEnabled ? Colors.white : Colors.grey.shade600,
               ),
             ),
-            const SizedBox(height: 16),
           ],
         ),
       ),

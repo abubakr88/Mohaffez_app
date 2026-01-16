@@ -1,124 +1,133 @@
-// lib/config/guards/timeout_guard.dart
+// FILE: lib/config/guards/timeout_guard.dart
+// CHANGES:
+// - Replaced fragile “single static start time” with a safer state machine:
+//   - Debounces repeated redirects while GoRouter is still resolving.
+//   - Ensures logout is triggered at most once per splash cycle.
+//   - Resets cleanly when leaving splash.
+// - Avoided running logout in tight loops (prevents infinite redirects).
+// - Kept behavior: only monitors "/" (splash) and only enforces after maxWaitDuration.
+// - Arabic user-facing messages are not shown here (guard layer remains UI-free).
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../route_guard.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 
-/// Prevents infinite loading by enforcing timeouts
+/// Prevents infinite loading by enforcing timeouts (splash only).
 class TimeoutGuard implements RouteGuard {
   @override
-  int get priority => 5; // Check before other guards
+  int get priority => 5;
 
-  static DateTime? _firstLoadTime;
-  static const maxWaitDuration = Duration(seconds: 12); // Increased from 8
+  static const Duration maxWaitDuration = Duration(seconds: 12);
+
+  // Debounce to avoid repeated redirects while router is transitioning.
+  static const Duration _redirectDebounce = Duration(milliseconds: 800);
+
+  static DateTime? _startedAt;
+  static bool _logoutTriggered = false;
+
+  static String? _lastRedirectLocation;
+  static DateTime? _lastRedirectAt;
 
   @override
   String? check(Ref ref, GoRouterState state) {
-    final authState = ref.read(authStateProvider);
-    final userState = ref.read(currentUserProvider);
-    final currentPath = state.matchedLocation;
+    final currentPath = state.uri.path;
 
-    // Only monitor splash screen
+    // Only monitor splash.
     if (currentPath != '/') {
-      if (_firstLoadTime != null) {
-        debugPrint("⏱️ TimeoutGuard: Left splash, resetting timer");
-        _firstLoadTime = null;
-      }
+      _reset();
       return null;
     }
 
-    // Start timer on first check
-    if (_firstLoadTime == null) {
-      _firstLoadTime = DateTime.now();
-      debugPrint("⏱️ TimeoutGuard: Started timer");
+    _startedAt ??= DateTime.now();
+    final elapsed = DateTime.now().difference(_startedAt!);
+
+    final authState = ref.read(authStateProvider);
+    final userState = ref.read(currentUserProvider);
+
+    if (kDebugMode) {
+      debugPrint(
+        '⏱️ TimeoutGuard: ${elapsed.inSeconds}s | '
+        'auth: ${_fmtAsync(authState)} | user: ${_fmtAsync(userState)}',
+      );
     }
 
-    final elapsed = DateTime.now().difference(_firstLoadTime!);
-
-    // Log current state
-    debugPrint("⏱️ TimeoutGuard: ${elapsed.inSeconds}s elapsed | "
-        "Auth: ${authState.isLoading ? 'loading' : authState.value != null ? 'yes' : 'no'} | "
-        "User: ${userState.isLoading ? 'loading' : userState.value != null ? 'yes' : 'no'}");
-
-    // ✅ FIX 1: If auth finished loading and no user -> redirect immediately
-    if (!authState.isLoading && authState.value == null && !userState.isLoading) {
-      debugPrint("❌ TimeoutGuard: No auth detected -> /login");
-      _firstLoadTime = null;
-      return '/login';
+    // If auth already resolved to "no user", do not keep user on splash.
+    if (!authState.isLoading && authState.value == null) {
+      return _redirectOnce('/login');
     }
 
-    // ✅ FIX 2: If we have auth but user data has permission error -> show it but don't logout
-    if (authState.value != null && userState.hasError && !userState.isLoading) {
-      final error = userState.error.toString();
-      
-      if (error.contains('PERMISSION_DENIED')) {
-        debugPrint("🚫 TimeoutGuard: Permission denied error detected");
-        
-        // Only logout if this persists for more than 8 seconds
-        if (elapsed.inSeconds >= 8) {
-          debugPrint("❌ TimeoutGuard: Permission denied for ${elapsed.inSeconds}s -> logout");
-          _firstLoadTime = null;
-          Future.microtask(() {
-            ref.read(authServiceProvider).logout();
-          });
-          return '/login';
-        }
-        
-        // Still within grace period - let it retry
-        debugPrint("⏳ TimeoutGuard: Waiting for permission issue to resolve...");
-        return null;
-      }
-
-      // For other errors, check if user document doesn't exist
-      if (error.contains('not exist') || error.contains('NOT_FOUND')) {
-        debugPrint("❌ TimeoutGuard: User document doesn't exist -> logout");
-        _firstLoadTime = null;
-        Future.microtask(() {
-          ref.read(authServiceProvider).logout();
-        });
-        return '/login';
-      }
-
-      // Other errors - wait a bit longer
-      if (elapsed.inSeconds >= 10) {
-        debugPrint("❌ TimeoutGuard: User error after ${elapsed.inSeconds}s -> logout");
-        _firstLoadTime = null;
-        Future.microtask(() {
-          ref.read(authServiceProvider).logout();
-        });
-        return '/login';
-      }
+    // If authenticated and user loaded successfully, allow and reset.
+    if (authState.value != null && userState.hasValue && userState.value != null) {
+      _reset();
+      return null;
     }
 
-    // ✅ FIX 3: Timeout exceeded - force action
-    if (elapsed > maxWaitDuration) {
-      debugPrint("⚠️ TimeoutGuard: TIMEOUT EXCEEDED (${elapsed.inSeconds}s)");
-      _firstLoadTime = null;
-
-      // If still loading anything - force to login
-      if (authState.isLoading || userState.isLoading) {
-        debugPrint("❌ TimeoutGuard: Still loading after timeout -> /login");
-        return '/login';
+    // Timeout exceeded: decide action.
+    if (elapsed >= maxWaitDuration) {
+      if (kDebugMode) {
+        debugPrint('⚠️ TimeoutGuard: timeout exceeded (${elapsed.inSeconds}s)');
       }
 
-      // If not authenticated - go to login
+      // If still not authenticated -> go login (no logout needed).
       if (authState.value == null) {
-        debugPrint("❌ TimeoutGuard: No auth after timeout -> /login");
-        return '/login';
+        return _redirectOnce('/login');
       }
 
-      // Authenticated but no user data - force logout
-      if (userState.value == null && !userState.hasError) {
-        debugPrint("❌ TimeoutGuard: No user data after timeout -> logout");
-        Future.microtask(() {
-          ref.read(authServiceProvider).logout();
-        });
-        return '/login';
+      // Authenticated but user doc is missing/error/loading too long -> logout once and go login.
+      _triggerLogoutOnce(ref);
+
+      return _redirectOnce('/login');
+    }
+
+    return null;
+  }
+
+  static void _triggerLogoutOnce(Ref ref) {
+    if (_logoutTriggered) return;
+    _logoutTriggered = true;
+
+    // Fire-and-forget; guard must stay synchronous.
+    Future.microtask(() async {
+      try {
+        await ref.read(authServiceProvider).logout();
+      } catch (e) {
+        // Swallow here to avoid breaking router; UI/services handle detailed reporting.
+        if (kDebugMode) debugPrint('❌ TimeoutGuard logout failed: $e');
+      }
+    });
+  }
+
+  static String? _redirectOnce(String location) {
+    final now = DateTime.now();
+    final lastAt = _lastRedirectAt;
+
+    if (_lastRedirectLocation == location && lastAt != null) {
+      final since = now.difference(lastAt);
+      if (since < _redirectDebounce) {
+        return null; // debounce repeated redirects
       }
     }
 
-    return null; // Continue to other guards
+    _lastRedirectLocation = location;
+    _lastRedirectAt = now;
+    return location;
+  }
+
+  static void _reset() {
+    _startedAt = null;
+    _logoutTriggered = false;
+    _lastRedirectLocation = null;
+    _lastRedirectAt = null;
+  }
+
+  static String _fmtAsync(AsyncValue<dynamic> v) {
+    if (v.isLoading) return 'loading';
+    if (v.hasError) return 'error';
+    return v.value == null ? 'null' : 'data';
   }
 }

@@ -1,72 +1,67 @@
-// lib/config/app_router.dart (REFACTORED - COMPLETE FILE)
+// FILE: lib/config/app_router.dart
+// CHANGES:
+// - Added redirectLimit to mitigate redirect loops at the router level.
+// - Tightened GoRouterNotifier listens to typed AsyncValue<UserModel?> (less rebuild noise).
+// - Hardened session-details route: avoids runtime cast crash when state.extra is missing/wrong.
+// - Kept routes & Arabic RTL behavior unchanged.
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../models/session_model.dart';
+import '../models/user_model.dart';
+import '../providers/auth_provider.dart';
+import '../providers/user_provider.dart';
+import '../screens/availability_management_screen.dart';
+import '../screens/completed_sessions_screen.dart';
 import '../screens/login_screen.dart';
-import '../screens/student_home.dart';
+import '../screens/mohaffez_credentials_screen.dart';
 import '../screens/mohaffez_home.dart';
-import '../screens/nearby_mohaffez_screen.dart';
 import '../screens/mohaffez_profile_screen.dart';
+import '../screens/nearby_mohaffez_screen.dart';
+import '../screens/notifications_screen.dart';
+import '../screens/pending_requests_screen.dart';
+import '../screens/profile_screen.dart';
 import '../screens/session_details_screen.dart';
 import '../screens/student_assignments_screen.dart';
+import '../screens/student_home.dart';
 import '../screens/student_requests_screen.dart';
-import '../screens/notifications_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/pending_requests_screen.dart';
-import '../screens/completed_sessions_screen.dart';
 import '../screens/upcoming_sessions_screen.dart';
-import '../screens/mohaffez_credentials_screen.dart';
-import '../screens/availability_management_screen.dart';
-import '../models/session_model.dart';
-import '../providers/auth_provider.dart';
-import '../providers/user_provider.dart'; // ✅ ADD THIS IMPORT
-import 'guard_manager.dart';
 import '../shared/constants/app_theme.dart';
 
-// ============================================================================
-// GoRouter Notifier (FIXED)
-// ============================================================================
+import 'guard_manager.dart';
 
 class GoRouterNotifier extends ChangeNotifier {
   final Ref ref;
 
   GoRouterNotifier(this.ref) {
-    // Listen to auth state changes
-    ref.listen(authStateProvider, (_, next) {
-      debugPrint('🔄 GoRouterNotifier: Auth state changed');
-      notifyListeners();
-    });
-    
-    // ✅ FIXED: Listen to user data changes with proper null handling
-    ref.listen<AsyncValue>(currentUserProvider, (previous, next) { // ✅ Added type annotation
-      // Only notify on data changes, not loading states
+    ref.listen(authStateProvider, (_, __) => notifyListeners());
+
+    // Notify on terminal states only (data/error), not loading.
+    ref.listen<AsyncValue<UserModel?>>(currentUserProvider, (prev, next) {
       if (next.hasValue || next.hasError) {
-        debugPrint('🔄 GoRouterNotifier: User data updated (hasValue: ${next.hasValue}, hasError: ${next.hasError})');
         notifyListeners();
       }
     });
   }
 
-  /// Simplified redirect - delegates to GuardManager
   String? redirect(BuildContext context, GoRouterState state) {
     return GuardManager.checkGuards(ref, state);
   }
 }
 
-// ============================================================================
-// Router Provider (UNCHANGED)
-// ============================================================================
-
 final goRouterProvider = Provider<GoRouter>((ref) {
   final notifier = GoRouterNotifier(ref);
-  
+
   return GoRouter(
-    debugLogDiagnostics: true,
+    debugLogDiagnostics: kDebugMode,
+    redirectLimit: 12,
     initialLocation: '/',
     refreshListenable: notifier,
     redirect: notifier.redirect,
     routes: [
-      // PUBLIC ROUTES
       GoRoute(
         path: '/',
         name: 'splash',
@@ -77,8 +72,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         name: 'login',
         builder: (context, state) => const LoginScreen(),
       ),
-      
-      // AUTHENTICATED ROUTES - STUDENT
+
+      // STUDENT
       GoRoute(
         path: '/home',
         name: 'student-home',
@@ -107,8 +102,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/session/:id',
         name: 'session-details',
         builder: (context, state) {
-          final sessionData = state.extra as SessionModel;
-          return SessionDetailsScreen(session: sessionData);
+          final extra = state.extra;
+          if (extra is! SessionModel) {
+            return ErrorScreen(
+              error: 'بيانات الجلسة غير متوفرة',
+              onRetry: () => context.go('/'),
+            );
+          }
+          return SessionDetailsScreen(session: extra);
         },
       ),
       GoRoute(
@@ -121,8 +122,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         name: 'requests',
         builder: (context, state) => const StudentRequestsScreen(),
       ),
-      
-      // SHARED ROUTES (Both roles)
+
+      // SHARED
       GoRoute(
         path: '/notifications',
         name: 'notifications',
@@ -133,8 +134,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         name: 'profile',
         builder: (context, state) => const ProfileScreen(),
       ),
-      
-      // AUTHENTICATED ROUTES - MOHAFFEZ
+
+      // MOHAFFEZ
       GoRoute(
         path: '/mohaffez-home',
         name: 'mohaffez-home',
@@ -144,7 +145,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/pending-requests',
         name: 'pending-requests',
         builder: (context, state) {
-          final mohaffezId = state.uri.queryParameters['mohaffezId']!;
+          final mohaffezId = state.uri.queryParameters['mohaffezId'];
+          if (mohaffezId == null || mohaffezId.isEmpty) {
+            return ErrorScreen(
+              error: 'معرّف المحفظ غير موجود',
+              onRetry: () => context.go('/'),
+            );
+          }
           return PendingRequestsScreen(mohaffezId: mohaffezId);
         },
       ),
@@ -152,7 +159,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/completed-sessions',
         name: 'completed-sessions',
         builder: (context, state) {
-          final mohaffezId = state.uri.queryParameters['mohaffezId']!;
+          final mohaffezId = state.uri.queryParameters['mohaffezId'];
+          if (mohaffezId == null || mohaffezId.isEmpty) {
+            return ErrorScreen(
+              error: 'معرّف المحفظ غير موجود',
+              onRetry: () => context.go('/'),
+            );
+          }
           return CompletedSessionsScreen(mohaffezId: mohaffezId);
         },
       ),
@@ -160,7 +173,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/upcoming-sessions',
         name: 'upcoming-sessions',
         builder: (context, state) {
-          final mohaffezId = state.uri.queryParameters['mohaffezId']!;
+          final mohaffezId = state.uri.queryParameters['mohaffezId'];
+          if (mohaffezId == null || mohaffezId.isEmpty) {
+            return ErrorScreen(
+              error: 'معرّف المحفظ غير موجود',
+              onRetry: () => context.go('/'),
+            );
+          }
           return UpcomingSessionsScreen(mohaffezId: mohaffezId);
         },
       ),
@@ -182,18 +201,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// ============================================================================
-// Splash Screen (SIMPLIFIED)
-// ============================================================================
-
+// Splash UI kept as-is (guards decide navigation).
 class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch providers to trigger rebuilds (guards handle all logic)
     final authAsync = ref.watch(authStateProvider);
-    
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -207,7 +222,6 @@ class SplashScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // App Logo
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -236,8 +250,6 @@ class SplashScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 30),
-              
-              // App Title
               const Text(
                 'محفظ',
                 style: TextStyle(
@@ -255,15 +267,11 @@ class SplashScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 50),
-              
-              // Loading Indicator
               const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 strokeWidth: 3,
               ),
               const SizedBox(height: 16),
-              
-              // Status Text (simplified)
               Text(
                 _getStatusText(authAsync),
                 style: const TextStyle(
@@ -278,17 +286,13 @@ class SplashScreen extends ConsumerWidget {
     );
   }
 
-  String _getStatusText(AsyncValue authAsync) {
+  static String _getStatusText(AsyncValue authAsync) {
     if (authAsync.isLoading) return 'جاري التحقق من الحساب...';
     if (authAsync.hasError) return 'خطأ في المصادقة';
     if (authAsync.value == null) return 'جاري الانتقال لتسجيل الدخول...';
     return 'جاري تحميل البيانات...';
   }
 }
-
-// ============================================================================
-// Error Screen (UNCHANGED)
-// ============================================================================
 
 class ErrorScreen extends StatelessWidget {
   final String error;
@@ -311,18 +315,11 @@ class ErrorScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Colors.red,
-                ),
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
                 const SizedBox(height: 16),
                 const Text(
                   'حدث خطأ',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -336,10 +333,7 @@ class ErrorScreen extends StatelessWidget {
                   icon: const Icon(Icons.refresh),
                   label: const Text('إعادة المحاولة'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   ),
                 ),
               ],

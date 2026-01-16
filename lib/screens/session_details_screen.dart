@@ -1,557 +1,468 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart' hide TextDirection; // Hide TextDirection from intl
+import 'package:intl/intl.dart' hide TextDirection;
 import '../models/session_model.dart';
 import '../shared/constants/app_theme.dart';
-import '../shared/widgets/cached_avatar.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../providers/user_provider.dart';
 
 class SessionDetailsScreen extends ConsumerWidget {
   final SessionModel session;
 
-  const SessionDetailsScreen({
-    super.key,
-    required this.session,
-  });
+  const SessionDetailsScreen({super.key, required this.session});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(currentUserProvider).value;
+    final isMohaffez = currentUser?.role == 'mohaffez';
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          title: const Text('تفاصيل الجلسة'),
-          elevation: 0,
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Card
-              _buildHeaderCard(),
-              const SizedBox(height: 16),
-
-              // Session Info
-              _buildInfoCard(),
-              const SizedBox(height: 16),
-
-              // Location
-              _buildLocationCard(),
-              const SizedBox(height: 16),
-
-              // Assignments (if any)
-              if (_hasAssignments()) ...[
-                _buildAssignmentsCard(),
-                const SizedBox(height: 16),
-              ],
-
-              // Rating & Notes (if completed)
-              if (_isCompleted()) ...[
-                _buildRatingCard(),
-                const SizedBox(height: 16),
-              ],
-
-              // Actions
-              _buildActionsCard(context),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          CachedAvatar(
-            imageUrl: null, // Add mohaffez photo if available
-            radius: 40,
-            semanticLabel: session.mohaffezName,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            session.mohaffezName,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              _getSessionTypeLabel(session.sessionType),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
+        body: CustomScrollView(
+          slivers: [
+            // Modern App Bar with Gradient
+            SliverAppBar(
+              expandedHeight: 200,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Hero(
+                                tag: 'session_${session.id}',
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Icon(
+                                    Icons.school,
+                                    size: 32,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isMohaffez
+                                          ? session.studentName
+                                          : session.mohaffezName,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        _getStatusLabel(session.status!),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'معلومات الجلسة',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Divider(height: 24),
-          _buildInfoRow(
-            icon: Icons.calendar_today,
-            label: 'التاريخ',
-            value: _formatDate(session.sessionDate ?? session.slotStart),
-          ),
-          const SizedBox(height: 12),
-          _buildInfoRow(
-            icon: Icons.access_time,
-            label: 'الوقت',
-            value: session.preferredTimeSlot ?? _formatTime(session.slotStart),
-          ),
-          const SizedBox(height: 12),
-          _buildInfoRow(
-            icon: Icons.book,
-            label: 'عدد الأجزاء',
-            value: '${session.juzCount} جزء',
-          ),
-          if (session.mohaffezPhone != null && session.mohaffezPhone!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              icon: Icons.phone,
-              label: 'رقم المحفظ',
-              value: session.mohaffezPhone!,
-              trailing: IconButton(
-                icon: const Icon(Icons.call, color: Colors.green),
-                onPressed: () => _makeCall(session.mohaffezPhone!),
+            // Content
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Session Info Card
+                  _SectionCard(
+                    title: 'معلومات الجلسة',
+                    icon: Icons.info_outline,
+                    color: Colors.blue,
+                    child: Column(
+                      children: [
+                        _InfoRow(
+                          icon: Icons.event,
+                          label: 'النوع',
+                          value: _getSessionTypeLabel(session.sessionType),
+                        ),
+                        const Divider(height: 24),
+                        _InfoRow(
+                          icon: Icons.access_time,
+                          label: 'الوقت',
+                          value: session.preferredTimeSlot!,
+                        ),
+                        if (session.sessionDate != null) ...[
+                          const Divider(height: 24),
+                          _InfoRow(
+                            icon: Icons.calendar_today,
+                            label: 'التاريخ',
+                            value: DateFormat('dd MMMM yyyy', 'ar')
+                                .format(session.sessionDate!),
+                          ),
+                        ],
+                        if (session.location.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          _InfoRow(
+                            icon: Icons.location_on,
+                            label: 'المكان',
+                            value: session.location,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Assignments Section
+                  if (session.hifzAssignment?.isNotEmpty ?? false ||
+                      (session.hifzAssignment?.isNotEmpty ?? false) == true)
+                    _SectionCard(
+                      title: 'الواجبات',
+                      icon: Icons.assignment,
+                      color: AppTheme.accentGreen,
+                      child: Column(
+                        children: [
+                          if (session.hifzAssignment?.isNotEmpty ?? false)
+                            _AssignmentCard(
+                              title: 'حفظ',
+                              content: session.hifzAssignment!,
+                              color: Colors.green,
+                              icon: Icons.book,
+                            ),
+                          if (session.hifzAssignment?.isNotEmpty ?? false &&
+                              (session.murajaAssignment?.isNotEmpty ?? false) == true)
+                            const SizedBox(height: 12),
+                          if (session.murajaAssignment?.isNotEmpty ?? false)
+                            _AssignmentCard(
+                              title: 'مراجعة',
+                              content: session.murajaAssignment!,
+                              color: Colors.blue,
+                              icon: Icons.refresh,
+                            ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // Rating Section
+                  if (session.sessionRating > 0)
+                    _SectionCard(
+                      title: 'التقييم',
+                      icon: Icons.star,
+                      color: Colors.amber,
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${session.sessionRating}/10',
+                                style: const TextStyle(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(10, (index) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: Icon(
+                                  index < session.sessionRating
+                                      ? Icons.star
+                                      : Icons.star_border,
+                                  color: Colors.amber,
+                                  size: 28,
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // Notes Section
+                  if (session.sessionNotes?.isNotEmpty ?? false)
+                    _SectionCard(
+                      title: 'ملاحظات',
+                      icon: Icons.notes,
+                      color: Colors.purple,
+                      child: Text(
+                        session.sessionNotes!,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 32),
+                ]),
               ),
             ),
           ],
-        ],
+        ),
+
+        // Action Buttons (for mohaffez only)
+        bottomNavigationBar: isMohaffez && session.status == 'accepted'
+            ? SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // Complete session
+                          },
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text('إنهاء الجلسة'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: const BorderSide(
+                              color: AppTheme.accentGreen,
+                              width: 2,
+                            ),
+                            foregroundColor: AppTheme.accentGreen,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            // Edit assignment
+                          },
+                          icon: const Icon(Icons.edit),
+                          label: const Text('تعديل الواجب'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: AppTheme.primaryAmber,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildLocationCard() {
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return 'مقبولة';
+      case 'pending':
+        return 'قيد الانتظار';
+      case 'completed':
+        return 'مكتملة';
+      case 'cancelled':
+        return 'ملغية';
+      default:
+        return status;
+    }
+  }
+
+  String _getSessionTypeLabel(String type) {
+    switch (type.toLowerCase()) {
+      case 'home':
+        return 'في المنزل';
+      case 'mosque':
+        return 'في المسجد';
+      case 'online':
+        return 'عن بُعد';
+      default:
+        return type;
+    }
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey.shade600),
+        const SizedBox(width: 12),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.grey.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AssignmentCard extends StatelessWidget {
+  final String title;
+  final String content;
+  final Color color;
+  final IconData icon;
+
+  const _AssignmentCard({
+    required this.title,
+    required this.content,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: color.withOpacity(0.3), width: 2),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                _getLocationIcon(),
-                color: AppTheme.accentGreen,
-                size: 20,
-              ),
+              Icon(icon, color: color, size: 20),
               const SizedBox(width: 8),
-              const Text(
-                'الموقع',
+              Text(
+                title,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: color,
                 ),
               ),
             ],
           ),
-          const Divider(height: 24),
+          const SizedBox(height: 12),
           Text(
-            session.location,
-            style: const TextStyle(fontSize: 15),
-          ),
-          if (session.imamAddressLat != null && session.imamAddressLng != null) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _openMap(),
-                icon: const Icon(Icons.map, size: 18),
-                label: const Text('فتح الخريطة'),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAssignmentsCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.assignment, color: AppTheme.primaryAmber, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'الواجبات',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          if (session.hifzAssignment?.isNotEmpty ?? false) ...[
-            const Text(
-              'حفظ جديد',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Text(
-                session.hifzAssignment!,
-                style: const TextStyle(fontSize: 15),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          if (session.murajaAssignment?.isNotEmpty ?? false) ...[
-            const Text(
-              'مراجعة',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Text(
-                session.murajaAssignment!,
-                style: const TextStyle(fontSize: 15),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRatingCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'التقييم والملاحظات',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Divider(height: 24),
-          if ((session.sessionRating ?? 0) > 0) ...[
-            Row(
-              children: [
-                const Text(
-                  'التقييم: ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 8),
-                ...List.generate(
-                  10,
-                  (index) => Icon(
-                    index < (session.sessionRating ?? 0)
-                        ? Icons.star
-                        : Icons.star_border,
-                    size: 18,
-                    color: Colors.amber,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${session.sessionRating}/10',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
-          if (session.sessionNotes?.isNotEmpty ?? false) ...[
-            const Text(
-              'ملاحظات المحفظ:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.shade200),
-              ),
-              child: Text(
-                session.sessionNotes!,
-                style: const TextStyle(fontSize: 14),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionsCard(BuildContext context) {
-    // Only show cancel for pending sessions
-    final isPending = session.sessionDate != null &&
-        session.sessionDate!.isAfter(DateTime.now());
-
-    if (!isPending) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _confirmCancel(context),
-              icon: const Icon(Icons.cancel),
-              label: const Text('إلغاء الجلسة'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
+            content,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.6,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    Widget? trailing,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppTheme.primaryAmber),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (trailing != null) trailing,
-      ],
-    );
-  }
-
-  // Helper methods
-  bool _hasAssignments() {
-    return (session.hifzAssignment?.isNotEmpty ?? false) ||
-        (session.murajaAssignment?.isNotEmpty ?? false);
-  }
-
-  bool _isCompleted() {
-    return (session.sessionRating ?? 0) > 0 ||
-        (session.sessionNotes?.isNotEmpty ?? false);
-  }
-
-  String _getSessionTypeLabel(String type) {
-    switch (type.toLowerCase()) {
-      case 'home':
-        return 'في البيت';
-      case 'mosque':
-        return 'في المسجد';
-      case 'online':
-        return 'أونلاين';
-      default:
-        return type;
-    }
-  }
-
-  IconData _getLocationIcon() {
-    switch (session.sessionType.toLowerCase()) {
-      case 'home':
-        return Icons.home;
-      case 'mosque':
-        return Icons.mosque;
-      case 'online':
-        return Icons.videocam;
-      default:
-        return Icons.location_on;
-    }
-  }
-
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'غير محدد';
-    return DateFormat('yyyy/MM/dd').format(date);
-  }
-
-  String _formatTime(DateTime? date) {
-    if (date == null) return 'غير محدد';
-    return DateFormat('HH:mm').format(date);
-  }
-
-  void _makeCall(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    await launchUrl(uri);
-  }
-
-  void _openMap() async {
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${session.imamAddressLat},${session.imamAddressLng}',
-    );
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  void _confirmCancel(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إلغاء الجلسة'),
-          content: const Text('هل أنت متأكد من إلغاء هذه الجلسة؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('لا'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                // TODO: Implement cancel logic
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم إلغاء الجلسة')),
-                );
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('نعم، إلغاء'),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -1,0 +1,161 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function onlyUpdating(allowedFields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+    }
+    
+    // ============================================================================
+    // USERS COLLECTION - ENHANCED
+    // ============================================================================
+    
+    match /users/{userId} {
+      // ✅ READ: Any authenticated user can read any profile
+      allow read: if isAuthenticated();
+      
+      // CREATE: Users can create their own profile during signup
+      allow create: if isAuthenticated() 
+                    && request.auth.uid == userId;
+      
+      // UPDATE: Users can update their own profile OR update counters
+      allow update: if isOwner(userId) 
+                    || (isAuthenticated() && onlyUpdating(['followerCount', 'followingCount', 'fcmToken', 'fcmTokenUpdatedAt']));
+      
+      allow delete: if isOwner(userId);
+      
+      // Credentials subcollection
+      match /credentials/{credentialId} {
+        allow read: if isAuthenticated() && 
+                    (resource == null || resource.data.status == 'approved' || request.auth.uid == userId);
+        allow write: if isOwner(userId);
+      }
+      
+      // Availability subcollection  
+      match /availability/{availabilityId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+      }
+      
+      // Unavailable dates subcollection
+      match /unavailableDates/{dateId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+      }
+    }
+    
+    // ============================================================================
+    // SESSION REQUESTS - FIXED
+    // ============================================================================
+    
+    match /sessionRequests/{requestId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+      
+      allow create: if isAuthenticated()
+                    && request.auth.uid == request.resource.data.studentId
+                    && request.resource.data.status == 'pending';
+      
+      allow update: if isAuthenticated() && (
+        // Mohaffez accepts/rejects
+        (request.auth.uid == resource.data.mohaffezId &&
+         resource.data.status == 'pending' &&
+         request.resource.data.status in ['accepted', 'rejected'])
+        ||
+        // Student cancels
+        (request.auth.uid == resource.data.studentId &&
+         resource.data.status == 'pending' &&
+         request.resource.data.status == 'cancelled')
+      );
+      
+      allow delete: if isAuthenticated() 
+                    && request.auth.uid == resource.data.studentId
+                    && resource.data.status == 'pending';
+    }
+    
+    // ============================================================================
+    // HAFIZ SESSIONS - FIXED
+    // ============================================================================
+    
+    match /hafizSessions/{sessionId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+      
+      allow create: if isAuthenticated()
+                    && request.auth.uid == request.resource.data.mohaffezId;
+      
+      allow update: if isAuthenticated() && (
+        // Mohaffez updates session
+        (request.auth.uid == resource.data.mohaffezId)
+        ||
+        // Student updates feedback only
+        (request.auth.uid == resource.data.studentId &&
+         onlyUpdating(['studentFeedback', 'studentNotes']))
+      );
+      
+      allow delete: if isAuthenticated()
+                    && request.auth.uid == resource.data.mohaffezId;
+    }
+    
+    // ============================================================================
+    // FOLLOWS
+    // ============================================================================
+    
+    match /follows/{followId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated()
+                    && request.auth.uid == request.resource.data.studentId;
+      
+      allow delete: if isAuthenticated()
+                    && request.auth.uid == resource.data.studentId;
+      
+      allow update: if false;
+    }
+    
+    // ============================================================================
+    // NOTIFICATIONS
+    // ============================================================================
+    
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated()
+                  && request.auth.uid == resource.data.userId;
+      
+      allow create: if isAuthenticated();
+      
+      allow update: if isAuthenticated()
+                    && request.auth.uid == resource.data.userId
+                    && onlyUpdating(['isRead', 'readAt']);
+      
+      allow delete: if isAuthenticated()
+                    && request.auth.uid == resource.data.userId;
+    }
+    
+    // ============================================================================
+    // DEFAULT DENY
+    // ============================================================================
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

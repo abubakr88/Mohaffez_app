@@ -1,144 +1,121 @@
-// lib/config/guards/role_guard.dart
+// FILE: lib/config/guards/role_guard.dart
+// CHANGES:
+// - Made types explicit (AsyncValue<UserModel?>) for better null-safety/readability.
+// - Improved route matching: checks by path prefix, plus explicit shared routes bypass.
+// - Added defensive handling for unknown/empty roles.
+// - Avoided redirects while user doc is still loading (TimeoutGuard will handle hard timeouts).
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../route_guard.dart';
+import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 
-/// Redirects authenticated users from splash/login and enforces role-based access
+/// Redirects authenticated users from splash/login and enforces role-based access.
 class RoleGuard implements RouteGuard {
   @override
-  int get priority => 20; // Check after AuthGuard and TimeoutGuard
+  int get priority => 20;
 
-  // Routes accessible to any authenticated user
-  static const sharedRoutes = ['notifications', 'profile', 'session'];
+  static const String splashPath = '/';
+  static const String loginPath = '/login';
 
-  // Mohaffez-only routes
-  static const mohaffezRoutes = [
-    'mohaffez-home',
-    'pending-requests',
-    'completed-sessions',
-    'upcoming-sessions',
-    'credentials',
-    'availability',
+  static const String studentHomePath = '/home';
+  static const String mohaffezHomePath = '/mohaffez-home';
+
+  // Routes accessible to any authenticated user.
+  static const List<String> sharedRoutePrefixes = <String>[
+    '/notifications',
+    '/profile',
+    '/session', // session details
   ];
 
-  // Student-only routes
-  static const studentRoutes = [
-    'home',
-    'nearby',
-    'assignments',
-    'requests',
-    'mohaffez',
+  // Mohaffez-only routes.
+  static const List<String> mohaffezRoutePrefixes = <String>[
+    '/mohaffez-home',
+    '/pending-requests',
+    '/completed-sessions',
+    '/upcoming-sessions',
+    '/credentials',
+    '/availability',
+  ];
+
+  // Student-only routes.
+  static const List<String> studentRoutePrefixes = <String>[
+    '/home',
+    '/nearby',
+    '/assignments',
+    '/requests',
+    '/mohaffez', // profiles
   ];
 
   @override
   String? check(Ref ref, GoRouterState state) {
     final authState = ref.read(authStateProvider);
-    final userState = ref.read(currentUserProvider);
-    final currentPath = state.matchedLocation;
+    final AsyncValue<UserModel?> userState = ref.read(currentUserProvider);
+    final currentPath = state.uri.path;
 
-    // ✅ Only process if authenticated
-    if (authState.value == null) {
-      debugPrint("🔄 RoleGuard: No auth, skipping");
-      return null; // Let AuthGuard handle
-    }
+    // Only process if authenticated (AuthGuard handles unauth).
+    if (authState.value == null) return null;
 
-    debugPrint("🔄 RoleGuard: Auth exists, checking user data...");
+    // Shared routes are always allowed for authenticated users.
+    if (_startsWithAny(currentPath, sharedRoutePrefixes)) return null;
 
-    // ✅ On splash or login with auth - redirect based on user data
-    if (currentPath == '/' || currentPath == '/login') {
-      // Still loading user data - wait
-      if (userState.isLoading) {
-        debugPrint("🔄 RoleGuard: User loading, waiting...");
-        return null;
-      }
+    // On splash/login with auth: route based on role once user is available.
+    if (currentPath == splashPath || currentPath == loginPath) {
+      if (userState.isLoading) return null;
 
-      // ✅ NEW: Handle permission errors gracefully
+      // If user doc errored, wait: TimeoutGuard decides what to do.
       if (userState.hasError) {
-        final error = userState.error.toString();
-        
-        if (error.contains('PERMISSION_DENIED')) {
-          debugPrint("⚠️ RoleGuard: Permission error on splash/login");
-          // Don't redirect yet - let TimeoutGuard handle after proper timeout
-          return null;
+        if (kDebugMode) {
+          debugPrint('⚠️ RoleGuard: user load error on $currentPath: ${userState.error}');
         }
-
-        if (error.contains('not exist') || error.contains('NOT_FOUND')) {
-          debugPrint("❌ RoleGuard: User document doesn't exist");
-          // This is a real error - user needs to logout
-          return null; // Let TimeoutGuard handle logout
-        }
-
-        // Other errors - wait a bit
-        debugPrint("⚠️ RoleGuard: User error, waiting...");
         return null;
       }
 
-      // User data loaded - redirect to home
-      if (userState.value != null) {
-        final role = userState.value!.role;
-        final destination = role == 'mohaffez' ? '/mohaffez-home' : '/home';
-        debugPrint("✅ RoleGuard: Redirecting $role to $destination");
-        return destination;
-      }
+      final user = userState.value;
+      if (user == null) return null;
 
-      // No user data but no error either - still loading
-      debugPrint("⏳ RoleGuard: Auth but no user yet, waiting...");
-      return null;
+      final destination = _homeForRole(user.role);
+      if (destination == null) return loginPath; // defensive: unknown role
+      return destination;
     }
 
-    // ✅ For protected routes, ensure user data is loaded
-    if (userState.isLoading) {
-      debugPrint("🔄 RoleGuard: User loading on protected route, waiting...");
-      return null;
+    // Protected routes: if user still loading, don't redirect yet.
+    if (userState.isLoading) return null;
+
+    // If error, let UI handle (and TimeoutGuard may resolve on splash).
+    if (userState.hasError) return null;
+
+    final user = userState.value;
+    if (user == null) return null;
+
+    final role = user.role.trim();
+    if (role.isEmpty) return loginPath;
+
+    // Enforce role-based access.
+    if (_startsWithAny(currentPath, mohaffezRoutePrefixes) && role != 'mohaffez') {
+      return studentHomePath;
     }
 
-    // ✅ Handle errors on protected routes
-    if (userState.hasError) {
-      final error = userState.error.toString();
-      
-      if (error.contains('PERMISSION_DENIED')) {
-        debugPrint("⚠️ RoleGuard: Permission error on protected route");
-        // Allow navigation - don't block user
-        // Show error in UI instead
-        return null;
-      }
-
-      // For other errors, let TimeoutGuard handle
-      debugPrint("⚠️ RoleGuard: User error on protected route");
-      return null;
+    if (_startsWithAny(currentPath, studentRoutePrefixes) && role == 'mohaffez') {
+      return mohaffezHomePath;
     }
 
-    // No user data on protected route - let TimeoutGuard handle
-    if (userState.value == null) {
-      debugPrint("⚠️ RoleGuard: No user on protected route");
-      return null; // Let TimeoutGuard decide after timeout
-    }
-
-    // ✅ Check role-based access
-    final role = userState.value!.role;
-
-    if (_isMohaffezRoute(currentPath) && role != 'mohaffez') {
-      debugPrint("🚫 RoleGuard: Student blocked from mohaffez route");
-      return '/home';
-    }
-
-    if (_isStudentRoute(currentPath) && role == 'mohaffez') {
-      debugPrint("🚫 RoleGuard: Mohaffez blocked from student route");
-      return '/mohaffez-home';
-    }
-
-    debugPrint("✅ RoleGuard: Access granted to $currentPath for $role");
     return null;
   }
 
-  bool _isMohaffezRoute(String path) {
-    return mohaffezRoutes.any((route) => path.startsWith('/$route'));
+  static bool _startsWithAny(String path, List<String> prefixes) {
+    return prefixes.any((p) => path == p || path.startsWith('$p/'));
   }
 
-  bool _isStudentRoute(String path) {
-    return studentRoutes.any((route) => path.startsWith('/$route'));
+  static String? _homeForRole(String role) {
+    final normalized = role.trim().toLowerCase();
+    if (normalized == 'mohaffez') return mohaffezHomePath;
+    if (normalized == 'student') return studentHomePath;
+    return null;
   }
 }

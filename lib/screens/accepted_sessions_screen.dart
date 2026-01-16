@@ -1,14 +1,12 @@
-// lib/screens/accepted_sessions_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/constants/app_theme.dart';
-import '../shared/widgets/error_widgets.dart';
 import '../shared/widgets/empty_state.dart';
-import '../providers/session_provider_paginated.dart';
+import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
-import 'session_details_screen.dart';
+import '../providers/session_provider_paginated.dart';
 import '../models/session_model.dart';
+import 'session_details_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AcceptedSessionsScreen extends ConsumerWidget {
@@ -41,10 +39,21 @@ class AcceptedSessionsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('الجلسات المقبولة')),
+        appBar: AppBar(
+          title: const Text('الجلسات المقبولة'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                ref.invalidate(studentSessionsFirstPageProvider(studentId));
+              },
+              tooltip: 'تحديث',
+            ),
+          ],
+        ),
         body: firstPageAsync.when(
           data: (_) {
-            final sessions = paginatedState.sessions; // ✅ FIXED: Use sessions instead of items
+            final sessions = paginatedState.sessions;
 
             final acceptedSessions = sessions.where((session) {
               final status = session['status'] as String? ?? '';
@@ -53,48 +62,54 @@ class AcceptedSessionsScreen extends ConsumerWidget {
 
             if (acceptedSessions.isEmpty && !paginatedState.isLoadingMore) {
               return Container(
-                color: Colors.grey.withValues(alpha: 0.05), // ✅ FIXED
+                color: Colors.grey.withValues(alpha: 0.05),
                 child: const EmptyState(
                   icon: Icons.event_busy,
                   title: 'لا توجد جلسات مقبولة',
                   message: 'جميع الجلسات المقبولة ستظهر هنا',
+                  animated: true,
                 ),
               );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: acceptedSessions.length + (paginatedState.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == acceptedSessions.length) {
-                  return _buildLoadMoreButton(ref, studentId, paginatedState);
-                }
-
-                final session = acceptedSessions[index];
-                
-                // ✅ FIXED: Create SessionModel properly
-                final sessionModel = SessionModel(
-                  id: session['id'] as String?,
-                  mohaffezId: session['mohaffezId'] as String? ?? '',
-                  studentId: session['studentId'] as String? ?? '',
-                  mohaffezName: session['mohaffezName'] as String? ?? 'غير معروف',
-                  studentName: session['studentName'] as String? ?? '',
-                  sessionType: session['sessionType'] as String? ?? 'بيت',
-                  preferredTimeSlot: session['preferredTimeSlot'] as String? ?? '08:00',
-                  location: session['location'] as String? ?? '',
-                  sessionDate: session['sessionDate'] as DateTime?,
-                  slotStart: session['sessionDate'] as DateTime?,
-                  slotEnd: session['sessionDate'] as DateTime?,
-                  hifzAssignment: session['hifzAssignment'] as String?,
-                  murajaAssignment: session['murajaAssignment'] as String?,
-                  sessionRating: session['sessionRating'] as int? ?? 0, // ✅ FIXED: Provide default
-                  sessionNotes: session['sessionNotes'] as String?,
-                  status: session['status'] as String? ?? 'accepted',
-                  createdAt: (session['createdAt'] as Timestamp?)?.toDate(),
-                );
-
-                return _buildSessionCard(context, sessionModel);
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(studentSessionsFirstPageProvider(studentId));
               },
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: acceptedSessions.length + (paginatedState.hasMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == acceptedSessions.length) {
+                    return _buildLoadMoreButton(ref, studentId, paginatedState);
+                  }
+
+                  final session = acceptedSessions[index];
+                  
+                  // Create SessionModel properly with null safety
+                  final sessionModel = SessionModel(
+                    id: session['id'] as String?,
+                    mohaffezId: session['mohaffezId'] as String? ?? '',
+                    studentId: session['studentId'] as String? ?? '',
+                    mohaffezName: session['mohaffezName'] as String? ?? 'غير معروف',
+                    studentName: session['studentName'] as String? ?? '',
+                    sessionType: session['sessionType'] as String? ?? 'بيت',
+                    preferredTimeSlot: session['preferredTimeSlot'] as String? ?? '08:00',
+                    location: session['location'] as String? ?? '',
+                    sessionDate: session['sessionDate'] as DateTime?,
+                    slotStart: session['sessionDate'] as DateTime?,
+                    slotEnd: session['sessionDate'] as DateTime?,
+                    hifzAssignment: session['hifzAssignment'] as String?,
+                    murajaAssignment: session['murajaAssignment'] as String?,
+                    sessionRating: session['sessionRating'] as int? ?? 0,
+                    sessionNotes: session['sessionNotes'] as String?,
+                    status: session['status'] as String? ?? 'accepted',
+                    createdAt: (session['createdAt'] as Timestamp?)?.toDate(),
+                  );
+
+                  return _buildSessionCard(context, sessionModel);
+                },
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -109,20 +124,34 @@ class AcceptedSessionsScreen extends ConsumerWidget {
   Widget _buildSessionCard(BuildContext context, SessionModel session) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: AppTheme.accentGreen.withValues(alpha: 0.2),
           child: const Icon(Icons.school, color: AppTheme.accentGreen),
         ),
-        title: Text(session.mohaffezName),
+        title: Text(
+          session.mohaffezName,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 4),
             Text('${session.sessionType} - ${session.preferredTimeSlot}'),
-            if (session.location.isNotEmpty) // ✅ FIXED: Remove ?? operator
-              Text(
-                session.location,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            if (session.location.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  session.location,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
               ),
           ],
         ),

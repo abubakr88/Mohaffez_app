@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'firebase_options.dart';
 import 'config/app_router.dart';
 import 'shared/constants/app_theme.dart';
@@ -12,7 +13,7 @@ import 'services/cache_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     // Initialize Firebase
     if (Firebase.apps.isEmpty) {
@@ -20,24 +21,24 @@ void main() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
-    
-    // ✅ Enable Firestore offline persistence
+
+    // Enable Firestore offline persistence
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
-    
+
     // Initialize CacheService
     await CacheService.initialize();
-    
-    // ✅ Clear stale cache if auth state doesn't match
-    final hasStaleData = CacheService.getUserId() != null && 
-                         FirebaseAuth.instance.currentUser == null;
+
+    // Clear stale cache if auth state doesn't match
+    final hasStaleData = CacheService.getUserId() != null &&
+        FirebaseAuth.instance.currentUser == null;
     if (hasStaleData) {
       debugPrint('🧹 Clearing stale cache data');
       await CacheService.clearAll();
     }
-    
+
     // Set system UI overlay style
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -46,20 +47,19 @@ void main() async {
       systemNavigationBarColor: Colors.white,
       systemNavigationBarIconBrightness: Brightness.dark,
     ));
-    
+
     // Set preferred orientations (portrait only)
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-    
+
     // Run app with ProviderScope for Riverpod
     runApp(const ProviderScope(child: MyApp()));
-    
   } catch (e, stackTrace) {
     debugPrint('❌ Initialization error: $e');
     debugPrint('Stack trace: $stackTrace');
-    
+
     // Show error screen
     runApp(
       MaterialApp(
@@ -93,7 +93,6 @@ void main() async {
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () {
-                      // Restart app
                       SystemNavigator.pop();
                     },
                     icon: const Icon(Icons.refresh),
@@ -115,10 +114,14 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
-    
+
     return MaterialApp.router(
       title: 'محفظ',
       debugShowCheckedModeBanner: false,
+      
+      // Force light theme
+      themeMode: ThemeMode.light,
+      
       locale: const Locale('ar'),
       supportedLocales: const [
         Locale('ar', 'SA'),
@@ -131,14 +134,25 @@ class MyApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      
+      // Light theme configuration
       theme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppTheme.primaryAmber,
           primary: AppTheme.primaryAmber,
           secondary: AppTheme.accentGreen,
+          brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: Colors.grey.shade50,
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
         appBarTheme: const AppBarTheme(
           elevation: 0,
           centerTitle: true,
@@ -164,6 +178,7 @@ class MyApp extends ConsumerWidget {
           ),
         ),
       ),
+      
       routerConfig: router,
     );
   }

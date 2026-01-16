@@ -9,7 +9,7 @@ exports.onSessionBooked = functions.firestore
   .document('sessionRequests/{requestId}')
   .onCreate(async (snap, context) => {
     const request = snap.data();
-    const mohaffezId = request.mohaffezId;
+    const mohaffezId = request.momohaffezId;
     
     // Get Mohaffez FCM token
     const mohaffezDoc = await db.collection('users').doc(mohaffezId).get();

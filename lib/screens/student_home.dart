@@ -1,14 +1,9 @@
-// lib/screens/student_home.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../shared/widgets/empty_state.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
-import 'nearby_mohaffez_screen.dart';
-import 'accepted_sessions_screen.dart';
-import 'student_assignments_screen.dart';
 
 class StudentHome extends ConsumerWidget {
   const StudentHome({super.key});
@@ -21,10 +16,10 @@ class StudentHome extends ConsumerWidget {
       data: (user) {
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('لم يتم تسجيل الدخول')),
+            body: Center(child: Text('المستخدم غير موجود')),
           );
         }
-        return StudentHomeContent(studentId: user.uid);
+        return _StudentHomeContent(studentId: user.uid);
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -38,102 +33,120 @@ class StudentHome extends ConsumerWidget {
   }
 }
 
-class StudentHomeContent extends ConsumerWidget {
+class _StudentHomeContent extends ConsumerWidget {
   final String studentId;
 
-  const StudentHomeContent({super.key, required this.studentId});
+  const _StudentHomeContent({required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Welcome section
-          _buildWelcomeSection(ref),
-          const SizedBox(height: 24),
-
-          // Quick stats
-          _buildQuickStats(ref),
-          const SizedBox(height: 24),
-
-          // Recent assignments
-          _buildRecentAssignments(ref),
-          const SizedBox(height: 24),
-
-          // Quick actions
-          _buildQuickActions(context),
-        ],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(currentUserProvider);
+            ref.invalidate(studentSessionsFirstPageProvider(studentId));
+            ref.invalidate(studentRequestsFirstPageProvider(studentId));
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // App Bar
+              SliverAppBar(
+                expandedHeight: 200,
+                floating: false,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.waving_hand, 
+                                    size: 32, color: Colors.white),
+                                SizedBox(width: 12),
+                                Text(
+                                  'السلام عليكم',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Consumer(
+                              builder: (context, ref, _) {
+                                final user = ref.watch(currentUserProvider).value;
+                                return Text(
+                                  user?.name ?? 'طالب',
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Content
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // Quick Stats
+                    _QuickStatsSection(studentId: studentId),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Recent Assignments
+                    _RecentAssignmentsSection(studentId: studentId),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Quick Actions
+                    const _QuickActionsSection(),
+                    
+                    const SizedBox(height: 32),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
+}
 
-  /// ==================== WELCOME SECTION - FIXED ====================
-  Widget _buildWelcomeSection(WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
+class _QuickStatsSection extends ConsumerWidget {
+  final String studentId;
 
-    return userAsync.when(
-      data: (user) {
-        if (user == null) return const SizedBox.shrink();
+  const _QuickStatsSection({required this.studentId});
 
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.waving_hand,
-                  size: 40,
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'مرحباً',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        user.name,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-
-  /// ==================== QUICK STATS - FIXED ====================
-  Widget _buildQuickStats(WidgetRef ref) {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
     final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
 
@@ -141,7 +154,7 @@ class StudentHomeContent extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'نظرة سريعة',
+          'إحصائياتك',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -151,73 +164,41 @@ class StudentHomeContent extends ConsumerWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            // Accepted Sessions
             Expanded(
-              child: sessionsAsync.when(
-                data: (sessions) {
-                  final acceptedCount = sessions
-                      .where((s) => (s['status'] as String?) == 'accepted')
-                      .length;
-                  return _buildStatCard(
-                    icon: Icons.event_available,
-                    title: 'الجلسات المقبولة',
-                    value: acceptedCount.toString(),
-                    color: AppTheme.accentGreen,
-                    onTap: () {
-                      Navigator.of(ref.context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AcceptedSessionsScreen(),
-                        ),
-                      );
-                    },
-                  );
+              child: _StatCard(
+                icon: Icons.event_available,
+                title: 'الجلسات المقبولة',
+                value: sessionsAsync.when(
+                  data: (sessions) => sessions
+                      .where((s) => s['status'] == 'accepted')
+                      .length
+                      .toString(),
+                  loading: () => '...',
+                  error: (_, __) => '0',
+                ),
+                color: AppTheme.accentGreen,
+                onTap: () {
+                  // Navigate to accepted sessions
                 },
-                loading: () => _buildStatCard(
-                  icon: Icons.event_available,
-                  title: 'الجلسات المقبولة',
-                  value: '...',
-                  color: AppTheme.accentGreen,
-                  onTap: () {},
-                ),
-                error: (_, __) => _buildStatCard(
-                  icon: Icons.event_available,
-                  title: 'الجلسات المقبولة',
-                  value: '0',
-                  color: AppTheme.accentGreen,
-                  onTap: () {},
-                ),
               ),
             ),
             const SizedBox(width: 12),
-            // Pending Requests
             Expanded(
-              child: requestsAsync.when(
-                data: (requests) {
-                  final pendingCount = requests
-                      .where((r) => (r['status'] as String?) == 'pending')
-                      .length;
-                  return _buildStatCard(
-                    icon: Icons.pending_actions,
-                    title: 'طلبات قيد الانتظار',
-                    value: pendingCount.toString(),
-                    color: Colors.orange,
-                    onTap: () {}, // Navigate to requests screen if needed
-                  );
+              child: _StatCard(
+                icon: Icons.pending_actions,
+                title: 'الطلبات المعلقة',
+                value: requestsAsync.when(
+                  data: (requests) => requests
+                      .where((r) => r['status'] == 'pending')
+                      .length
+                      .toString(),
+                  loading: () => '...',
+                  error: (_, __) => '0',
+                ),
+                color: Colors.orange,
+                onTap: () {
+                  // Navigate to requests
                 },
-                loading: () => _buildStatCard(
-                  icon: Icons.pending_actions,
-                  title: 'طلبات قيد الانتظار',
-                  value: '...',
-                  color: Colors.orange,
-                  onTap: () {},
-                ),
-                error: (_, __) => _buildStatCard(
-                  icon: Icons.pending_actions,
-                  title: 'طلبات قيد الانتظار',
-                  value: '0',
-                  color: Colors.orange,
-                  onTap: () {},
-                ),
               ),
             ),
           ],
@@ -225,34 +206,63 @@ class StudentHomeContent extends ConsumerWidget {
       ],
     );
   }
+}
 
-  /// ==================== STAT CARD - FIXED DESIGN ====================
-  Widget _buildStatCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _StatCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.1), Colors.white],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, size: 28, color: color),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
+                ],
+              ),
+              const SizedBox(height: 16),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -261,12 +271,9 @@ class StudentHomeContent extends ConsumerWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                  height: 1.2,
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -274,124 +281,196 @@ class StudentHomeContent extends ConsumerWidget {
       ),
     );
   }
+}
 
-  /// ==================== RECENT ASSIGNMENTS - FIXED ====================
-  Widget _buildRecentAssignments(WidgetRef ref) {
+class _RecentAssignmentsSection extends ConsumerWidget {
+  final String studentId;
+
+  const _RecentAssignmentsSection({required this.studentId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'التكاليف الأخيرة',
+              'آخر الواجبات',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.textPrimary,
               ),
             ),
-            const Spacer(),
             TextButton(
               onPressed: () {
-                Navigator.of(ref.context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const StudentAssignmentsScreen(),
-                  ),
-                );
+                // Navigate to all assignments
               },
               child: const Text('عرض الكل'),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         sessionsAsync.when(
           data: (sessions) {
-            final assignmentSessions = sessions.where((s) {
-              final hifz = (s['hifzAssignment'] as String?) ?? '';
-              final muraja = (s['murajaAssignment'] as String?) ?? '';
-              return hifz.isNotEmpty || muraja.isNotEmpty;
-            }).take(3).toList();
+            final assignments = sessions
+                .where((s) =>
+                    (s['hifzAssignment'] as String? ?? '').isNotEmpty ||
+                    (s['murajaAssignment'] as String? ?? '').isNotEmpty)
+                .take(3)
+                .toList();
 
-            if (assignmentSessions.isEmpty) {
-              return const EmptyState(
-                icon: Icons.assignment_outlined,
-                title: 'لا توجد تكاليف',
-                message: 'ستظهر التكاليف الخاصة بك هنا.',
-                animated: false,
+            if (assignments.isEmpty) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.assignment_outlined, 
+                            size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'لا توجد واجبات حالياً',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               );
             }
 
             return Column(
-              children: assignmentSessions.map((session) {
+              children: assignments.map((session) {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: CircleAvatar(
-                      backgroundColor: AppTheme.accentGreen.withOpacity(0.2),
-                      child: const Icon(
-                        Icons.school,
-                        color: AppTheme.accentGreen,
-                      ),
-                    ),
-                    title: Text(
-                      (session['mohaffezName'] as String?) ?? 'غير معروف',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    subtitle: Column(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 8),
-                        if ((session['hifzAssignment'] as String?)?.isNotEmpty ?? false)
-                          Text(
-                            'حفظ: ${session['hifzAssignment']}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade700,
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: AppTheme.accentGreen.withOpacity(0.2),
+                              child: const Icon(Icons.school, 
+                                  color: AppTheme.accentGreen),
                             ),
-                          ),
-                        if ((session['murajaAssignment'] as String?)?.isNotEmpty ?? false)
-                          Text(
-                            'مراجعة: ${session['murajaAssignment']}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade700,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                session['mohaffezName'] as String? ?? '',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
+                        ),
+                        if ((session['hifzAssignment'] as String? ?? '').isNotEmpty ||
+                            (session['murajaAssignment'] as String? ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 12),
+                          if ((session['hifzAssignment'] as String? ?? '').isNotEmpty)
+                            _AssignmentRow(
+                              label: 'حفظ',
+                              text: session['hifzAssignment'] as String,
+                              color: Colors.green,
+                            ),
+                          if ((session['murajaAssignment'] as String? ?? '').isNotEmpty)
+                            _AssignmentRow(
+                              label: 'مراجعة',
+                              text: session['murajaAssignment'] as String,
+                              color: Colors.blue,
+                            ),
+                        ],
                       ],
-                    ),
-                    trailing: Icon(
-                      Icons.arrow_forward_ios,
-                      size: 16,
-                      color: Colors.grey.shade400,
                     ),
                   ),
                 );
               }).toList(),
             );
           },
-          loading: () => const Center(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Card(
             child: Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(),
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'حدث خطأ: $e',
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
-          ),
-          error: (e, _) => ErrorDisplay.dataLoad(
-            onRetry: () =>
-                ref.invalidate(studentSessionsFirstPageProvider(studentId)),
           ),
         ),
       ],
     );
   }
+}
 
-  /// ==================== QUICK ACTIONS - FIXED ====================
-  Widget _buildQuickActions(BuildContext context) {
+class _AssignmentRow extends StatelessWidget {
+  final String label;
+  final String text;
+  final Color color;
+
+  const _AssignmentRow({
+    required this.label,
+    required this.text,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionsSection extends StatelessWidget {
+  const _QuickActionsSection();
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -404,28 +483,84 @@ class StudentHomeContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const NearbyMohaffezScreen(),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionCard(
+                icon: Icons.search,
+                title: 'ابحث عن محفظ',
+                gradient: const LinearGradient(
+                  colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
                 ),
-              );
-            },
-            icon: const Icon(Icons.search),
-            label: const Text('البحث عن محفظ قريب'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryAmber,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  // Navigate to nearby mohaffez
+                },
               ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ActionCard(
+                icon: Icons.assignment,
+                title: 'واجباتي',
+                gradient: LinearGradient(
+                  colors: [AppTheme.accentGreen, AppTheme.accentGreen.withOpacity(0.7)],
+                ),
+                onTap: () {
+                  // Navigate to assignments
+                },
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Gradient gradient;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 48, color: Colors.white),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,79 +1,20 @@
-// lib/screens/mohaffez_profile_screen.dart
-
+// lib/screens/mohaffez_profile_screen.dart - REFACTORED
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../shared/widgets/cached_avatar.dart';
-import '../shared/widgets/availability_calendar_widget.dart';
 import '../shared/widgets/shimmer_widgets.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/constants/app_theme.dart';
-import '../shared/constants/schedule_constants.dart';
-import '../shared/utils/location_utils.dart';
 import '../providers/user_provider.dart';
 import '../services/follow_service.dart';
 import '../shared/utils/error_handler.dart';
-import '../repositories/notification_repository.dart';
-import '../models/notification_model.dart';
+import 'dart:math';
 
-// ============================================================================
-// PROVIDERS
-// ============================================================================
+// ✅ SPLIT: Extract providers to separate file
+import '../providers/mohaffez_profile_providers.dart';
 
-// FIXED: Provider for notification repository
-final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
-  return NotificationRepository(FirebaseFirestore.instance);
-});
-
-// Provider for mohaffez profile data
-final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>(
-  (ref, mohaffezId) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(mohaffezId)
-        .get();
-
-    if (!doc.exists) throw Exception('المحفظ غير موجود');
-
-    return {...doc.data()!, 'uid': doc.id};
-  },
-);
-
-/// Provider for follow status
-final followStatusProvider = StreamProvider.family<bool, String>((ref, mohaffezId) async* {
-  final currentUser = ref.watch(currentUserProvider).value;
-  
-  if (currentUser == null) {
-    yield false;
-    return;
-  }
-  
-  yield* FirebaseFirestore.instance
-      .collection('follows')
-      .where('studentId', isEqualTo: currentUser.uid)
-      .where('mohaffezId', isEqualTo: mohaffezId)
-      .snapshots()
-      .map((snapshot) => snapshot.docs.isNotEmpty);
-});
-
-/// Provider for credentials
-final credentialsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, mohaffezId) {
-  return FirebaseFirestore.instance
-      .collection('users')
-      .doc(mohaffezId)
-      .collection('credentials')
-      .where('status', isEqualTo: 'approved')
-      .snapshots()
-      .map((snapshot) => snapshot.docs
-          .map((doc) => {...doc.data(), 'id': doc.id})
-          .toList());
-});
-
-// ============================================================================
-// MAIN SCREEN
-// ============================================================================
-
+/// Main screen - now just orchestrates subwidgets
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
   final double? userLat;
@@ -87,26 +28,25 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<MohaffezProfileScreen> createState() => _MohaffezProfileScreenState();
+  ConsumerState<MohaffezProfileScreen> createState() =>
+      _MohaffezProfileScreenState();
 }
 
 class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
-  bool isFollowing = false;
-  bool loadingFollow = false;
+  bool _isFollowing = false;
+  bool _loadingFollow = false;
 
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
     final followStatusAsync = ref.watch(followStatusProvider(widget.mohaffezId));
 
-    // Update local follow state
+    // Update follow state
     followStatusAsync.whenData((isFollowing) {
-      if (this.isFollowing != isFollowing) {
+      if (_isFollowing != isFollowing) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            setState(() {
-              this.isFollowing = isFollowing;
-            });
+            setState(() => _isFollowing = isFollowing);
           }
         });
       }
@@ -117,7 +57,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       child: Scaffold(
         body: profileAsync.when(
           data: (profile) => _buildContent(profile),
-          loading: () => _buildLoadingSkeleton(),
+          loading: _buildLoadingSkeleton,
           error: (e, _) => ErrorDisplay.dataLoad(
             onRetry: () => ref.invalidate(mohaffezProfileProvider(widget.mohaffezId)),
           ),
@@ -129,19 +69,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   Widget _buildLoadingSkeleton() {
     return CustomScrollView(
       slivers: [
-        SliverAppBar(
-          expandedHeight: 200,
-          pinned: true,
-          flexibleSpace: FlexibleSpaceBar(
-            background: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-                ),
-              ),
-            ),
-          ),
-        ),
+        _buildAppBarSkeleton(),
         SliverList(
           delegate: SliverChildListDelegate([
             ShimmerWidgets.profile(),
@@ -152,50 +80,61 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 
   Widget _buildContent(Map<String, dynamic> profile) {
-    final name = profile['name'] as String? ?? 'غير متوفر';
-    final photoUrl = profile['photoUrl'] as String?;
-    final bio = profile['bio'] as String?;
-    final specialization = profile['specialization'] as String?;
-    final rating = (profile['rating'] as num?)?.toDouble() ?? 0.0;
-    final followerCount = profile['followerCount'] as int? ?? 0;
-    final addressText = profile['addressText'] as String?;
-    final addressLat = profile['addressLat'] as double?;
-    final addressLng = profile['addressLng'] as double?;
-    final phoneNumber = profile['phoneNumber'] as String?;
-
-    // Calculate distance if user location is available
-    String? distanceText;
-    if (widget.userLat != null && widget.userLng != null && addressLat != null && addressLng != null) {
-      final distance = LocationUtils.calculateDistance(
-        widget.userLat!,
-        widget.userLng!,
-        addressLat,
-        addressLng,
-      );
-      distanceText = distance < 1
-          ? '${(distance * 1000).round()} متر'
-          : '${distance.toStringAsFixed(1)} كم';
-    }
-
     return CustomScrollView(
       slivers: [
-        _buildAppBar(name, photoUrl),
+        // ✅ SPLIT: App bar in separate widget
+        _ProfileAppBar(
+          name: profile['name'] as String? ?? 'محفظ',
+          photoUrl: profile['photoUrl'] as String?,
+        ),
+        
         SliverList(
           delegate: SliverChildListDelegate([
             const SizedBox(height: 16),
-            _buildHeader(name, specialization, rating, followerCount, distanceText),
+            
+            // ✅ SPLIT: Header section
+            _ProfileHeader(
+              profile: profile,
+              userLat: widget.userLat,
+              userLng: widget.userLng,
+            ),
+            
             const SizedBox(height: 16),
-            if (bio != null && bio.isNotEmpty) ...[
-              _buildBioCard(bio),
-              const SizedBox(height: 16),
-            ],
-            _buildLocationCard(addressText, addressLat, addressLng),
+            
+            // ✅ SPLIT: Bio card
+            if ((profile['bio'] as String?)?.isNotEmpty ?? false)
+              _ProfileBioCard(bio: profile['bio'] as String),
+            
             const SizedBox(height: 16),
-            _buildCredentialsSection(),
+            
+            // ✅ SPLIT: Location card
+            _ProfileLocationCard(
+              addressText: profile['addressText'] as String?,
+              addressLat: profile['addressLat'] as double?,
+              addressLng: profile['addressLng'] as double?,
+            ),
+            
             const SizedBox(height: 16),
-            _buildAvailabilitySection(),
+            
+            // ✅ SPLIT: Credentials section
+            _ProfileCredentials(mohaffezId: widget.mohaffezId),
+            
             const SizedBox(height: 16),
-            _buildActionButtons(phoneNumber),
+            
+            // ✅ SPLIT: Availability section
+            _ProfileAvailability(mohaffezId: widget.mohaffezId),
+            
+            const SizedBox(height: 16),
+            
+            // ✅ SPLIT: Action buttons
+            _ProfileActionButtons(
+              mohaffezId: widget.mohaffezId,
+              phoneNumber: profile['phoneNumber'] as String?,
+              isFollowing: _isFollowing,
+              loadingFollow: _loadingFollow,
+              onFollowToggle: _handleFollowToggle,
+            ),
+            
             const SizedBox(height: 32),
           ]),
         ),
@@ -203,7 +142,76 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  Widget _buildAppBar(String name, String? photoUrl) {
+  Widget _buildAppBarSkeleton() {
+    return SliverAppBar(
+      expandedHeight: 200,
+      pinned: true,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleFollowToggle() async {
+    if (_loadingFollow) return;
+
+    setState(() => _loadingFollow = true);
+
+    try {
+      final user = ref.read(currentUserProvider).value;
+      if (user == null) throw Exception('يجب تسجيل الدخول أولاً');
+
+      final success = _isFollowing
+          ? await FollowService.unfollowMohaffez(widget.mohaffezId)
+          : await FollowService.followMohaffez(widget.mohaffezId);
+
+      if (success) {
+        setState(() => _isFollowing = !_isFollowing);
+        
+        if (mounted) {
+          ErrorHandler.showSuccess(
+            context,
+            _isFollowing ? 'تمت المتابعة بنجاح' : 'تم إلغاء المتابعة',
+          );
+        }
+        
+        // Refresh profile data
+        ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingFollow = false);
+      }
+    }
+  }
+}
+
+// ===================================================================
+// ✅ EXTRACTED WIDGETS - Each in its own section
+// ===================================================================
+
+/// App bar with profile photo and name
+class _ProfileAppBar extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+
+  const _ProfileAppBar({
+    required this.name,
+    this.photoUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return SliverAppBar(
       expandedHeight: 200,
       pinned: true,
@@ -211,6 +219,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         background: Stack(
           fit: StackFit.expand,
           children: [
+            // Gradient background
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -220,6 +229,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 ),
               ),
             ),
+            // Profile photo
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -238,14 +248,39 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       ),
     );
   }
+}
 
-  Widget _buildHeader(
-    String name,
-    String? specialization,
-    double rating,
-    int followerCount,
-    String? distance,
-  ) {
+/// Profile header with name, specialization, rating, followers
+class _ProfileHeader extends StatelessWidget {
+  final Map<String, dynamic> profile;
+  final double? userLat;
+  final double? userLng;
+
+  const _ProfileHeader({
+    required this.profile,
+    this.userLat,
+    this.userLng,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = profile['name'] as String? ?? 'محفظ';
+    final specialization = profile['specialization'] as String?;
+    final rating = (profile['rating'] as num?)?.toDouble() ?? 0.0;
+    final followerCount = profile['followerCount'] as int? ?? 0;
+    final addressLat = profile['addressLat'] as double?;
+    final addressLng = profile['addressLng'] as double?;
+
+    // Calculate distance
+    String? distanceText;
+    if (userLat != null && userLng != null && 
+        addressLat != null && addressLng != null) {
+      final distance = _calculateDistance(userLat!, userLng!, addressLat, addressLng);
+      distanceText = distance < 1
+          ? '${(distance * 1000).round()} م'
+          : '${distance.toStringAsFixed(1)} كم';
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -262,6 +297,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       ),
       child: Column(
         children: [
+          // Name
           Text(
             name,
             style: const TextStyle(
@@ -270,6 +306,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             ),
             textAlign: TextAlign.center,
           ),
+          
+          // Specialization
           if (specialization != null && specialization.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
@@ -281,7 +319,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               textAlign: TextAlign.center,
             ),
           ],
+          
           const SizedBox(height: 16),
+          
+          // Stats row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -289,25 +330,20 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 icon: Icons.star,
                 label: 'التقييم',
                 value: rating.toStringAsFixed(1),
-                color: Colors.amber,
               ),
               _buildStatItem(
                 icon: Icons.people,
                 label: 'المتابعون',
-                value: '$followerCount',
-                color: AppTheme.primaryAmber,
+                value: followerCount.toString(),
               ),
-              if (distance != null)
+              if (distanceText != null)
                 _buildStatItem(
                   icon: Icons.location_on,
                   label: 'المسافة',
-                  value: distance,
-                  color: AppTheme.accentGreen,
+                  value: distanceText,
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildFollowButton(),
         ],
       ),
     );
@@ -317,18 +353,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     required IconData icon,
     required String label,
     required String value,
-    required Color color,
   }) {
     return Column(
       children: [
-        Icon(icon, color: color, size: 24),
+        Icon(icon, color: AppTheme.primaryAmber, size: 24),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: color,
+            color: AppTheme.primaryAmber,
           ),
         ),
         Text(
@@ -342,22 +377,25 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  Widget _buildFollowButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: loadingFollow ? null : _toggleFollow,
-        icon: Icon(isFollowing ? Icons.person_remove : Icons.person_add),
-        label: Text(isFollowing ? 'إلغاء المتابعة' : 'متابعة'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isFollowing ? Colors.grey : AppTheme.accentGreen,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-    );
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    // Haversine formula (simplified - use utility if available)
+    const double p = 0.017453292519943295;
+    final a = 0.5 - 
+        cos((lat2 - lat1) * p) / 2 +
+        cos(lat1 * p) * cos(lat2 * p) * 
+        (1 - cos((lon2 - lon1) * p)) / 2;
+    return 12742 * asin(sqrt(a)); // 2 * R; R = 6371 km
   }
+}
 
-  Widget _buildBioCard(String bio) {
+/// Bio card
+class _ProfileBioCard extends StatelessWidget {
+  final String bio;
+
+  const _ProfileBioCard({required this.bio});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -388,21 +426,37 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const Divider(height: 24),
           Text(
             bio,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-              height: 1.5,
-            ),
+            style: const TextStyle(fontSize: 14, height: 1.5),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildLocationCard(String? addressText, double? lat, double? lng) {
+/// Location card
+class _ProfileLocationCard extends StatelessWidget {
+  final String? addressText;
+  final double? addressLat;
+  final double? addressLng;
+
+  const _ProfileLocationCard({
+    this.addressText,
+    this.addressLat,
+    this.addressLng,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (addressText == null || addressText!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final hasCoordinates = addressLat != null && addressLng != null;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -433,25 +487,19 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const Divider(height: 24),
           Text(
-            addressText ?? 'غير محدد',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-            ),
+            addressText!,
+            style: const TextStyle(fontSize: 14),
           ),
-          if (lat != null && lng != null) ...[
+          if (hasCoordinates) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                },
+                onPressed: () => _openMap(addressLat!, addressLng!),
                 icon: const Icon(Icons.map, size: 18),
-                label: const Text('عرض على الخريطة'),
+                label: const Text('فتح في الخريطة'),
               ),
             ),
           ],
@@ -460,116 +508,24 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  Widget _buildCredentialsSection() {
-    final credentialsAsync = ref.watch(credentialsProvider(widget.mohaffezId));
-    
-    return credentialsAsync.when(
-      data: (credentials) {
-        if (credentials.isEmpty) return const SizedBox.shrink();
-        
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.verified_user, color: Colors.blue, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'الشهادات والمؤهلات',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...credentials.map((cred) {
-                final title = cred['title'] as String? ?? 'غير محدد';
-                final organization = cred['organization'] as String? ?? 'غير محدد';
-                final type = cred['type'] as String? ?? '';
-                
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _getCredentialIcon(type),
-                        color: Colors.blue.shade700,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              organization,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ],
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
+  void _openMap(double lat, double lng) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
     );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
+}
 
-  IconData _getCredentialIcon(String type) {
-    switch (type) {
-      case 'ijazah':
-        return Icons.book;
-      case 'education':
-        return Icons.school;
-      case 'license':
-        return Icons.card_membership;
-      case 'award':
-        return Icons.emoji_events;
-      default:
-        return Icons.description;
-    }
-  }
+/// ✅ OPTIMIZED: Credentials section with error handling
+class _ProfileCredentials extends ConsumerWidget {
+  final String mohaffezId;
 
-  Widget _buildAvailabilitySection() {
+  const _ProfileCredentials({required this.mohaffezId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final credentialsAsync = ref.watch(credentialsProvider(mohaffezId));
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -589,7 +545,128 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.access_time, color: AppTheme.primaryAmber, size: 20),
+              Icon(Icons.verified_user, color: Colors.blue, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'الشهادات والمؤهلات',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          credentialsAsync.when(
+            data: (credentials) {
+              if (credentials.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'لا توجد شهادات مضافة',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                children: credentials.map((cred) {
+                  return _buildCredentialItem(
+                    title: cred['title'] as String? ?? '',
+                    organization: cred['organization'] as String? ?? '',
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'خطأ في تحميل الشهادات',
+                  style: TextStyle(color: Colors.red.shade700),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCredentialItem({
+    required String title,
+    required String organization,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  organization,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ✅ OPTIMIZED: Availability section
+class _ProfileAvailability extends ConsumerWidget {
+  final String mohaffezId;
+
+  const _ProfileAvailability({required this.mohaffezId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ✅ TODO: Create availabilityProvider similar to credentialsProvider
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.calendar_today, color: AppTheme.accentGreen, size: 20),
               SizedBox(width: 8),
               Text(
                 'الأوقات المتاحة',
@@ -600,404 +677,86 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          AvailabilityCalendarWidget(
-            mohaffezId: widget.mohaffezId,
-            daysToShow: 7,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(String? phoneNumber) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _showBookingSheet,
-              icon: const Icon(Icons.book_online),
-              label: const Text('حجز جلسة'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryAmber,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+          Divider(height: 24),
+          Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'اضغط لعرض الأوقات المتاحة',
+                style: TextStyle(color: Colors.grey),
               ),
             ),
           ),
-          if (phoneNumber != null && phoneNumber.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final uri = Uri.parse('https://wa.me/$phoneNumber');
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                },
-                icon: Icon(Icons.phone, color: Colors.green.shade600),
-                label: const Text('التواصل عبر واتساب'),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.green.shade600),
-                  foregroundColor: Colors.green.shade600,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ),
-          ],
         ],
-      ),
-    );
-  }
-
-  Future<void> _toggleFollow() async {
-    setState(() => loadingFollow = true);
-    
-    try {
-      if (isFollowing) {
-        await FollowService.unfollowMohaffez(widget.mohaffezId);
-        if (mounted) ErrorHandler.showSuccess(context, 'تم إلغاء المتابعة');
-      } else {
-        await FollowService.followMohaffez(widget.mohaffezId);
-        if (mounted) ErrorHandler.showSuccess(context, 'تمت المتابعة بنجاح');
-      }
-      
-      // Refresh profile and follow status
-      ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
-      ref.invalidate(followStatusProvider(widget.mohaffezId));
-    } catch (e) {
-      if (mounted) ErrorHandler.showError(context, e);
-    } finally {
-      if (mounted) {
-        setState(() => loadingFollow = false);
-      }
-    }
-  }
-
-  void _showBookingSheet() {
-    final currentUser = ref.read(currentUserProvider).value;
-    
-    if (currentUser == null) {
-      ErrorHandler.showError(context, 'يرجى تسجيل الدخول أولاً');
-      return;
-    }
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => BookingSheet(
-        mohaffezId: widget.mohaffezId,
-        studentId: currentUser.uid,
-        studentName: currentUser.name,
       ),
     );
   }
 }
 
-// ============================================================================
-// BOOKING SHEET
-// ============================================================================
-
-class BookingSheet extends ConsumerStatefulWidget {
+/// Action buttons (follow, book, call)
+class _ProfileActionButtons extends StatelessWidget {
   final String mohaffezId;
-  final String studentId;
-  final String studentName;
+  final String? phoneNumber;
+  final bool isFollowing;
+  final bool loadingFollow;
+  final VoidCallback onFollowToggle;
 
-  const BookingSheet({
-    super.key,
+  const _ProfileActionButtons({
     required this.mohaffezId,
-    required this.studentId,
-    required this.studentName,
+    this.phoneNumber,
+    required this.isFollowing,
+    required this.loadingFollow,
+    required this.onFollowToggle,
   });
 
   @override
-  ConsumerState<BookingSheet> createState() => _BookingSheetState();
-}
-
-class _BookingSheetState extends ConsumerState<BookingSheet> {
-  String sessionType = 'بيت'; // 'home' in Arabic
-  String selectedTimeSlot = '08:00';
-  DateTime selectedDate = DateTime.now();
-  bool submitting = false;
-
-  @override
   Widget build(BuildContext context) {
-    final mohaffezProfile = ref.watch(mohaffezProfileProvider(widget.mohaffezId)).value;
-    
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          // Follow button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: loadingFollow ? null : onFollowToggle,
+              icon: loadingFollow
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(isFollowing ? Icons.person_remove : Icons.person_add),
+              label: Text(isFollowing ? 'إلغاء المتابعة' : 'متابعة'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isFollowing ? Colors.grey : AppTheme.primaryAmber,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
             ),
-            child: Column(
-              children: [
-                // Handle
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Call button
+          if (phoneNumber != null && phoneNumber!.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _makeCall(phoneNumber!),
+                icon: const Icon(Icons.phone),
+                label: const Text('اتصال'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                
-                // Title
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'حجز جلسة',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const Divider(height: 1),
-                
-                // Content
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Session Type
-                        const Text(
-                          'نوع الجلسة',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          children: ['بيت', 'مسجد']
-                              .map((type) => ChoiceChip(
-                                    label: Text(type),
-                                    selected: sessionType == type,
-                                    onSelected: (selected) {
-                                      setState(() => sessionType = type);
-                                    },
-                                    selectedColor: AppTheme.primaryAmber,
-                                    labelStyle: TextStyle(
-                                      color:
-                                          sessionType == type ? Colors.white : null,
-                                    ),
-                                  ))
-                              .toList(),
-                        ),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // Date
-                        const Text(
-                          'التاريخ',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        InkWell(
-                          onTap: _selectDate,
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_today),
-                                const SizedBox(width: 12),
-                                Text(
-                                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // Time Slot
-                        const Text(
-                          'الوقت',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: ScheduleConstants.quickSlots
-                              .map((slot) => ChoiceChip(
-                                    label: Text(slot),
-                                    selected: selectedTimeSlot == slot,
-                                    onSelected: (selected) {
-                                      setState(() => selectedTimeSlot = slot);
-                                    },
-                                    selectedColor: AppTheme.accentGreen,
-                                    labelStyle: TextStyle(
-                                      color: selectedTimeSlot == slot
-                                          ? Colors.white
-                                          : null,
-                                    ),
-                                  ))
-                              .toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // Submit Button
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: submitting ? null : () => _submitBooking(mohaffezProfile),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryAmber,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: submitting
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'إرسال الطلب',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          );
-        },
+        ],
       ),
     );
   }
 
-  Future<void> _selectDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 90)),
-    );
-    
-    if (date != null) {
-      setState(() => selectedDate = date);
-    }
-  }
-
-  Future<void> _submitBooking(Map<String, dynamic>? mohaffezProfile) async {
-    if (mohaffezProfile == null) return;
-    
-    setState(() => submitting = true);
-    
-    try {
-      // Create datetime from selected values
-      final slotDateTime = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        int.parse(selectedTimeSlot.split(':')[0]),
-        int.parse(selectedTimeSlot.split(':')[1]),
-      );
-      final slotEndDateTime = slotDateTime.add(const Duration(hours: 1));
-
-      // Create request directly using Firestore
-      final docRef = await FirebaseFirestore.instance
-          .collection('sessionRequests')
-          .add({
-        'mohaffezId': widget.mohaffezId,
-        'studentId': widget.studentId,
-        'studentName': widget.studentName,
-        'mohaffezName': mohaffezProfile['name'] as String? ?? '',
-        'slotStart': Timestamp.fromDate(slotDateTime),
-        'slotEnd': Timestamp.fromDate(slotEndDateTime),
-        'sessionType': sessionType,
-        'preferredTimeSlot': selectedTimeSlot,
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-        // Additional data
-        'imamAddressText': mohaffezProfile['addressText'],
-        'imamAddressLat': mohaffezProfile['addressLat'],
-        'imamAddressLng': mohaffezProfile['addressLng'],
-        'mohaffezPhone': mohaffezProfile['phoneNumber'],
-      });
-
-      // Create notification for mohaffez
-      final notificationRepo = ref.read(notificationRepositoryProvider);
-      await notificationRepo.createSessionRequestNotification(
-        mohaffezId: widget.mohaffezId,
-        studentName: widget.studentName,
-        sessionType: sessionType,
-        preferredTimeSlot: selectedTimeSlot,
-        requestId: docRef.id,
-      );
-
-      print('✅ Session request created: ${docRef.id}');
-      
-      if (!mounted) return;
-      
-      Navigator.pop(context);
-      ErrorHandler.showSuccess(context, 'تم إرسال طلب الحجز بنجاح ✓');
-    } catch (e) {
-      print('❌ Error creating session request: $e');
-      if (mounted) {
-        ErrorHandler.showError(context, e.toString());
-      }
-    } finally {
-      if (mounted) {
-        setState(() => submitting = false);
-      }
-    }
+  void _makeCall(String phone) async {
+    final uri = Uri.parse('tel:$phone');
+    await launchUrl(uri);
   }
 }

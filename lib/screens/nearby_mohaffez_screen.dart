@@ -1,435 +1,329 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
-import '../shared/widgets/cached_avatar.dart';
-import '../shared/widgets/empty_state.dart';
-import '../shared/widgets/shimmer_widgets.dart';
-import '../shared/widgets/error_widgets.dart';
 import '../shared/constants/app_theme.dart';
-import '../shared/utils/location_utils.dart';
-import 'mohaffez_profile_screen.dart';
-
-// Model for mohaffez with distance
-class MohaffezWithDistance {
-  final String uid;
-  final String name;
-  final String? photoUrl;
-  final String? bio;
-  final String? specialization;
-  final double? rating;
-  final int followerCount;
-  final double? addressLat;
-  final double? addressLng;
-  final String? addressText;
-  final double distance;
-
-  MohaffezWithDistance({
-    required this.uid,
-    required this.name,
-    this.photoUrl,
-    this.bio,
-    this.specialization,
-    this.rating,
-    required this.followerCount,
-    this.addressLat,
-    this.addressLng,
-    this.addressText,
-    required this.distance,
-  });
-
-  factory MohaffezWithDistance.fromFirestore(
-    DocumentSnapshot doc,
-    double userLat,
-    double userLng,
-  ) {
-    final data = doc.data() as Map<String, dynamic>;
-    final mohaffezLat = data['addressLat'] as double?;
-    final mohaffezLng = data['addressLng'] as double?;
-
-    double distance = 0;
-    if (mohaffezLat != null && mohaffezLng != null) {
-      distance = LocationUtils.calculateDistance(
-        userLat,
-        userLng,
-        mohaffezLat,
-        mohaffezLng,
-      );
-    }
-
-    return MohaffezWithDistance(
-      uid: doc.id,
-      name: data['name'] as String? ?? 'بدون اسم',
-      photoUrl: data['photoUrl'] as String?,
-      bio: data['bio'] as String?,
-      specialization: data['specialization'] as String?,
-      rating: (data['rating'] as num?)?.toDouble(),
-      followerCount: data['followerCount'] as int? ?? 0,
-      addressLat: mohaffezLat,
-      addressLng: mohaffezLng,
-      addressText: data['addressText'] as String?,
-      distance: distance,
-    );
-  }
-}
-
-// Provider for nearby mohaffez
-final nearbyMohaffezProvider = FutureProvider.family<List<MohaffezWithDistance>, (double, double)>(
-  (ref, coords) async {
-    final (userLat, userLng) = coords;
-    
-    // Query mohaffez with location
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .where('role', isEqualTo: 'mohaffez')
-        .where('addressLat', isNotEqualTo: null)
-        .get();
-
-    final mohaffezList = snapshot.docs
-        .map((doc) => MohaffezWithDistance.fromFirestore(doc, userLat, userLng))
-        .where((m) => m.distance <= 50) // Within 50km
-        .toList();
-
-    return mohaffezList;
-  },
-);
-
-// Sort mode provider
-enum SortMode { distance, rating, followers }
-
-final sortModeProvider = StateProvider<SortMode>((ref) => SortMode.distance);
+import '../shared/widgets/cached_avatar.dart';
 
 class NearbyMohaffezScreen extends ConsumerStatefulWidget {
   final double? userLat;
   final double? userLng;
 
-  const NearbyMohaffezScreen({
-    super.key,
-    this.userLat,
-    this.userLng,
-  });
+  const NearbyMohaffezScreen({super.key, this.userLat, this.userLng});
 
   @override
   ConsumerState<NearbyMohaffezScreen> createState() => _NearbyMohaffezScreenState();
 }
 
 class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
-  Position? _currentPosition;
-  bool _loadingLocation = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.userLat == null || widget.userLng == null) {
-      _getCurrentLocation();
-    } else {
-      _currentPosition = Position(
-        latitude: widget.userLat!,
-        longitude: widget.userLng!,
-        timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        heading: 0,
-        speed: 0,
-        speedAccuracy: 0,
-        altitudeAccuracy: 0,
-        headingAccuracy: 0,
-      );
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    setState(() => _loadingLocation = true);
-
-    try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('خدمات الموقع معطلة');
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        throw Exception('لم يتم منح إذن الوصول للموقع');
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-      setState(() => _currentPosition = position);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: ${e.toString()}')),
-        );
-      }
-    } finally {
-      setState(() => _loadingLocation = false);
-    }
-  }
+  String selectedFilter = 'distance'; // distance, rating, followers
 
   @override
   Widget build(BuildContext context) {
-    if (_loadingLocation) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('محفظون قريبون')),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('جاري تحديد موقعك...'),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_currentPosition == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('محفظون قريبون')),
-        body: ErrorDisplay.locationDisabled(
-          onRetry: _getCurrentLocation,
-        ),
-      );
-    }
-
-    return _buildContent();
-  }
-
-  Widget _buildContent() {
-    final sortMode = ref.watch(sortModeProvider);
-    final mohaffezAsync = ref.watch(
-      nearbyMohaffezProvider((_currentPosition!.latitude, _currentPosition!.longitude)),
-    );
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('محفظون قريبون'),
-          actions: [
-            PopupMenuButton<SortMode>(
-              icon: const Icon(Icons.sort),
-              onSelected: (mode) {
-                ref.read(sortModeProvider.notifier).state = mode;
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: SortMode.distance,
+        body: CustomScrollView(
+          slivers: [
+            // Search AppBar
+            SliverAppBar(
+              expandedHeight: 120,
+              floating: true,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'ابحث عن محفظ قريب',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'اعثر على معلم القرآن المناسب',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Filter Chips
+            SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.location_on,
-                        color: sortMode == SortMode.distance ? AppTheme.primaryAmber : null,
+                      _FilterChip(
+                        label: 'الأقرب',
+                        icon: Icons.location_on,
+                        isSelected: selectedFilter == 'distance',
+                        onTap: () => setState(() => selectedFilter = 'distance'),
                       ),
                       const SizedBox(width: 8),
-                      const Text('الأقرب'),
+                      _FilterChip(
+                        label: 'الأعلى تقييماً',
+                        icon: Icons.star,
+                        isSelected: selectedFilter == 'rating',
+                        onTap: () => setState(() => selectedFilter = 'rating'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'الأكثر متابعة',
+                        icon: Icons.people,
+                        isSelected: selectedFilter == 'followers',
+                        onTap: () => setState(() => selectedFilter = 'followers'),
+                      ),
                     ],
                   ),
                 ),
-                PopupMenuItem(
-                  value: SortMode.rating,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.star,
-                        color: sortMode == SortMode.rating ? AppTheme.primaryAmber : null,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text('الأعلى تقييماً'),
-                    ],
-                  ),
+              ),
+            ),
+
+            // Mohaffez List
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    // Mock data - replace with actual provider
+                    return _MohaffezCard(
+                      name: 'الشيخ محمد أحمد',
+                      specialization: 'متخصص في التجويد والقراءات',
+                      distance: 2.5,
+                      rating: 4.8,
+                      followerCount: 120,
+                      photoUrl: null,
+                      onTap: () {
+                        // Navigate to profile
+                      },
+                    );
+                  },
+                  childCount: 5, // Replace with actual count
                 ),
-                PopupMenuItem(
-                  value: SortMode.followers,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.people,
-                        color: sortMode == SortMode.followers ? AppTheme.primaryAmber : null,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text('الأكثر متابعة'),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
-        ),
-        body: mohaffezAsync.when(
-          data: (mohaffezList) {
-            if (mohaffezList.isEmpty) {
-              return const EmptyState(
-                icon: Icons.person_search,
-                title: 'لا يوجد محفظون قريبون',
-                message: 'لا يوجد محفظون في نطاق 50 كم من موقعك الحالي.',
-                animated: true,
-              );
-            }
-
-            // Sort list based on selected mode
-            final sortedList = List<MohaffezWithDistance>.from(mohaffezList);
-            switch (sortMode) {
-              case SortMode.distance:
-                sortedList.sort((a, b) => a.distance.compareTo(b.distance));
-                break;
-              case SortMode.rating:
-                sortedList.sort((a, b) {
-                  final ratingA = a.rating ?? 0;
-                  final ratingB = b.rating ?? 0;
-                  return ratingB.compareTo(ratingA);
-                });
-                break;
-              case SortMode.followers:
-                sortedList.sort((a, b) => b.followerCount.compareTo(a.followerCount));
-                break;
-            }
-
-            return RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(nearbyMohaffezProvider);
-              },
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: sortedList.length,
-                itemBuilder: (context, index) {
-                  final mohaffez = sortedList[index];
-                  return _buildMohaffezCard(mohaffez);
-                },
-              ),
-            );
-          },
-          loading: () => ShimmerWidgets.list(
-            itemCount: 5,
-            itemBuilder: () => ShimmerWidgets.listItem(
-              showAvatar: true,
-              lines: 3,
-            ),
-          ),
-          error: (e, _) => ErrorDisplay.dataLoad(
-            onRetry: () => ref.invalidate(nearbyMohaffezProvider),
-          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildMohaffezCard(MohaffezWithDistance mohaffez) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MohaffezProfileScreen(
-                mohaffezId: mohaffez.uid,
-                userLat: _currentPosition?.latitude,
-                userLng: _currentPosition?.longitude,
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryAmber : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.primaryAmber.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey.shade700,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
               ),
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MohaffezCard extends StatelessWidget {
+  final String name;
+  final String? specialization;
+  final double distance;
+  final double rating;
+  final int followerCount;
+  final String? photoUrl;
+  final VoidCallback onTap;
+
+  const _MohaffezCard({
+    required this.name,
+    this.specialization,
+    required this.distance,
+    required this.rating,
+    required this.followerCount,
+    this.photoUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              CachedAvatar(
-                imageUrl: mohaffez.photoUrl,
-                radius: 32,
-                semanticLabel: 'صورة ${mohaffez.name}',
+              Hero(
+                tag: 'mohaffez_$name',
+                child: CachedAvatar(
+                  imageUrl: photoUrl,
+                  radius: 36,
+                  semanticLabel: name,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      mohaffez.name,
+                      name,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (mohaffez.specialization?.isNotEmpty ?? false) ...[
+                    if (specialization?.isNotEmpty ?? false) ...[
                       const SizedBox(height: 4),
                       Text(
-                        mohaffez.specialization!,
+                        specialization!,
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey.shade600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
-                        // Distance
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.grey.shade600,
+                        _InfoBadge(
+                          icon: Icons.location_on,
+                          label: distance < 1
+                              ? '${(distance * 1000).round()} م'
+                              : '${distance.toStringAsFixed(1)} كم',
+                          color: Colors.blue,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          mohaffez.distance < 1
-                              ? '${(mohaffez.distance * 1000).round()} م'
-                              : '${mohaffez.distance.toStringAsFixed(1)} كم',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
+                        const SizedBox(width: 12),
+                        _InfoBadge(
+                          icon: Icons.star,
+                          label: rating.toStringAsFixed(1),
+                          color: Colors.amber,
                         ),
-                        const SizedBox(width: 16),
-                        // Rating
-                        if (mohaffez.rating != null) ...[
-                          const Icon(
-                            Icons.star,
-                            size: 14,
-                            color: Colors.amber,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            mohaffez.rating!.toStringAsFixed(1),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                        ],
-                        // Followers
-                        Icon(
-                          Icons.people,
-                          size: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${mohaffez.followerCount}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
+                        const SizedBox(width: 12),
+                        _InfoBadge(
+                          icon: Icons.people,
+                          label: '$followerCount',
+                          color: Colors.green,
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Colors.grey.shade400,
-              ),
+              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey.shade400),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _InfoBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _InfoBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

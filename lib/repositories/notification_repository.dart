@@ -137,17 +137,20 @@ class NotificationRepository with FirestorePaginationMixin {
   }
 
   /// Mark all notifications as read for a user
+  /// ✅ OPTIMIZED: Mark all as read with batch
   Future<void> markAllAsRead(String userId) async {
     final batch = firestore.batch();
     final snapshot = await firestore
         .collection('notifications')
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
+        .limit(500) // Firestore batch limit
         .get();
 
     for (final doc in snapshot.docs) {
       batch.update(doc.reference, {'isRead': true});
     }
+
     await batch.commit();
   }
 
@@ -273,4 +276,6 @@ class NotificationRepository with FirestorePaginationMixin {
     });
     return docRef.id;
   }
+
+
 }

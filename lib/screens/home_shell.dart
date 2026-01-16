@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'student_home.dart';
-import 'mohaffez_home.dart';
-import 'profile_screen.dart';
-import 'notifications_screen.dart';
-import 'nearby_mohaffez_screen.dart';
 import '../shared/widgets/offline_banner.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';

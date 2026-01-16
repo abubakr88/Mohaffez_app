@@ -1,20 +1,32 @@
-// lib/screens/notifications_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/notification_provider_paginated.dart'; // ✅ Only this one
-import '../providers/user_provider.dart';
-import '../shared/widgets/paginated_list_view.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
-import '../shared/widgets/empty_state_illustrations.dart';
+import '../providers/notification_provider_paginated.dart';
+import '../providers/user_provider.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider).value;
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+}
 
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  String selectedFilter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    // Configure timeago for Arabic
+    timeago.setLocaleMessages('ar', timeago.ArMessages());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider).value;
+    
     if (user == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -27,122 +39,246 @@ class NotificationsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('الإشعارات ${unreadCount > 0 ? '($unreadCount)' : ''}'),
-          actions: [
-            // Mark all as read
-            if (paginatedState.items.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.done_all),
-                tooltip: 'تعليم الكل كمقروء',
-                onPressed: () {
-                  ref.read(notificationActionsProvider)
-                      .markAllAsRead(user.uid);
-                },
+        body: CustomScrollView(
+          slivers: [
+            // Modern App Bar
+            SliverAppBar(
+              expandedHeight: 140,
+              floating: true,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'الإشعارات',
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  if (unreadCount > 0)
+                                    Text(
+                                      '$unreadCount غير مقروءة',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white.withOpacity(0.9),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (paginatedState.items.isNotEmpty)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.done_all,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () {
+                                      ref
+                                          .read(notificationActionsProvider)
+                                          .markAllAsRead(user.uid);
+                                    },
+                                    tooltip: 'تحديد الكل كمقروء',
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            // Filter menu
-            PopupMenuButton<NotificationFilter>(
-              icon: const Icon(Icons.filter_list),
-              onSelected: (filter) {
-                ref.read(notificationFilterProvider.notifier).state = filter;
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: NotificationFilter.all,
-                  child: Text('جميع الإشعارات'),
-                ),
-                const PopupMenuItem(
-                  value: NotificationFilter.sessionRequest,
-                  child: Text('طلبات الجلسات'),
-                ),
-                const PopupMenuItem(
-                  value: NotificationFilter.sessionAccepted,
-                  child: Text('جلسات مقبولة'),
-                ),
-                const PopupMenuItem(
-                  value: NotificationFilter.assignmentUpdated,
-                  child: Text('تحديث الواجبات'),
-                ),
-                const PopupMenuItem(
-                  value: NotificationFilter.follow,
-                  child: Text('متابعات جديدة'),
-                ),
-              ],
             ),
+
+            // Filter Chips
+            SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'الكل',
+                        count: paginatedState.items.length,
+                        isSelected: selectedFilter == 'all',
+                        onTap: () => setState(() => selectedFilter = 'all'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'الجلسات',
+                        isSelected: selectedFilter == 'session',
+                        onTap: () => setState(() => selectedFilter = 'session'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'المتابعات',
+                        isSelected: selectedFilter == 'follow',
+                        onTap: () => setState(() => selectedFilter = 'follow'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Notifications List
+            if (paginatedState.items.isEmpty && !paginatedState.isLoadingMore)
+              const SliverFillRemaining(
+                child: EmptyState(
+                  icon: Icons.notifications_none,
+                  title: 'لا توجد إشعارات',
+                  message: 'ستظهر إشعاراتك هنا',
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index >= paginatedState.items.length) {
+                        return paginatedState.isLoadingMore
+                            ? const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            : const SizedBox.shrink();
+                      }
+
+                      final notification = paginatedState.items[index];
+                      return _NotificationCard(
+                        notification: notification,
+                        onTap: () {
+                          if (!notification.isRead) {
+                            ref
+                                .read(notificationActionsProvider)
+                                .markAsRead(user.uid, notification.id!);
+                          }
+                          // Navigate based on type
+                        },
+                        onDismiss: () {
+                          ref
+                              .read(notificationActionsProvider)
+                              .deleteNotification(user.uid, notification.id!);
+                        },
+                      );
+                    },
+                    childCount: paginatedState.items.length +
+                        (paginatedState.hasMore ? 1 : 0),
+                  ),
+                ),
+              ),
           ],
         ),
-        body: paginatedState.items.isEmpty && !paginatedState.isLoadingMore
-            ? IllustratedEmptyState(
-                illustration: EmptyStateIllustrations.noNotifications(),
-                title: 'لا توجد إشعارات',
-                message: 'سيتم عرض الإشعارات الخاصة بك هنا',
-              )
-            : PaginatedListView(
-                items: paginatedState.items,
-                hasMore: paginatedState.hasMore,
-                isLoadingMore: paginatedState.isLoadingMore,
-                error: paginatedState.error,
-                itemBuilder: (context, notification, index) {
-                  return _NotificationTile(
-                    notification: notification,
-                    onTap: () {
-                      if (!notification.isRead) {
-                        ref.read(notificationActionsProvider)
-                            .markAsRead(user.uid, notification.id!);
-                      }
-                      // Navigate based on type
-                      _handleNotificationTap(context, notification);
-                    },
-                    onDismiss: () {
-                      ref.read(notificationActionsProvider)
-                          .deleteNotification(user.uid, notification.id!);
-                    },
-                  );
-                },
-                onLoadMore: () {
-                  return ref
-                      .read(paginatedNotificationsProvider(user.uid).notifier)
-                      .loadMore();
-                },
-                onRefresh: () async {
-                  return ref
-                      .read(paginatedNotificationsProvider(user.uid).notifier)
-                      .refresh();
-                },
-              ),
       ),
     );
   }
+}
 
-  void _handleNotificationTap(BuildContext context, notification) {
-    // Navigate based on notification type
-    switch (notification.type) {
-      case 'session_request':
-        // Navigate to pending requests screen
-        break;
-      case 'session_accepted':
-        // Navigate to session details
-        break;
-      case 'assignment_updated':
-        // Navigate to assignments
-        break;
-      case 'follow':
-        // Navigate to profile
-        break;
-    }
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final int? count;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    this.count,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryAmber : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.primaryAmber.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+              ),
+            ),
+            if (count != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.3)
+                      : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 
-// ============================================================================
-// NOTIFICATION TILE WIDGET
-// ============================================================================
-
-class _NotificationTile extends StatelessWidget {
+class _NotificationCard extends StatelessWidget {
   final dynamic notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
 
-  const _NotificationTile({
+  const _NotificationCard({
     required this.notification,
     required this.onTap,
     required this.onDismiss,
@@ -150,69 +286,100 @@ class _NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = _getNotificationColor(notification.type);
+    final icon = _getNotificationIcon(notification.type);
+
     return Dismissible(
       key: Key(notification.id!),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
-        color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete, color: Colors.white, size: 28),
       ),
       onDismissed: (_) => onDismiss(),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: notification.isRead ? Colors.white : Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: _getNotificationColor(notification.type),
-            child: Icon(
-              _getNotificationIcon(notification.type),
-              color: Colors.white,
-            ),
-          ),
-          title: Text(
-            notification.title ?? '',
-            style: TextStyle(
-              fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
-            ),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(notification.body ?? ''),
-              const SizedBox(height: 4),
-              Text(
-                _formatTimestamp(notification.createdAt),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-          trailing: !notification.isRead
-              ? Container(
-                  width: 12,
-                  height: 12,
-                  decoration: const BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                )
-              : null,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: notification.isRead ? 1 : 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: notification.isRead
+                  ? Colors.white
+                  : color.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: notification.isRead
+                    ? Colors.grey.shade200
+                    : color.withOpacity(0.3),
+                width: notification.isRead ? 1 : 2,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        notification.title ?? '',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: notification.isRead
+                              ? FontWeight.w600
+                              : FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        notification.body ?? '',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _formatTimestamp(notification.createdAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!notification.isRead)
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -250,20 +417,6 @@ class _NotificationTile extends StatelessWidget {
 
   String _formatTimestamp(DateTime? timestamp) {
     if (timestamp == null) return '';
-
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inMinutes < 1) {
-      return 'الآن';
-    } else if (difference.inHours < 1) {
-      return 'منذ ${difference.inMinutes} دقيقة';
-    } else if (difference.inDays < 1) {
-      return 'منذ ${difference.inHours} ساعة';
-    } else if (difference.inDays < 7) {
-      return 'منذ ${difference.inDays} يوم';
-    } else {
-      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
-    }
+    return timeago.format(timestamp, locale: 'ar');
   }
 }

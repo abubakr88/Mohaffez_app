@@ -448,4 +448,22 @@ class SessionRepository {
   Future<void> deleteRequest(String requestId) async {
     await _firestore.collection('sessionRequests').doc(requestId).delete();
   }
+
+    /// ✅ ADDED: Batch update multiple sessions
+  Future<void> batchUpdateSessions(
+    List<String> sessionIds,
+    Map<String, dynamic> updates,
+  ) async {
+    final batch = _firestore.batch();
+    
+    for (final sessionId in sessionIds) {
+      batch.update(
+        _firestore.collection('hafizSessions').doc(sessionId),
+        updates,
+      );
+    }
+    
+    await batch.commit();
+  }
+
 }

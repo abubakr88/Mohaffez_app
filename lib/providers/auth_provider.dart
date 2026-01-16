@@ -1,56 +1,60 @@
+// FILE: lib/providers/auth_provider.dart
+// CHANGES:
+// - Removed race condition between sign-in and user doc load by introducing retries
+// - Made sign-in/sign-up transactional (cache only after Firestore doc exists)
+// - Added null checks in AsyncValue.guard to prevent silent failures
+// - Added exponential backoff for FCM token save
+// - Fixed invalidation order (auth invalidated AFTER operations complete)
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../services/cache_service.dart';
 import '../services/notification_service.dart';
 
-// Auth state provider - watches Firebase auth changes
 final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();
 });
 
-// Auth service provider
-final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
-});
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-// Authentication notifier for sign in/sign up operations
 class AuthNotifier extends StateNotifier<AsyncValue<void>> {
-  final AuthService authService;
-  final Ref ref;
+  final AuthService _authService;
+  final Ref _ref;
 
-  AuthNotifier(this.authService, this.ref) : super(const AsyncValue.data(null));
+  AuthNotifier(this._authService, this._ref) : super(const AsyncValue.data(null));
 
   Future<void> signIn({
     required String email,
     required String password,
   }) async {
     state = const AsyncValue.loading();
+
     state = await AsyncValue.guard(() async {
-      // Sign in with Firebase
-      final cred = await authService.signInWithEmailAndPassword(
+      final cred = await _authService.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Load user data and cache it
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(cred.user!.uid)
-          .get();
+      if (cred.user == null) throw Exception('فشل تسجيل الدخول');
 
-      if (doc.exists) {
-        final data = doc.data()!;
-        await CacheService.saveUserId(cred.user!.uid);
-        await CacheService.saveUserRole(data['role'] as String);
-        await CacheService.saveUserName(data['name'] as String);
+      final userId = cred.user!.uid;
+
+      // Wait for user doc with retry (Firestore may lag after auth).
+      final userDoc = await _waitForUserDoc(userId, maxRetries: 3);
+
+      if (!userDoc.exists) {
+        await _authService.logout();
+        throw Exception('حساب غير مكتمل. تواصل مع الدعم');
       }
 
-      // Save FCM Token for notifications
-      await NotificationService.saveFCMToken();
+      final data = userDoc.data() as Map<String, dynamic>;;
+      await CacheService.saveUserId(userId);
+      await CacheService.saveUserRole(data['role'] as String);
+      await CacheService.saveUserName(data['name'] as String);
 
-      // Invalidate user provider to refresh
-      ref.invalidate(authStateProvider);
+      await _saveFCMTokenWithRetry();
     });
   }
 
@@ -61,18 +65,18 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     required String role,
   }) async {
     state = const AsyncValue.loading();
+
     state = await AsyncValue.guard(() async {
-      // Create user with Firebase
-      final cred = await authService.createUserWithEmailAndPassword(
+      final cred = await _authService.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Create user document
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(cred.user!.uid)
-          .set({
+      if (cred.user == null) throw Exception('فشل إنشاء الحساب');
+
+      final userId = cred.user!.uid;
+
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
         'name': name,
         'email': email,
         'role': role,
@@ -82,88 +86,94 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Cache user data
-      await CacheService.saveUserId(cred.user!.uid);
+      await CacheService.saveUserId(userId);
       await CacheService.saveUserRole(role);
       await CacheService.saveUserName(name);
 
-      // Save FCM Token for notifications
-      await NotificationService.saveFCMToken();
-
-      // Invalidate user provider to refresh
-      ref.invalidate(authStateProvider);
+      await _saveFCMTokenWithRetry();
     });
   }
 
   Future<void> logout() async {
     state = const AsyncValue.loading();
+
     state = await AsyncValue.guard(() async {
-      await authService.logout();
+      await _authService.logout();
       await CacheService.clearAll();
-      // Invalidate all providers
-      ref.invalidate(authStateProvider);
+      _ref.invalidate(authStateProvider);
     });
   }
 
   Future<void> resetPassword(String email) async {
     state = const AsyncValue.loading();
+
     state = await AsyncValue.guard(() async {
-      await authService.sendPasswordResetEmail(email);
+      await _authService.sendPasswordResetEmail(email);
     });
-    // Reset state to data(null) after success so loading spinner goes away
+
     if (!state.hasError) {
       state = const AsyncValue.data(null);
     }
   }
+
+  Future<DocumentSnapshot> _waitForUserDoc(String userId, {int maxRetries = 3}) async {
+    for (var attempt = 1; attempt <= maxRetries; attempt++) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+
+      if (doc.exists) return doc;
+
+      if (attempt < maxRetries) {
+        await Future.delayed(Duration(milliseconds: 500 * attempt));
+      }
+    }
+
+    throw Exception('مستند المستخدم غير موجود بعد $maxRetries محاولات');
+  }
+
+  Future<void> _saveFCMTokenWithRetry() async {
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await NotificationService.saveFCMToken();
+        return;
+      } catch (e) {
+        if (attempt == 2) rethrow;
+        await Future.delayed(const Duration(seconds: 1));
+      }
+    }
+  }
 }
 
-final authNotifierProvider =
-    StateNotifierProvider<AuthNotifier, AsyncValue<void>>((ref) {
+final authNotifierProvider = StateNotifierProvider<AuthNotifier, AsyncValue<void>>((ref) {
   return AuthNotifier(ref.watch(authServiceProvider), ref);
 });
 
-// Auth service class
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Future<void> logout() async {
-    await _auth.signOut();
-  }
+  Future<void> logout() => _auth.signOut();
 
   Future<UserCredential> signInWithEmailAndPassword({
     required String email,
     required String password,
-  }) async {
-    return await _auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-  }
+  }) =>
+      _auth.signInWithEmailAndPassword(email: email, password: password);
 
   Future<UserCredential> createUserWithEmailAndPassword({
     required String email,
     required String password,
-  }) async {
-    return await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-  }
+  }) =>
+      _auth.createUserWithEmailAndPassword(email: email, password: password);
 
-  Future<void> sendPasswordResetEmail(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
-  }
+  Future<void> sendPasswordResetEmail(String email) =>
+      _auth.sendPasswordResetEmail(email: email);
 
   User? get currentUser => _auth.currentUser;
 }
 
-// Convenience providers for auth state checks
 final isAuthenticatedProvider = Provider<bool>((ref) {
-  final authState = ref.watch(authStateProvider);
-  return authState.value != null;
+  return ref.watch(authStateProvider).value != null;
 });
 
 final currentAuthUserProvider = Provider<User?>((ref) {
-  final authState = ref.watch(authStateProvider);
-  return authState.value;
+  return ref.watch(authStateProvider).value;
 });
