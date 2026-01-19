@@ -22,7 +22,7 @@ class SessionDetailsScreen extends ConsumerWidget {
           slivers: [
             // Modern App Bar with Gradient
             SliverAppBar(
-              expandedHeight: 120,
+              expandedHeight: 130,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(

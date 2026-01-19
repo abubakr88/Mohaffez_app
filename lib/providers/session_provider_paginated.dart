@@ -1,94 +1,220 @@
-// FILE: lib/providers/session_provider_paginated.dart
-// CHANGES:
-// - Converted ALL List<dynamic> to properly typed Map data
-// - Fixed Timestamp conversion for dates
-// - Added defensive null handling for all fields
-// - Kept existing pagination and state management logic
+// lib/providers/session_provider_paginated.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ============================================================================
-// COUNTERS (Real-time StreamProviders for MohaffezHome)
+// FILTER ENUM AND PROVIDER
 // ============================================================================
 
-final completedSessionsCountProvider = StreamProvider.family<int, String>((ref, mohaffezId) {
-  return FirebaseFirestore.instance
-      .collection('hafizSessions')
-      .where('mohaffezId', isEqualTo: mohaffezId)
-      .where('status', isEqualTo: 'completed')
-      .snapshots()
-      .map((snapshot) => snapshot.docs.length);
-});
+enum UpcomingFilter {
+  all, // الكل
+  today, // اليوم
+  thisWeek, // هذا الأسبوع
+  thisMonth, // هذا الشهر
+}
 
-// ✅ FIXED: Properly format all fields with safe type conversion
-final pendingRequestsFirstPageProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, mohaffezId) {
-  return FirebaseFirestore.instance
-      .collection('sessionRequests')
-      .where('mohaffezId', isEqualTo: mohaffezId)
-      .where('status', isEqualTo: 'pending')
-      .orderBy('createdAt', descending: true)
-      .limit(20)
-      .snapshots()
-      .map((snapshot) {
-        return snapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'studentName': data['studentName'] as String? ?? 'غير معروف',
-            'mohaffezName': data['mohaffezName'] as String? ?? '',
-            'sessionType': data['sessionType'] as String? ?? 'منزل',
-            'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-            'imamAddressText': data['imamAddressText'] as String?,
-            'imamAddressLat': data['imamAddressLat'] as double?,
-            'imamAddressLng': data['imamAddressLng'] as double?,
-            'createdAt': (data['createdAt'] as Timestamp?)?.toDate(), // ✅ Convert Timestamp
-            'status': data['status'] as String? ?? 'pending',
-            'mohaffezId': data['mohaffezId'] as String?,
-            'studentId': data['studentId'] as String?,
-          };
-        }).toList();
-      });
-});
-
-// ✅ FIXED: Properly format upcoming sessions with date conversion
-final upcomingSessionsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, mohaffezId) {
-  final now = DateTime.now();
-  final weekFromNow = now.add(const Duration(days: 7));
-
-  return FirebaseFirestore.instance
-      .collection('hafizSessions')
-      .where('mohaffezId', isEqualTo: mohaffezId)
-      .where('status', isEqualTo: 'accepted')
-      .where('sessionDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
-      .where('sessionDate', isLessThanOrEqualTo: Timestamp.fromDate(weekFromNow))
-      .orderBy('sessionDate', descending: false)
-      .limit(10)
-      .snapshots()
-      .map((snapshot) {
-        return snapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'studentName': data['studentName'] as String? ?? 'غير معروف',
-            'mohaffezName': data['mohaffezName'] as String? ?? '',
-            'sessionType': data['sessionType'] as String? ?? 'منزل',
-            'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-            'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(), // ✅ Convert!
-            'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
-            'hifzAssignment': data['hifzAssignment'] as String?,
-            'murajaAssignment': data['murajaAssignment'] as String?,
-            'sessionRating': data['sessionRating'] as int?,
-            'sessionNotes': data['sessionNotes'] as String?,
-            'status': data['status'] as String? ?? 'accepted',
-          };
-        }).toList();
-      });
+final upcomingSessionsFilterProvider = StateProvider<UpcomingFilter>((ref) {
+  return UpcomingFilter.all;
 });
 
 // ============================================================================
-// COMPLETED SESSIONS (Paginated)
+// COUNTERS - Real-time StreamProviders for MohaffezHome
+// ============================================================================
+
+final completedSessionsCountProvider = StreamProvider.family<int, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'completed')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  },
+);
+
+// ✅ Accepted sessions count provider (all accepted sessions)
+final acceptedSessionsCountProvider = StreamProvider.family<int, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'accepted')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  },
+);
+
+// ============================================================================
+// PENDING REQUESTS - First Page Real-time
+// ============================================================================
+
+final pendingRequestsFirstPageProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('sessionRequests')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'studentName': data['studentName'] as String? ?? '',
+          'mohaffezName': data['mohaffezName'] as String? ?? '',
+          'sessionType': data['sessionType'] as String? ?? '',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+          'imamAddressText': data['imamAddressText'] as String?,
+          'imamAddressLat': data['imamAddressLat'] as double?,
+          'imamAddressLng': data['imamAddressLng'] as double?,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+          'status': data['status'] as String? ?? 'pending',
+          'mohaffezId': data['mohaffezId'] as String?,
+          'studentId': data['studentId'] as String?,
+        };
+      }).toList();
+    });
+  },
+);
+
+// ============================================================================
+// UPCOMING SESSIONS - ALL upcoming sessions (no date limit)
+// ============================================================================
+
+final upcomingSessionsProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, mohaffezId) {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'accepted')
+        .where('sessionDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .orderBy('sessionDate', descending: false)
+        .limit(100) // ✅ Increased limit to show all upcoming sessions
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'studentName': data['studentName'] as String? ?? '',
+          'mohaffezName': data['mohaffezName'] as String? ?? '',
+          'sessionType': data['sessionType'] as String? ?? '',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
+          'hifzAssignment': data['hifzAssignment'] as String?,
+          'murajaAssignment': data['murajaAssignment'] as String?,
+          'sessionRating': data['sessionRating'] as int?,
+          'sessionNotes': data['sessionNotes'] as String?,
+          'status': data['status'] as String? ?? 'accepted',
+          'studentId': data['studentId'] as String?, // ✅ Added for fetching previous assignment
+        };
+      }).toList();
+    });
+  },
+);
+
+// ✅ NEW: Filtered sessions based on selected filter
+final filteredUpcomingSessionsProvider = Provider.family<List<Map<String, dynamic>>, String>(
+  (ref, mohaffezId) {
+    final allSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
+    final filter = ref.watch(upcomingSessionsFilterProvider);
+
+    return allSessions.when(
+      data: (sessions) {
+        final now = DateTime.now();
+
+        switch (filter) {
+          case UpcomingFilter.all:
+            return sessions;
+
+          case UpcomingFilter.today:
+            final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+            return sessions.where((session) {
+              final date = (session['sessionDate'] as DateTime?);
+              return date != null && date.isBefore(endOfDay);
+            }).toList();
+
+          case UpcomingFilter.thisWeek:
+            final endOfWeek = now.add(const Duration(days: 7));
+            return sessions.where((session) {
+              final date = (session['sessionDate'] as DateTime?);
+              return date != null && date.isBefore(endOfWeek);
+            }).toList();
+
+          case UpcomingFilter.thisMonth:
+            final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+            return sessions.where((session) {
+              final date = (session['sessionDate'] as DateTime?);
+              return date != null && date.isBefore(endOfMonth);
+            }).toList();
+        }
+      },
+      loading: () => [],
+      error: (_, __) => [],
+    );
+  },
+);
+
+// ============================================================================
+// COMPLETED SESSIONS - Stream Provider (Real-time)
+// ============================================================================
+
+final completedSessionsProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: 'completed')
+        .orderBy('completedAt', descending: true)
+        .limit(100)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'studentName': data['studentName'] as String? ?? '',
+          'studentId': data['studentId'] as String? ?? '',
+          'mohaffezName': data['mohaffezName'] as String? ?? '',
+          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
+          'sessionType': data['sessionType'] as String? ?? '',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+          'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
+          
+          // ✅ التكليف الحالي
+          'hifzAssignment': data['hifzAssignment'] as String?,
+          'murajaAssignment': data['murajaAssignment'] as String?,
+          
+          // ✅ تقييم التكليف السابق
+          'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
+          'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
+          'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
+          'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
+          'performanceNotes': data['performanceNotes'] as String?,
+          
+          // ✅ التقييم العام
+          'sessionRating': data['sessionRating'] as int? ?? 0,
+          'sessionNotes': data['sessionNotes'] as String?,
+        };
+      }).toList();
+    });
+  },
+);
+
+// ============================================================================
+// COMPLETED SESSIONS - Paginated (Legacy - kept for compatibility)
 // ============================================================================
 
 class CompletedSessionsState {
@@ -143,7 +269,7 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
           .collection('hafizSessions')
           .where('mohaffezId', isEqualTo: mohaffezId)
           .where('status', isEqualTo: 'completed')
-          .orderBy('sessionDate', descending: true)
+          .orderBy('completedAt', descending: true)
           .limit(pageSize);
 
       if (state.lastDocument != null) {
@@ -161,14 +287,21 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'id': doc.id,
-          'studentName': data['studentName'] as String? ?? 'غير معروف',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(), // ✅ Convert
-          'sessionType': data['sessionType'] as String? ?? 'منزل',
+          'studentName': data['studentName'] as String? ?? '',
+          'studentId': data['studentId'] as String? ?? '',
+          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
+          'sessionType': data['sessionType'] as String? ?? '',
           'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
           'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
-          'sessionRating': data['sessionRating'] as int?,
+          'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
+          'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
+          'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
+          'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
+          'performanceNotes': data['performanceNotes'] as String?,
+          'sessionRating': data['sessionRating'] as int? ?? 0,
           'sessionNotes': data['sessionNotes'] as String?,
         };
       }).toList();
@@ -190,7 +323,7 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
       );
     } catch (e) {
       state = state.copyWith(
-        error: 'فشل تحميل الجلسات. تحقق من الاتصال.',
+        error: 'حدث خطأ في تحميل الجلسات. حاول مرة أخرى.',
         isLoadingMore: false,
       );
     }
@@ -202,13 +335,15 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
   }
 }
 
-final completedSessionsPaginatedProvider =
-    StateNotifierProvider.family<CompletedSessionsNotifier, CompletedSessionsState, String>(
-  (ref, mohaffezId) => CompletedSessionsNotifier(mohaffezId),
+final completedSessionsPaginatedProvider = StateNotifierProvider.family<
+    CompletedSessionsNotifier, CompletedSessionsState, String>(
+  (ref, mohaffezId) {
+    return CompletedSessionsNotifier(mohaffezId);
+  },
 );
 
 // ============================================================================
-// STUDENT SESSIONS (Paginated)
+// STUDENT SESSIONS - Paginated
 // ============================================================================
 
 class StudentSessionsState {
@@ -280,14 +415,19 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'id': doc.id,
-          'mohaffezName': data['mohaffezName'] as String? ?? 'غير معروف',
+          'mohaffezName': data['mohaffezName'] as String? ?? '',
           'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
-          'sessionType': data['sessionType'] as String? ?? 'منزل',
+          'sessionType': data['sessionType'] as String? ?? '',
           'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(), // ✅ Convert
+          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
-          'sessionRating': data['sessionRating'] as int?,
+          'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
+          'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
+          'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
+          'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
+          'performanceNotes': data['performanceNotes'] as String?,
+          'sessionRating': data['sessionRating'] as int? ?? 0,
           'sessionNotes': data['sessionNotes'] as String?,
           'status': data['status'] as String? ?? 'pending',
         };
@@ -310,7 +450,7 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
       );
     } catch (e) {
       state = state.copyWith(
-        error: 'فشل تحميل الجلسات. تحقق من الاتصال.',
+        error: 'حدث خطأ في تحميل الجلسات. حاول مرة أخرى.',
         isLoadingMore: false,
       );
     }
@@ -322,69 +462,84 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
   }
 }
 
-final paginatedStudentSessionsProvider =
-    StateNotifierProvider.family<StudentSessionsNotifier, StudentSessionsState, String>(
-  (ref, studentId) => StudentSessionsNotifier(studentId),
+final paginatedStudentSessionsProvider = StateNotifierProvider.family<
+    StudentSessionsNotifier, StudentSessionsState, String>(
+  (ref, studentId) {
+    return StudentSessionsNotifier(studentId);
+  },
 );
 
-final studentSessionsFirstPageProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, studentId) async {
-  final snapshot = await FirebaseFirestore.instance
-      .collection('hafizSessions')
-      .where('studentId', isEqualTo: studentId)
-      .orderBy('sessionDate', descending: true)
-      .limit(20)
-      .get();
+final studentSessionsFirstPageProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, studentId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('sessionDate', descending: true)
+        .limit(20)
+        .get();
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    ref.read(paginatedStudentSessionsProvider(studentId).notifier).refresh();
-  });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(paginatedStudentSessionsProvider(studentId).notifier).refresh();
+    });
 
-  return snapshot.docs.map((doc) {
-    final data = doc.data();
-    return {
-      'id': doc.id,
-      'mohaffezName': data['mohaffezName'] as String? ?? 'غير معروف',
-      'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
-      'sessionType': data['sessionType'] as String? ?? 'منزل',
-      'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-      'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(), // ✅ Convert
-      'hifzAssignment': data['hifzAssignment'] as String?,
-      'murajaAssignment': data['murajaAssignment'] as String?,
-      'sessionRating': data['sessionRating'] as int?,
-      'sessionNotes': data['sessionNotes'] as String?,
-      'status': data['status'] as String? ?? 'pending',
-    };
-  }).toList();
-});
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'id': doc.id,
+        'mohaffezName': data['mohaffezName'] as String? ?? '',
+        'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
+        'sessionType': data['sessionType'] as String? ?? '',
+        'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+        'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+        'hifzAssignment': data['hifzAssignment'] as String?,
+        'murajaAssignment': data['murajaAssignment'] as String?,
+        'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
+        'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
+        'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
+        'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
+        'performanceNotes': data['performanceNotes'] as String?,
+        'sessionRating': data['sessionRating'] as int? ?? 0,
+        'sessionNotes': data['sessionNotes'] as String?,
+        'status': data['status'] as String? ?? 'pending',
+      };
+    }).toList();
+  },
+);
 
-final studentRequestsFirstPageProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, studentId) {
-  return FirebaseFirestore.instance
-      .collection('sessionRequests')
-      .where('studentId', isEqualTo: studentId)
-      .orderBy('createdAt', descending: true)
-      .limit(20)
-      .snapshots()
-      .map((snapshot) {
-        return snapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'mohaffezName': data['mohaffezName'] as String? ?? 'غير معروف',
-            'sessionType': data['sessionType'] as String? ?? 'منزل',
-            'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-            'status': data['status'] as String? ?? 'pending',
-            'createdAt': (data['createdAt'] as Timestamp?)?.toDate(), // ✅ Convert
-            'imamAddressText': data['imamAddressText'] as String?,
-          };
-        }).toList();
-      });
-});
+final studentRequestsFirstPageProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, studentId) {
+    return FirebaseFirestore.instance
+        .collection('sessionRequests')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'mohaffezName': data['mohaffezName'] as String? ?? '',
+          'sessionType': data['sessionType'] as String? ?? '',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+          'status': data['status'] as String? ?? 'pending',
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+          'imamAddressText': data['imamAddressText'] as String?,
+          'rejectionReason': data['rejectionReason'] as String?,
+        };
+      }).toList();
+    });
+  },
+);
 
 // ============================================================================
 // SESSION ACTIONS
 // ============================================================================
 
-final sessionActionsProvider = StateNotifierProvider<SessionActionsNotifier, AsyncValue<void>>(
+final sessionActionsProvider =
+    StateNotifierProvider<SessionActionsNotifier, AsyncValue<void>>(
   (ref) => SessionActionsNotifier(),
 );
 
@@ -393,27 +548,26 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// ✅ FIXED: Use transaction to ensure atomic accept + create
+  // Accept request and create session
   Future<void> acceptRequestAndCreateSession(String requestId) async {
     if (requestId.trim().isEmpty) {
-      throw ArgumentError('معرّف الطلب فارغ');
+      throw ArgumentError('Request ID cannot be empty');
     }
 
     state = const AsyncValue.loading();
+
     try {
       await _firestore.runTransaction((transaction) async {
-        // 1. Get the request data
         final requestRef = _firestore.collection('sessionRequests').doc(requestId);
         final requestDoc = await transaction.get(requestRef);
 
         if (!requestDoc.exists) {
-          throw Exception('الطلب غير موجود');
+          throw Exception('Session request not found');
         }
 
         final requestData = requestDoc.data()!;
-
-        // 2. Create session in hafizSessions collection
         final sessionRef = _firestore.collection('hafizSessions').doc();
+
         transaction.set(sessionRef, {
           'mohaffezId': requestData['mohaffezId'],
           'studentId': requestData['studentId'],
@@ -432,16 +586,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
           'murajaAssignment': null,
           'sessionRating': null,
           'sessionNotes': null,
-          'mohaffezPhone': requestData['mohaffezPhone'],
           'createdAt': FieldValue.serverTimestamp(),
-          'acceptedAt': FieldValue.serverTimestamp(),
         });
 
-        // 3. Update request status
-        transaction.update(requestRef, {
-          'status': 'accepted',
-          'acceptedAt': FieldValue.serverTimestamp(),
-        });
+        transaction.update(requestRef, {'status': 'accepted'});
       });
 
       state = const AsyncValue.data(null);
@@ -451,16 +599,14 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> rejectRequest(String requestId) async {
-    if (requestId.trim().isEmpty) {
-      throw ArgumentError('معرّف الطلب فارغ');
-    }
-
+  // ✅ FIXED: reason is now optional [String? reason]
+  Future<void> rejectRequest(String requestId, [String? reason]) async {
     state = const AsyncValue.loading();
+
     try {
       await _firestore.collection('sessionRequests').doc(requestId).update({
         'status': 'rejected',
-        'rejectedAt': FieldValue.serverTimestamp(),
+        if (reason != null) 'rejectionReason': reason,
       });
 
       state = const AsyncValue.data(null);
@@ -470,31 +616,96 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  // Update generic session details
+  Future<void> updateSession(
+    String sessionId,
+    Map<String, dynamic> updates,
+  ) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await _firestore.collection('hafizSessions').doc(sessionId).update(updates);
+      state = const AsyncValue.data(null);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
+    }
+  }
+
+  // ✅ ADDED: Missing method for RateSessionScreen & StudentAssignmentsScreen
   Future<void> updateAssignment({
     required String sessionId,
-    String? hifzAssignment,
-    String? murajaAssignment,
-    int? rating,
+    String? hifz,
+    String? muraja,
     String? notes,
+    int? rating,
   }) async {
-    if (sessionId.trim().isEmpty) {
-      throw ArgumentError('معرّف الجلسة فارغ');
-    }
+    final updates = <String, dynamic>{};
 
-    if (rating != null && (rating < 0 || rating > 10)) {
-      throw ArgumentError('التقييم يجب أن يكون بين 0 و 10');
-    }
+    if (hifz != null) updates['hifzAssignment'] = hifz;
+    if (muraja != null) updates['murajaAssignment'] = muraja;
+    if (notes != null) updates['sessionNotes'] = notes;
+    if (rating != null) updates['sessionRating'] = rating;
 
+    if (updates.isNotEmpty) {
+      await updateSession(sessionId, updates);
+    }
+  }
+
+  // ✅ NEW: Complete session with full details (evaluation + new assignment)
+  Future<void> completeSessionWithDetails({
+    required String sessionId,
+    // تقييم التكليف السابق
+    bool? previousHifzCompleted,
+    int? previousHifzRating,
+    bool? previousMurajaCompleted,
+    int? previousMurajaRating,
+    String? performanceNotes,
+    // التكليف الجديد
+    String? newHifzAssignment,
+    String? newMurajaAssignment,
+    // التقييم العام
+    int sessionRating = 7,
+    String? generalNotes,
+  }) async {
     state = const AsyncValue.loading();
+
     try {
-      final Map<String, dynamic> updates = {
-        'updatedAt': FieldValue.serverTimestamp(),
+      final updates = <String, dynamic>{
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+        'sessionRating': sessionRating,
       };
 
-      if (hifzAssignment != null) updates['hifzAssignment'] = hifzAssignment.trim();
-      if (murajaAssignment != null) updates['murajaAssignment'] = murajaAssignment.trim();
-      if (rating != null) updates['sessionRating'] = rating;
-      if (notes != null) updates['sessionNotes'] = notes.trim();
+      // تقييم التكليف السابق
+      if (previousHifzCompleted != null) {
+        updates['previousHifzCompleted'] = previousHifzCompleted;
+      }
+      if (previousHifzRating != null) {
+        updates['previousHifzRating'] = previousHifzRating;
+      }
+      if (previousMurajaCompleted != null) {
+        updates['previousMurajaCompleted'] = previousMurajaCompleted;
+      }
+      if (previousMurajaRating != null) {
+        updates['previousMurajaRating'] = previousMurajaRating;
+      }
+      if (performanceNotes != null && performanceNotes.isNotEmpty) {
+        updates['performanceNotes'] = performanceNotes;
+      }
+
+      // التكليف الجديد
+      if (newHifzAssignment != null && newHifzAssignment.isNotEmpty) {
+        updates['hifzAssignment'] = newHifzAssignment;
+      }
+      if (newMurajaAssignment != null && newMurajaAssignment.isNotEmpty) {
+        updates['murajaAssignment'] = newMurajaAssignment;
+      }
+
+      // الملاحظات العامة
+      if (generalNotes != null && generalNotes.isNotEmpty) {
+        updates['sessionNotes'] = generalNotes;
+      }
 
       await _firestore.collection('hafizSessions').doc(sessionId).update(updates);
 

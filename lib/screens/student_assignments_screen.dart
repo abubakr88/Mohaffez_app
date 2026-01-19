@@ -1,6 +1,9 @@
+// lib/screens/student_assignments_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -21,6 +24,7 @@ class StudentAssignmentsScreen extends ConsumerWidget {
             body: Center(child: Text('الرجاء تسجيل الدخول')),
           );
         }
+
         return _AssignmentsContent(studentId: user.uid);
       },
       loading: () => const Scaffold(
@@ -41,7 +45,8 @@ class _AssignmentsContent extends ConsumerStatefulWidget {
   const _AssignmentsContent({required this.studentId});
 
   @override
-  ConsumerState<_AssignmentsContent> createState() => _AssignmentsContentState();
+  ConsumerState<_AssignmentsContent> createState() =>
+      _AssignmentsContentState();
 }
 
 class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
@@ -62,7 +67,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
 
   @override
   Widget build(BuildContext context) {
-    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(widget.studentId));
+    final sessionsAsync =
+        ref.watch(studentSessionsFirstPageProvider(widget.studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -71,7 +77,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
           slivers: [
             // Modern App Bar with Tabs
             SliverAppBar(
-              expandedHeight: 100,
+              expandedHeight: 130,
               floating: true,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
@@ -159,8 +165,11 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                       final activeSessions = sessions
                           .where((s) =>
                               (s['status'] as String?) == 'accepted' &&
-                              ((s['hifzAssignment'] as String?)?.isNotEmpty == true ||
-                              (s['murajaAssignment'] as String?)?.isNotEmpty == true))
+                              ((s['hifzAssignment'] as String?)?.isNotEmpty ==
+                                      true ||
+                                  (s['murajaAssignment'] as String?)
+                                          ?.isNotEmpty ==
+                                      true))
                           .toList();
 
                       if (activeSessions.isEmpty) {
@@ -174,7 +183,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
 
                       return RefreshIndicator(
                         onRefresh: () async {
-                          ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
+                          ref.invalidate(
+                              studentSessionsFirstPageProvider(widget.studentId));
                         },
                         child: ListView.builder(
                           padding: const EdgeInsets.all(16),
@@ -187,7 +197,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                         ),
                       );
                     },
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
                     error: (e, _) => ErrorDisplay.dataLoad(
                       onRetry: () => ref.invalidate(
                         studentSessionsFirstPageProvider(widget.studentId),
@@ -199,8 +210,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                   sessionsAsync.when(
                     data: (sessions) {
                       final completedSessions = sessions
-                          .where((s) =>
-                              (s['status'] as String?) == 'completed')
+                          .where((s) => (s['status'] as String?) == 'completed')
                           .toList();
 
                       if (completedSessions.isEmpty) {
@@ -223,7 +233,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                         },
                       );
                     },
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
                     error: (e, _) => ErrorDisplay.dataLoad(
                       onRetry: () => ref.invalidate(
                         studentSessionsFirstPageProvider(widget.studentId),
@@ -239,6 +250,10 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
     );
   }
 }
+
+// ============================================================================
+// ACTIVE ASSIGNMENT CARD
+// ============================================================================
 
 class _ActiveAssignmentCard extends StatelessWidget {
   final Map<String, dynamic> session;
@@ -258,7 +273,7 @@ class _ActiveAssignmentCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () {
-          // Navigate to session details
+          // Navigate to session details if needed
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -304,7 +319,8 @@ class _ActiveAssignmentCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                DateFormat('dd MMM yyyy', 'ar').format(sessionDate),
+                                DateFormat('dd MMM yyyy', 'ar')
+                                    .format(sessionDate),
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey.shade600,
@@ -336,7 +352,6 @@ class _ActiveAssignmentCard extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 20),
 
               // Assignments
@@ -356,7 +371,6 @@ class _ActiveAssignmentCard extends StatelessWidget {
                   content: muraja,
                   color: Colors.blue,
                 ),
-
               const SizedBox(height: 16),
 
               // Progress Indicator
@@ -390,6 +404,10 @@ class _ActiveAssignmentCard extends StatelessWidget {
   }
 }
 
+// ============================================================================
+// COMPLETED ASSIGNMENT CARD - ✅ UPDATED WITH NEW EVALUATION FEATURES
+// ============================================================================
+
 class _CompletedAssignmentCard extends ConsumerWidget {
   final Map<String, dynamic> session;
   final String studentId;
@@ -404,10 +422,18 @@ class _CompletedAssignmentCard extends ConsumerWidget {
     final mohaffezName = session['mohaffezName'] as String? ?? 'محفظ';
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
-    final rating = session['sessionRating'] as int? ?? 5;  // ✅ Default to 5
-    final notes = session['sessionNotes'] as String? ?? '';
     final sessionDate = session['sessionDate'] as DateTime?;
     final sessionId = session['id'] as String? ?? '';
+
+    // ✅ NEW: التقييمات
+    final previousHifzCompleted = session['previousHifzCompleted'] as bool?;
+    final previousHifzRating = session['previousHifzRating'] as int? ?? 0;
+    final previousMurajaCompleted =
+        session['previousMurajaCompleted'] as bool?;
+    final previousMurajaRating = session['previousMurajaRating'] as int? ?? 0;
+    final performanceNotes = session['performanceNotes'] as String?;
+    final sessionRating = session['sessionRating'] as int? ?? 0;
+    final sessionNotes = session['sessionNotes'] as String?;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -461,121 +487,191 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Assignments
-            if (hifz.isNotEmpty)
-              _CompletedAssignmentItem(
-                icon: Icons.book,
-                label: 'حفظ',
-                content: hifz,
-              ),
-            if (hifz.isNotEmpty && muraja.isNotEmpty)
-              const Divider(height: 24),
-            if (muraja.isNotEmpty)
-              _CompletedAssignmentItem(
-                icon: Icons.refresh,
-                label: 'مراجعة',
-                content: muraja,
-              ),
-
-            const Divider(height: 24),
-
-            // Rating Section - ✅ UPDATED
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'التقييم: $rating/10',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      ...List.generate(
-                        5,
-                        (index) => Icon(
-                          index < (rating / 2).round()
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: Colors.amber,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // ✅ ADD RATE BUTTON if rating is default (5) and student hasn't rated
-                  if (rating == 5 && notes.isEmpty) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          _showRatingDialog(context, ref, sessionId, mohaffezName);
-                        },
-                        icon: const Icon(Icons.star),
-                        label: const Text('قيّم المحفظ'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          side: const BorderSide(color: Colors.amber, width: 2),
-                          foregroundColor: Colors.amber,
-                        ),
-                      ),
+                // ✅ عرض التقييم العام
+                if (sessionRating > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                  ],
-                ],
-              ),
-            ),
-
-            if (notes.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.blue.withOpacity(0.2),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.notes, size: 16, color: Colors.blue.shade700),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.star, size: 16, color: Colors.amber),
+                        const SizedBox(width: 4),
                         Text(
-                          'ملاحظات المحفظ:',
-                          style: TextStyle(
+                          '$sessionRating/10',
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
+                            color: Colors.amber,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      notes,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.5,
+                  ),
+              ],
+            ),
+
+            // ✅ تقييم الأداء السابق
+            if (previousHifzCompleted != null ||
+                previousMurajaCompleted != null) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.assignment_turned_in,
+                      size: 18, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  Text(
+                    'تقييم أدائك في التكليف السابق:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              if (previousHifzCompleted != null)
+                _buildPerformanceBadge(
+                  'الحفظ',
+                  previousHifzCompleted,
+                  previousHifzRating,
+                  Colors.green,
+                ),
+
+              if (previousMurajaCompleted != null) ...[
+                const SizedBox(height: 8),
+                _buildPerformanceBadge(
+                  'المراجعة',
+                  previousMurajaCompleted,
+                  previousMurajaRating,
+                  Colors.blue,
+                ),
+              ],
+
+              if (performanceNotes != null && performanceNotes.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.note, size: 16, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'ملاحظات على أدائك:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              performanceNotes,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+
+            // ✅ التكليف الجديد المعطى
+            if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.assignment, size: 18, color: Colors.grey.shade700),
+                  const SizedBox(width: 8),
+                  Text(
+                    'التكليف الجديد للجلسة القادمة:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              if (hifz.isNotEmpty)
+                _CompletedAssignmentItem(
+                  icon: Icons.book,
+                  label: 'حفظ',
+                  content: hifz,
+                  color: Colors.green,
+                ),
+              if (hifz.isNotEmpty && muraja.isNotEmpty)
+                const SizedBox(height: 12),
+              if (muraja.isNotEmpty)
+                _CompletedAssignmentItem(
+                  icon: Icons.refresh,
+                  label: 'مراجعة',
+                  content: muraja,
+                  color: Colors.blue,
+                ),
+            ],
+
+            // ✅ رسالة من المحفظ
+            if (sessionNotes != null && sessionNotes.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.purple.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.message, size: 16, color: Colors.purple),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'رسالة من المحفّظ:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            sessionNotes,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -588,168 +684,72 @@ class _CompletedAssignmentCard extends ConsumerWidget {
     );
   }
 
-  // ✅ NEW METHOD: Show rating dialog
-  void _showRatingDialog(
-    BuildContext context,
-    WidgetRef ref,
-    String sessionId,
-    String mohaffezName,
+  // ✅ دالة مساعدة لعرض شارة الأداء
+  Widget _buildPerformanceBadge(
+    String label,
+    bool completed,
+    int rating,
+    Color color,
   ) {
-    int rating = 5;  // Default to 5
-    final notesController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            title: const Text('تقييم المحفظ'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            completed ? Icons.check_circle : Icons.cancel,
+            size: 20,
+            color: completed ? color : Colors.red,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          if (completed) ...[
+            Expanded(
+              child: Row(
                 children: [
-                  // Mohaffez Info
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentGreen.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.school, color: AppTheme.accentGreen),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            mohaffezName,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
+                  ...List.generate(
+                    rating,
+                    (index) =>
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
                   ),
-                  const SizedBox(height: 20),
-
-                  // Rating Stars
-                  const Text(
-                    'تقييمك للجلسة',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: List.generate(10, (index) {
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              rating = index + 1;
-                            });
-                          },
-                          child: Icon(
-                            index < rating ? Icons.star : Icons.star_border,
-                            color: Colors.amber,
-                            size: 32,
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        '$rating / 10',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Notes
-                  const Text(
-                    'ملاحظاتك (اختياري)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: notesController,
-                    maxLines: 4,
-                    maxLength: 500,
-                    decoration: InputDecoration(
-                      hintText: 'شاركنا رأيك حول الجلسة...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
+                  const SizedBox(width: 6),
+                  Text(
+                    '$rating/10',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: color,
                     ),
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء'),
+          ] else
+            Text(
+              'لم يُكمل',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w600,
               ),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  try {
-                    await ref.read(sessionActionsProvider.notifier).updateAssignment(
-                      sessionId: sessionId,
-                      rating: rating,
-                      notes: notesController.text.trim(),
-                    );
-
-                    if (ctx.mounted) {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تم إرسال التقييم بنجاح'),
-                          backgroundColor: AppTheme.accentGreen,
-                        ),
-                      );
-                      ref.invalidate(studentSessionsFirstPageProvider(studentId));
-                    }
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('خطأ: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.send),
-                label: const Text('إرسال التقييم'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryAmber,
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
 }
+
+// ============================================================================
+// ASSIGNMENT ITEM WIDGET (ACTIVE)
+// ============================================================================
 
 class _AssignmentItem extends StatelessWidget {
   final IconData icon;
@@ -812,48 +812,69 @@ class _AssignmentItem extends StatelessWidget {
   }
 }
 
+// ============================================================================
+// ASSIGNMENT ITEM WIDGET (COMPLETED) - ✅ UPDATED
+// ============================================================================
+
 class _CompletedAssignmentItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String content;
+  final Color color;
 
   const _CompletedAssignmentItem({
     required this.icon,
     required this.label,
     required this.content,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: Colors.grey.shade600),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                content,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 16, color: color),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  content,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,10 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+
+import '../providers/session_provider_paginated.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/utils/error_handler.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../providers/session_provider_paginated.dart';
-import '../shared/utils/error_handler.dart';
 
 class PendingRequestsScreen extends ConsumerWidget {
   final String mohaffezId;
@@ -22,7 +25,7 @@ class PendingRequestsScreen extends ConsumerWidget {
           slivers: [
             // Modern App Bar
             SliverAppBar(
-              expandedHeight: 100,
+              expandedHeight: 120,
               floating: true,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
@@ -138,7 +141,7 @@ class PendingRequestsScreen extends ConsumerWidget {
 }
 
 class _PendingRequestCard extends ConsumerWidget {
-  final Map<String, dynamic> request;
+  final Map request;
   final String mohaffezId;
 
   const _PendingRequestCard({
@@ -146,12 +149,27 @@ class _PendingRequestCard extends ConsumerWidget {
     required this.mohaffezId,
   });
 
+  DateTime? _asDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final studentName = request['studentName'] as String? ?? 'طالب';
     final sessionType = request['sessionType'] as String? ?? '';
     final timeSlot = request['preferredTimeSlot'] as String? ?? '08:00';
     final location = request['imamAddressText'] as String?;
+
+    final slotStart = _asDateTime(request['slotStart']);
+    final createdAt = _asDateTime(request['createdAt']);
+    final displayDate = slotStart ?? createdAt;
+
+    final dateText = displayDate != null
+        ? DateFormat('EEEE dd/MM/yyyy', 'ar').format(displayDate)
+        : 'غير محدد';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -227,6 +245,13 @@ class _PendingRequestCard extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             _DetailItem(
+              icon: Icons.calendar_today,
+              label: 'اليوم',
+              value: dateText,
+              color: Colors.purple,
+            ),
+            const SizedBox(height: 12),
+            _DetailItem(
               icon: Icons.access_time,
               label: 'الوقت المفضل',
               value: timeSlot,
@@ -293,11 +318,11 @@ class _PendingRequestCard extends ConsumerWidget {
           .read(sessionActionsProvider.notifier)
           .acceptRequestAndCreateSession(requestId);
 
-      if (context.mounted) {
-        ErrorHandler.showSuccess(context, 'تم قبول الطلب وإنشاء الجلسة');
-        ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
-        ref.invalidate(upcomingSessionsProvider(mohaffezId));
-      }
+      if (!context.mounted) return;
+
+      ErrorHandler.showSuccess(context, 'تم قبول الطلب وإنشاء الجلسة');
+      ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
+      ref.invalidate(upcomingSessionsProvider(mohaffezId));
     } catch (e) {
       if (context.mounted) {
         ErrorHandler.showError(context, e);
@@ -312,21 +337,25 @@ class _PendingRequestCard extends ConsumerWidget {
   ) async {
     if (requestId == null) return;
 
-    // Show reason dialog
-    final reason = await showDialog<String>(
+    final reason = await showDialog<String?>(
       context: context,
-      builder: (ctx) => _RejectReasonDialog(),
+      builder: (ctx) => const _RejectReasonDialog(),
     );
 
-    if (reason == null || reason.isEmpty) return;
+    // Cancelled
+    if (reason == null) return;
+
+    final sanitizedReason = reason.trim().isEmpty ? null : reason.trim();
 
     try {
-      await ref.read(sessionActionsProvider.notifier).rejectRequest(requestId);
+      await ref
+          .read(sessionActionsProvider.notifier)
+          .rejectRequest(requestId, sanitizedReason);
 
-      if (context.mounted) {
-        ErrorHandler.showSuccess(context, 'تم رفض الطلب');
-        ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
-      }
+      if (!context.mounted) return;
+
+      ErrorHandler.showSuccess(context, 'تم رفض الطلب');
+      ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
     } catch (e) {
       if (context.mounted) {
         ErrorHandler.showError(context, e);
@@ -423,6 +452,8 @@ class _DetailItem extends StatelessWidget {
 }
 
 class _RejectReasonDialog extends StatefulWidget {
+  const _RejectReasonDialog();
+
   @override
   State<_RejectReasonDialog> createState() => _RejectReasonDialogState();
 }
@@ -452,11 +483,12 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, null),
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, reasonController.text.trim()),
+            onPressed: () =>
+                Navigator.pop(context, reasonController.text.trim()),
             child: const Text('تأكيد الرفض'),
           ),
         ],

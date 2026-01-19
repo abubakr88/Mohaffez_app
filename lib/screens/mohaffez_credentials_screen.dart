@@ -1,3 +1,4 @@
+// lib/screens/mohaffez_credentials_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../shared/widgets/empty_state.dart';
 import '../services/credential_service.dart';
-import 'dart:io';  // Add this import
+import 'dart:io';
 
 class MohaffezCredentialsScreen extends StatefulWidget {
   const MohaffezCredentialsScreen({super.key});
@@ -220,7 +221,6 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
             ),
           ],
         ),
-
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _showAddCredentialDialog,
           icon: const Icon(Icons.add),
@@ -232,6 +232,9 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
   }
 }
 
+// ============================================================================
+// CREDENTIAL CARD WIDGET
+// ============================================================================
 class _CredentialCard extends StatelessWidget {
   final String credentialId;
   final Map<String, dynamic> data;
@@ -247,17 +250,16 @@ class _CredentialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = data['title'] as String? ?? '';
-    final organization = data['organization'] as String? ?? '';
-    final type = data['type'] as String? ?? '';
-    final status = data['status'] as String? ?? 'pending';
+    final title = data['title'] as String? ?? 'بدون عنوان';
+    final organization = data['organization'] as String? ?? 'بدون جهة';
+    final type = data['type'] as String? ?? 'ijazah';
+    final status = data['status'] as String? ?? 'approved'; // ✅ Default approved
     final issueDate = (data['issueDate'] as Timestamp?)?.toDate();
-    final imageUrls = List<String>.from(data['imageUrls'] ?? []);
+    final imageUrls = List<String>.from(data['imageUrls'] ?? []); // ✅ Can be empty
 
     final statusColor = _getStatusColor(status);
     final statusIcon = _getStatusIcon(status);
     final statusLabel = _getStatusLabel(status);
-
     final typeColor = _getTypeColor(type);
     final typeIcon = _getTypeIcon(type);
     final typeLabel = _getTypeLabel(type);
@@ -279,7 +281,7 @@ class _CredentialCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: typeColor.withOpacity(0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(14),
                 topRight: Radius.circular(14),
@@ -287,23 +289,63 @@ class _CredentialCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(statusIcon, color: statusColor, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  statusLabel,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: typeColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(typeIcon, color: typeColor, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        organization,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: onDelete,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'حذف',
+                // Status Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor, width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, size: 14, color: statusColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -317,7 +359,8 @@ class _CredentialCard extends StatelessWidget {
               children: [
                 // Type Badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: typeColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -342,40 +385,12 @@ class _CredentialCard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Title
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Organization
-                Row(
-                  children: [
-                    Icon(Icons.business, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        organization,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
                 // Issue Date
-                if (issueDate != null) ...[
-                  const SizedBox(height: 8),
+                if (issueDate != null)
                   Row(
                     children: [
-                      Icon(Icons.date_range, size: 16, color: Colors.grey.shade600),
+                      Icon(Icons.date_range,
+                          size: 16, color: Colors.grey.shade600),
                       const SizedBox(width: 8),
                       Text(
                         DateFormat('yyyy/MM/dd').format(issueDate),
@@ -386,9 +401,8 @@ class _CredentialCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                ],
 
-                // Images
+                // ✅ UPDATED: Images - show only if available
                 if (imageUrls.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   SizedBox(
@@ -432,9 +446,33 @@ class _CredentialCard extends StatelessWidget {
                       },
                     ),
                   ),
+                ] else ...[
+                  // ✅ NEW: Show message when no images
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 18, color: Colors.grey.shade600),
+                        const SizedBox(width: 8),
+                        Text(
+                          'لا توجد صور مرفقة',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
 
-                // Rejection Reason
+                // Rejection Reason (if any)
                 if (status == 'rejected' && data['rejectionReason'] != null) ...[
                   const SizedBox(height: 16),
                   Container(
@@ -478,6 +516,22 @@ class _CredentialCard extends StatelessWidget {
                     ),
                   ),
                 ],
+
+                const SizedBox(height: 16),
+
+                // Delete Button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete, size: 18),
+                    label: const Text('حذف الشهادة'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -511,7 +565,7 @@ class _CredentialCard extends StatelessWidget {
   String _getStatusLabel(String status) {
     switch (status) {
       case 'approved':
-        return 'موافق عليها';
+        return 'مُعتمدة';
       case 'rejected':
         return 'مرفوضة';
       default:
@@ -565,7 +619,9 @@ class _CredentialCard extends StatelessWidget {
   }
 }
 
-// Image Gallery Screen
+// ============================================================================
+// IMAGE GALLERY SCREEN
+// ============================================================================
 class ImageGalleryScreen extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;
@@ -640,7 +696,9 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
   }
 }
 
-// Add Credential Screen (simplified)
+// ============================================================================
+// ADD CREDENTIAL SCREEN
+// ============================================================================
 class AddCredentialScreen extends StatefulWidget {
   const AddCredentialScreen({super.key});
 
@@ -681,31 +739,37 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
 
   Future<void> _submitCredential() async {
     if (!_formKey.currentState!.validate()) return;
+
     if (issueDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء اختيار تاريخ الإصدار')),
+        const SnackBar(content: Text('يرجى اختيار تاريخ الإصدار')),
       );
       return;
     }
-    if (selectedImagePaths.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرجاء إضافة صورة واحدة على الأقل')),
-      );
-      return;
-    }
+
+    // ✅ REMOVED: Image validation - now optional
+    // if (selectedImagePaths.isEmpty) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(content: Text('يرجى إضافة صورة واحدة على الأقل')),
+    //   );
+    //   return;
+    // }
 
     setState(() => uploading = true);
 
     try {
-      // Upload images
-      final images = selectedImagePaths
-          .map((path) => XFile(path))
-          .toList();
       final user = FirebaseAuth.instance.currentUser!;
-      final imageUrls = await CredentialService.uploadCredentialImages(
-        images,
-        user.uid,
-      );
+
+      // ✅ Upload images only if selected
+      List<String> imageUrls = [];
+      if (selectedImagePaths.isNotEmpty) {
+        final images =
+            selectedImagePaths.map((path) => XFile(path)).toList();
+        imageUrls = await CredentialService.uploadCredentialImages(
+          images,
+          user.uid,
+        );
+      }
 
       // Add credential
       await CredentialService.addCredential(
@@ -719,7 +783,10 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إضافة الشهادة بنجاح')),
+          const SnackBar(
+            content: Text('تمت إضافة الشهادة بنجاح ✅'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -768,7 +835,8 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     ChoiceChip(
                       label: const Text('مؤهل تعليمي'),
                       selected: selectedType == 'education',
-                      onSelected: (_) => setState(() => selectedType = 'education'),
+                      onSelected: (_) =>
+                          setState(() => selectedType = 'education'),
                     ),
                     ChoiceChip(
                       label: const Text('ترخيص'),
@@ -788,7 +856,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) =>
-                      value?.isEmpty ?? true ? 'مطلوب' : null,
+                      value?.isEmpty ?? true ? 'يرجى إدخال اسم الشهادة' : null,
                 ),
 
                 const SizedBox(height: 16),
@@ -801,7 +869,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) =>
-                      value?.isEmpty ?? true ? 'مطلوب' : null,
+                      value?.isEmpty ?? true ? 'يرجى إدخال الجهة المانحة' : null,
                 ),
 
                 const SizedBox(height: 16),
@@ -831,12 +899,13 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
 
                 const SizedBox(height: 24),
 
-                // Images
+                // ✅ UPDATED: Images - now optional
                 const Text(
-                  'صور الشهادة',
+                  'صور الشهادة (اختياري)',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
+
                 if (selectedImagePaths.isEmpty)
                   GestureDetector(
                     onTap: _pickImages,
@@ -845,15 +914,20 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300, width: 2),
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 2,
+                          style: BorderStyle.solid,
+                        ),
                       ),
                       child: const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate, size: 48, color: Colors.grey),
+                            Icon(Icons.add_photo_alternate,
+                                size: 48, color: Colors.grey),
                             SizedBox(height: 8),
-                            Text('اضغط لإضافة صور'),
+                            Text('اضغط لإضافة صور (اختياري)'),
                           ],
                         ),
                       ),
@@ -890,7 +964,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                       TextButton.icon(
                         onPressed: _pickImages,
                         icon: const Icon(Icons.add),
-                        label: const Text('إضافة المزيد'),
+                        label: const Text('إضافة المزيد من الصور'),
                       ),
                     ],
                   ),
@@ -908,7 +982,10 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     ),
                     child: uploading
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('إضافة الشهادة', style: TextStyle(fontSize: 16)),
+                        : const Text(
+                            'إضافة الشهادة',
+                            style: TextStyle(fontSize: 16),
+                          ),
                   ),
                 ),
               ],

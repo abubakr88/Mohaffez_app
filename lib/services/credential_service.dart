@@ -1,3 +1,4 @@
+// lib/services/credential_service.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,10 +7,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 
 class CredentialService {
-  // Upload credential images to Firebase Storage
-  static Future<List<String>> uploadCredentialImages(List<XFile> images, String userId) async {
+  /// Upload credential images to Firebase Storage
+  /// ✅ UPDATED: Now optional - can upload zero images
+  static Future<List<String>> uploadCredentialImages(
+    List<XFile> images,
+    String userId,
+  ) async {
     List<String> imageUrls = [];
-    
+
     for (var image in images) {
       // Validate file size (max 5MB)
       final file = File(image.path);
@@ -41,14 +46,15 @@ class CredentialService {
     return imageUrls;
   }
 
-  // Add a new credential
+  /// Add a new credential
+  /// ✅ UPDATED: Status is now 'approved' directly, imageUrls can be empty
   static Future<void> addCredential({
     required String type,
     required String title,
     required String organization,
     required DateTime issueDate,
     DateTime? expiryDate,
-    required List<String> imageUrls,
+    required List<String> imageUrls, // ✅ Can be empty now
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('يجب تسجيل الدخول');
@@ -74,16 +80,16 @@ class CredentialService {
       'organization': sanitizedOrg,
       'issueDate': Timestamp.fromDate(issueDate),
       'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
-      'imageUrls': imageUrls,
-      'status': 'pending', // pending, approved, rejected
+      'imageUrls': imageUrls, // ✅ Can be empty array
+      'status': 'approved', // ✅ CHANGED: Direct approval (was 'pending')
       'uploadedAt': FieldValue.serverTimestamp(),
-      'reviewedAt': null,
-      'reviewedBy': null,
+      'reviewedAt': FieldValue.serverTimestamp(), // ✅ Auto-reviewed timestamp
+      'reviewedBy': 'system', // ✅ System auto-approval
       'rejectionReason': null,
     });
   }
 
-  // Delete credential
+  /// Delete credential and its images from storage
   static Future<void> deleteCredential(String credentialId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -97,8 +103,9 @@ class CredentialService {
         .get();
 
     if (credentialDoc.exists) {
-      final imageUrls = List<String>.from(credentialDoc.data()?['imageUrls'] ?? []);
-      
+      final imageUrls =
+          List<String>.from(credentialDoc.data()?['imageUrls'] ?? []);
+
       // Delete images from storage
       for (var url in imageUrls) {
         try {
@@ -119,7 +126,7 @@ class CredentialService {
         .delete();
   }
 
-  // Pick images using image picker
+  /// Pick images using image picker
   static Future<List<XFile>> pickImages({int maxImages = 3}) async {
     final ImagePicker picker = ImagePicker();
     final List<XFile> images = await picker.pickMultiImage(

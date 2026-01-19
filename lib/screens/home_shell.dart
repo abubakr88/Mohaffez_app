@@ -10,7 +10,6 @@ import '../providers/notification_provider_paginated.dart';
 
 class HomeShell extends ConsumerWidget {
   final Widget child;
-
   const HomeShell({super.key, required this.child});
 
   @override
@@ -22,7 +21,7 @@ class HomeShell extends ConsumerWidget {
 
     final currentIndex = ref.watch(bottomNavIndexProvider);
     final isMohaffez = user.role == 'mohaffez';
-
+    
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -143,7 +142,6 @@ class HomeShell extends ConsumerWidget {
     String userId,
   ) {
     final unreadCountAsync = ref.watch(unreadNotificationsCountProvider(userId));
-
     return unreadCountAsync.when(
       data: (unreadCount) {
         return Stack(
@@ -253,7 +251,7 @@ class HomeShell extends ConsumerWidget {
               ],
             ),
           ),
-
+          
           // Profile
           ListTile(
             leading: const Icon(Icons.person, color: AppTheme.primaryAmber),
@@ -263,7 +261,7 @@ class HomeShell extends ConsumerWidget {
               context.go('/profile');
             },
           ),
-
+          
           // Mohaffez-only sections
           if (isMohaffez) ...[
             const Divider(),
@@ -284,31 +282,31 @@ class HomeShell extends ConsumerWidget {
               },
             ),
           ],
-
+          
           const Divider(),
-
-          // Settings
+          
+          // Settings - COMPLETED TODO
           ListTile(
             leading: const Icon(Icons.settings, color: Colors.grey),
             title: const Text('الإعدادات'),
             onTap: () {
               Navigator.pop(context);
-              // TODO: Navigate to settings screen
+              context.go('/settings');
             },
           ),
-
-          // Privacy
+          
+          // Privacy - COMPLETED TODO
           ListTile(
             leading: const Icon(Icons.privacy_tip, color: Colors.grey),
             title: const Text('الخصوصية'),
             onTap: () {
               Navigator.pop(context);
-              // TODO: Navigate to privacy settings
+              context.go('/privacy-settings');
             },
           ),
-
+          
           const Divider(),
-
+          
           // Logout
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),

@@ -18,7 +18,7 @@ class StudentRequestsScreen extends ConsumerWidget {
       data: (user) {
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('المستخدم غير موجود')),
+            body: Center(child: Text('لم يتم تسجيل الدخول')),
           );
         }
         return _buildContent(context, ref, user.uid);
@@ -45,7 +45,7 @@ class StudentRequestsScreen extends ConsumerWidget {
           slivers: [
             // Modern App Bar
             SliverAppBar(
-              expandedHeight: 100,
+              expandedHeight: 120,
               floating: true,
               pinned: true,
               elevation: 0,
@@ -117,7 +117,7 @@ class StudentRequestsScreen extends ConsumerWidget {
                     child: EmptyState(
                       icon: Icons.inbox_outlined,
                       title: 'لا توجد طلبات',
-                      message: 'ستظهر طلباتك هنا',
+                      message: 'لم تقم بإرسال أي طلبات حتى الآن',
                       animated: true,
                     ),
                   );
@@ -129,7 +129,10 @@ class StudentRequestsScreen extends ConsumerWidget {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final request = requests[index];
-                        return _RequestCard(request: request);
+                        return RequestCard(
+                          request: request,
+                          studentId: studentId,
+                        );
                       },
                       childCount: requests.length,
                     ),
@@ -154,25 +157,27 @@ class StudentRequestsScreen extends ConsumerWidget {
   }
 }
 
-class _RequestCard extends StatelessWidget {
+class RequestCard extends ConsumerWidget {
   final Map<String, dynamic> request;
+  final String studentId;
 
-  const _RequestCard({required this.request});
+  const RequestCard({
+    required this.request,
+    required this.studentId,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final status = request['status'] as String? ?? 'pending';
-    final mohaffezName = request['mohaffezName'] as String? ?? '';
-    final sessionType = request['sessionType'] as String? ?? '';
+    final mohaffezName = request['mohaffezName'] as String? ?? 'غير محدد';
+    final sessionType = request['sessionType'] as String? ?? 'غير محدد';
     final timeSlot = request['preferredTimeSlot'] as String? ?? '08:00';
 
-    // ✅ FIXED: Handle both Timestamp and DateTime types
-    String dateStr = '';
+    // FIXED: Handle both Timestamp and DateTime types
+    String dateStr = 'غير محدد';
     final createdAtField = request['createdAt'];
-
     if (createdAtField != null) {
       DateTime? date;
-
       // Check if it's a Timestamp
       if (createdAtField is Timestamp) {
         date = createdAtField.toDate();
@@ -181,7 +186,6 @@ class _RequestCard extends StatelessWidget {
       else if (createdAtField is DateTime) {
         date = createdAtField;
       }
-
       if (date != null) {
         dateStr = DateFormat('dd/MM/yyyy', 'ar').format(date);
       }
@@ -306,7 +310,7 @@ class _RequestCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'سبب الرفض:',
+                          'سبب الرفض',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -334,15 +338,7 @@ class _RequestCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: Implement cancel request
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('إلغاء الطلب - قريباً'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
+                  onPressed: () => _cancelRequest(context, ref, request['id'], studentId),
                   icon: const Icon(Icons.cancel),
                   label: const Text('إلغاء الطلب'),
                   style: OutlinedButton.styleFrom(
@@ -357,6 +353,69 @@ class _RequestCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _cancelRequest(
+    BuildContext context,
+    WidgetRef ref,
+    String? requestId,
+    String studentId,
+  ) async {
+    if (requestId == null) return;
+
+    // تأكيد الإلغاء
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تأكيد الإلغاء'),
+          content: const Text('هل أنت متأكد من إلغاء هذا الطلب؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('رجوع'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('إلغاء الطلب'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      // حذف الطلب من Firestore
+      await FirebaseFirestore.instance
+          .collection('sessionRequests')
+          .doc(requestId)
+          .delete();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إلغاء الطلب بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // تحديث القائمة
+        ref.invalidate(studentRequestsFirstPageProvider(studentId));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في الإلغاء: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Color _getStatusColor(String status) {
@@ -414,9 +473,9 @@ class _RequestCard extends StatelessWidget {
   String _getSessionTypeLabel(String type) {
     switch (type.toLowerCase()) {
       case 'home':
-        return 'منزل';
+        return 'في المنزل';
       case 'mosque':
-        return 'مسجد';
+        return 'في المسجد';
       case 'online':
         return 'أونلاين';
       default:

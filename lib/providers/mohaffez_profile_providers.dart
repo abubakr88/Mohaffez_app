@@ -1,7 +1,7 @@
-// lib/providers/mohaffez_profile_providers.dart - NEW FILE
+// lib/providers/mohaffez_profile_providers.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_provider.dart';  // ✅ ADD THIS IMPORT
+import 'user_provider.dart';
 
 /// Provider for mohaffez profile data
 final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>(
@@ -60,7 +60,7 @@ final credentialsProvider = StreamProvider.family<List<Map<String, dynamic>>, St
   },
 );
 
-/// ✅ NEW: Provider for availability
+/// ✅ Provider for availability
 final availabilityProvider = StreamProvider.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance

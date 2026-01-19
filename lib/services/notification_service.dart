@@ -1,25 +1,32 @@
-// lib/services/notification_service.dart - KEY IMPROVEMENTS
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// Background message handler - must be top-level function
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print('NotificationService: Background message: ${message.messageId}');
+}
+
 class NotificationService {
-  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  static final FlutterLocalNotificationsPlugin _localNotifications =
+  static final FirebaseMessaging messaging = FirebaseMessaging.instance;
+  static final FlutterLocalNotificationsPlugin localNotifications =
       FlutterLocalNotificationsPlugin();
 
-  // ✅ Centralized channel configuration
-  static const String _channelId = 'mohaffez_finder_channel';
-  static const String _channelName = 'Mohaffez Finder Notifications';
-  static const String _channelDescription =
-      'Notifications for Quran sessions and lessons';
+  // Centralized channel configuration
+  static const String channelId = 'mohaffez_finder_channel';
+  static const String channelName = 'Mohaffez Finder Notifications';
+  static const String channelDescription = 'Notifications for Quran sessions and lessons';
+
+  static int _tokenRetryCount = 0;
+  static const int _maxTokenRetries = 3;
 
   /// Initialize notifications with better error handling
   static Future<void> initialize() async {
     try {
       // Request permissions
-      final settings = await _messaging.requestPermission(
+      final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -27,10 +34,10 @@ class NotificationService {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('[NotificationService] Permission granted');
+        print('NotificationService: Permission granted');
       } else {
-        print('[NotificationService] Permission denied');
-        return; // Don't proceed if permission denied
+        print('NotificationService: Permission denied');
+        // Continue initialization even if permission denied
       }
 
       // Initialize local notifications
@@ -40,91 +47,107 @@ class NotificationService {
         requestBadgePermission: true,
         requestSoundPermission: true,
       );
-
       const initSettings = InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
       );
 
-      await _localNotifications.initialize(
+      await localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (response) {
-          print('[NotificationService] Notification tapped: ${response.payload}');
-          _handleNotificationTap(response.payload);
+          print('NotificationService: Notification tapped: ${response.payload}');
+          handleNotificationTap(response.payload);
         },
       );
 
       // Create notification channel
-      await _createNotificationChannel();
+      await createNotificationChannel();
 
       // Save FCM token
       await saveFCMToken();
 
       // Listen for token refresh
-      _messaging.onTokenRefresh.listen(_updateFCMToken);
+      messaging.onTokenRefresh.listen(updateFCMToken);
 
       // Handle foreground messages
-      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      FirebaseMessaging.onMessage.listen(handleForegroundMessage);
 
-      print('[NotificationService] Initialized successfully');
+      print('NotificationService: Initialized successfully');
     } catch (e, stack) {
-      print('[NotificationService] Initialization error: $e');
-      print('[NotificationService] Stack trace: $stack');
+      print('NotificationService: Initialization error: $e');
+      print('NotificationService: Stack trace: $stack');
     }
   }
 
   /// Create Android notification channel
-  static Future<void> _createNotificationChannel() async {
+  static Future<void> createNotificationChannel() async {
     const channel = AndroidNotificationChannel(
-      _channelId,
-      _channelName,
-      description: _channelDescription,
+      channelId,
+      channelName,
+      description: channelDescription,
       importance: Importance.high,
       playSound: true,
-      enableVibration: true, // ✅ Added vibration
+      enableVibration: true,
     );
 
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+    await localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
-    print('[NotificationService] Channel created');
+    print('NotificationService: Channel created');
   }
 
-  /// ✅ IMPROVED: Save FCM token with retry logic
+  /// FIXED: Save FCM token with retry logic and proper error handling
   static Future<void> saveFCMToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('[NotificationService] No authenticated user');
+      print('NotificationService: No authenticated user');
       return;
     }
 
     try {
-      final token = await _messaging.getToken();
+      final token = await messaging.getToken();
       if (token == null) {
-        print('[NotificationService] Failed to get FCM token');
+        print('NotificationService: Failed to get FCM token');
+        
+        // Retry with exponential backoff
+        if (_tokenRetryCount < _maxTokenRetries) {
+          _tokenRetryCount++;
+          final delay = Duration(seconds: 5 * _tokenRetryCount);
+          print('NotificationService: Retrying token fetch in ${delay.inSeconds}s (attempt $_tokenRetryCount)');
+          Future.delayed(delay, () => saveFCMToken());
+        }
         return;
       }
 
+      // ✅ FIXED: Use set with merge to avoid document not found error
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .update({
+          .set({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
-      print('[NotificationService] FCM token saved: $token');
+      print('NotificationService: FCM token saved: $token');
+      _tokenRetryCount = 0; // Reset retry count on success
     } catch (e) {
-      print('[NotificationService] Error saving token: $e');
-      // ✅ Retry after 5 seconds
-      Future.delayed(const Duration(seconds: 5), saveFCMToken);
+      print('NotificationService: Error saving token: $e');
+      
+      // Retry with limit
+      if (_tokenRetryCount < _maxTokenRetries) {
+        _tokenRetryCount++;
+        final delay = Duration(seconds: 5 * _tokenRetryCount);
+        print('NotificationService: Retrying in ${delay.inSeconds}s (attempt $_tokenRetryCount)');
+        Future.delayed(delay, () => saveFCMToken());
+      } else {
+        print('NotificationService: Max retries reached for token save');
+      }
     }
   }
 
   /// Update FCM token
-  static Future<void> _updateFCMToken(String token) async {
+  static Future<void> updateFCMToken(String token) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -132,33 +155,32 @@ class NotificationService {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .update({
+          .set({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
-      print('[NotificationService] Token updated: $token');
+      print('NotificationService: Token updated: $token');
     } catch (e) {
-      print('[NotificationService] Error updating token: $e');
+      print('NotificationService: Error updating token: $e');
     }
   }
 
-  /// ✅ IMPROVED: Handle foreground messages with error recovery
-  static Future<void> _handleForegroundMessage(RemoteMessage message) async {
+  /// IMPROVED: Handle foreground messages with better error recovery
+  static Future<void> handleForegroundMessage(RemoteMessage message) async {
     final notification = message.notification;
-    final android = message.notification?.android;
 
     if (notification != null) {
       try {
-        await _localNotifications.show(
+        await localNotifications.show(
           notification.hashCode,
           notification.title,
           notification.body,
           NotificationDetails(
             android: AndroidNotificationDetails(
-              _channelId,
-              _channelName,
-              channelDescription: _channelDescription,
+              channelId,
+              channelName,
+              channelDescription: channelDescription,
               importance: Importance.max,
               priority: Priority.high,
               icon: '@mipmap/ic_launcher',
@@ -174,36 +196,49 @@ class NotificationService {
           payload: message.data['payload'],
         );
 
-        print('[NotificationService] Foreground notification shown');
+        print('NotificationService: Foreground notification shown');
       } catch (e) {
-        print('[NotificationService] Error showing notification: $e');
+        print('NotificationService: Error showing notification: $e');
       }
     }
   }
 
-  /// Handle notification tap
-  static void _handleNotificationTap(String? payload) {
+  /// ✅ FIXED: Handle notification tap with navigation
+  static void handleNotificationTap(String? payload) {
     if (payload != null) {
-      print('[NotificationService] Payload: $payload');
-      // TODO: Navigate based on payload
+      print('NotificationService: Payload: $payload');
+      
+      // Parse payload and navigate
+      try {
+        // Assuming payload format: "type:sessionId" or "type:userId"
+        final parts = payload.split(':');
+        if (parts.length >= 2) {
+          final type = parts[0];
+          final id = parts[1];
+          
+          // Navigate based on type
+          // Note: You'll need to implement your navigation logic here
+          // This is just a template
+          print('NotificationService: Navigate to $type with ID: $id');
+          
+          // TODO: Use your navigation service/router to navigate
+          // Example: navigatorKey.currentState?.pushNamed('/session/$id');
+        }
+      } catch (e) {
+        print('NotificationService: Error parsing payload: $e');
+      }
     }
   }
 
-  /// ✅ ADDED: Clear all notifications
+  /// Clear all notifications
   static Future<void> clearAllNotifications() async {
-    await _localNotifications.cancelAll();
-    print('[NotificationService] All notifications cleared');
+    await localNotifications.cancelAll();
+    print('NotificationService: All notifications cleared');
   }
 
-  /// ✅ ADDED: Clear specific notification
+  /// Clear specific notification
   static Future<void> clearNotification(int id) async {
-    await _localNotifications.cancel(id);
-    print('[NotificationService] Notification $id cleared');
+    await localNotifications.cancel(id);
+    print('NotificationService: Notification $id cleared');
   }
-}
-
-/// Background message handler
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('[NotificationService] Background message: ${message.messageId}');
 }

@@ -1,3 +1,4 @@
+// lib/providers/notification_provider_paginated.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
@@ -5,12 +6,12 @@ import '../models/pagination_state.dart';
 import '../repositories/notification_repository.dart';
 import 'user_provider.dart';
 
-// REPOSITORY PROVIDER
-final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
+// ===== REPOSITORY PROVIDER =====
+final notificationRepositoryProvider = Provider((ref) {
   return NotificationRepository(FirebaseFirestore.instance);
 });
 
-// FIRST PAGE PROVIDER (Real-time)
+// ===== FIRST PAGE PROVIDER (Real-time) =====
 final notificationsFirstPageProvider = StreamProvider.family<List<NotificationModel>, String>(
   (ref, userId) {
     final repository = ref.watch(notificationRepositoryProvider);
@@ -18,7 +19,7 @@ final notificationsFirstPageProvider = StreamProvider.family<List<NotificationMo
   },
 );
 
-// UNREAD COUNT PROVIDER (Real-time)
+// ===== UNREAD COUNT PROVIDER (Real-time) =====
 final unreadNotificationsCountProvider = StreamProvider.family<int, String>(
   (ref, userId) {
     final repository = ref.watch(notificationRepositoryProvider);
@@ -26,7 +27,7 @@ final unreadNotificationsCountProvider = StreamProvider.family<int, String>(
   },
 );
 
-// PAGINATED STATE NOTIFIER
+// ===== PAGINATED STATE NOTIFIER =====
 class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<NotificationModel>> {
   final NotificationRepository repository;
   final String userId;
@@ -35,17 +36,19 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
   PaginatedNotificationsNotifier(this.repository, this.userId)
       : super(const PaginationState());
 
+  /// Initialize with first page from real-time stream
   void initializeWithFirstPage(List<NotificationModel> firstPage) {
     if (state.items.isEmpty && firstPage.isNotEmpty) {
       state = PaginationState(
         items: firstPage,
         lastDocument: null,
-        hasMore: firstPage.length >= 20,
+        hasMore: firstPage.length >= 20, // Assume more if we got full page
         isLoadingMore: false,
       );
     }
   }
 
+  /// Load more notifications (paginated)
   Future<void> loadMore() async {
     if (!state.hasMore || _isLoadingMore) return;
 
@@ -55,10 +58,12 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
         userId: userId,
         lastDocument: null,
       );
+      
       state = state.copyWith(
-        lastDocument: result.lastDocument, // ✅ FIXED: Use lastDocument not lastDoc
+        lastDocument: result.lastDocument,
         hasMore: result.hasMore,
       );
+      
       if (!result.hasMore) return;
     }
 
@@ -68,21 +73,20 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
     state = state.copyWith(isLoadingMore: true, error: null);
 
     try {
-      // ✅ FIXED: Pass userId as named parameter
       final result = await repository.getNotificationsNextPage(
         userId: userId,
         lastDocument: state.lastDocument,
       );
 
+      // Avoid duplicates
       final existingIds = state.items.map((e) => e.id).toSet();
-      // ✅ FIXED: Use result.items not result.notifications
       final newItems = result.items
           .where((item) => !existingIds.contains(item.id))
           .toList();
 
       state = state.copyWith(
         items: [...state.items, ...newItems],
-        lastDocument: result.lastDocument, // ✅ FIXED: Use lastDocument not lastDoc
+        lastDocument: result.lastDocument,
         hasMore: result.hasMore,
         isLoadingMore: false,
       );
@@ -96,20 +100,24 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
     }
   }
 
+  /// Check scroll position and auto-load more
   Future<void> checkScrollPosition(double scrollPercentage) async {
     if (scrollPercentage > 0.8 && state.hasMore && !_isLoadingMore) {
       await loadMore();
     }
   }
 
+  /// Refresh (reset state)
   Future<void> refresh() async {
     state = const PaginationState(isLoadingMore: false);
   }
 
+  /// Mark single notification as read
   Future<void> markAsRead(String notificationId) async {
     try {
       await repository.markAsRead(notificationId);
       
+      // Update local state
       final updatedItems = state.items.map((item) {
         if (item.id == notificationId) {
           return item.copyWith(isRead: true);
@@ -123,10 +131,12 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
     }
   }
 
+  /// Mark all notifications as read
   Future<void> markAllAsRead() async {
     try {
       await repository.markAllAsRead(userId);
       
+      // Update local state
       final updatedItems = state.items.map((item) {
         return item.copyWith(isRead: true);
       }).toList();
@@ -137,10 +147,12 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
     }
   }
 
+  /// Delete single notification
   Future<void> deleteNotification(String notificationId) async {
     try {
       await repository.deleteNotification(notificationId);
       
+      // Remove from local state
       final updatedItems = state.items
           .where((item) => item.id != notificationId)
           .toList();
@@ -151,6 +163,7 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
     }
   }
 
+  /// Delete all notifications
   Future<void> deleteAllNotifications() async {
     try {
       await repository.deleteAllNotifications(userId);
@@ -161,7 +174,7 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
   }
 }
 
-// PAGINATED PROVIDER
+// ===== PAGINATED PROVIDER =====
 final paginatedNotificationsProvider = StateNotifierProvider.family<
     PaginatedNotificationsNotifier,
     PaginationState<NotificationModel>,
@@ -170,6 +183,7 @@ final paginatedNotificationsProvider = StateNotifierProvider.family<
     final repository = ref.watch(notificationRepositoryProvider);
     final notifier = PaginatedNotificationsNotifier(repository, userId);
 
+    // Listen to first page changes (real-time)
     ref.listen(
       notificationsFirstPageProvider(userId),
       (previous, next) {
@@ -181,21 +195,24 @@ final paginatedNotificationsProvider = StateNotifierProvider.family<
   },
 );
 
-// CONVENIENCE PROVIDERS
+// ===== CONVENIENCE PROVIDERS =====
+
+/// Current user's notifications (based on auth state)
 final currentUserNotificationsProvider = Provider<PaginationState<NotificationModel>>((ref) {
   final user = ref.watch(currentUserProvider).value;
   if (user == null) return const PaginationState();
   return ref.watch(paginatedNotificationsProvider(user.uid));
 });
 
+/// Current user's unread count
 final currentUserUnreadCountProvider = Provider<int>((ref) {
   final user = ref.watch(currentUserProvider).value;
   if (user == null) return 0;
   return ref.watch(unreadNotificationsCountProvider(user.uid)).value ?? 0;
 });
 
-// NOTIFICATION ACTIONS PROVIDER
-final notificationActionsProvider = Provider<NotificationActions>((ref) {
+// ===== NOTIFICATION ACTIONS PROVIDER =====
+final notificationActionsProvider = Provider((ref) {
   return NotificationActions(ref);
 });
 
@@ -235,7 +252,7 @@ class NotificationActions {
   }
 }
 
-// NOTIFICATION FILTER
+// ===== NOTIFICATION FILTER =====
 enum NotificationFilter {
   all,
   sessionRequest,
@@ -249,6 +266,7 @@ final notificationFilterProvider = StateProvider<NotificationFilter>((ref) {
   return NotificationFilter.all;
 });
 
+/// Filtered notifications based on selected filter
 final filteredNotificationsProvider = Provider.family<List<NotificationModel>, String>(
   (ref, userId) {
     final paginatedState = ref.watch(paginatedNotificationsProvider(userId));

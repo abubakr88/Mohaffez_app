@@ -25,6 +25,9 @@ import '../screens/student_home.dart';
 import '../screens/student_requests_screen.dart';
 import '../screens/upcoming_sessions_screen.dart';
 import '../shared/constants/app_theme.dart';
+import '../screens/settings_screen.dart';
+import '../screens/privacy_settings_screen.dart';
+import '../screens/session_completion_screen.dart';
 
 import 'guard_manager.dart';
 
@@ -134,6 +137,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ProfileScreen(),
           ),
 
+          GoRoute(
+            path: '/settings',
+            name: 'settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+
+          GoRoute(
+            path: '/privacy-settings',
+            name: 'privacy-settings',
+            builder: (context, state) => const PrivacySettingsScreen(),
+          ),
+
           // MOHAFFEZ ROUTES
           GoRoute(
             path: '/mohaffez-home',
@@ -191,6 +206,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/availability',
             name: 'availability',
             builder: (context, state) => const AvailabilityManagementScreen(),
+          ),
+          GoRoute(
+            path: 'complete-session/:sessionId',
+            name: 'complete-session',
+            builder: (context, state) {
+              final sessionId = state.pathParameters['sessionId']!;
+              final extra = state.extra as Map<String, dynamic>?;
+              
+              return SessionCompletionScreen(
+                sessionId: sessionId,
+                studentName: extra?['studentName'] ?? 'طالب',
+                previousHifz: extra?['previousHifz'],
+                previousMuraja: extra?['previousMuraja'],
+              );
+            },
           ),
         ],
       ),

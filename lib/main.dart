@@ -10,6 +10,14 @@ import 'firebase_options.dart';
 import 'config/app_router.dart';
 import 'shared/constants/app_theme.dart';
 import 'services/cache_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print('Background message: ${message.messageId}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +35,8 @@ void main() async {
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
+    // ✅ Register background handler
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
     // Initialize CacheService
     await CacheService.initialize();

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // ✅ Added for navigation
 import 'package:intl/intl.dart' hide TextDirection;
-
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
@@ -18,7 +17,7 @@ class StudentHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
-    
+
     return userAsync.when(
       data: (user) {
         if (user == null) {
@@ -26,7 +25,7 @@ class StudentHome extends ConsumerWidget {
             body: Center(child: Text('المستخدم غير موجود')),
           );
         }
-        
+
         return _StudentHomeContent(studentId: user.uid);
       },
       loading: () => const Scaffold(
@@ -43,6 +42,7 @@ class StudentHome extends ConsumerWidget {
 
 class _StudentHomeContent extends ConsumerWidget {
   final String studentId;
+
   const _StudentHomeContent({required this.studentId});
 
   @override
@@ -62,7 +62,7 @@ class _StudentHomeContent extends ConsumerWidget {
             slivers: [
               // Modern App Bar
               _buildAppBar(context, ref),
-              
+
               // Content
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -71,15 +71,15 @@ class _StudentHomeContent extends ConsumerWidget {
                     // Welcome Message Card
                     _buildWelcomeCard(ref),
                     const SizedBox(height: 20),
-                    
+
                     // Quick Stats
                     _QuickStatsSection(studentId: studentId),
                     const SizedBox(height: 24),
-                    
+
                     // Quick Actions
                     _QuickActionsSection(studentId: studentId),
                     const SizedBox(height: 24),
-                    
+
                     // Recent Assignments
                     _RecentAssignmentsSection(studentId: studentId),
                     const SizedBox(height: 32),
@@ -237,9 +237,9 @@ class _StudentHomeContent extends ConsumerWidget {
 // ============================================================================
 // QUICK STATS SECTION
 // ============================================================================
-
 class _QuickStatsSection extends ConsumerWidget {
   final String studentId;
+
   const _QuickStatsSection({required this.studentId});
 
   @override
@@ -394,11 +394,11 @@ class _StatCard extends StatelessWidget {
 }
 
 // ============================================================================
-// QUICK ACTIONS SECTION - ✅ UPDATED WITH NEARBY NAVIGATION
+// QUICK ACTIONS SECTION - ✅ UPDATED: SCHEDULE NOW WORKS
 // ============================================================================
-
 class _QuickActionsSection extends StatelessWidget {
   final String studentId;
+
   const _QuickActionsSection({required this.studentId});
 
   @override
@@ -423,7 +423,7 @@ class _QuickActionsSection extends StatelessWidget {
           crossAxisSpacing: 12,
           childAspectRatio: 1.5,
           children: [
-            // ✅ SEARCH FOR NEARBY MOHAFFEZ - UPDATED
+            // ✅ SEARCH FOR NEARBY MOHAFFEZ
             _ActionCard(
               icon: Icons.search,
               title: 'ابحث عن محفظ',
@@ -437,7 +437,7 @@ class _QuickActionsSection extends StatelessWidget {
                 context.go('/nearby');
               },
             ),
-            
+
             // ASSIGNMENTS
             _ActionCard(
               icon: Icons.assignment,
@@ -455,7 +455,7 @@ class _QuickActionsSection extends StatelessWidget {
                 );
               },
             ),
-            
+
             // REQUESTS
             _ActionCard(
               icon: Icons.send,
@@ -473,8 +473,8 @@ class _QuickActionsSection extends StatelessWidget {
                 );
               },
             ),
-            
-            // SCHEDULE (Coming Soon)
+
+            // ✅✅✅ SCHEDULE - NOW ACTIVATED! ✅✅✅
             _ActionCard(
               icon: Icons.calendar_today,
               title: 'الجدول',
@@ -484,10 +484,10 @@ class _QuickActionsSection extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('جدول الحلقات - قريباً'),
-                    duration: Duration(seconds: 2),
+                // ✅ Navigate to StudentAssignmentsScreen (schedule view)
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const StudentAssignmentsScreen(),
                   ),
                 );
               },
@@ -550,9 +550,9 @@ class _ActionCard extends StatelessWidget {
 // ============================================================================
 // RECENT ASSIGNMENTS SECTION
 // ============================================================================
-
 class _RecentAssignmentsSection extends ConsumerWidget {
   final String studentId;
+
   const _RecentAssignmentsSection({required this.studentId});
 
   @override
@@ -826,8 +826,7 @@ class _AssignmentRow extends StatelessWidget {
               text,
               style: const TextStyle(
                 fontSize: 14,
-                height: 1.4,
-              ),
+                height: 1.4,              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
