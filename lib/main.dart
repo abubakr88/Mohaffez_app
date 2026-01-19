@@ -5,18 +5,23 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'firebase_options.dart';
 import 'config/app_router.dart';
 import 'shared/constants/app_theme.dart';
 import 'services/cache_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/notification_service.dart';
 
-
+// Background message handler - must be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  print('Background message: ${message.messageId}');
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  print("NotificationService: Background message ${message.messageId}");
+  
+  // Optional: Handle the background message
+  // You can show notification or process data here
 }
 
 void main() async {
@@ -35,17 +40,22 @@ void main() async {
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
-    // ✅ Register background handler
+
+    // Register background handler BEFORE initializing NotificationService
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
     // Initialize CacheService
     await CacheService.initialize();
 
+    // 🔥 CRITICAL FIX: Initialize NotificationService
+    await NotificationService.initialize();
+    print("NotificationService: Initialized successfully");
+
     // Clear stale cache if auth state doesn't match
     final hasStaleData = CacheService.getUserId() != null &&
         FirebaseAuth.instance.currentUser == null;
     if (hasStaleData) {
-      debugPrint('🧹 Clearing stale cache data');
+      debugPrint("Clearing stale cache data");
       await CacheService.clearAll();
     }
 
@@ -67,8 +77,8 @@ void main() async {
     // Run app with ProviderScope for Riverpod
     runApp(const ProviderScope(child: MyApp()));
   } catch (e, stackTrace) {
-    debugPrint('❌ Initialization error: $e');
-    debugPrint('Stack trace: $stackTrace');
+    debugPrint("Initialization error: $e");
+    debugPrint("Stack trace: $stackTrace"); // 🔥 FIXED: Changed from debugPrintStack
 
     // Show error screen
     runApp(
@@ -88,7 +98,7 @@ void main() async {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'خطأ في التهيئة',
+                    'حدث خطأ أثناء بدء التطبيق',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -102,9 +112,7 @@ void main() async {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      SystemNavigator.pop();
-                    },
+                    onPressed: () => SystemNavigator.pop(),
                     icon: const Icon(Icons.refresh),
                     label: const Text('إعادة المحاولة'),
                   ),
@@ -118,20 +126,40 @@ void main() async {
   }
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    
+    // 🔥 CRITICAL FIX: Save FCM token on app startup if user is logged in
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        NotificationService.saveFCMToken().then((_) {
+          debugPrint("FCM token saved on app startup");
+        }).catchError((error) {
+          debugPrint("Error saving FCM token on startup: $error");
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(goRouterProvider);
 
     return MaterialApp.router(
       title: 'محفظ',
       debugShowCheckedModeBanner: false,
-      
       // Force light theme
       themeMode: ThemeMode.light,
-      
       locale: const Locale('ar'),
       supportedLocales: const [
         Locale('ar', 'SA'),
@@ -144,7 +172,6 @@ class MyApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      
       // Light theme configuration
       theme: ThemeData(
         useMaterial3: true,
@@ -175,7 +202,8 @@ class MyApp extends ConsumerWidget {
           indicatorColor: Colors.white,
           indicatorSize: TabBarIndicatorSize.tab,
           labelStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
+          unselectedLabelStyle:
+              TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -188,7 +216,6 @@ class MyApp extends ConsumerWidget {
           ),
         ),
       ),
-      
       routerConfig: router,
     );
   }
