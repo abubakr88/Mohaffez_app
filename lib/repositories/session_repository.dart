@@ -1,6 +1,7 @@
-// lib/repositories/session_repository.dart (COMPLETE FIXED VERSION)
+// lib/repositories/session_repository.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import '../models/session_model.dart';
 import '../models/session_request_model.dart';
 
@@ -9,6 +10,87 @@ class SessionRepository {
   static const int pageSize = 20;
 
   SessionRepository(this._firestore);
+
+  // ============================================================================
+  // NEW: GET MOHAFFEZ STUDENTS WITH LAST SESSION
+  // ============================================================================
+  
+  /// Get all unique students for a specific mohaffez with their last session
+  Future<List<Map<String, dynamic>>> getMohaffezStudents(String mohaffezId) async {
+    try {
+      debugPrint('SessionRepository: Fetching students for mohaffez $mohaffezId');
+      
+      final snapshot = await _firestore
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('status', whereIn: ['accepted', 'completed'])
+          .orderBy('sessionDate', descending: true)
+          .get();
+
+      debugPrint('SessionRepository: Found ${snapshot.docs.length} sessions');
+
+      // Group by studentId and get the most recent session for each
+      final Map<String, Map<String, dynamic>> studentsMap = {};
+      
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final studentId = data['studentId'] as String?;
+        
+        if (studentId != null && !studentsMap.containsKey(studentId)) {
+          studentsMap[studentId] = {
+            ...data,
+            'id': doc.id,
+            'studentId': studentId,
+            'studentName': data['studentName'] ?? '',
+            'lastSessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+            'hifzAssignment': data['hifzAssignment'],
+            'murajaAssignment': data['murajaAssignment'],
+            'sessionRating': data['sessionRating'] ?? 0,
+            'sessionNotes': data['sessionNotes'],
+            'previousHifzCompleted': data['previousHifzCompleted'],
+            'previousHifzRating': data['previousHifzRating'] ?? 0,
+            'previousMurajaCompleted': data['previousMurajaCompleted'],
+            'previousMurajaRating': data['previousMurajaRating'] ?? 0,
+            'performanceNotes': data['performanceNotes'],
+            'status': data['status'],
+          };
+        }
+      }
+      
+      final students = studentsMap.values.toList();
+      
+      // Sort by last session date (most recent first)
+      students.sort((a, b) {
+        final dateA = a['lastSessionDate'] as DateTime?;
+        final dateB = b['lastSessionDate'] as DateTime?;
+        if (dateA == null) return 1;
+        if (dateB == null) return -1;
+        return dateB.compareTo(dateA);
+      });
+      
+      debugPrint('SessionRepository: Returning ${students.length} unique students');
+      return students;
+    } catch (e) {
+      debugPrint('SessionRepository: Error getting mohaffez students: $e');
+      rethrow;
+    }
+  }
+
+  /// Get total session count for a specific student with a mohaffez
+  Future<int> getStudentSessionCountWithMohaffez(String mohaffezId, String studentId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('studentId', isEqualTo: studentId)
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      debugPrint('SessionRepository: Error getting student session count: $e');
+      return 0;
+    }
+  }
 
   // ============================================================================
   // STREAM METHODS (Real-time first page)
@@ -27,12 +109,6 @@ class SessionRepository {
             .map((doc) => SessionRequestModel.fromJson({...doc.data(), 'id': doc.id}))
             .toList());
   }
-
-// lib/repositories/session_repository.dart (ADD THESE METHODS)
-
-  // ============================================================================
-  // WATCH METHODS (Real-time, all items - for backward compatibility)
-  // ============================================================================
 
   /// Watch all accepted sessions for mohaffez (real-time)
   Stream<List<SessionModel>> watchAcceptedSessions(String mohaffezId) {
@@ -92,7 +168,6 @@ class SessionRepository {
     required Map<String, dynamic> additionalData,
   }) async {
     final docRef = _firestore.collection('sessionRequests').doc();
-    
     await docRef.set({
       'mohaffezId': mohaffezId,
       'studentId': studentId,
@@ -106,7 +181,6 @@ class SessionRepository {
       'createdAt': FieldValue.serverTimestamp(),
       ...additionalData,
     });
-    
     return docRef.id;
   }
 
@@ -134,7 +208,6 @@ class SessionRepository {
     }
 
     final snapshot = await query.limit(pageSize).get();
-
     return (
       notifications: snapshot.docs
           .map((doc) => SessionRequestModel.fromJson({
@@ -166,7 +239,6 @@ class SessionRepository {
     }
 
     final snapshot = await query.limit(pageSize).get();
-
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
@@ -198,7 +270,6 @@ class SessionRepository {
     }
 
     final snapshot = await query.limit(pageSize).get();
-
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
@@ -230,7 +301,6 @@ class SessionRepository {
     }
 
     final snapshot = await query.limit(pageSize).get();
-
     return (
       requests: snapshot.docs
           .map((doc) => SessionRequestModel.fromJson({
@@ -392,9 +462,8 @@ class SessionRepository {
   /// Get a single session by ID
   Future<SessionModel?> getSessionById(String sessionId) async {
     final doc = await _firestore.collection('hafizSessions').doc(sessionId).get();
-    
     if (!doc.exists) return null;
-    
+
     return SessionModel.fromJson({
       ...doc.data()!,
       'id': doc.id
@@ -404,9 +473,8 @@ class SessionRepository {
   /// Get a single request by ID
   Future<SessionRequestModel?> getRequestById(String requestId) async {
     final doc = await _firestore.collection('sessionRequests').doc(requestId).get();
-    
     if (!doc.exists) return null;
-    
+
     return SessionRequestModel.fromJson({
       ...doc.data()!,
       'id': doc.id
@@ -420,7 +488,6 @@ class SessionRepository {
         .where('mohaffezId', isEqualTo: mohaffezId)
         .count()
         .get();
-    
     return snapshot.count ?? 0;
   }
 
@@ -431,7 +498,6 @@ class SessionRepository {
         .where('studentId', isEqualTo: studentId)
         .count()
         .get();
-    
     return snapshot.count ?? 0;
   }
 
@@ -449,21 +515,18 @@ class SessionRepository {
     await _firestore.collection('sessionRequests').doc(requestId).delete();
   }
 
-    /// ✅ ADDED: Batch update multiple sessions
+  /// Batch update multiple sessions
   Future<void> batchUpdateSessions(
     List<String> sessionIds,
     Map<String, dynamic> updates,
   ) async {
     final batch = _firestore.batch();
-    
     for (final sessionId in sessionIds) {
       batch.update(
         _firestore.collection('hafizSessions').doc(sessionId),
         updates,
       );
     }
-    
     await batch.commit();
   }
-
 }

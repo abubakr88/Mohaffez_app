@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/cached_avatar.dart';
 import '../shared/widgets/empty_state.dart';
@@ -13,7 +14,7 @@ class NearbyMohaffezScreen extends ConsumerStatefulWidget {
   const NearbyMohaffezScreen({super.key});
 
   @override
-  ConsumerState<NearbyMohaffezScreen> createState() => _NearbyMohaffezScreenState(); // ✅ إصلاح
+  ConsumerState<NearbyMohaffezScreen> createState() => _NearbyMohaffezScreenState();
 }
 
 class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
@@ -30,15 +31,16 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
     _getCurrentLocation();
   }
 
-  // ✅ تحديث الحصول على الموقع باستخدام API الجديد
+  // FIXED: Check mounted before calling setState
   Future<void> _getCurrentLocation() async {
     try {
+      if (!mounted) return;
+      
       setState(() {
         isLoadingLocation = true;
         locationError = null;
       });
 
-      // التحقق من صلاحيات الموقع
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         throw Exception('خدمات الموقع غير مفعلة');
@@ -48,15 +50,14 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception('تم رفض صلاحيات الموقع');
+          throw Exception('تم رفض إذن الموقع');
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception('صلاحيات الموقع مرفوضة بشكل دائم');
+        throw Exception('تم رفض إذن الموقع بشكل دائم');
       }
 
-      // ✅ استخدام LocationSettings بدلاً من المعاملات المهملة
       final Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -65,12 +66,18 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         ),
       );
 
+      // FIXED: Check mounted before setState
+      if (!mounted) return;
+      
       setState(() {
         userLat = position.latitude;
         userLng = position.longitude;
         isLoadingLocation = false;
       });
     } catch (e) {
+      // FIXED: Check mounted before setState
+      if (!mounted) return;
+      
       setState(() {
         locationError = e.toString();
         isLoadingLocation = false;
@@ -119,8 +126,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                   return const SliverFillRemaining(
                     child: EmptyState(
                       icon: Icons.search_off,
-                      title: 'لا يوجد محفظين قريبين',
-                      message: 'حاول توسيع نطاق البحث أو تغيير موقعك',
+                      title: 'لا يوجد محفظون',
+                      message: 'لم نتمكن من العثور على محفظين في منطقتك',
                     ),
                   );
                 }
@@ -136,12 +143,10 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                         return MohaffezCard(
                           mohaffez: mohaffez,
                           distance: distance,
-                          onTap: () {
-                            context.go('/mohaffez/${mohaffez.id}', extra: {
-                              'lat': userLat?.toString(),
-                              'lng': userLng?.toString(),
-                            });
-                          },
+                          onTap: () => context.go('/mohaffez/${mohaffez.id}', extra: {
+                            'lat': userLat?.toString(),
+                            'lng': userLng?.toString(),
+                          }),
                         );
                       },
                       childCount: mohaffezList.length,
@@ -154,9 +159,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
               ),
               error: (error, stack) => SliverFillRemaining(
                 child: ErrorDisplay.dataLoad(
-                  onRetry: () {
-                    ref.invalidate(nearbyMohaffezProvider);
-                  },
+                  onRetry: () => ref.invalidate(nearbyMohaffezProvider),
                 ),
               ),
             ),
@@ -192,7 +195,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2), // ✅ إصلاح
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -207,7 +210,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'محفظين قريبين',
+                              'المحفظون القريبون',
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -283,7 +286,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
-                'لم نتمكن من تحديد موقعك. النتائج قد لا تكون دقيقة',
+                'تعذر تحديد موقعك. يرجى التحقق من إعدادات الموقع.',
                 style: TextStyle(fontSize: 13, color: Colors.orange),
               ),
             ),
@@ -315,7 +318,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryAmber.withValues(alpha: 0.1), // ✅ إصلاح
+                  color: AppTheme.primaryAmber.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -334,7 +337,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
               activeTrackColor: AppTheme.primaryAmber,
               inactiveTrackColor: Colors.grey.shade300,
               thumbColor: AppTheme.primaryAmber,
-              overlayColor: AppTheme.primaryAmber.withValues(alpha: 0.2), // ✅ إصلاح
+              overlayColor: AppTheme.primaryAmber.withValues(alpha: 0.2),
             ),
             child: Slider(
               value: radiusKm,
@@ -418,7 +421,7 @@ class _FilterChip extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.primaryAmber.withValues(alpha: 0.3), // ✅ إصلاح
+                    color: AppTheme.primaryAmber.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -509,7 +512,7 @@ class MohaffezCard extends StatelessWidget {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        if (distance != null)
+                        if (distance != null) ...[
                           _InfoBadge(
                             icon: Icons.location_on,
                             label: distance! < 1
@@ -517,7 +520,8 @@ class MohaffezCard extends StatelessWidget {
                                 : '${distance!.toStringAsFixed(1)} كم',
                             color: Colors.blue,
                           ),
-                        if (distance != null) const SizedBox(width: 12),
+                          const SizedBox(width: 12),
+                        ],
                         _InfoBadge(
                           icon: Icons.star,
                           label: mohaffez.rating.toStringAsFixed(1),
@@ -563,7 +567,7 @@ class _InfoBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1), // ✅ إصلاح
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

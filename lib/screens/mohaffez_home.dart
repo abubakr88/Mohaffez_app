@@ -1,4 +1,5 @@
 // lib/screens/mohaffez_home.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,7 @@ class MohaffezHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
+
     return userAsync.when(
       data: (user) {
         if (user == null) {
@@ -37,7 +39,8 @@ class MohaffezHome extends ConsumerWidget {
 
 class MohaffezHomeContent extends ConsumerWidget {
   final String mohaffezId;
-  const MohaffezHomeContent({required this.mohaffezId});
+
+  const MohaffezHomeContent({super.key, required this.mohaffezId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -164,7 +167,7 @@ class MohaffezHomeContent extends ConsumerWidget {
     final hour = now.hour;
     String greeting;
     IconData greetingIcon;
-    
+
     if (hour < 12) {
       greeting = 'صباح الخير';
       greetingIcon = Icons.wb_sunny;
@@ -229,20 +232,17 @@ class MohaffezHomeContent extends ConsumerWidget {
   }
 }
 
-// QUICK STATS SECTION - WITH NAVIGATION
-// lib/screens/mohaffez_home.dart
-// UPDATED QuickStatsSection
-
-// lib/screens/mohaffez_home.dart
-// ✅ UPDATED: Shows total count of ALL upcoming sessions
+// ============================================================================
+// QUICK STATS SECTION
+// ============================================================================
 
 class QuickStatsSection extends ConsumerWidget {
   final String mohaffezId;
-  const QuickStatsSection({required this.mohaffezId});
+
+  const QuickStatsSection({super.key, required this.mohaffezId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ✅ Shows ALL upcoming sessions count
     final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
     final pendingRequests = ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
 
@@ -260,7 +260,6 @@ class QuickStatsSection extends ConsumerWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            // ✅ Shows ALL upcoming sessions
             Expanded(
               child: StatCard(
                 icon: Icons.event_available,
@@ -272,7 +271,6 @@ class QuickStatsSection extends ConsumerWidget {
                 ),
                 color: AppTheme.accentGreen,
                 onTap: () {
-                  // Reset filter to show all when navigating
                   ref.read(upcomingSessionsFilterProvider.notifier).state =
                       UpcomingFilter.all;
                   context.push('/upcoming-sessions?mohaffezId=$mohaffezId');
@@ -313,6 +311,7 @@ class StatCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const StatCard({
+    super.key,
     required this.icon,
     required this.title,
     required this.value,
@@ -385,10 +384,14 @@ class StatCard extends StatelessWidget {
   }
 }
 
-// QUICK ACTIONS SECTION - WITH NAVIGATION
+// ============================================================================
+// QUICK ACTIONS SECTION
+// ============================================================================
+
 class QuickActionsSection extends StatelessWidget {
   final String mohaffezId;
-  const QuickActionsSection({required this.mohaffezId});
+
+  const QuickActionsSection({super.key, required this.mohaffezId});
 
   @override
   Widget build(BuildContext context) {
@@ -436,11 +439,22 @@ class QuickActionsSection extends StatelessWidget {
                 context.push('/upcoming-sessions?mohaffezId=$mohaffezId');
               },
             ),
+            // ✅ NEW: My Students Card
+            ActionCard(
+              icon: Icons.groups,
+              title: 'طلابي',
+              gradient: const LinearGradient(
+                colors: [Colors.purple, Color(0xFFAB47BC)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () => context.go('/my-students'),  // ✅ No parameter needed
+            ),
             ActionCard(
               icon: Icons.verified_user,
               title: 'الشهادات',
               gradient: const LinearGradient(
-                colors: [Colors.purple, Color(0xFFAB47BC)],
+                colors: [Colors.deepPurple, Color(0xFF7E57C2)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -474,6 +488,7 @@ class ActionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const ActionCard({
+    super.key,
     required this.icon,
     required this.title,
     required this.gradient,
@@ -517,10 +532,14 @@ class ActionCard extends StatelessWidget {
   }
 }
 
-// UPCOMING SESSIONS SECTION - PRESERVED
+// ============================================================================
+// UPCOMING SESSIONS SECTION
+// ============================================================================
+
 class UpcomingSessionsSection extends ConsumerWidget {
   final String mohaffezId;
-  const UpcomingSessionsSection({required this.mohaffezId});
+
+  const UpcomingSessionsSection({super.key, required this.mohaffezId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

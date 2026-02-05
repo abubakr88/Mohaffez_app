@@ -1,4 +1,4 @@
-// lib/screens/login_screen.dart
+// FILE: lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +23,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _isLogin = true;
   bool _obscurePassword = true;
   String _selectedRole = 'student';
+  
+  // ✅ NEW: Form validation state
+  bool _autoValidate = false;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -50,6 +53,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _submit() async {
+    // ✅ Enable auto-validation after first submit attempt
+    setState(() {
+      _autoValidate = true;
+    });
+
     if (!_formKey.currentState!.validate()) return;
 
     final notifier = ref.read(authNotifierProvider.notifier);
@@ -68,7 +76,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
     }
 
-    // ✅ FIX: Check if mounted BEFORE accessing ref
     if (!mounted) return;
     
     final state = ref.read(authNotifierProvider);
@@ -89,7 +96,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           behavior: SnackBarBehavior.floating,
         ),
       );
-      // Navigation is handled by GoRouter automatically
     }
   }
 
@@ -129,6 +135,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     opacity: _fadeAnimation,
                     child: Form(
                       key: _formKey,
+                      // ✅ IMPROVED: Enable auto-validation mode
+                      autovalidateMode: _autoValidate
+                          ? AutovalidateMode.onUserInteraction
+                          : AutovalidateMode.disabled,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -142,7 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
+                                    color: Colors.black.withOpacity(0.15),
                                     blurRadius: 30,
                                     offset: const Offset(0, 10),
                                   ),
@@ -191,7 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
+                                  color: Colors.black.withOpacity(0.08),
                                   blurRadius: 20,
                                   offset: const Offset(0, 4),
                                 ),
@@ -211,10 +221,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       ),
                                       filled: true,
                                       fillColor: Colors.grey.shade50,
+                                      // ✅ NEW: Error styling
+                                      errorMaxLines: 2,
                                     ),
+                                    // ✅ IMPROVED: Better validation messages
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'الرجاء إدخال الاسم';
+                                      if (value == null || value.trim().isEmpty) {
+                                        return 'الرجاء إدخال الاسم الكامل';
+                                      }
+                                      if (value.trim().length < 3) {
+                                        return 'الاسم يجب أن يكون 3 أحرف على الأقل';
                                       }
                                       return null;
                                     },
@@ -234,13 +250,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     ),
                                     filled: true,
                                     fillColor: Colors.grey.shade50,
+                                    errorMaxLines: 2,
                                   ),
+                                  // ✅ IMPROVED: Better email validation
                                   validator: (value) {
-                                    if (value == null || value.isEmpty) {
+                                    if (value == null || value.trim().isEmpty) {
                                       return 'الرجاء إدخال البريد الإلكتروني';
                                     }
-                                    if (!RegExp(r'^[^@]+@[^@]+\.[^@]{2,4}$')
-                                        .hasMatch(value)) {
+                                    final emailRegex = RegExp(
+                                      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                                    );
+                                    if (!emailRegex.hasMatch(value.trim())) {
                                       return 'البريد الإلكتروني غير صحيح';
                                     }
                                     return null;
@@ -271,10 +291,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     ),
                                     filled: true,
                                     fillColor: Colors.grey.shade50,
+                                    errorMaxLines: 3,
                                   ),
+                                  // ✅ IMPROVED: More detailed password validation
                                   validator: (value) {
-                                    if (value == null || value.length < 8) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'الرجاء إدخال كلمة المرور';
+                                    }
+                                    if (value.length < 8) {
                                       return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
+                                    }
+                                    if (!_isLogin && value.length < 8) {
+                                      // Additional validation for signup
+                                      if (!value.contains(RegExp(r'[A-Z]'))) {
+                                        return 'يجب أن تحتوي على حرف كبير واحد على الأقل';
+                                      }
+                                      if (!value.contains(RegExp(r'[0-9]'))) {
+                                        return 'يجب أن تحتوي على رقم واحد على الأقل';
+                                      }
                                     }
                                     return null;
                                   },
@@ -370,6 +404,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               setState(() {
                                 _isLogin = !_isLogin;
                                 _nameController.clear();
+                                // ✅ Reset auto-validation when switching modes
+                                _autoValidate = false;
                               });
                             },
                             child: RichText(
@@ -391,7 +427,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     style: const TextStyle(
                                       color: AppTheme.primaryAmber,
                                       fontWeight: FontWeight.bold,
-                                      decoration: TextDecoration.underline,
                                     ),
                                   ),
                                 ],
@@ -412,6 +447,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 }
 
+// Role Selection Card
 class _RoleCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -437,7 +473,7 @@ class _RoleCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.1) : Colors.grey.shade50,
+          color: isSelected ? color.withOpacity(0.1) : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : Colors.grey.shade300,
@@ -448,8 +484,8 @@ class _RoleCard extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 40,
-              color: isSelected ? color : Colors.grey,
+              size: 48,
+              color: isSelected ? color : Colors.grey.shade400,
             ),
             const SizedBox(height: 8),
             Text(
@@ -457,9 +493,10 @@ class _RoleCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? color : Colors.black87,
+                color: isSelected ? color : Colors.grey.shade700,
               ),
             ),
+            const SizedBox(height: 4),
             Text(
               subtitle,
               style: TextStyle(
