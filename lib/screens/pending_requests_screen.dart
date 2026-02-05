@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:url_launcher/url_launcher.dart'; // ✅ ADD THIS IMPORT
 
 import '../providers/session_provider_paginated.dart';
 import '../shared/constants/app_theme.dart';
@@ -141,7 +142,7 @@ class PendingRequestsScreen extends ConsumerWidget {
 }
 
 class _PendingRequestCard extends ConsumerWidget {
-  final Map request;
+  final Map<String, dynamic> request;
   final String mohaffezId;
 
   const _PendingRequestCard({
@@ -161,11 +162,27 @@ class _PendingRequestCard extends ConsumerWidget {
     final studentName = request['studentName'] as String? ?? 'طالب';
     final sessionType = request['sessionType'] as String? ?? '';
     final timeSlot = request['preferredTimeSlot'] as String? ?? '08:00';
+    
+    // ✅ Location fields
     final location = request['imamAddressText'] as String?;
+    final lat = request['imamAddressLat'] as double?;
+    final lng = request['imamAddressLng'] as double?;
 
+    // ✅ FIX: Try slotDate first, then slotStart, then createdAt
+    final slotDate = _asDateTime(request['slotDate']);
     final slotStart = _asDateTime(request['slotStart']);
     final createdAt = _asDateTime(request['createdAt']);
-    final displayDate = slotStart ?? createdAt;
+
+    // ✅ Use slotDate if available, otherwise extract date from slotStart
+    DateTime? displayDate;
+    if (slotDate != null) {
+      displayDate = slotDate;
+    } else if (slotStart != null) {
+      // Extract just the date part from slotStart
+      displayDate = DateTime(slotStart.year, slotStart.month, slotStart.day);
+    } else {
+      displayDate = createdAt;
+    }
 
     final dateText = displayDate != null
         ? DateFormat('EEEE dd/MM/yyyy', 'ar').format(displayDate)
@@ -243,27 +260,32 @@ class _PendingRequestCard extends ConsumerWidget {
               value: _getSessionTypeLabel(sessionType),
               color: Colors.blue,
             ),
+
             const SizedBox(height: 12),
+
             _DetailItem(
               icon: Icons.calendar_today,
               label: 'اليوم',
               value: dateText,
               color: Colors.purple,
             ),
+
             const SizedBox(height: 12),
+
             _DetailItem(
               icon: Icons.access_time,
               label: 'الوقت المفضل',
               value: timeSlot,
               color: Colors.green,
             ),
-            if (location?.isNotEmpty ?? false) ...[
+
+            // ✅ FIXED LOCATION - Now clickable and opens Google Maps
+            if ((location?.isNotEmpty ?? false) || (lat != null && lng != null)) ...[
               const SizedBox(height: 12),
-              _DetailItem(
-                icon: Icons.location_on,
-                label: 'الموقع',
-                value: location!,
-                color: Colors.red,
+              _ClickableLocationItem(
+                location: location,
+                lat: lat,
+                lng: lng,
               ),
             ],
 
@@ -387,6 +409,133 @@ class _PendingRequestCard extends ConsumerWidget {
       default:
         return type;
     }
+  }
+}
+
+// ✅ NEW: Clickable Location Widget
+class _ClickableLocationItem extends StatelessWidget {
+  final String? location;
+  final double? lat;
+  final double? lng;
+
+  const _ClickableLocationItem({
+    this.location,
+    this.lat,
+    this.lng,
+  });
+
+  Future<void> _openInGoogleMaps(BuildContext context) async {
+    if (lat == null || lng == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الإحداثيات غير متوفرة')),
+        );
+      }
+      return;
+    }
+
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تعذر فتح خرائط جوجل')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _openInGoogleMaps(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.location_on,
+                color: Colors.red,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'الموقع',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.open_in_new,
+                        size: 12,
+                        color: Colors.red,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    location?.isNotEmpty == true
+                        ? location!
+                        : (lat != null && lng != null ? 'موقع المعلم' : 'غير محدد'),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (lat != null && lng != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'اضغط للفتح في خرائط جوجل',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

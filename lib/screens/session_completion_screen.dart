@@ -1,4 +1,5 @@
 // screens/session_completion_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,6 +12,7 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String studentName;
   final String? previousHifz;
   final String? previousMuraja;
+  final bool isLateCompletion; // ✅ NEW PARAMETER
 
   const SessionCompletionScreen({
     super.key,
@@ -18,6 +20,7 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
     required this.studentName,
     this.previousHifz,
     this.previousMuraja,
+    this.isLateCompletion = false, // ✅ DEFAULT FALSE
   });
 
   @override
@@ -87,6 +90,8 @@ class _SessionCompletionScreenState
             generalNotes: generalNotesController.text.trim().isEmpty
                 ? null
                 : generalNotesController.text.trim(),
+            // ✅ NEW: Flag for late completion
+            isLateCompletion: widget.isLateCompletion,
           );
 
       if (!mounted) return;
@@ -94,9 +99,13 @@ class _SessionCompletionScreenState
       // رجوع مع رسالة نجاح
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم إكمال الجلسة بنجاح ✓'),
-          backgroundColor: AppTheme.accentGreen,
+        SnackBar(
+          content: Text(
+            widget.isLateCompletion
+                ? 'تم إكمال الجلسة المتأخرة بنجاح ✓'
+                : 'تم إكمال الجلسة بنجاح ✓',
+          ),
+          backgroundColor: widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
         ),
       );
     } catch (e) {
@@ -119,14 +128,45 @@ class _SessionCompletionScreenState
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('إكمال الجلسة'),
-          backgroundColor: AppTheme.accentGreen,
+          title: Text(
+            widget.isLateCompletion ? 'إكمال جلسة متأخرة' : 'إكمال الجلسة',
+          ),
+          backgroundColor: widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
         ),
         body: Form(
           key: _formKey,
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // ✅ Late Warning Banner
+              if (widget.isLateCompletion)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: Colors.orange.shade700, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'هذه جلسة متأخرة - يُفضل إكمال الجلسات في موعدها',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.orange.shade900,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // معلومات الطالب
               Card(
                 child: Padding(
@@ -454,7 +494,7 @@ class _SessionCompletionScreenState
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentGreen,
+                    backgroundColor: widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

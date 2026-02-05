@@ -1,4 +1,5 @@
 // screens/upcoming_sessions_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -7,7 +8,7 @@ import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/session_provider_paginated.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'session_completion_screen.dart'; // ✅ استيراد الشاشة الجديدة
+import 'session_completion_screen.dart';
 
 class UpcomingSessionsScreen extends ConsumerWidget {
   final String mohaffezId;
@@ -255,7 +256,6 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
@@ -264,7 +264,10 @@ class UpcomingSessionsScreen extends ConsumerWidget {
   }
 }
 
-// ✅ SESSION CARD WIDGET - محدثة
+// ============================================================================
+// SESSION CARD WIDGET - With Complete Workflow
+// ============================================================================
+
 class SessionCard extends ConsumerWidget {
   final Map<String, dynamic> session;
   final String mohaffezId;
@@ -275,8 +278,60 @@ class SessionCard extends ConsumerWidget {
     required this.mohaffezId,
   });
 
-  // ✅ دالة للحصول على التكليف السابق
-  Future<Map<String, String?>> _getPreviousAssignment(String studentId) async {
+  // ✅ Check if session can be completed (30 min before → 24 hours after)
+  bool _canCompleteSession(DateTime sessionDate, String timeSlot) {
+    try {
+      final now = DateTime.now();
+      
+      // Parse time slot (e.g., "08:00" or "08:00-09:00")
+      final timeParts = timeSlot.split('-')[0].split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
+      
+      // Actual session time
+      final sessionTime = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        hour,
+        minute,
+      );
+      
+      // Window: 30 min before → 24 hours after
+      final canStartFrom = sessionTime.subtract(const Duration(minutes: 30));
+      final canCompleteUntil = sessionTime.add(const Duration(hours: 24));
+      
+      return now.isAfter(canStartFrom) && now.isBefore(canCompleteUntil);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ✅ Check if session is late (more than 15 min after scheduled time)
+  bool _isSessionLate(DateTime sessionDate, String timeSlot) {
+    try {
+      final now = DateTime.now();
+      final timeParts = timeSlot.split('-')[0].split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
+      
+      final sessionTime = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        hour,
+        minute,
+      );
+      
+      final lateThreshold = sessionTime.add(const Duration(minutes: 15));
+      return now.isAfter(lateThreshold);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ✅ Get previous assignment
+  Future<Map<String, dynamic>> _getPreviousAssignment(String studentId) async {
     try {
       final previousSessions = await FirebaseFirestore.instance
           .collection('hafizSessions')
@@ -301,6 +356,42 @@ class SessionCard extends ConsumerWidget {
     }
   }
 
+  // ✅ Mark as No-Show
+  Future<void> _markAsNoShow(BuildContext context, WidgetRef ref) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _NoShowReasonDialog(),
+    );
+
+    if (reason == null) return; // User cancelled
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('hafizSessions')
+          .doc(session['id'] as String)
+          .update({
+        'status': 'no-show',
+        'noShowReason': reason,
+        'noShowMarkedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تسجيل عدم الحضور'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+
+      ref.invalidate(upcomingSessionsProvider(mohaffezId));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final studentName = session['studentName'] as String? ?? 'غير معروف';
@@ -310,10 +401,13 @@ class SessionCard extends ConsumerWidget {
     final sessionType = session['sessionType'] as String? ?? '';
     final studentId = session['studentId'] as String? ?? '';
 
+    // ✅ Determine session status
+    final bool canComplete = sessionDate != null && _canCompleteSession(sessionDate, timeSlot);
+    final bool isLate = sessionDate != null && _isSessionLate(sessionDate, timeSlot);
+
     // Calculate days until session
     String getTimeUntil() {
       if (sessionDate == null) return '';
-
       final now = DateTime.now();
       final dateOnly = DateTime(sessionDate.year, sessionDate.month, sessionDate.day);
       final today = DateTime(now.year, now.month, now.day);
@@ -338,7 +432,7 @@ class SessionCard extends ConsumerWidget {
       ),
       child: InkWell(
         onTap: () {
-          // يمكن فتح تفاصيل الجلسة إذا لزم الأمر
+          // Can show session details if needed
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
@@ -384,7 +478,7 @@ class SessionCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  // Time Until Badge
+                  // Status Badge
                   if (sessionDate != null)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -392,18 +486,22 @@ class SessionCard extends ConsumerWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryAmber.withValues(alpha: 0.1),
+                        color: canComplete
+                            ? AppTheme.accentGreen.withValues(alpha: 0.1)
+                            : AppTheme.primaryAmber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: AppTheme.primaryAmber.withValues(alpha: 0.3),
+                          color: canComplete
+                              ? AppTheme.accentGreen.withValues(alpha: 0.3)
+                              : AppTheme.primaryAmber.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Text(
-                        getTimeUntil(),
-                        style: const TextStyle(
+                        canComplete ? 'جاهزة' : getTimeUntil(),
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryAmber,
+                          color: canComplete ? AppTheme.accentGreen : AppTheme.primaryAmber,
                         ),
                       ),
                     ),
@@ -462,56 +560,152 @@ class SessionCard extends ConsumerWidget {
               const Divider(height: 1),
               const SizedBox(height: 12),
 
-              // ✅ زر إكمال الجلسة
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    // جلب التكليف السابق
-                    final previousAssignment = await _getPreviousAssignment(studentId);
-
-                    if (!context.mounted) return;
-
-                    // فتح شاشة الإكمال
-                    final result = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SessionCompletionScreen(
-                          sessionId: session['id'] as String,
-                          studentName: studentName,
-                          previousHifz: previousAssignment['hifz'],
-                          previousMuraja: previousAssignment['muraja'],
+              // ✅ ACTION BUTTONS - Based on Session Time
+              if (canComplete) ...[
+                // Session is ACTIVE - Can complete
+                Row(
+                  children: [
+                    // No-Show Button (if late)
+                    if (isLate)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _markAsNoShow(context, ref),
+                          icon: const Icon(Icons.person_off, size: 18),
+                          label: const Text('لم يحضر'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.orange,
+                            side: const BorderSide(color: Colors.orange),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
                         ),
                       ),
-                    );
+                    if (isLate) const SizedBox(width: 8),
+                    // Complete Button
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          // Fetch previous assignment
+                          final previousAssignment = await _getPreviousAssignment(studentId);
+                          if (!context.mounted) return;
 
-                    // تحديث القائمة بعد الإكمال
-                    if (result == true && context.mounted) {
-                      ref.invalidate(upcomingSessionsProvider(mohaffezId));
-                      ref.invalidate(completedSessionsProvider(mohaffezId));
-                    }
-                  },
-                  icon: const Icon(Icons.check_circle, size: 20),
-                  label: const Text(
-                    'إكمال الجلسة',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                          // Open completion screen
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SessionCompletionScreen(
+                                sessionId: session['id'] as String,
+                                studentName: studentName,
+                                previousHifz: previousAssignment['hifz'],
+                                previousMuraja: previousAssignment['muraja'],
+                                isLateCompletion: isLate,
+                              ),
+                            ),
+                          );
+
+                          // Refresh lists if completed
+                          if (result == true && context.mounted) {
+                            ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                            ref.invalidate(completedSessionsProvider(mohaffezId));
+                          }
+                        },
+                        icon: const Icon(Icons.check_circle, size: 20),
+                        label: Text(
+                          isLate ? 'إكمال متأخر' : 'إكمال الجلسة',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isLate ? Colors.orange : AppTheme.accentGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+              ] else ...[
+                // Session is SCHEDULED - Too early to complete
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.schedule, size: 20, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'يمكن إكمال الجلسة قبل الموعد بـ 30 دقيقة',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// NO-SHOW REASON DIALOG
+// ============================================================================
+
+class _NoShowReasonDialog extends StatefulWidget {
+  @override
+  State<_NoShowReasonDialog> createState() => _NoShowReasonDialogState();
+}
+
+class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
+  final reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('سبب عدم الحضور'),
+        content: TextField(
+          controller: reasonController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'اختياري: يمكنك توضيح سبب عدم حضور الطالب',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, reasonController.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('تأكيد'),
+          ),
+        ],
       ),
     );
   }

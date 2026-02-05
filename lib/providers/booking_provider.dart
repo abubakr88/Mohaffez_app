@@ -9,6 +9,7 @@ final bookingServiceProvider = Provider<BookingService>((ref) {
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  /// FIXED: Properly handle DateTime to Timestamp conversion
   Future<BookingResult> createSessionRequest({
     required String mohaffezId,
     required String studentId,
@@ -18,13 +19,27 @@ class BookingService {
     required String preferredTimeSlot,
     required DateTime slotStart,
     required DateTime slotEnd,
+    DateTime? slotDate,
     String? imamAddressText,
     double? imamAddressLat,
     double? imamAddressLng,
     String? mohaffezPhone,
   }) async {
     try {
-      final docRef = await _firestore.collection('sessionRequests').add({
+      // CRITICAL FIX: Ensure slotDate is properly set
+      final DateTime actualSlotDate = slotDate ?? 
+          DateTime(slotStart.year, slotStart.month, slotStart.day);
+      
+      // Debug prints
+      print('📤 BOOKING SERVICE - Creating Session Request:');
+      print('   slotStart: $slotStart');
+      print('   slotEnd: $slotEnd');
+      print('   slotDate: $actualSlotDate');
+      print('   slotStart Timestamp: ${Timestamp.fromDate(slotStart)}');
+      print('   slotEnd Timestamp: ${Timestamp.fromDate(slotEnd)}');
+      print('   slotDate Timestamp: ${Timestamp.fromDate(actualSlotDate)}');
+
+      final Map<String, dynamic> requestData = {
         'mohaffezId': mohaffezId,
         'studentId': studentId,
         'studentName': studentName,
@@ -33,17 +48,25 @@ class BookingService {
         'preferredTimeSlot': preferredTimeSlot,
         'slotStart': Timestamp.fromDate(slotStart),
         'slotEnd': Timestamp.fromDate(slotEnd),
+        'slotDate': Timestamp.fromDate(actualSlotDate), // FIXED: Ensure this is set
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
         'imamAddressText': imamAddressText,
         'imamAddressLat': imamAddressLat,
         'imamAddressLng': imamAddressLng,
         'mohaffezPhone': mohaffezPhone,
-      });
+      };
 
+      print('📦 Request Data: $requestData');
+
+      final docRef = await _firestore.collection('sessionRequests').add(requestData);
+      
+      print('✅ Session request created with ID: ${docRef.id}');
+      
       return BookingResult.success(docRef.id);
     } catch (e) {
-      return BookingResult.failure('فشل في إرسال الطلب: ${e.toString()}');
+      print('❌ Error creating session request: $e');
+      return BookingResult.failure(e.toString());
     }
   }
 
@@ -53,10 +76,9 @@ class BookingService {
           .collection('sessionRequests')
           .doc(requestId)
           .update({'status': 'cancelled'});
-
       return BookingResult.success(requestId);
     } catch (e) {
-      return BookingResult.failure('فشل في إلغاء الطلب: ${e.toString()}');
+      return BookingResult.failure(e.toString());
     }
   }
 
@@ -67,10 +89,7 @@ class BookingService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  ...doc.data(),
-                  'id': doc.id,
-                })
+            .map((doc) => {...doc.data(), 'id': doc.id})
             .toList());
   }
 
@@ -82,10 +101,7 @@ class BookingService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => {
-                  ...doc.data(),
-                  'id': doc.id,
-                })
+            .map((doc) => {...doc.data(), 'id': doc.id})
             .toList());
   }
 }

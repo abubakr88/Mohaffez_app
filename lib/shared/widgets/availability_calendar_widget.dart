@@ -48,7 +48,7 @@ class _DayAvailabilityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dayOfWeek = date.weekday; // 1 = Monday
+    final dayOfWeek = date.weekday - 1; // 1 = Monday
     final isToday = DateUtils.isSameDay(date, DateTime.now());
 
     return FutureBuilder<QuerySnapshot>(
