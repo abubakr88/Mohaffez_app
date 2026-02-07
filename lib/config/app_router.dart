@@ -30,6 +30,8 @@ import '../screens/student_requests_screen.dart';
 import '../screens/upcoming_sessions_screen.dart';
 import '../shared/constants/app_theme.dart';
 import 'guard_manager.dart';
+import '../screens/student_payment_screen.dart';
+import '../screens/mohaffez_pricing_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -157,7 +159,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'privacy-settings',
             builder: (context, state) => const PrivacySettingsScreen(),
           ),
-
+          GoRoute(
+            path: '/payment/:mohaffezId',
+            name: 'payment',
+            builder: (context, state) {
+              final mohaffezId = state.pathParameters['mohaffezId']!;
+              final mohaffezName = state.uri.queryParameters['name'] ?? '';
+              return StudentPaymentScreen(
+                mohaffezId: mohaffezId,
+                mohaffezName: mohaffezName,
+              );
+            },
+          ),
           // ============================================
           // MOHAFFEZ ROUTES
           // ============================================
@@ -237,6 +250,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 previousMuraja: extra?['previousMuraja'],
               );
             },
+          ),
+          GoRoute(
+            path: '/pricing-management',
+            name: 'pricing-management',
+            builder: (context, state) => const MohaffezPricingScreen(),
           ),
         ],
       ),

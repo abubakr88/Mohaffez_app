@@ -151,8 +151,8 @@ class SessionDetailsScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
 
                   // Assignments Section
-                  if (session.hifzAssignment?.isNotEmpty ?? false ||
-                      (session.hifzAssignment?.isNotEmpty ?? false) == true)
+                  if ((session.hifzAssignment?.isNotEmpty ?? false) ||
+                      (session.murajaAssignment?.isNotEmpty ?? false))
                     _SectionCard(
                       title: 'الواجبات',
                       icon: Icons.assignment,
@@ -166,8 +166,8 @@ class SessionDetailsScreen extends ConsumerWidget {
                               color: Colors.green,
                               icon: Icons.book,
                             ),
-                          if (session.hifzAssignment?.isNotEmpty ?? false &&
-                              (session.murajaAssignment?.isNotEmpty ?? false) == true)
+                          if ((session.hifzAssignment?.isNotEmpty ?? false) &&
+                              (session.murajaAssignment?.isNotEmpty ?? false))
                             const SizedBox(height: 12),
                           if (session.murajaAssignment?.isNotEmpty ?? false)
                             _AssignmentCard(

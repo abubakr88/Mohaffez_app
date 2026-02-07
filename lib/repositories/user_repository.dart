@@ -161,10 +161,10 @@ class UserRepository {
         'addressLat': user.addressLat,
         'addressLng': user.addressLng,
         'addressText': user.addressText,
-        'rating': user.rating ?? 0.0,
-        'followerCount': user.followerCount ?? 0,
-        'followingCount': user.followingCount ?? 0,
-        'reviewCount': user.reviewCount ?? 0,
+        'rating': user.rating,
+        'followerCount': user.followerCount,
+        'followingCount': user.followingCount,
+        'reviewCount': user.reviewCount,
         'createdAt': FieldValue.serverTimestamp(),
       };
 

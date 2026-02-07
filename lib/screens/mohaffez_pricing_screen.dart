@@ -1,0 +1,370 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/pricing_plan_model.dart';
+import '../providers/pricing_provider.dart';
+import '../providers/user_provider.dart';
+import '../shared/constants/app_theme.dart';
+import '../shared/widgets/empty_state.dart';
+import '../shared/widgets/error_widgets.dart';
+import '../shared/widgets/add_pricing_plan_sheet.dart';
+
+class MohaffezPricingScreen extends ConsumerWidget {
+  const MohaffezPricingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(currentUserProvider);
+    
+    return userAsync.when(
+      data: (user) {
+        if (user == null) {
+          return const Scaffold(
+            body: Center(child: Text('الرجاء تسجيل الدخول')),
+          );
+        }
+        
+        final mohaffezId = user.uid;
+        final plansAsync = ref.watch(pricingPlansProvider(mohaffezId));
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('إدارة الأسعار'),
+            ),
+            body: plansAsync.when(
+              data: (plans) => _buildPlansList(context, ref, plans, mohaffezId),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => ErrorDisplay.dataLoad(
+                onRetry: () {
+                  ref.invalidate(pricingPlansProvider(mohaffezId));
+                },
+              ),
+            ),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () => _showAddPlanDialog(context, ref, mohaffezId),
+              icon: const Icon(Icons.add),
+              label: const Text('إضافة خطة تسعير'),
+            ),
+          ),
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        body: Center(child: Text('خطأ: $e')),
+      ),
+    );
+  }
+
+  Widget _buildPlansList(
+    BuildContext context,
+    WidgetRef ref,
+    List<PricingPlanModel> plans,
+    String mohaffezId,
+  ) {
+    if (plans.isEmpty) {
+      return const EmptyState(
+        icon: Icons.payments_outlined,
+        title: 'لم تقم بإضافة أي خطط تسعير',
+        message: 'أضف خططك الآن لتمكين الطلاب من الحجز',
+      );
+    }
+
+    // Group by session mode
+    final onlinePlans = plans.where((p) => p.mode == SessionMode.online).toList();
+    final homePlans = plans.where((p) => p.mode == SessionMode.home).toList();
+    final mosquePlans = plans.where((p) => p.mode == SessionMode.mosque).toList();
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (onlinePlans.isNotEmpty) ...[
+          _buildSectionHeader('جلسات أونلاين', Icons.videocam),
+          ...onlinePlans.map((plan) => PricingPlanCard(
+                plan: plan,
+                mohaffezId: mohaffezId,
+              )),
+          const SizedBox(height: 24),
+        ],
+        if (homePlans.isNotEmpty) ...[
+          _buildSectionHeader('جلسات منزلية', Icons.home),
+          ...homePlans.map((plan) => PricingPlanCard(
+                plan: plan,
+                mohaffezId: mohaffezId,
+              )),
+          const SizedBox(height: 24),
+        ],
+        if (mosquePlans.isNotEmpty) ...[
+          _buildSectionHeader('جلسات في المسجد', Icons.mosque),
+          ...mosquePlans.map((plan) => PricingPlanCard(
+                plan: plan,
+                mohaffezId: mohaffezId,
+              )),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, right: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.primaryAmber),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddPlanDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String mohaffezId,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => AddPricingPlanSheet(mohaffezId: mohaffezId),
+    );
+  }
+}
+
+// Pricing Plan Card Widget
+class PricingPlanCard extends ConsumerWidget {
+  final PricingPlanModel plan;
+  final String mohaffezId;
+
+  const PricingPlanCard({
+    super.key,
+    required this.plan,
+    required this.mohaffezId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        plan.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _getPlanDescription(),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${plan.priceEGP.toStringAsFixed(0)} جنيه',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.accentGreen,
+                      ),
+                    ),
+                    if (plan.sessionsCount > 1)
+                      Text(
+                        '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} ج/جلسة',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildChip(
+                  '${plan.sessionsCount} جلسة',
+                  Icons.event_available,
+                ),
+                if (plan.sessionsPerWeek != null)
+                  _buildChip(
+                    '${plan.sessionsPerWeek}x أسبوعياً',
+                    Icons.calendar_today,
+                  ),
+                if (plan.validityDays != null)
+                  _buildChip(
+                    'صالح لـ ${plan.validityDays} يوم',
+                    Icons.schedule,
+                  ),
+                if (plan.isFreeTrialAvailable)
+                  _buildChip(
+                    'جلسة تجريبية',
+                    Icons.stars,
+                    color: Colors.orange,
+                  ),
+              ],
+            ),
+            if (plan.description != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  plan.description!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Switch(
+                  value: plan.isActive,
+                  onChanged: (val) => _togglePlanStatus(context, ref, val),
+                  activeColor: AppTheme.accentGreen,
+                ),
+                const Text('مفعّل'),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => _editPlan(context, ref),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                  onPressed: () => _deletePlan(context, ref),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChip(String label, IconData icon, {Color? color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: (color ?? AppTheme.primaryAmber).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (color ?? AppTheme.primaryAmber).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color ?? AppTheme.primaryAmber),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color ?? AppTheme.primaryAmber,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getPlanDescription() {
+    switch (plan.type) {
+      case PlanType.single:
+        return 'جلسة واحدة';
+      case PlanType.bundle:
+        return 'باقة ${plan.sessionsCount} جلسات';
+      case PlanType.subscription:
+        return 'اشتراك شهري - ${plan.sessionsPerWeek}x أسبوعياً';
+    }
+  }
+
+  void _togglePlanStatus(BuildContext context, WidgetRef ref, bool isActive) {
+    // FIX: Call on the notifier, not the state
+    ref.read(pricingActionsProvider.notifier).updatePlanStatus(
+          mohaffezId,
+          plan.id!,
+          isActive,
+        );
+  }
+
+  void _editPlan(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => AddPricingPlanSheet(
+        mohaffezId: mohaffezId,
+        existingPlan: plan,
+      ),
+    );
+  }
+
+  void _deletePlan(BuildContext context, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('حذف خطة التسعير'),
+          content: const Text('هل أنت متأكد من حذف هذه الخطة؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('حذف'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      // FIX: Call on the notifier, not the state
+      await ref.read(pricingActionsProvider.notifier).deletePlan(
+            plan.id!,
+            mohaffezId,
+          );
+    }
+  }
+}

@@ -17,6 +17,7 @@ class NotificationModel with _$NotificationModel {
     String? scheduleId,
     String? mohaffezId,
     String? mohaffezName,
+    Map<String, dynamic>? data,
     @TimestampConverter() DateTime? createdAt,
   }) = _NotificationModel;
 

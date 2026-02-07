@@ -23,6 +23,7 @@ class MohaffezHome extends ConsumerWidget {
             body: Center(child: Text('لم يتم تسجيل الدخول')),
           );
         }
+
         return MohaffezHomeContent(mohaffezId: user.uid);
       },
       loading: () => const Scaffold(
@@ -83,7 +84,7 @@ class MohaffezHomeContent extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
@@ -192,7 +193,7 @@ class MohaffezHomeContent extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.accentGreen.withOpacity(0.1),
+                color: AppTheme.accentGreen.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -327,7 +328,7 @@ class StatCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -345,7 +346,7 @@ class StatCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
+                      color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(icon, size: 28, color: color),
@@ -415,6 +416,7 @@ class QuickActionsSection extends StatelessWidget {
           crossAxisSpacing: 12,
           childAspectRatio: 1.5,
           children: [
+            // Pending Requests
             ActionCard(
               icon: Icons.pending_actions,
               title: 'الطلبات المعلقة',
@@ -427,6 +429,8 @@ class QuickActionsSection extends StatelessWidget {
                 context.push('/pending-requests?mohaffezId=$mohaffezId');
               },
             ),
+
+            // Upcoming Sessions
             ActionCard(
               icon: Icons.event_available,
               title: 'الجلسات القادمة',
@@ -439,7 +443,22 @@ class QuickActionsSection extends StatelessWidget {
                 context.push('/upcoming-sessions?mohaffezId=$mohaffezId');
               },
             ),
-            // ✅ NEW: My Students Card
+
+            // ✅ NEW: Pricing Management
+            ActionCard(
+              icon: Icons.payments,
+              title: 'إدارة الأسعار',
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () {
+                context.push('/pricing-management');
+              },
+            ),
+
+            // My Students
             ActionCard(
               icon: Icons.groups,
               title: 'طلابي',
@@ -448,8 +467,10 @@ class QuickActionsSection extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              onTap: () => context.go('/my-students'),  // ✅ No parameter needed
+              onTap: () => context.go('/my-students'),
             ),
+
+            // Credentials
             ActionCard(
               icon: Icons.verified_user,
               title: 'الشهادات',
@@ -462,6 +483,8 @@ class QuickActionsSection extends StatelessWidget {
                 context.push('/credentials');
               },
             ),
+
+            // Availability
             ActionCard(
               icon: Icons.calendar_today,
               title: 'الأوقات المتاحة',
@@ -623,7 +646,7 @@ class UpcomingSessionsSection extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppTheme.accentGreen.withOpacity(0.1),
+                            color: AppTheme.accentGreen.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(

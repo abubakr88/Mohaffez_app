@@ -5,24 +5,26 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // ✅ مضاف
 
 import 'firebase_options.dart';
 import 'config/app_router.dart';
 import 'shared/constants/app_theme.dart';
 import 'services/cache_service.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-
 
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   print('Background message: ${message.messageId}');
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   try {
+    // ✅ Load .env from project root (جديد)
+    await dotenv.load(fileName: '.env');
+
     // Initialize Firebase
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
@@ -35,6 +37,7 @@ void main() async {
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
+
     // ✅ Register background handler
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -42,8 +45,8 @@ void main() async {
     await CacheService.initialize();
 
     // Clear stale cache if auth state doesn't match
-    final hasStaleData = CacheService.getUserId() != null &&
-        FirebaseAuth.instance.currentUser == null;
+    final hasStaleData =
+        CacheService.getUserId() != null && FirebaseAuth.instance.currentUser == null;
     if (hasStaleData) {
       debugPrint('🧹 Clearing stale cache data');
       await CacheService.clearAll();
@@ -128,10 +131,8 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'محفظ',
       debugShowCheckedModeBanner: false,
-      
       // Force light theme
       themeMode: ThemeMode.light,
-      
       locale: const Locale('ar'),
       supportedLocales: const [
         Locale('ar', 'SA'),
@@ -144,7 +145,6 @@ class MyApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      
       // Light theme configuration
       theme: ThemeData(
         useMaterial3: true,
@@ -175,7 +175,8 @@ class MyApp extends ConsumerWidget {
           indicatorColor: Colors.white,
           indicatorSize: TabBarIndicatorSize.tab,
           labelStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
+          unselectedLabelStyle:
+              TextStyle(fontSize: 18, fontWeight: FontWeight.normal),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -188,7 +189,6 @@ class MyApp extends ConsumerWidget {
           ),
         ),
       ),
-      
       routerConfig: router,
     );
   }

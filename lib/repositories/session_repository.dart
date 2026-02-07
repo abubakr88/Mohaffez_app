@@ -119,7 +119,7 @@ class SessionRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => SessionModel.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
+                  ...doc.data(),
                   'id': doc.id
                 }))
             .toList());
@@ -134,7 +134,7 @@ class SessionRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => SessionModel.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
+                  ...doc.data(),
                   'id': doc.id
                 }))
             .toList());
@@ -149,7 +149,7 @@ class SessionRepository {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => SessionRequestModel.fromJson({
-                  ...doc.data() as Map<String, dynamic>,
+                  ...doc.data(),
                   'id': doc.id
                 }))
             .toList());
@@ -211,7 +211,7 @@ class SessionRepository {
     return (
       notifications: snapshot.docs
           .map((doc) => SessionRequestModel.fromJson({
-                ...doc.data() as Map<String, dynamic>,
+                ...doc.data()! as Map<String, dynamic>,
                 'id': doc.id
               }))
           .toList(),
@@ -242,7 +242,7 @@ class SessionRepository {
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
-                ...doc.data() as Map<String, dynamic>,
+                ...doc.data()! as Map<String, dynamic>,
                 'id': doc.id
               }))
           .toList(),
@@ -273,7 +273,7 @@ class SessionRepository {
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
-                ...doc.data() as Map<String, dynamic>,
+                ...doc.data()! as Map<String, dynamic>,
                 'id': doc.id
               }))
           .toList(),
@@ -304,7 +304,7 @@ class SessionRepository {
     return (
       requests: snapshot.docs
           .map((doc) => SessionRequestModel.fromJson({
-                ...doc.data() as Map<String, dynamic>,
+                ...doc.data()! as Map<String, dynamic>,
                 'id': doc.id
               }))
           .toList(),

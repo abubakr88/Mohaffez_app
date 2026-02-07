@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:go_router/go_router.dart';
+
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../providers/notification_provider_paginated.dart';
 import '../providers/user_provider.dart';
+import '../models/notification_model.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
@@ -26,7 +30,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider).value;
-    
+
     if (user == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -34,7 +38,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
 
     final paginatedState = ref.watch(paginatedNotificationsProvider(user.uid));
-    final unreadCount = ref.watch(unreadNotificationsCountProvider(user.uid)).value ?? 0;
+    final unreadCount =
+        ref.watch(unreadNotificationsCountProvider(user.uid)).value ?? 0;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -116,7 +121,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             // Filter Chips
             SliverToBoxAdapter(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -131,7 +137,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       _FilterChip(
                         label: 'الجلسات',
                         isSelected: selectedFilter == 'session',
-                        onTap: () => setState(() => selectedFilter = 'session'),
+                        onTap: () =>
+                            setState(() => selectedFilter = 'session'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'المدفوعات',
+                        isSelected: selectedFilter == 'payment',
+                        onTap: () =>
+                            setState(() => selectedFilter = 'payment'),
                       ),
                       const SizedBox(width: 8),
                       _FilterChip(
@@ -164,12 +178,36 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         return paginatedState.isLoadingMore
                             ? const Padding(
                                 padding: EdgeInsets.all(16),
-                                child: Center(child: CircularProgressIndicator()),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
                               )
                             : const SizedBox.shrink();
                       }
 
                       final notification = paginatedState.items[index];
+
+                      // Filter logic
+                      if (selectedFilter != 'all') {
+                        if (selectedFilter == 'session' &&
+                            ![
+                              'session_request',
+                              'session_accepted',
+                              'session_rejected',
+                            ].contains(notification.type)) {
+                          return const SizedBox.shrink();
+                        }
+
+                        if (selectedFilter == 'payment' &&
+                            notification.type != 'payment_required') {
+                          return const SizedBox.shrink();
+                        }
+
+                        if (selectedFilter == 'follow' &&
+                            notification.type != 'follow') {
+                          return const SizedBox.shrink();
+                        }
+                      }
+
                       return _NotificationCard(
                         notification: notification,
                         onTap: () {
@@ -178,7 +216,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                 .read(notificationActionsProvider)
                                 .markAsRead(user.uid, notification.id!);
                           }
-                          // Navigate based on type
+
+                          _handleNotificationTap(
+                            context,
+                            notification as NotificationModel,
+                          );
                         },
                         onDismiss: () {
                           ref
@@ -196,6 +238,97 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ),
       ),
     );
+  }
+
+  /// Handle notification tap with proper navigation
+  void _handleNotificationTap(
+      BuildContext context, NotificationModel notification) {
+    final type = notification.type;
+
+    switch (type) {
+      case 'payment_required':
+      case 'paymentrequired':
+        final Map<String, dynamic> data =
+            notification.data ?? <String, dynamic>{};
+
+        final requestId = data['requestId'] as String?;
+        final mohaffezId = data['mohaffezId'] as String?;
+        final mohaffezName = data['mohaffezName'] as String? ??
+            notification.mohaffezName ??
+            '';
+
+        if (requestId != null &&
+            mohaffezId != null &&
+            mohaffezName.isNotEmpty) {
+          // Navigate to payment confirmation screen with request ID
+          context.push(
+            '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
+            extra: {
+              'requestId': requestId,
+              'mohaffezId': mohaffezId,
+              'mohaffezName': mohaffezName,
+              'sessionDetails': data,
+            },
+          );
+        } else if (mohaffezId != null && mohaffezName.isNotEmpty) {
+          // Fallback: generic payment screen
+          final sessionType = data['sessionType'] as String?;
+          final preferredTimeSlot = data['timeSlot'] ?? data['preferredTimeSlot'];
+
+          context.push(
+            '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}'
+            '${sessionType != null ? '&sessionType=$sessionType' : ''}'
+            '${preferredTimeSlot != null ? '&timeSlot=$preferredTimeSlot' : ''}',
+            extra: {
+              'preselectedSessionType': sessionType,
+              'preselectedTimeSlot': preferredTimeSlot != null
+                  ? {
+                      'startTime': preferredTimeSlot,
+                      'endTime': null,
+                    }
+                  : null,
+              'preselectedDate': data['sessionDate'],
+              'autoBookAfterPayment': true,
+            },
+          );
+        }
+        break;
+
+      case 'session_accepted':
+        context.go('/home');
+        break;
+
+      case 'session_rejected':
+        final reason = notification.body ?? 'لم يذكر سبب الرفض';
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('تم رفض الطلب'),
+            content: Text(reason),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('حسناً'),
+              ),
+            ],
+          ),
+        );
+        break;
+
+      case 'session_request':
+        // Navigate to pending requests
+        context.go('/mohaffez-home');
+        break;
+
+      case 'assignment_updated':
+        // Navigate to student assignments
+        context.go('/assignments');
+        break;
+
+      default:
+        // No specific action
+        break;
+    }
   }
 }
 
@@ -223,7 +356,8 @@ class _FilterChip extends StatelessWidget {
           color: isSelected ? AppTheme.primaryAmber : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
+            color:
+                isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
           ),
           boxShadow: isSelected
               ? [
@@ -242,14 +376,17 @@ class _FilterChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight:
+                    isSelected ? FontWeight.bold : FontWeight.normal,
+                color:
+                    isSelected ? Colors.white : Colors.grey.shade700,
               ),
             ),
             if (count != null) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Colors.white.withOpacity(0.3)
@@ -261,7 +398,9 @@ class _FilterChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : Colors.grey.shade700,
+                    color: isSelected
+                        ? Colors.white
+                        : Colors.grey.shade700,
                   ),
                 ),
               ),
@@ -305,7 +444,9 @@ class _NotificationCard extends StatelessWidget {
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
         elevation: notification.isRead ? 1 : 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
@@ -384,39 +525,49 @@ class _NotificationCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Color _getNotificationColor(String? type) {
-    switch (type) {
-      case 'session_request':
-        return Colors.orange;
-      case 'session_accepted':
-        return Colors.green;
-      case 'assignment_updated':
-        return Colors.blue;
-      case 'follow':
-        return Colors.purple;
-      default:
-        return Colors.grey;
-    }
+Color _getNotificationColor(String? type) {
+  switch (type) {
+    case 'session_request':
+      return Colors.orange;
+    case 'session_accepted':
+      return Colors.green;
+    case 'payment_required':
+    case 'paymentrequired':
+      return AppTheme.primaryAmber;
+    case 'session_rejected':
+      return Colors.red;
+    case 'assignment_updated':
+      return Colors.blue;
+    case 'follow':
+      return Colors.purple;
+    default:
+      return Colors.grey;
   }
+}
 
-  IconData _getNotificationIcon(String? type) {
-    switch (type) {
-      case 'session_request':
-        return Icons.pending_actions;
-      case 'session_accepted':
-        return Icons.check_circle;
-      case 'assignment_updated':
-        return Icons.assignment;
-      case 'follow':
-        return Icons.person_add;
-      default:
-        return Icons.notifications;
-    }
+IconData _getNotificationIcon(String? type) {
+  switch (type) {
+    case 'session_request':
+      return Icons.pending_actions;
+    case 'session_accepted':
+      return Icons.check_circle;
+    case 'payment_required':
+    case 'paymentrequired':
+      return Icons.payment;
+    case 'session_rejected':
+      return Icons.cancel;
+    case 'assignment_updated':
+      return Icons.assignment;
+    case 'follow':
+      return Icons.person_add;
+    default:
+      return Icons.notifications;
   }
+}
 
-  String _formatTimestamp(DateTime? timestamp) {
-    if (timestamp == null) return '';
-    return timeago.format(timestamp, locale: 'ar');
-  }
+String _formatTimestamp(DateTime? timestamp) {
+  if (timestamp == null) return '';
+  return timeago.format(timestamp, locale: 'ar');
 }

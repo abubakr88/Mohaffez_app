@@ -269,7 +269,7 @@ class BasicInfoSection extends StatelessWidget {
           _buildInfoRow(
             icon: Icons.email,
             label: 'البريد الإلكتروني',
-            value: user.email ?? '',
+            value: user.email,
           ),
           const SizedBox(height: 12),
           // Bio (Mohaffez only, editable)
@@ -330,7 +330,7 @@ class BasicInfoSection extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     label: 'متابعون',
-                    value: (user.followerCount ?? 0).toString(),
+                    value: user.followerCount.toString(),
                     icon: Icons.people,
                   ),
                 ),
@@ -338,7 +338,7 @@ class BasicInfoSection extends StatelessWidget {
                 Expanded(
                   child: _buildStatCard(
                     label: 'التقييم',
-                    value: (user.rating ?? 0.0).toStringAsFixed(1),
+                    value: user.rating.toStringAsFixed(1),
                     icon: Icons.star,
                   ),
                 ),

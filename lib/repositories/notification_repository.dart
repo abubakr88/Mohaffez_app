@@ -13,7 +13,7 @@ class NotificationRepository with FirestorePaginationMixin {
 
   /// Watch first page of notifications (real-time, paginated)
   Stream<List<NotificationModel>> watchNotificationsFirstPage(String userId) {
-    return watchFirstPage(
+    return watchFirstPage<NotificationModel>(
       query: firestore
           .collection('notifications')
           .where('userId', isEqualTo: userId)
@@ -59,7 +59,7 @@ class NotificationRepository with FirestorePaginationMixin {
     required String userId,
     DocumentSnapshot? lastDocument,
   }) async {
-    return executePaginatedQuery(
+    return executePaginatedQuery<NotificationModel>(
       query: firestore
           .collection('notifications')
           .where('userId', isEqualTo: userId)
@@ -111,6 +111,7 @@ class NotificationRepository with FirestorePaginationMixin {
         .where('isRead', isEqualTo: false)
         .count()
         .get();
+
     return snapshot.count ?? 0;
   }
 
@@ -150,7 +151,6 @@ class NotificationRepository with FirestorePaginationMixin {
     for (final doc in snapshot.docs) {
       batch.update(doc.reference, {'isRead': true});
     }
-
     await batch.commit();
   }
 
@@ -164,6 +164,7 @@ class NotificationRepository with FirestorePaginationMixin {
     String? scheduleId,
     String? mohaffezId,
     String? mohaffezName,
+    Map<String, dynamic>? metadata,
   }) async {
     final docRef = firestore.collection('notifications').doc();
     await docRef.set({
@@ -175,6 +176,7 @@ class NotificationRepository with FirestorePaginationMixin {
       'scheduleId': scheduleId,
       'mohaffezId': mohaffezId,
       'mohaffezName': mohaffezName,
+      if (metadata != null) ...metadata,
       'createdAt': FieldValue.serverTimestamp(),
     });
     return docRef.id;
@@ -246,6 +248,51 @@ class NotificationRepository with FirestorePaginationMixin {
     return docRef.id;
   }
 
+  /// ✅ NEW: Create payment required notification
+  Future<String> createPaymentRequiredNotification({
+    required String studentId,
+    required String mohaffezName,
+    required String requestId,
+    required Map<String, dynamic> sessionDetails,
+  }) async {
+    final docRef = firestore.collection('notifications').doc();
+    await docRef.set({
+      'userId': studentId,
+      'title': 'تم قبول طلب الحجز! 🎉',
+      'body': '$mohaffezName قبل طلبك. اضغط للدفع وتأكيد الجلسة.',
+      'type': 'payment_required',
+      'isRead': false,
+      'requestId': requestId,
+      'mohaffezName': mohaffezName,
+      'sessionType': sessionDetails['sessionType'],
+      'sessionDate': sessionDetails['slotDate'],
+      'timeSlot': sessionDetails['preferredTimeSlot'],
+      'mohaffezId': sessionDetails['mohaffezId'],
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  /// ✅ NEW: Create session rejection notification
+  Future<String> createSessionRejectionNotification({
+    required String studentId,
+    required String mohaffezName,
+    String? reason,
+  }) async {
+    final docRef = firestore.collection('notifications').doc();
+    await docRef.set({
+      'userId': studentId,
+      'title': 'تم رفض طلب الحجز',
+      'body': '$mohaffezName اعتذر عن قبول الطلب${reason != null ? ": $reason" : ""}',
+      'type': 'session_rejected',
+      'isRead': false,
+      'mohaffezName': mohaffezName,
+      if (reason != null) 'rejectionReason': reason,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
   /// Create notification when assignment is updated
   Future<String> createAssignmentUpdatedNotification({
     required String studentId,
@@ -276,6 +323,4 @@ class NotificationRepository with FirestorePaginationMixin {
     });
     return docRef.id;
   }
-
-
 }

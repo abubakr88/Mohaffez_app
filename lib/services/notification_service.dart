@@ -1,24 +1,29 @@
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
 // Background message handler - must be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('NotificationService: Background message: ${message.messageId}');
+  // Create notification in database when app is in background
+  await NotificationService.createDatabaseNotificationFromRemote(message);
 }
 
 class NotificationService {
   static final FirebaseMessaging messaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin localNotifications =
       FlutterLocalNotificationsPlugin();
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Centralized channel configuration
   static const String channelId = 'mohaffez_finder_channel';
   static const String channelName = 'Mohaffez Finder Notifications';
   static const String channelDescription = 'Notifications for Quran sessions and lessons';
-
+  
   static int _tokenRetryCount = 0;
   static const int _maxTokenRetries = 3;
 
@@ -37,7 +42,6 @@ class NotificationService {
         print('NotificationService: Permission granted');
       } else {
         print('NotificationService: Permission denied');
-        // Continue initialization even if permission denied
       }
 
       // Initialize local notifications
@@ -93,11 +97,10 @@ class NotificationService {
     await localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
-
     print('NotificationService: Channel created');
   }
 
-  /// FIXED: Save FCM token with retry logic and proper error handling
+  /// Save FCM token with retry logic
   static Future<void> saveFCMToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -109,39 +112,27 @@ class NotificationService {
       final token = await messaging.getToken();
       if (token == null) {
         print('NotificationService: Failed to get FCM token');
-        
-        // Retry with exponential backoff
         if (_tokenRetryCount < _maxTokenRetries) {
           _tokenRetryCount++;
           final delay = Duration(seconds: 5 * _tokenRetryCount);
-          print('NotificationService: Retrying token fetch in ${delay.inSeconds}s (attempt $_tokenRetryCount)');
+          print('NotificationService: Retrying token fetch in ${delay.inSeconds}s');
           Future.delayed(delay, () => saveFCMToken());
         }
         return;
       }
 
-      // ✅ FIXED: Use set with merge to avoid document not found error
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({
+      await _firestore.collection('users').doc(user.uid).set({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       print('NotificationService: FCM token saved: $token');
-      _tokenRetryCount = 0; // Reset retry count on success
+      _tokenRetryCount = 0;
     } catch (e) {
       print('NotificationService: Error saving token: $e');
-      
-      // Retry with limit
       if (_tokenRetryCount < _maxTokenRetries) {
         _tokenRetryCount++;
-        final delay = Duration(seconds: 5 * _tokenRetryCount);
-        print('NotificationService: Retrying in ${delay.inSeconds}s (attempt $_tokenRetryCount)');
-        Future.delayed(delay, () => saveFCMToken());
-      } else {
-        print('NotificationService: Max retries reached for token save');
+        Future.delayed(Duration(seconds: 5 * _tokenRetryCount), () => saveFCMToken());
       }
     }
   }
@@ -152,26 +143,25 @@ class NotificationService {
     if (user == null) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({
+      await _firestore.collection('users').doc(user.uid).set({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
       print('NotificationService: Token updated: $token');
     } catch (e) {
       print('NotificationService: Error updating token: $e');
     }
   }
 
-  /// IMPROVED: Handle foreground messages with better error recovery
+  /// Handle foreground messages
   static Future<void> handleForegroundMessage(RemoteMessage message) async {
     final notification = message.notification;
-
     if (notification != null) {
       try {
+        // Create database notification
+        await createDatabaseNotificationFromRemote(message);
+
+        // Show local notification
         await localNotifications.show(
           notification.hashCode,
           notification.title,
@@ -193,9 +183,8 @@ class NotificationService {
               presentSound: true,
             ),
           ),
-          payload: message.data['payload'],
+          payload: jsonEncode(message.data),
         );
-
         print('NotificationService: Foreground notification shown');
       } catch (e) {
         print('NotificationService: Error showing notification: $e');
@@ -203,30 +192,241 @@ class NotificationService {
     }
   }
 
-  /// ✅ FIXED: Handle notification tap with navigation
+  /// Handle notification tap
   static void handleNotificationTap(String? payload) {
-    if (payload != null) {
+    if (payload != null && payload.isNotEmpty) {
       print('NotificationService: Payload: $payload');
+      // The actual navigation will be handled in the UI layer
+      // This is just for logging and data extraction
+    }
+  }
+
+  // ==================== NEW METHODS FOR NOTIFICATIONS ====================
+
+  /// Create database notification from RemoteMessage
+  static Future<void> createDatabaseNotificationFromRemote(RemoteMessage message) async {
+    try {
+      final data = message.data;
+      final userId = data['userId'] as String?;
       
-      // Parse payload and navigate
-      try {
-        // Assuming payload format: "type:sessionId" or "type:userId"
-        final parts = payload.split(':');
-        if (parts.length >= 2) {
-          final type = parts[0];
-          final id = parts[1];
-          
-          // Navigate based on type
-          // Note: You'll need to implement your navigation logic here
-          // This is just a template
-          print('NotificationService: Navigate to $type with ID: $id');
-          
-          // TODO: Use your navigation service/router to navigate
-          // Example: navigatorKey.currentState?.pushNamed('/session/$id');
-        }
-      } catch (e) {
-        print('NotificationService: Error parsing payload: $e');
+      if (userId == null) return;
+
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': message.notification?.title ?? '',
+        'body': message.notification?.body ?? '',
+        'type': data['type'] ?? 'general',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': data,
+      });
+
+      print('NotificationService: Database notification created');
+    } catch (e) {
+      print('NotificationService: Error creating database notification: $e');
+    }
+  }
+
+  /// Send Payment Required Notification
+  static Future<void> sendPaymentRequiredNotification({
+    required String studentId,
+    required String requestId,
+    required String mohaffezId,
+    required String mohaffezName,
+    required Map<String, dynamic> sessionDetails,
+  }) async {
+    try {
+      // 1. Create notification in database
+      await _firestore.collection('notifications').add({
+        'userId': studentId,
+        'title': 'الدفع مطلوب!',
+        'body': '$mohaffezName قبل طلبك. الرجاء إتمام الدفع لتأكيد الجلسة.',
+        'type': 'paymentrequired',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'mohaffezId': mohaffezId,
+        'mohaffezName': mohaffezName,
+        'data': {
+          'requestId': requestId,
+          'mohaffezId': mohaffezId,
+          'mohaffezName': mohaffezName,
+          ...sessionDetails,
+        },
+      });
+
+      // 2. Send FCM push notification
+      await _sendFCMNotification(
+        userId: studentId,
+        title: 'الدفع مطلوب!',
+        body: '$mohaffezName قبل طلبك. اضغط للدفع.',
+        data: {
+          'type': 'paymentrequired',
+          'requestId': requestId,
+          'mohaffezId': mohaffezId,
+          'mohaffezName': mohaffezName,
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      print('✅ Payment required notification sent');
+    } catch (e) {
+      print('❌ Error sending payment notification: $e');
+    }
+  }
+
+  /// Send Session Accepted Notification
+  static Future<void> sendSessionAcceptedNotification({
+    required String studentId,
+    required String mohaffezName,
+    required String sessionId,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': studentId,
+        'title': 'تم قبول الجلسة!',
+        'body': '$mohaffezName قبل جلستك. يمكنك الآن رؤية التفاصيل.',
+        'type': 'sessionaccepted',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': {
+          'sessionId': sessionId,
+          'mohaffezName': mohaffezName,
+        },
+      });
+
+      await _sendFCMNotification(
+        userId: studentId,
+        title: 'تم قبول الجلسة!',
+        body: '$mohaffezName قبل جلستك.',
+        data: {
+          'type': 'sessionaccepted',
+          'sessionId': sessionId,
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      print('✅ Session accepted notification sent');
+    } catch (e) {
+      print('❌ Error sending session accepted notification: $e');
+    }
+  }
+
+  /// Send Session Rejected Notification
+  static Future<void> sendSessionRejectedNotification({
+    required String studentId,
+    required String mohaffezName,
+    required String? rejectionReason,
+  }) async {
+    try {
+      final body = rejectionReason != null && rejectionReason.isNotEmpty
+          ? '$mohaffezName رفض جلستك. السبب: $rejectionReason'
+          : '$mohaffezName رفض جلستك.';
+
+      await _firestore.collection('notifications').add({
+        'userId': studentId,
+        'title': 'تم رفض الجلسة',
+        'body': body,
+        'type': 'sessionrejected',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': {
+          'mohaffezName': mohaffezName,
+          'rejectionReason': rejectionReason,
+        },
+      });
+
+      await _sendFCMNotification(
+        userId: studentId,
+        title: 'تم رفض الجلسة',
+        body: body,
+        data: {
+          'type': 'sessionrejected',
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      print('✅ Session rejected notification sent');
+    } catch (e) {
+      print('❌ Error sending session rejected notification: $e');
+    }
+  }
+
+  /// Send New Session Request Notification (to Mohaffez)
+  static Future<void> sendNewRequestNotification({
+    required String mohaffezId,
+    required String studentName,
+    required String requestId,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': mohaffezId,
+        'title': 'طلب جلسة جديد!',
+        'body': '$studentName أرسل لك طلب جلسة جديد.',
+        'type': 'sessionrequest',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': {
+          'requestId': requestId,
+          'studentName': studentName,
+        },
+      });
+
+      await _sendFCMNotification(
+        userId: mohaffezId,
+        title: 'طلب جلسة جديد!',
+        body: '$studentName أرسل لك طلب جلسة.',
+        data: {
+          'type': 'sessionrequest',
+          'requestId': requestId,
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      print('✅ New request notification sent');
+    } catch (e) {
+      print('❌ Error sending new request notification: $e');
+    }
+  }
+
+  /// Private method to send FCM notification
+  static Future<void> _sendFCMNotification({
+    required String userId,
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      // Get user's FCM token
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final fcmToken = userDoc.data()?['fcmToken'] as String?;
+
+      if (fcmToken == null || fcmToken.isEmpty) {
+        print('⚠️ No FCM token found for user: $userId');
+        return;
       }
+
+      // ✅ Use your deployed Cloud Function URL
+      final response = await http.post(
+        Uri.parse('https://us-central1-mohaffez-ba2ec.cloudfunctions.net/sendNotification'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': fcmToken,
+          'notification': {
+            'title': title,
+            'body': body,
+          },
+          'data': data,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        print('✅ FCM notification sent successfully: ${result['messageId']}');
+      } else {
+        print('❌ FCM send failed (${response.statusCode}): ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Error sending FCM: $e');
     }
   }
 
@@ -240,5 +440,20 @@ class NotificationService {
   static Future<void> clearNotification(int id) async {
     await localNotifications.cancel(id);
     print('NotificationService: Notification $id cleared');
+  }
+
+  /// Get unread notification count
+  static Future<int> getUnreadCount(String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
+      return snapshot.docs.length;
+    } catch (e) {
+      print('Error getting unread count: $e');
+      return 0;
+    }
   }
 }

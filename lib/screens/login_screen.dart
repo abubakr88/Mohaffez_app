@@ -1,7 +1,6 @@
 // FILE: lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/offline_banner.dart';

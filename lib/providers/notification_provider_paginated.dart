@@ -1,4 +1,5 @@
 // lib/providers/notification_provider_paginated.dart
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
@@ -7,11 +8,13 @@ import '../repositories/notification_repository.dart';
 import 'user_provider.dart';
 
 // ===== REPOSITORY PROVIDER =====
+
 final notificationRepositoryProvider = Provider((ref) {
   return NotificationRepository(FirebaseFirestore.instance);
 });
 
 // ===== FIRST PAGE PROVIDER (Real-time) =====
+
 final notificationsFirstPageProvider = StreamProvider.family<List<NotificationModel>, String>(
   (ref, userId) {
     final repository = ref.watch(notificationRepositoryProvider);
@@ -20,6 +23,7 @@ final notificationsFirstPageProvider = StreamProvider.family<List<NotificationMo
 );
 
 // ===== UNREAD COUNT PROVIDER (Real-time) =====
+
 final unreadNotificationsCountProvider = StreamProvider.family<int, String>(
   (ref, userId) {
     final repository = ref.watch(notificationRepositoryProvider);
@@ -28,6 +32,7 @@ final unreadNotificationsCountProvider = StreamProvider.family<int, String>(
 );
 
 // ===== PAGINATED STATE NOTIFIER =====
+
 class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<NotificationModel>> {
   final NotificationRepository repository;
   final String userId;
@@ -58,12 +63,10 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
         userId: userId,
         lastDocument: null,
       );
-      
       state = state.copyWith(
         lastDocument: result.lastDocument,
         hasMore: result.hasMore,
       );
-      
       if (!result.hasMore) return;
     }
 
@@ -175,6 +178,7 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
 }
 
 // ===== PAGINATED PROVIDER =====
+
 final paginatedNotificationsProvider = StateNotifierProvider.family<
     PaginatedNotificationsNotifier,
     PaginationState<NotificationModel>,
@@ -212,6 +216,7 @@ final currentUserUnreadCountProvider = Provider<int>((ref) {
 });
 
 // ===== NOTIFICATION ACTIONS PROVIDER =====
+
 final notificationActionsProvider = Provider((ref) {
   return NotificationActions(ref);
 });
@@ -253,11 +258,14 @@ class NotificationActions {
 }
 
 // ===== NOTIFICATION FILTER =====
+
 enum NotificationFilter {
   all,
   sessionRequest,
   sessionAccepted,
   assignmentUpdated,
+  paymentRequired, // ✅ NEW
+  sessionRejected, // ✅ NEW
   follow,
   system,
 }
@@ -286,6 +294,12 @@ final filteredNotificationsProvider = Provider.family<List<NotificationModel>, S
         break;
       case NotificationFilter.assignmentUpdated:
         filterType = 'assignment_updated';
+        break;
+      case NotificationFilter.paymentRequired: // ✅ NEW
+        filterType = 'payment_required';
+        break;
+      case NotificationFilter.sessionRejected: // ✅ NEW
+        filterType = 'session_rejected';
         break;
       case NotificationFilter.follow:
         filterType = 'follow';

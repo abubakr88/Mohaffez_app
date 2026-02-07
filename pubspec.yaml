@@ -27,6 +27,9 @@ dependencies:
   shimmer: ^3.0.0
   cached_network_image: ^3.3.0
 
+  # Payment
+  webview_flutter: ^4.4.2
+
   # Storage & Cache
   shared_preferences: ^2.2.2
   hive: ^2.2.3
@@ -96,9 +99,6 @@ dev_dependencies:
   # Icons
   flutter_launcher_icons: ^0.13.1
 
-# ✅ FIX: Override incompatible analyzer_plugin version
-dependency_overrides:
-  analyzer_plugin: ^0.13.4
 
 flutter:
   uses-material-design: true

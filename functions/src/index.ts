@@ -1,19 +1,9 @@
-import * as nodemailer from 'nodemailer';
+// functions/src/index.ts
+// Main entry point - only imports and re-exports
 
-// Configure Gmail transporter
-const transporter = nodemailer.createTransporter({
-  service: 'gmail',
-  auth: {
-    user: functions.config().gmail?.user || process.env.GMAIL_USER,
-    pass: functions.config().gmail?.password || process.env.GMAIL_APP_PASSWORD, // Use App Password!
-  },
-});
+// Notification functions
+export { sendNotification } from './notifications/sendNotification';
+export { onSessionRequestAccepted } from './notifications/triggers';
 
-// In sendInvitationEmail function, replace sgMail.send with:
-await transporter.sendMail({
-  from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-  to: invitation.email,
-  subject: `دعوة للانضمام إلى ${companyName}`,
-  text: emailText,
-  html: emailHtml,
-});
+// Payment functions
+export { paymobWebhook } from './payments/paymobWebhook';

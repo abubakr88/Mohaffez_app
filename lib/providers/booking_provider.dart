@@ -9,7 +9,7 @@ final bookingServiceProvider = Provider<BookingService>((ref) {
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// FIXED: Properly handle DateTime to Timestamp conversion
+  /// Create session request with payment tracking
   Future<BookingResult> createSessionRequest({
     required String mohaffezId,
     required String studentId,
@@ -24,6 +24,10 @@ class BookingService {
     double? imamAddressLat,
     double? imamAddressLng,
     String? mohaffezPhone,
+    // ✅ NEW PAYMENT FIELDS
+    String? subscriptionId,
+    bool isPaid = false,
+    bool requiresPaymentOnAcceptance = false,
   }) async {
     try {
       // CRITICAL FIX: Ensure slotDate is properly set
@@ -35,9 +39,9 @@ class BookingService {
       print('   slotStart: $slotStart');
       print('   slotEnd: $slotEnd');
       print('   slotDate: $actualSlotDate');
-      print('   slotStart Timestamp: ${Timestamp.fromDate(slotStart)}');
-      print('   slotEnd Timestamp: ${Timestamp.fromDate(slotEnd)}');
-      print('   slotDate Timestamp: ${Timestamp.fromDate(actualSlotDate)}');
+      print('   subscriptionId: $subscriptionId');
+      print('   isPaid: $isPaid');
+      print('   requiresPaymentOnAcceptance: $requiresPaymentOnAcceptance');
 
       final Map<String, dynamic> requestData = {
         'mohaffezId': mohaffezId,
@@ -48,13 +52,18 @@ class BookingService {
         'preferredTimeSlot': preferredTimeSlot,
         'slotStart': Timestamp.fromDate(slotStart),
         'slotEnd': Timestamp.fromDate(slotEnd),
-        'slotDate': Timestamp.fromDate(actualSlotDate), // FIXED: Ensure this is set
+        'slotDate': Timestamp.fromDate(actualSlotDate),
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
         'imamAddressText': imamAddressText,
         'imamAddressLat': imamAddressLat,
         'imamAddressLng': imamAddressLng,
         'mohaffezPhone': mohaffezPhone,
+        
+        // ✅ PAYMENT TRACKING FIELDS
+        'isPaid': isPaid,
+        'subscriptionId': subscriptionId,
+        'requiresPaymentOnAcceptance': requiresPaymentOnAcceptance,
       };
 
       print('📦 Request Data: $requestData');

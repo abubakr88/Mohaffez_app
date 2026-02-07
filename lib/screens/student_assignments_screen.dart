@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -423,7 +422,6 @@ class _CompletedAssignmentCard extends ConsumerWidget {
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
     final sessionDate = session['sessionDate'] as DateTime?;
-    final sessionId = session['id'] as String? ?? '';
 
     // ✅ NEW: التقييمات
     final previousHifzCompleted = session['previousHifzCompleted'] as bool?;

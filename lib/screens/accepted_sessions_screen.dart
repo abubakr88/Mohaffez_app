@@ -105,6 +105,7 @@ class AcceptedSessionsScreen extends ConsumerWidget {
                     sessionNotes: session['sessionNotes'] as String?,
                     status: session['status'] as String? ?? 'accepted',
                     createdAt: (session['createdAt'] as Timestamp?)?.toDate(),
+                    isPaid: session['isPaid'] as bool? ?? false,
                   );
 
                   return _buildSessionCard(context, sessionModel);

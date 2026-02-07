@@ -153,7 +153,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                     const SizedBox(width: 32),
                                     _StatItem(
                                       label: 'تقييم',
-                                      value: user.rating?.toStringAsFixed(1) ?? '0.0',
+                                      value: user.rating.toStringAsFixed(1),
                                     ),
                                   ],
                                 ),

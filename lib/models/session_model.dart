@@ -1,4 +1,5 @@
 // models/session_model.dart
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_model.dart'; // for TimestampConverter
@@ -44,6 +45,19 @@ class SessionModel with _$SessionModel {
     @TimestampConverter() DateTime? completedAt, // ✅ NEW: تاريخ الإكمال
     
     String? status, // pending, accepted, completed, rejected, cancelled
+    
+    // NEW FIELDS FOR PAYMENT
+    @Default(false) bool isPaid,
+    String? paymentId,
+    String? subscriptionId,
+    double? sessionPrice,
+    
+    // ONLINE SESSION FIELDS
+    String? meetingLink,
+    String? meetingId,
+    String? meetingPassword,
+    @Default(false) bool isMeetingLinkSent,
+    @TimestampConverter() DateTime? meetingScheduledAt,
   }) = _SessionModel;
 
   factory SessionModel.fromJson(Map<String, dynamic> json) =>
