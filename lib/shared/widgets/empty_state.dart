@@ -13,8 +13,8 @@ class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,
     required this.icon,
-    required this.title,
-    this.message,
+    this.title = 'لا توجد بيانات',
+    this.message = 'لا يوجد محتوى لعرضه حالياً',
     this.action,
     this.iconColor,
     this.animated = true,
@@ -44,7 +44,8 @@ class EmptyState extends StatelessWidget {
                 curve: Curves.easeOutBack, // ⭐ Changed from elasticOut
                 builder: (context, value, child) {
                   return Transform.scale(
-                    scale: (0.5 + (0.5 * value)).clamp(0.5, 1.0), // ⭐ Safe scale range
+                    scale: (0.5 + (0.5 * value))
+                        .clamp(0.5, 1.0), // ⭐ Safe scale range
                     child: Opacity(
                       opacity: value.clamp(0.0, 1.0), // ⭐ Safe opacity
                       child: child,
@@ -69,7 +70,8 @@ class EmptyState extends StatelessWidget {
               curve: Curves.easeIn,
               builder: (context, value, child) {
                 return Opacity(
-                  opacity: animated ? value.clamp(0.0, 1.0) : 1.0, // ⭐ Safe opacity
+                  opacity:
+                      animated ? value.clamp(0.0, 1.0) : 1.0, // ⭐ Safe opacity
                   child: child,
                 );
               },
@@ -93,7 +95,9 @@ class EmptyState extends StatelessWidget {
                 curve: Curves.easeIn,
                 builder: (context, value, child) {
                   return Opacity(
-                    opacity: animated ? value.clamp(0.0, 1.0) : 1.0, // ⭐ Safe opacity
+                    opacity: animated
+                        ? value.clamp(0.0, 1.0)
+                        : 1.0, // ⭐ Safe opacity
                     child: child,
                   );
                 },
@@ -122,7 +126,9 @@ class EmptyState extends StatelessWidget {
                   return Transform.translate(
                     offset: animated ? value * 20 : Offset.zero,
                     child: Opacity(
-                      opacity: animated ? (1 - value.dy / 0.3).clamp(0.0, 1.0) : 1.0, // ⭐ Safe opacity
+                      opacity: animated
+                          ? (1 - value.dy / 0.3).clamp(0.0, 1.0)
+                          : 1.0, // ⭐ Safe opacity
                       child: child,
                     ),
                   );

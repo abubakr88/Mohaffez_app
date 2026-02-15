@@ -1,11 +1,11 @@
-name: mohaffez_finder_app
+﻿name: mohaffez_finder_app
 description: "Find and learn from Quran teachers near you."
 publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.5.0
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -18,6 +18,9 @@ dependencies:
   url_launcher: ^6.3.1
   cupertino_icons: ^1.0.8
   flutter_dotenv: ^5.1.0
+
+  # Quran data
+  quran: ^1.2.9
 
   # State Management
   flutter_riverpod: ^2.4.9
@@ -44,16 +47,18 @@ dependencies:
   cloud_firestore: ^5.5.2
   firebase_messaging: ^15.1.3
   firebase_storage: ^12.3.0
+  cloud_functions: ^5.1.4  # ← ADD THIS if not present
 
   # Code Generation - Required at runtime
-  freezed_annotation: ^2.4.1
-  json_annotation: ^4.8.1
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
 
   # Notifications
   flutter_local_notifications: ^17.2.3
 
   # Maps and Location
   google_maps_flutter: ^2.9.0
+  google_places_flutter: ^2.1.0
   geolocator: ^13.0.1
   geocoding: ^3.0.0
   flutter_google_maps_webservices: ^1.1.1
@@ -72,7 +77,7 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
-  
+
   # Image Processing
   flutter_image_compress: ^2.1.0
   path: ^1.8.3
@@ -81,31 +86,73 @@ dependencies:
   intl: ^0.20.0
   timeago: ^3.6.1
 
+  
+  table_calendar: ^3.0.9
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
-  
-  # Code generation tools
-  build_runner: ^2.4.0
-  freezed: ^2.4.0
-  json_serializable: ^6.7.0
-  
-  # Riverpod code generation
+  flutter_lints: ^4.0.0
+
+  # Code generation tools - UPDATED TO LATEST
+  build_runner: ^2.4.13
+  freezed: ^2.5.7
+  json_serializable: ^6.8.0
+
+  # Riverpod code generation - UPDATED
   custom_lint: ^0.7.3
   riverpod_generator: ^2.4.3
-  riverpod_lint: ^2.3.13
+  riverpod_lint: ^2.6.2
 
   # Icons
   flutter_launcher_icons: ^0.13.1
 
-
 flutter:
   uses-material-design: true
 
+  # ADD THESE FONTS
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo-Regular.ttf
+        - asset: assets/fonts/Cairo-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Cairo-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Cairo-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Cairo-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Cairo-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/Cairo-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Cairo-Black.ttf
+          weight: 900
+
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Tajawal-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Tajawal-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Tajawal-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/Tajawal-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Tajawal-Black.ttf
+          weight: 900
+          
   assets:
     - assets/images/icon.png
+    - assets/images/mastercard.png
+    - assets/images/visa.png
+    - assets/quran_data.json
     - .env
+
 
 flutter_launcher_icons:
   android: true

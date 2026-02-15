@@ -1,165 +1,202 @@
-// functions/src/payments/handlers.ts
 import * as functions from 'firebase-functions';
 import admin, { db } from '../utils/admin';
+import { PaymentDocument, PaymentMetadata } from '../types/payment.types';
 
-/**
- * Confirm booking request and create session after payment
- */
+interface BookingConfirmationResult {
+  sessionId: string;
+}
+
+interface SubscriptionCreationResult {
+  subscriptionId: string;
+}
+
+interface SubscriptionConsumptionResult {
+  remainingSessions: number;
+  sessionId?: string;
+}
+
+const parseNumber = (value: unknown, fallback: number): number => {
+  if (typeof value === 'number') {
+    return value;
+  }
+  return fallback;
+};
+
+const parseString = (value: unknown, fallback: string): string => {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value;
+  }
+  return fallback;
+};
+
 export async function confirmBookingAfterPayment(
-  batch: FirebaseFirestore.WriteBatch,
   requestId: string,
-  sessionDetails: any,
-  payment: any,
+  sessionDetails: Record<string, unknown>,
+  payment: PaymentDocument,
   transactionId: string
-): Promise<void> {
-  const requestRef = db.collection('sessionRequests').doc(requestId);
-  const requestSnap = await requestRef.get();
+): Promise<BookingConfirmationResult> {
+  return db.runTransaction(async (transaction) => {
+    const requestRef = db.collection('sessionRequests').doc(requestId);
+    const requestSnap = await transaction.get(requestRef);
 
-  if (!requestSnap.exists) {
-    throw new Error('Session request not found');
-  }
+    if (!requestSnap.exists) {
+      throw new Error('Session request not found');
+    }
 
-  // Update request to accepted + paid
-  batch.update(requestRef, {
-    status: 'accepted',
-    isPaid: true,
-    paidAt: admin.firestore.FieldValue.serverTimestamp(),
-    paymentTransactionId: transactionId,
-  });
+    const sessionRef = db.collection('hafizSessions').doc();
 
-  // Create hafizSession
-  const sessionRef = db.collection('hafizSessions').doc();
-  batch.set(sessionRef, {
-    ...sessionDetails,
-    requestId,
-    status: 'accepted',
-    isPaid: true,
-    paymentTransactionId: transactionId,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+    transaction.update(requestRef, {
+      status: 'accepted',
+      isPaid: true,
+      paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      paymentTransactionId: transactionId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-  // Send notification to student
-  const notifRef = db.collection('notifications').doc();
-  batch.set(notifRef, {
-    recipientId: payment.studentId,
-    senderId: payment.mohaffezId,
-    type: 'session_confirmed',
-    title: 'تم تأكيد الحجز ✅',
-    message: `تم تأكيد حجزك مع ${payment.mohaffezName} بعد الدفع`,
-    body: `تم تأكيد حجزك مع ${payment.mohaffezName} بعد الدفع`,
-    data: { 
-      sessionId: sessionRef.id, 
+    transaction.set(sessionRef, {
+      ...sessionDetails,
       requestId,
+      status: 'accepted',
+      isPaid: true,
+      paymentTransactionId: transactionId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+      studentId: payment.studentId,
       mohaffezId: payment.mohaffezId,
-    },
-    isRead: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+    });
 
-  functions.logger.info('Booking confirmed after payment', { requestId, sessionId: sessionRef.id });
+    functions.logger.info('Booking confirmed in transaction', {
+      requestId,
+      sessionId: sessionRef.id,
+    });
+
+    return { sessionId: sessionRef.id };
+  });
 }
 
-/**
- * Consume subscription session and create booking
- */
 export async function consumeSubscriptionAndCreateSession(
-  batch: FirebaseFirestore.WriteBatch,
   subscriptionId: string,
-  payment: any,
-  transactionId: string
-): Promise<void> {
-  const subRef = db.collection('subscriptions').doc(subscriptionId);
-  const subSnap = await subRef.get();
+  payment: PaymentDocument,
+  transactionId: string,
+  metadata: PaymentMetadata
+): Promise<SubscriptionConsumptionResult> {
+  return db.runTransaction(async (transaction) => {
+    const subRef = db.collection('subscriptions').doc(subscriptionId);
+    const subSnap = await transaction.get(subRef);
 
-  if (!subSnap.exists) {
-    throw new Error('Subscription not found');
-  }
+    if (!subSnap.exists) {
+      throw new Error('Subscription not found');
+    }
 
-  const subscription = subSnap.data()!;
+    const subscription = subSnap.data() as Record<string, unknown>;
+    const remainingSessions = parseNumber(subscription.remainingSessions, 0);
 
-  if (subscription.remainingSessions <= 0) {
-    throw new Error('No sessions remaining');
-  }
+    if (remainingSessions <= 0) {
+      throw new Error('No sessions remaining');
+    }
 
-  const newRemaining = subscription.remainingSessions - 1;
-  const newStatus = newRemaining === 0 ? 'depleted' : subscription.status;
+    const newRemaining = remainingSessions - 1;
+    const status = newRemaining === 0
+      ? 'depleted'
+      : parseString(subscription.status, 'active');
 
-  batch.update(subRef, {
-    remainingSessions: newRemaining,
-    status: newStatus,
-    lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+    transaction.update(subRef, {
+      remainingSessions: newRemaining,
+      status,
+      lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-  functions.logger.info('Subscription session consumed', { 
-    subscriptionId, 
-    remainingSessions: newRemaining 
+    let sessionId: string | undefined;
+    if (metadata.requestId && metadata.sessionDetails) {
+      const requestRef = db.collection('sessionRequests').doc(metadata.requestId);
+      const requestSnap = await transaction.get(requestRef);
+
+      if (!requestSnap.exists) {
+        throw new Error('Session request not found for subscription consumption');
+      }
+
+      const sessionRef = db.collection('hafizSessions').doc();
+      sessionId = sessionRef.id;
+
+      transaction.update(requestRef, {
+        status: 'accepted',
+        isPaid: true,
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        paymentTransactionId: transactionId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(sessionRef, {
+        ...metadata.sessionDetails,
+        requestId: metadata.requestId,
+        status: 'accepted',
+        isPaid: true,
+        paymentTransactionId: transactionId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        studentId: payment.studentId,
+        mohaffezId: payment.mohaffezId,
+      });
+    }
+
+    functions.logger.info('Subscription session consumed in transaction', {
+      subscriptionId,
+      remainingSessions: newRemaining,
+      sessionId,
+    });
+
+    return { remainingSessions: newRemaining, sessionId };
   });
 }
 
-/**
- * Create subscription from plan purchase
- */
 export async function createSubscriptionFromPayment(
-  batch: FirebaseFirestore.WriteBatch,
-  payment: any,
+  payment: PaymentDocument,
   transactionId: string
-): Promise<void> {
-  const metadata = payment.metadata || {};
-  const planMetadata = {
-    planId: metadata.planId,
-    planTitle: metadata.planTitle || 'خطة دفع',
-    planType: metadata.planType || 'single',
-    sessionsCount: metadata.sessionsCount || 1,
-    validityDays: metadata.validityDays,
-  };
+): Promise<SubscriptionCreationResult> {
+  const metadata = payment.metadata ?? {};
 
-  const subscriptionRef = db.collection('subscriptions').doc();
-  
-  let expiryDate = null;
-  if (planMetadata.validityDays) {
-    const expiry = new Date();
-    expiry.setDate(expiry.getDate() + planMetadata.validityDays);
-    expiryDate = admin.firestore.Timestamp.fromDate(expiry);
-  }
+  const planTitle = parseString(metadata.planTitle, 'Payment Plan');
+  const planType = parseString(metadata.planType, 'single');
+  const sessionsCount = parseNumber(metadata.sessionsCount, 1);
+  const validityDays = typeof metadata.validityDays === 'number'
+    ? metadata.validityDays
+    : undefined;
 
-  batch.set(subscriptionRef, {
-    studentId: payment.studentId,
-    studentName: payment.studentName,
-    mohaffezId: payment.mohaffezId,
-    mohaffezName: payment.mohaffezName,
-    planId: planMetadata.planId,
-    planTitle: planMetadata.planTitle,
-    planType: planMetadata.planType,
-    totalSessions: planMetadata.sessionsCount,
-    remainingSessions: planMetadata.sessionsCount,
-    totalPaid: payment.amount,
-    paymentTransactionId: transactionId,
-    startDate: admin.firestore.FieldValue.serverTimestamp(),
-    expiryDate: expiryDate,
-    status: 'active',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  return db.runTransaction(async (transaction) => {
+    const subscriptionRef = db.collection('subscriptions').doc();
 
-  // Send notification to student
-  const notifRef = db.collection('notifications').doc();
-  batch.set(notifRef, {
-    recipientId: payment.studentId,
-    senderId: payment.mohaffezId,
-    type: 'subscription_created',
-    title: 'تم شراء الباقة بنجاح 🎉',
-    message: `تم شراء ${planMetadata.planTitle} - ${planMetadata.sessionsCount} جلسة`,
-    body: `تم شراء ${planMetadata.planTitle} - ${planMetadata.sessionsCount} جلسة`,
-    data: { 
-      subscriptionId: subscriptionRef.id,
+    let expiryDate: FirebaseFirestore.Timestamp | null = null;
+    if (validityDays && validityDays > 0) {
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + validityDays);
+      expiryDate = admin.firestore.Timestamp.fromDate(expiry);
+    }
+
+    transaction.set(subscriptionRef, {
+      studentId: payment.studentId,
+      studentName: payment.studentName,
       mohaffezId: payment.mohaffezId,
-    },
-    isRead: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+      mohaffezName: payment.mohaffezName,
+      planId: parseString(metadata.planId, ''),
+      planTitle,
+      planType,
+      totalSessions: sessionsCount,
+      remainingSessions: sessionsCount,
+      totalPaid: payment.amount,
+      paymentTransactionId: transactionId,
+      startDate: admin.firestore.FieldValue.serverTimestamp(),
+      expiryDate,
+      status: 'active',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-  functions.logger.info('Subscription created from payment', { 
-    subscriptionId: subscriptionRef.id, 
-    sessions: planMetadata.sessionsCount 
+    functions.logger.info('Subscription created in transaction', {
+      subscriptionId: subscriptionRef.id,
+      sessionsCount,
+    });
+
+    return { subscriptionId: subscriptionRef.id };
   });
 }

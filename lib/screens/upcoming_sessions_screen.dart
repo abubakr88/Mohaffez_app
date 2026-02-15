@@ -7,7 +7,9 @@ import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/session_provider_paginated.dart';
+import '../utils/arabic_labels.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'session_completion_screen.dart';
 
 class UpcomingSessionsScreen extends ConsumerWidget {
@@ -56,7 +58,7 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
@@ -71,7 +73,7 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'الجلسات القادمة',
+                                      ArabicLabels.upcomingSessions,
                                       style: TextStyle(
                                         fontSize: 26,
                                         fontWeight: FontWeight.bold,
@@ -144,40 +146,48 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                           label: const Text('الكل'),
                           selected: filter == UpcomingFilter.all,
                           onSelected: (_) {
-                            ref.read(upcomingSessionsFilterProvider.notifier).state =
-                                UpcomingFilter.all;
+                            ref
+                                .read(upcomingSessionsFilterProvider.notifier)
+                                .state = UpcomingFilter.all;
                           },
-                          selectedColor: AppTheme.accentGreen.withOpacity(0.2),
+                          selectedColor:
+                              AppTheme.accentGreen.withValues(alpha: 0.2),
                           checkmarkColor: AppTheme.accentGreen,
                         ),
                         FilterChip(
                           label: const Text('اليوم'),
                           selected: filter == UpcomingFilter.today,
                           onSelected: (_) {
-                            ref.read(upcomingSessionsFilterProvider.notifier).state =
-                                UpcomingFilter.today;
+                            ref
+                                .read(upcomingSessionsFilterProvider.notifier)
+                                .state = UpcomingFilter.today;
                           },
-                          selectedColor: AppTheme.accentGreen.withOpacity(0.2),
+                          selectedColor:
+                              AppTheme.accentGreen.withValues(alpha: 0.2),
                           checkmarkColor: AppTheme.accentGreen,
                         ),
                         FilterChip(
                           label: const Text('هذا الأسبوع'),
                           selected: filter == UpcomingFilter.thisWeek,
                           onSelected: (_) {
-                            ref.read(upcomingSessionsFilterProvider.notifier).state =
-                                UpcomingFilter.thisWeek;
+                            ref
+                                .read(upcomingSessionsFilterProvider.notifier)
+                                .state = UpcomingFilter.thisWeek;
                           },
-                          selectedColor: AppTheme.accentGreen.withOpacity(0.2),
+                          selectedColor:
+                              AppTheme.accentGreen.withValues(alpha: 0.2),
                           checkmarkColor: AppTheme.accentGreen,
                         ),
                         FilterChip(
                           label: const Text('هذا الشهر'),
                           selected: filter == UpcomingFilter.thisMonth,
                           onSelected: (_) {
-                            ref.read(upcomingSessionsFilterProvider.notifier).state =
-                                UpcomingFilter.thisMonth;
+                            ref
+                                .read(upcomingSessionsFilterProvider.notifier)
+                                .state = UpcomingFilter.thisMonth;
                           },
-                          selectedColor: AppTheme.accentGreen.withOpacity(0.2),
+                          selectedColor:
+                              AppTheme.accentGreen.withValues(alpha: 0.2),
                           checkmarkColor: AppTheme.accentGreen,
                         ),
                       ],
@@ -215,12 +225,14 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                     child: EmptyState(
                       icon: Icons.filter_list_off,
                       title: 'لا توجد نتائج',
-                      message: 'لا توجد جلسات في الفترة المحددة',
+                      message:
+                          'لا توجد جلسات في الفترة المحددة',
                       animated: true,
                       action: TextButton.icon(
                         onPressed: () {
-                          ref.read(upcomingSessionsFilterProvider.notifier).state =
-                              UpcomingFilter.all;
+                          ref
+                              .read(upcomingSessionsFilterProvider.notifier)
+                              .state = UpcomingFilter.all;
                         },
                         icon: const Icon(Icons.clear),
                         label: const Text('مسح التصفية'),
@@ -282,12 +294,12 @@ class SessionCard extends ConsumerWidget {
   bool _canCompleteSession(DateTime sessionDate, String timeSlot) {
     try {
       final now = DateTime.now();
-      
+
       // Parse time slot (e.g., "08:00" or "08:00-09:00")
       final timeParts = timeSlot.split('-')[0].split(':');
       final hour = int.parse(timeParts[0]);
       final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
-      
+
       // Actual session time
       final sessionTime = DateTime(
         sessionDate.year,
@@ -296,11 +308,11 @@ class SessionCard extends ConsumerWidget {
         hour,
         minute,
       );
-      
+
       // Window: 30 min before → 24 hours after
       final canStartFrom = sessionTime.subtract(const Duration(minutes: 30));
       final canCompleteUntil = sessionTime.add(const Duration(hours: 24));
-      
+
       return now.isAfter(canStartFrom) && now.isBefore(canCompleteUntil);
     } catch (e) {
       return false;
@@ -314,7 +326,7 @@ class SessionCard extends ConsumerWidget {
       final timeParts = timeSlot.split('-')[0].split(':');
       final hour = int.parse(timeParts[0]);
       final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
-      
+
       final sessionTime = DateTime(
         sessionDate.year,
         sessionDate.month,
@@ -322,7 +334,7 @@ class SessionCard extends ConsumerWidget {
         hour,
         minute,
       );
-      
+
       final lateThreshold = sessionTime.add(const Duration(minutes: 15));
       return now.isAfter(lateThreshold);
     } catch (e) {
@@ -392,24 +404,223 @@ class SessionCard extends ConsumerWidget {
     }
   }
 
+  Future<void> _showCancelSessionDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String sessionId,
+    String partnerName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              SizedBox(width: 12),
+              Text(ArabicLabels.cancelSession),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'هل أنت متأكد من إلغاء هذه الجلسة مع $partnerName؟',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 20, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'سيتم إعادة الوقت للمحفظ ليتمكن طلاب آخرون من الحجز',
+                        style: TextStyle(fontSize: 13, color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('تراجع'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('نعم، إلغاء الجلسة'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('جاري إلغاء الجلسة...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId);
+
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 12),
+              Text('تم إلغاء الجلسة بنجاح'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      ref.invalidate(upcomingSessionsProvider(mohaffezId));
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                  child:
+                      Text('فشل إلغاء الجلسة: ${e.toString()}')),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openWhatsApp(BuildContext context, String? phone) async {
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('رقم الهاتف غير متوفر')),
+      );
+      return;
+    }
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final whatsappUrl =
+        Uri.parse('https://wa.me/$cleanPhone?text=السلام عليكم');
+    if (await canLaunchUrl(whatsappUrl)) {
+      await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+    } else {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فشل فتح واتساب')),
+      );
+    }
+  }
+
+  Future<void> _callTeacher(BuildContext context, String? phone) async {
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('رقم الهاتف غير متوفر')),
+      );
+      return;
+    }
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final telUrl = Uri.parse('tel:$cleanPhone');
+    if (await canLaunchUrl(telUrl)) {
+      await launchUrl(telUrl);
+    } else {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فشل فتح تطبيق الهاتف')),
+      );
+    }
+  }
+
+  Future<void> _openMaps(BuildContext context, String? address) async {
+    if (address == null || address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('العنوان غير متوفر')),
+      );
+      return;
+    }
+    final encodedAddress = Uri.encodeComponent(address);
+    final mapsUrl = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$encodedAddress');
+    if (await canLaunchUrl(mapsUrl)) {
+      await launchUrl(mapsUrl, mode: LaunchMode.externalApplication);
+    } else {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فشل فتح خرائط جوجل')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final studentName = session['studentName'] as String? ?? 'غير معروف';
+    final studentName =
+        session['studentName'] as String? ?? 'غير معروف';
     final sessionDate = session['sessionDate'] as DateTime?;
     final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
     final location = session['location'] as String? ?? '';
     final sessionType = session['sessionType'] as String? ?? '';
     final studentId = session['studentId'] as String? ?? '';
+    final mohaffezPhone = session['mohaffezPhone'] as String? ??
+        session['teacherPhone'] as String?;
+    final locationAddress =
+        session['imamAddressText'] as String? ?? session['location'] as String?;
 
-    // ✅ Determine session status
-    final bool canComplete = sessionDate != null && _canCompleteSession(sessionDate, timeSlot);
-    final bool isLate = sessionDate != null && _isSessionLate(sessionDate, timeSlot);
+    final bool canComplete =
+        sessionDate != null && _canCompleteSession(sessionDate, timeSlot);
+    final bool isLate =
+        sessionDate != null && _isSessionLate(sessionDate, timeSlot);
+    final hoursUntilSession =
+        sessionDate?.difference(DateTime.now()).inHours ?? 999;
+    final showCommunication =
+        hoursUntilSession <= 24 && hoursUntilSession >= -2;
 
     // Calculate days until session
     String getTimeUntil() {
       if (sessionDate == null) return '';
       final now = DateTime.now();
-      final dateOnly = DateTime(sessionDate.year, sessionDate.month, sessionDate.day);
+      final dateOnly =
+          DateTime(sessionDate.year, sessionDate.month, sessionDate.day);
       final today = DateTime(now.year, now.month, now.day);
       final difference = dateOnly.difference(today).inDays;
 
@@ -501,7 +712,9 @@ class SessionCard extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: canComplete ? AppTheme.accentGreen : AppTheme.primaryAmber,
+                          color: canComplete
+                              ? AppTheme.accentGreen
+                              : AppTheme.primaryAmber,
                         ),
                       ),
                     ),
@@ -512,11 +725,13 @@ class SessionCard extends ConsumerWidget {
               // Date & Time
               Row(
                 children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                  Icon(Icons.calendar_today,
+                      size: 14, color: Colors.grey.shade600),
                   const SizedBox(width: 6),
                   Text(
                     sessionDate != null
-                        ? DateFormat('EEEE dd MMMM yyyy', 'ar').format(sessionDate)
+                        ? DateFormat('EEEE dd MMMM yyyy', 'ar')
+                            .format(sessionDate)
                         : 'غير محدد',
                     style: TextStyle(
                       fontSize: 13,
@@ -528,7 +743,8 @@ class SessionCard extends ConsumerWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                  Icon(Icons.access_time,
+                      size: 14, color: Colors.grey.shade600),
                   const SizedBox(width: 6),
                   Text(
                     timeSlot,
@@ -539,7 +755,8 @@ class SessionCard extends ConsumerWidget {
                   ),
                   if (location.isNotEmpty) ...[
                     const SizedBox(width: 16),
-                    Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
+                    Icon(Icons.location_on,
+                        size: 14, color: Colors.grey.shade600),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -555,10 +772,77 @@ class SessionCard extends ConsumerWidget {
                   ],
                 ],
               ),
+              if (showCommunication) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.message, size: 20),
+                        label: const Text('مراسلة',
+                            style: TextStyle(fontSize: 14)),
+                        onPressed:
+                            (mohaffezPhone == null || mohaffezPhone.isEmpty)
+                                ? null
+                                : () => _openWhatsApp(context, mohaffezPhone),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green,
+                          side: const BorderSide(color: Colors.green),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.phone, size: 20),
+                        label:
+                            const Text('اتصال', style: TextStyle(fontSize: 14)),
+                        onPressed:
+                            (mohaffezPhone == null || mohaffezPhone.isEmpty)
+                                ? null
+                                : () => _callTeacher(context, mohaffezPhone),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.blue,
+                          side: const BorderSide(color: Colors.blue),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.location_on, size: 20),
+                        label: const Text('الموقع',
+                            style: TextStyle(fontSize: 14)),
+                        onPressed: () => _openMaps(context, locationAddress),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
 
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                  tooltip: ArabicLabels.cancelSession,
+                  onPressed: () => _showCancelSessionDialog(
+                    context,
+                    ref,
+                    session['id'] as String,
+                    session['studentName'] as String? ?? 'الطالب',
+                  ),
+                ),
+              ),
 
               // ✅ ACTION BUTTONS - Based on Session Time
               if (canComplete) ...[
@@ -586,7 +870,8 @@ class SessionCard extends ConsumerWidget {
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           // Fetch previous assignment
-                          final previousAssignment = await _getPreviousAssignment(studentId);
+                          final previousAssignment =
+                              await _getPreviousAssignment(studentId);
                           if (!context.mounted) return;
 
                           // Open completion screen
@@ -605,20 +890,25 @@ class SessionCard extends ConsumerWidget {
 
                           // Refresh lists if completed
                           if (result == true && context.mounted) {
-                            ref.invalidate(upcomingSessionsProvider(mohaffezId));
-                            ref.invalidate(completedSessionsProvider(mohaffezId));
+                            ref.invalidate(
+                                upcomingSessionsProvider(mohaffezId));
+                            ref.invalidate(
+                                completedSessionsProvider(mohaffezId));
                           }
                         },
                         icon: const Icon(Icons.check_circle, size: 20),
                         label: Text(
-                          isLate ? 'إكمال متأخر' : 'إكمال الجلسة',
+                          isLate
+                              ? 'إكمال متأخر'
+                              : 'إكمال الجلسة',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isLate ? Colors.orange : AppTheme.accentGreen,
+                          backgroundColor:
+                              isLate ? Colors.orange : AppTheme.accentGreen,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -640,7 +930,8 @@ class SessionCard extends ConsumerWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.schedule, size: 20, color: Colors.blue.shade700),
+                      Icon(Icons.schedule,
+                          size: 20, color: Colors.blue.shade700),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -691,7 +982,8 @@ class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
           controller: reasonController,
           maxLines: 3,
           decoration: const InputDecoration(
-            hintText: 'اختياري: يمكنك توضيح سبب عدم حضور الطالب',
+            hintText:
+                'اختياري: يمكنك توضيح سبب عدم حضور الطالب',
             border: OutlineInputBorder(),
           ),
         ),
@@ -701,7 +993,8 @@ class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, reasonController.text.trim()),
+            onPressed: () =>
+                Navigator.pop(context, reasonController.text.trim()),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             child: const Text('تأكيد'),
           ),

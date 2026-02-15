@@ -1,14 +1,37 @@
-// functions/src/utils/paymobVerification.ts
 import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
 
-// TODO: Store in Firebase Config: firebase functions:config:set paymob.hmac_secret="YOUR_SECRET"
 const PAYMOB_HMAC_SECRET = functions.config().paymob?.hmac_secret || '';
 
-/**
- * Verify Paymob HMAC signature
- */
-export function verifyPaymobHmac(obj: any, receivedHmac: string): boolean {
+interface PaymobVerificationObject {
+  amount_cents?: number;
+  created_at?: string;
+  currency?: string;
+  error_occured?: boolean;
+  has_parent_transaction?: boolean;
+  id?: number;
+  integration_id?: number;
+  is_3d_secure?: boolean;
+  is_auth?: boolean;
+  is_capture?: boolean;
+  is_refunded?: boolean;
+  is_standalone_payment?: boolean;
+  is_voided?: boolean;
+  order?: { id?: number };
+  owner?: number;
+  pending?: boolean;
+  source_data?: {
+    pan?: string;
+    sub_type?: string;
+    type?: string;
+  };
+  success?: boolean;
+}
+
+export function verifyPaymobHmac(
+  obj: PaymobVerificationObject,
+  receivedHmac: string
+): boolean {
   if (!PAYMOB_HMAC_SECRET) {
     functions.logger.error('PAYMOB_HMAC_SECRET not configured');
     return false;

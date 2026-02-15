@@ -161,16 +161,43 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                   // Active Assignments
                   sessionsAsync.when(
                     data: (sessions) {
-                      final activeSessions = sessions
-                          .where((s) =>
-                              (s['status'] as String?) == 'accepted' &&
-                              ((s['hifzAssignment'] as String?)?.isNotEmpty ==
-                                      true ||
-                                  (s['murajaAssignment'] as String?)
-                                          ?.isNotEmpty ==
-                                      true))
-                          .toList();
+                    final now = DateTime.now();
 
+                    // "قيد الإنجاز" - الجلسات القادمة المقبولة فقط
+                    final activeSessions = sessions
+                      .where((s) {
+                        final status = s['status'] as String?;
+                        if (status != 'accepted') return false;
+
+                        final sessionDate = s['sessionDate'] as DateTime?;
+                        if (sessionDate == null) return false;
+
+                        final timeSlot = s['preferredTimeSlot'] as String? ?? '08:00';
+                        
+                        try {
+                          // Parse time from slot (e.g., "08:00-09:00")
+                          final timeParts = timeSlot.split('-')[0].split(':');
+                          final hour = int.parse(timeParts[0]);
+                          final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
+
+                          final sessionDateTime = DateTime(
+                            sessionDate.year,
+                            sessionDate.month,
+                            sessionDate.day,
+                            hour,
+                            minute,
+                          );
+
+                          // Only future sessions
+                          return sessionDateTime.isAfter(now);
+                        } catch (_) {
+                          // Fallback: at least check date is today or future
+                          final today = DateTime(now.year, now.month, now.day);
+                          final dateOnly = DateTime(sessionDate.year, sessionDate.month, sessionDate.day);
+                          return !dateOnly.isBefore(today);
+                        }
+                      })
+                      .toList();
                       if (activeSessions.isEmpty) {
                         return const EmptyState(
                           icon: Icons.assignment_outlined,

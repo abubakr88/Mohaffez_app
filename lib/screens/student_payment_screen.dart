@@ -1,37 +1,66 @@
-// lib/screens/student_payment_screen.dart
-import 'package:flutter/material.dart';
+﻿import 'dart:math';
 import 'dart:ui' as ui;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/pricing_plan_model.dart';
-import '../models/payment_model.dart';
-import '../providers/pricing_provider.dart';
-import '../providers/payment_provider.dart';
-import '../providers/user_provider.dart';
-import '../shared/constants/app_theme.dart';
-import '../shared/widgets/empty_state.dart';
-import 'payment_webview_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-class StudentPaymentScreen extends ConsumerStatefulWidget {
-  final String mohaffezId;
-  final String mohaffezName;
-  final String? preselectedSessionType;
-  final Map<String, dynamic>? preselectedTimeSlot;
-  final DateTime? preselectedDate;
-  final bool autoBookAfterPayment;
-  final bool showSubscriptionsOnly;
+import '../models/payment_model.dart';
+import '../models/pricing_plan_model.dart';
+import '../models/promo_code_model.dart';
+import '../providers/payment_provider.dart';
+import '../providers/pricing_provider.dart';
+import '../providers/promo_code_provider.dart';
+import '../providers/user_provider.dart';
+import '../providers/booking_provider.dart';
+import '../services/pricing_service.dart';
+import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/empty_state.dart';
+import '../utils/arabic_labels.dart';
+import 'payment_webview_screen.dart';
 
+class StudentPaymentScreen extends ConsumerStatefulWidget {
   const StudentPaymentScreen({
     super.key,
     required this.mohaffezId,
     required this.mohaffezName,
+    this.requestId,
+    this.sessionType,
+    this.sessionDate,
+    this.timeSlot,
+    this.location,
+    this.sessionDetails,
     this.preselectedSessionType,
     this.preselectedTimeSlot,
     this.preselectedDate,
     this.autoBookAfterPayment = false,
     this.showSubscriptionsOnly = false,
+    this.mohaffezAddress,
+    this.mohaffezLat,
+    this.mohaffezLng,
+    this.mohaffezPhone,
   });
+
+  final String mohaffezId;
+  final String mohaffezName;
+  final String? requestId;
+  final String? sessionType;
+  final DateTime? sessionDate;
+  final String? timeSlot;
+  final String? location;
+  final Map<String, dynamic>? sessionDetails;
+  final String? preselectedSessionType;
+  final Map<String, dynamic>? preselectedTimeSlot;
+  final DateTime? preselectedDate;
+  final bool autoBookAfterPayment;
+  final bool showSubscriptionsOnly;
+  final String? mohaffezAddress;
+  final double? mohaffezLat;
+  final double? mohaffezLng;
+  final String? mohaffezPhone;
 
   @override
   ConsumerState<StudentPaymentScreen> createState() =>
@@ -40,265 +69,242 @@ class StudentPaymentScreen extends ConsumerStatefulWidget {
 
 class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   PricingPlanModel? selectedPlan;
-  late String selectedSessionType;
+  final _promoCodeController = TextEditingController();
+  PromoCodeModel? _appliedPromoCode;
+  PricingResult? _pricingResult;
+  bool _isProcessingPayment = false;
+
+  String get _lockedSessionType =>
+      widget.sessionType ?? widget.preselectedSessionType ?? 'online';
+  
+  DateTime? get _lockedDate => widget.sessionDate ?? widget.preselectedDate;
+
+  String get _lockedTimeSlot {
+    if (widget.timeSlot != null && widget.timeSlot!.trim().isNotEmpty) {
+      return widget.timeSlot!;
+    }
+    if (widget.preselectedTimeSlot != null) {
+      final start = widget.preselectedTimeSlot!['startTime']?.toString() ?? '';
+      final end = widget.preselectedTimeSlot!['endTime']?.toString();
+      if (end != null && end.isNotEmpty) {
+        return '$start-$end';
+      }
+      return start;
+    }
+    return '';
+  }
+
+  bool get _hasSelectedSlot => _lockedTimeSlot.isNotEmpty && _lockedDate != null;
 
   @override
-  void initState() {
-    super.initState();
-    selectedSessionType = widget.preselectedSessionType ?? 'online';
+  void dispose() {
+    _promoCodeController.dispose();
+    super.dispose();
+  }
+
+  void _calculatePrice() {
+    if (selectedPlan == null) {
+      setState(() => _pricingResult = null);
+      return;
+    }
+    final pricing = ref
+        .read(pricingServiceProvider)
+        .applyPromoCode(selectedPlan!, _appliedPromoCode);
+    setState(() => _pricingResult = pricing);
+  }
+
+  PricingResult _resolvePricing() {
+    if (selectedPlan == null) {
+      return const PricingResult(
+        originalPrice: 0,
+        discount: 0,
+        finalPrice: 0,
+        isFree: false,
+      );
+    }
+    return _pricingResult ??
+        ref
+            .read(pricingServiceProvider)
+            .applyPromoCode(selectedPlan!, _appliedPromoCode);
   }
 
   @override
   Widget build(BuildContext context) {
     final plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    final pricing = _resolvePricing();
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.autoBookAfterPayment ? 'إتمام الحجز' : 'اختر خطة الدفع',
-          ),
+          title: const Text(ArabicLabels.payment),
           backgroundColor: AppTheme.accentGreen,
         ),
         body: plansAsync.when(
           data: (plans) {
-            // Filter by selected session type
             var filteredPlans = plans.where((p) {
-              if (selectedSessionType == 'home') return p.mode == SessionMode.home;
-              if (selectedSessionType == 'mosque') {
+              if (_lockedSessionType == 'home') {
+                return p.mode == SessionMode.home;
+              }
+              if (_lockedSessionType == 'mosque') {
                 return p.mode == SessionMode.mosque;
               }
-              if (selectedSessionType == 'online') {
-                return p.mode == SessionMode.online;
-              }
-              return false;
+              return p.mode == SessionMode.online;
             }).toList();
-
-            // Filter to show only subscriptions/bundles if requested
+            
             if (widget.showSubscriptionsOnly) {
               filteredPlans = filteredPlans
                   .where((p) => p.type != PlanType.single)
                   .toList();
             }
-
+            
             if (filteredPlans.isEmpty) {
-              return EmptyState(
+              return const EmptyState(
                 icon: Icons.payments_outlined,
                 title: 'لا توجد خطط متاحة',
-                message: widget.showSubscriptionsOnly
-                    ? 'لا توجد باقات أو اشتراكات متاحة حالياً'
-                    : 'لا توجد خطط تسعير متاحة',
+                message: 'لا توجد خطط مناسبة لهذا النوع من الجلسات',
               );
             }
 
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                if (widget.autoBookAfterPayment && widget.preselectedDate != null)
-                  _buildSessionInfoCard(),
-                _buildHeader(),
-                const SizedBox(height: 24),
-                _buildSessionTypeSelector(),
-                const SizedBox(height: 24),
-                ...filteredPlans.map((plan) => _buildPlanCard(plan)),
+                _buildLockedSessionDetailsCard(),
+                if (widget.sessionDetails != null) const SizedBox(height: 14),
+                ...filteredPlans.map(_buildPlanCard),
+                if (selectedPlan != null) ...[
+                  const SizedBox(height: 14),
+                  _buildPromoCodeSection(),
+                  const SizedBox(height: 12),
+                  _buildPriceSummary(),
+                  const SizedBox(height: 100),
+                ],
               ],
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('خطأ: $e')),
+          error: (e, _) => Center(child: Text('${ArabicLabels.error}: $e')),
         ),
-        bottomNavigationBar: selectedPlan != null
-            ? SafeArea(
+        bottomNavigationBar: selectedPlan == null
+            ? null
+            : SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: ElevatedButton(
-                    onPressed: () => _proceedToPayment(context, ref),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: AppTheme.accentGreen,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.payment, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${selectedPlan!.priceEGP.toStringAsFixed(0)} ج.م - ادفع الآن',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: _buildPaymentButton(pricing),
                 ),
-              )
-            : null,
+              ),
       ),
     );
   }
 
-  Widget _buildSessionTypeSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'نوع الجلسة',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSessionTypeChip(
-                'home',
-                'بيت الطالب',
-                Icons.home,
-                Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildSessionTypeChip(
-                'mosque',
-                'المسجد',
-                Icons.mosque,
-                Colors.green,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildSessionTypeChip(
-                'online',
-                'أونلاين',
-                Icons.videocam,
-                Colors.purple,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  Widget _buildPaymentButton(PricingResult pricing) {
+    final isFreeSession = pricing.finalPrice <= 0.01;
+    final canPay = !_isProcessingPayment && (!isFreeSession || _hasSelectedSlot);
 
-  Widget _buildSessionTypeChip(
-    String type,
-    String label,
-    IconData icon,
-    Color color,
-  ) {
-    final isSelected = selectedSessionType == type;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedSessionType = type;
-          selectedPlan = null; // Reset plan when type changes
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.15) : Colors.white,
+    return ElevatedButton.icon(
+      onPressed: canPay ? () => _proceedToPayment(context, ref) : null,
+      icon: _isProcessingPayment
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : Icon(
+              isFreeSession ? Icons.check_circle : Icons.payment,
+              color: Colors.white,
+            ),
+      label: Text(
+        isFreeSession
+            ? '🎉 تأكيد الجلسة المجانية'
+            : '${pricing.finalPrice.toStringAsFixed(0)} ${ArabicLabels.egp} - ${ArabicLabels.payNow}',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isFreeSession ? Colors.green : AppTheme.accentGreen,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
         ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? color : Colors.grey.shade600,
-              size: 28,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? color : Colors.grey.shade700,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+        elevation: isFreeSession ? 4 : 2,
       ),
     );
   }
 
-  Widget _buildSessionInfoCard() {
+  Widget _buildLockedSessionDetailsCard() {
+    if (widget.sessionDetails == null) {
+      return const SizedBox.shrink();
+    }
+
+    final details = widget.sessionDetails!;
+    final sessionType = details['sessionType'] as String?;
+    final slotDate = details['slotDate'] as Timestamp?;
+    final timeSlot = details['timeSlot'] as String?;
+    final location = details['location'] as String?;
+
     return Container(
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.blue.shade50,
+        border: Border.all(color: Colors.blue, width: 2),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.blue.shade700),
-              const SizedBox(width: 8),
-              Text(
-                'معلومات الجلسة المحجوزة',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade700,
+              const Icon(Icons.lock, size: 32, color: Colors.blue),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'تفاصيل الجلسة مؤكدة من المحفظ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.calendar_today, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                DateFormat('EEEE، dd MMMM yyyy', 'ar')
-                    .format(widget.preselectedDate!),
-              ),
-            ],
-          ),
-          if (widget.preselectedTimeSlot != null) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.access_time, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  '${widget.preselectedTimeSlot!['startTime']} - ${widget.preselectedTimeSlot!['endTime']}',
-                ),
-              ],
+          Divider(height: 24, color: Colors.blue.shade300),
+          _lockedDetailRow('المحفظ', widget.mohaffezName),
+          _lockedDetailRow(ArabicLabels.type, _getSessionTypeArabic(sessionType)),
+          if (slotDate != null)
+            _lockedDetailRow(
+              ArabicLabels.date,
+              DateFormat('EEEE dd MMMM yyyy', 'ar').format(slotDate.toDate()),
             ),
-          ],
+          if (timeSlot != null) _lockedDetailRow(ArabicLabels.time, timeSlot),
+          if (location != null && location.isNotEmpty)
+            _lockedDetailRow(ArabicLabels.location, location),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: Colors.amber.shade100,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              'اختر خطة الدفع المناسبة لإتمام الحجز',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.green.shade700,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline,
+                    size: 20, color: Colors.amber.shade900),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'لا يمكن تغيير هذه التفاصيل. الباقات المعروضة تطابق نوع الجلسة المختار.',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -306,45 +312,294 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _lockedDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.blue.shade800,
+              ),
+            ),
+          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPromoCodeSection() {
+    final promoState = ref.watch(promoCodeProvider);
+    final isValidatingPromo = promoState.isLoading;
+    final promoError = promoState.hasError ? promoState.error.toString() : null;
+    final promoCodeValid = _appliedPromoCode != null;
+    final discount = _appliedPromoCode?.discount ?? 0;
+    
+    final pricing = _resolvePricing();
+    final isFreeSession = pricing.finalPrice <= 0.01;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        borderRadius: AppThemeConstants.borderRadiusMd,
+        border: Border.all(
+          color: isFreeSession ? Colors.green : Colors.grey.shade300,
+          width: isFreeSession ? 2 : 1,
         ),
-        borderRadius: BorderRadius.circular(16),
+        color: isFreeSession ? Colors.green.shade50 : null,
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.school,
-            size: 48,
-            color: Colors.white,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            widget.mohaffezName,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          if (isFreeSession && promoCodeValid) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Colors.green, Color(0xFF66BB6A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.celebration, color: Colors.white, size: 36),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '🎉 جلسة مجانية!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'تم تطبيق خصم 100% - لا حاجة للدفع',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
+          TextField(
+            controller: _promoCodeController,
+            onChanged: (_) {
+              if (_appliedPromoCode != null) {
+                setState(() {
+                  _appliedPromoCode = null;
+                  _calculatePrice();
+                });
+                ref.read(promoCodeProvider.notifier).clearPromoCode();
+              }
+            },
+            decoration: InputDecoration(
+              labelText: ArabicLabels.enterPromoCode,
+              hintText: 'أدخل كود الخصم هنا',
+              suffixIcon: isValidatingPromo
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : promoCodeValid
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : null,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            widget.showSubscriptionsOnly
-                ? 'اختر الباقة المناسبة'
-                : widget.autoBookAfterPayment
-                    ? 'اختر خطة الدفع'
-                    : 'الدفع لـ ${widget.mohaffezName}',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
+          ElevatedButton(
+            onPressed: isValidatingPromo
+                ? null
+                : () async {
+                    if (_promoCodeController.text.trim().isEmpty) return;
+                    await ref
+                        .read(promoCodeProvider.notifier)
+                        .validateCode(_promoCodeController.text.trim());
+                    final latest = ref.read(promoCodeProvider).valueOrNull;
+                    if (latest != null && mounted) {
+                      setState(() {
+                        _appliedPromoCode = latest;
+                        _calculatePrice();
+                      });
+                    }
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: promoCodeValid ? Colors.green : null,
             ),
-            textAlign: TextAlign.center,
+            child: Text(
+              isValidatingPromo 
+                  ? 'جاري التحقق...' 
+                  : promoCodeValid 
+                      ? 'تم التطبيق ✓' 
+                      : ArabicLabels.apply,
+            ),
+          ),
+          
+          if (promoError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      promoError,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          if (promoCodeValid && discount > 0 && !isFreeSession)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'كود صحيح',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade900,
+                            ),
+                          ),
+                          Text(
+                            _appliedPromoCode?.type == 'percentage'
+                                ? '${ArabicLabels.discount} ${discount.toStringAsFixed(0)}%'
+                                : '${ArabicLabels.discount} ${discount.toStringAsFixed(0)} ${ArabicLabels.currency}',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.green.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceSummary() {
+    final pricing = _resolvePricing();
+    final isFreeSession = pricing.finalPrice <= 0.01;
+    
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isFreeSession 
+            ? Colors.green.withOpacity(0.1)
+            : AppTheme.primaryAmber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isFreeSession
+              ? Colors.green
+              : AppTheme.primaryAmber.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        children: [
+          if (pricing.originalPrice > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('السعر الأصلي:'),
+                Text(
+                  '${pricing.originalPrice.toStringAsFixed(2)} ${ArabicLabels.currency}',
+                  style: TextStyle(
+                    decoration: pricing.discount > 0 
+                        ? TextDecoration.lineThrough 
+                        : null,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          if (pricing.discount > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('${ArabicLabels.discount}:'),
+                Text(
+                  '- ${pricing.discount.toStringAsFixed(2)} ${ArabicLabels.currency}',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '${ArabicLabels.total}:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              Text(
+                isFreeSession
+                    ? 'مجاني 🎉'
+                    : '${pricing.finalPrice.toStringAsFixed(2)} ${ArabicLabels.currency}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: isFreeSession ? Colors.green : AppTheme.primaryAmber,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -352,287 +607,205 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   }
 
   Widget _buildPlanCard(PricingPlanModel plan) {
-    final isSelected = selectedPlan?.id == plan.id;
-    final pricePerSession = plan.priceEGP / plan.sessionsCount;
-
+    final selected = selectedPlan?.id == plan.id;
     return GestureDetector(
-      onTap: () => setState(() => selectedPlan = plan),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 12),
+      onTap: () {
+        setState(() {
+          selectedPlan = plan;
+          _calculatePrice();
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppTheme.accentGreen : Colors.grey.shade300,
-            width: isSelected ? 3 : 1,
+            color: selected ? AppTheme.accentGreen : Colors.grey.shade300,
+            width: selected ? 2.5 : 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.accentGreen.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+          color: selected ? AppTheme.accentGreen.withOpacity(0.05) : null,
         ),
-        child: Stack(
+        child: Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
+            Icon(
+              selected ? Icons.check_circle : Icons.circle_outlined,
+              color: AppTheme.accentGreen,
+              size: 28,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      if (isSelected)
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: AppTheme.accentGreen,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        )
-                      else
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Colors.grey.shade400,
-                              width: 2,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              plan.title,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: isSelected
-                                    ? AppTheme.accentGreen
-                                    : Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _getPlanTypeLabel(plan),
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${plan.priceEGP.toStringAsFixed(0)} ج.م',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected
-                                  ? AppTheme.accentGreen
-                                  : AppTheme.primaryAmber,
-                            ),
-                          ),
-                          if (plan.sessionsCount > 1)
-                            Text(
-                              '${pricePerSession.toStringAsFixed(0)} ج.م/جلسة',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildFeatureChip(
-                        '${plan.sessionsCount} جلسة',
-                        Icons.event_available,
-                      ),
-                      if (plan.sessionsPerWeek != null)
-                        _buildFeatureChip(
-                          '${plan.sessionsPerWeek}x أسبوعياً',
-                          Icons.calendar_today,
-                        ),
-                      if (plan.validityDays != null)
-                        _buildFeatureChip(
-                          'صالح ${plan.validityDays} يوم',
-                          Icons.schedule,
-                        ),
-                      if (plan.isFreeTrialAvailable)
-                        _buildFeatureChip(
-                          'تجربة مجانية',
-                          Icons.stars,
-                          color: Colors.orange,
-                        ),
-                    ],
-                  ),
-                  if (plan.description != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.local_offer,
-                            size: 16,
-                            color: Colors.green.shade700,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              plan.description!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  Text(
+                    plan.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${plan.sessionsCount} ${plan.sessionsCount == 1 ? "جلسة" : "جلسات"}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
                 ],
               ),
             ),
-            if (plan.isBundle || plan.isSubscription)
-              Positioned(
-                top: 0,
-                left: 0,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.purple, Colors.deepPurple],
-                    ),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.local_fire_department,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        plan.isSubscription ? 'الأكثر طلباً' : 'عرض مميز',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            Text(
+              '${plan.priceEGP.toStringAsFixed(0)} ${ArabicLabels.egp}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFeatureChip(String label, IconData icon, {Color? color}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: (color ?? AppTheme.primaryAmber).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: (color ?? AppTheme.primaryAmber).withOpacity(0.3),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 14,
-            color: color ?? AppTheme.primaryAmber,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: color ?? AppTheme.primaryAmber,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getPlanTypeLabel(PricingPlanModel plan) {
-    if (plan.isSingle) return 'جلسة واحدة';
-    if (plan.isBundle) return 'باقة ${plan.sessionsCount} جلسات';
-    if (plan.isSubscription) {
-      return 'اشتراك شهري - ${plan.sessionsPerWeek}x أسبوعياً';
-    }
-    return '';
-  }
-
-  /// REFACTORED: Now uses centralized orchestration
   Future<void> _proceedToPayment(BuildContext context, WidgetRef ref) async {
     if (selectedPlan == null) return;
 
     final user = ref.read(currentUserProvider).value;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يجب تسجيل الدخول أولاً')),
+        const SnackBar(content: Text('الرجاء تسجيل الدخول')),
       );
       return;
     }
 
-    // Show loading
+    final pricing = _resolvePricing();
+    final isFreeSession = pricing.finalPrice <= 0.01;
+
+    if (isFreeSession && _appliedPromoCode != null) {
+      await _handleFreeSession(context, ref, user);
+      return;
+    }
+
+    await _handleRegularPayment(context, ref, user, pricing);
+  }
+
+  // ============================================
+  // ✅ FIXED: Use Cloud Function via bookingFlowProvider
+  // ============================================
+  Future<void> _handleFreeSession(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic user,
+  ) async {
+    // Guard: a time slot must be selected for a free session
+    if (!_hasSelectedSlot) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ يجب اختيار موعد الجلسة أولاً من صفحة المحفظ'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isProcessingPayment = true);
+
+    try {
+      // Parse slot details
+      final slotDate = _lockedDate!;
+      final timeSlotParts = _lockedTimeSlot.split('-');
+      
+      final startParts = timeSlotParts.first.split(':');
+      final endParts = timeSlotParts.length > 1 
+          ? timeSlotParts.last.split(':') 
+          : startParts;
+      
+      final slotStart = DateTime(
+        slotDate.year,
+        slotDate.month,
+        slotDate.day,
+        int.tryParse(startParts[0]) ?? 0,
+        int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0,
+      );
+      
+      final slotEnd = DateTime(
+        slotDate.year,
+        slotDate.month,
+        slotDate.day,
+        int.tryParse(endParts[0]) ?? 0,
+        int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0,
+      );
+
+      // ✅ Use the existing booking flow provider which calls the Cloud Function
+      final result = await ref.read(bookingFlowProvider.notifier).createFreeSession(
+        mohaffezId: widget.mohaffezId,
+        mohaffezName: widget.mohaffezName,
+        studentId: user.uid,
+        studentName: user.name,
+        sessionType: _lockedSessionType,
+        preferredTimeSlot: _lockedTimeSlot,
+        slotDate: slotDate,
+        slotStart: slotStart,
+        slotEnd: slotEnd,
+        imamAddressText: widget.mohaffezAddress ?? widget.location,
+        imamAddressLat: widget.mohaffezLat,
+        imamAddressLng: widget.mohaffezLng,
+        mohaffezPhone: widget.mohaffezPhone,
+        promoCode: _appliedPromoCode!.code,
+      );
+
+      if (!mounted) return;
+
+      if (result.isSuccess) {
+        // Cloud Function already increments promo usage
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 تم حجز الجلسة المجانية بنجاح!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // Navigate to home after a short delay
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          context.go('/home');
+        }
+      } else {
+        throw Exception(result.errorMessage ?? 'فشل إنشاء الجلسة المجانية');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingPayment = false);
+      }
+    }
+  }
+
+  Future<void> _handleRegularPayment(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic user,
+    PricingResult pricing,
+  ) async {
+    setState(() => _isProcessingPayment = true);
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      // Build base payment model
       final basePayment = PaymentModel(
         studentId: user.uid,
         studentName: user.name,
@@ -642,26 +815,27 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         mohaffezName: widget.mohaffezName,
         planId: selectedPlan!.id!,
         planTitle: selectedPlan!.title,
-        amount: selectedPlan!.priceEGP,
+        amount: pricing.finalPrice,
         method: PaymentMethod.card,
         status: PaymentStatus.pending,
         gateway: PaymentGateway.paymob,
         createdAt: DateTime.now(),
       );
 
-      // Build metadata for backend webhook
       final metadata = <String, dynamic>{
-        if (widget.autoBookAfterPayment) ...{
-          'confirmBooking': false, // Just creating subscription first
-          'sessionType': widget.preselectedSessionType,
-          if (widget.preselectedTimeSlot != null)
-            'timeSlot': widget.preselectedTimeSlot,
-          if (widget.preselectedDate != null)
-            'sessionDate': widget.preselectedDate!.toIso8601String(),
-        },
+        if (widget.requestId != null) 'requestId': widget.requestId,
+        if (widget.requestId != null) 'confirmBooking': true,
+        if (widget.requestId != null)
+          'sessionDetails': {
+            'sessionType': _lockedSessionType,
+            'slotDate':
+                _lockedDate != null ? Timestamp.fromDate(_lockedDate!) : null,
+            'preferredTimeSlot': _lockedTimeSlot,
+            'location': widget.location,
+          },
+        if (_appliedPromoCode != null) 'promoCode': _appliedPromoCode!.code,
       };
 
-      // Call centralized orchestration
       final result = await ref
           .read(paymentActionsProvider.notifier)
           .startPaymentAndHandleResult(
@@ -670,21 +844,38 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             extraMetadata: metadata,
           );
 
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
+      if (!context.mounted) return;
+      Navigator.pop(context);
 
       if (result == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل إنشاء رابط الدفع')),
+          const SnackBar(content: Text('فشل إنشاء عملية الدفع')),
         );
         return;
       }
 
-      // Navigate to payment webview with paymentId for status polling
+      if (result.paymentUrl.isEmpty) {
+        // This case should not happen for paid sessions, but handle gracefully
+        if (_appliedPromoCode != null) {
+          await ref
+              .read(promoCodeProvider.notifier)
+              .applyPromoCode(_appliedPromoCode!.code);
+        }
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تأكيد الجلسة المجانية بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.go('/home');
+        return;
+      }
+
       final success = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (ctx) => PaymentWebViewScreen(
+          builder: (_) => PaymentWebViewScreen(
             paymentUrl: result.paymentUrl,
             paymentId: result.paymentId,
             plan: selectedPlan!,
@@ -692,22 +883,44 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         ),
       );
 
-      if (success == true && mounted) {
+      if (success == true) {
+        if (_appliedPromoCode != null) {
+          await ref
+              .read(promoCodeProvider.notifier)
+              .applyPromoCode(_appliedPromoCode!.code);
+        }
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم الدفع بنجاح! 🎉'),
-            backgroundColor: AppTheme.accentGreen,
+            content: Text('تم الدفع بنجاح'),
+            backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${ArabicLabels.error}: $e')),
+      );
+    } finally {
       if (mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
-        );
+        setState(() => _isProcessingPayment = false);
       }
+    }
+  }
+
+  String _getSessionTypeArabic(String? type) {
+    switch (type) {
+      case 'home':
+        return ArabicLabels.homeSession;
+      case 'mosque':
+        return ArabicLabels.mosqueSession;
+      case 'online':
+        return ArabicLabels.onlineSession;
+      default:
+        return type ?? '';
     }
   }
 }

@@ -6,6 +6,7 @@ import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/session_provider_paginated.dart';
+import '../utils/arabic_labels.dart';
 
 class CompletedSessionsScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -76,22 +77,22 @@ class _CompletedSessionsScreenState
                                 ),
                               ),
                               const SizedBox(width: 16),
-                              const Expanded(
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'الجلسات المكتملة',
-                                      style: TextStyle(
+                                      ArabicLabels.completedSessions,
+                                      style: const TextStyle(
                                         fontSize: 26,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
                                       ),
                                     ),
-                                    SizedBox(height: 4),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      'سجل الجلسات المنجزة',
-                                      style: TextStyle(
+                                      ArabicLabels.sessionHistory,
+                                      style: const TextStyle(
                                         fontSize: 14,
                                         color: Colors.white70,
                                       ),
@@ -132,7 +133,7 @@ class _CompletedSessionsScreenState
               ),
             ),
 
-            // ✅ Search Bar
+            // Search Bar
             SliverToBoxAdapter(
               child: Container(
                 margin: const EdgeInsets.all(16),
@@ -144,7 +145,7 @@ class _CompletedSessionsScreenState
                     });
                   },
                   decoration: InputDecoration(
-                    hintText: 'ابحث عن طالب...',
+                    hintText: ArabicLabels.searchStudents,
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: searchQuery.isNotEmpty
                         ? IconButton(
@@ -171,17 +172,17 @@ class _CompletedSessionsScreenState
             sessionsAsync.when(
               data: (allSessions) {
                 if (allSessions.isEmpty) {
-                  return const SliverFillRemaining(
+                  return SliverFillRemaining(
                     child: EmptyState(
                       icon: Icons.history,
-                      title: 'لا توجد جلسات مكتملة',
-                      message: 'لم يتم إكمال أي جلسات بعد',
+                      title: ArabicLabels.noCompletedSessions,
+                      message: ArabicLabels.noSessionsMessage,
                       animated: true,
                     ),
                   );
                 }
 
-                // ✅ تصفية بالبحث
+                // Apply search filter
                 final filteredSessions = searchQuery.isEmpty
                     ? allSessions
                     : allSessions.where((session) {
@@ -195,8 +196,8 @@ class _CompletedSessionsScreenState
                   return SliverFillRemaining(
                     child: EmptyState(
                       icon: Icons.search_off,
-                      title: 'لا توجد نتائج',
-                      message: 'لم يتم العثور على طالب بهذا الاسم',
+                      title: ArabicLabels.noSearchResults,
+                      message: ArabicLabels.noSessionsMessage,
                       animated: true,
                       action: TextButton.icon(
                         onPressed: () {
@@ -206,7 +207,7 @@ class _CompletedSessionsScreenState
                           });
                         },
                         icon: const Icon(Icons.clear),
-                        label: const Text('مسح البحث'),
+                        label: Text(ArabicLabels.clearSearch),
                       ),
                     ),
                   );
@@ -245,7 +246,6 @@ class _CompletedSessionsScreenState
   }
 }
 
-// ✅ بطاقة الجلسة المكتملة - محدثة لعرض التقييمات
 class CompletedSessionCard extends StatelessWidget {
   final Map<String, dynamic> session;
 
@@ -256,17 +256,17 @@ class CompletedSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final studentName = session['studentName'] as String? ?? 'غير معروف';
+    final studentName = session['studentName'] as String? ?? ArabicLabels.notSpecified;
     final completedAt = session['completedAt'] as DateTime?;
     final sessionDate = session['sessionDate'] as DateTime?;
     final location = session['location'] as String? ?? '';
     final sessionType = session['sessionType'] as String? ?? '';
 
-    // التكليف
+    // Assignments
     final hifzAssignment = session['hifzAssignment'] as String?;
     final murajaAssignment = session['murajaAssignment'] as String?;
 
-    // ✅ التقييمات الجديدة
+    // New evaluation fields
     final previousHifzCompleted = session['previousHifzCompleted'] as bool?;
     final previousHifzRating = session['previousHifzRating'] as int? ?? 0;
     final previousMurajaCompleted = session['previousMurajaCompleted'] as bool?;
@@ -314,8 +314,8 @@ class CompletedSessionCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   completedAt != null
-                      ? 'أُكملت في ${DateFormat('dd/MM/yyyy', 'ar').format(completedAt)}'
-                      : 'غير محدد',
+                      ? '${ArabicLabels.completed} ${DateFormat('dd/MM/yyyy', 'ar').format(completedAt)}'
+                      : ArabicLabels.notSpecified,
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
@@ -350,18 +350,18 @@ class CompletedSessionCard extends StatelessWidget {
           const Divider(height: 1),
           const SizedBox(height: 16),
 
-          // ✅ تقييم التكليف السابق
+          // Previous assignment evaluation
           if (previousHifzCompleted != null || previousMurajaCompleted != null) ...[
             _buildSectionHeader(
               icon: Icons.assignment_turned_in,
-              title: 'تقييم التكليف السابق',
+              title: ArabicLabels.previousAssignments,
               color: Colors.blue,
             ),
             const SizedBox(height: 12),
 
             if (previousHifzCompleted != null)
               _buildAssignmentEvaluation(
-                label: 'الحفظ',
+                label: ArabicLabels.hifz,
                 completed: previousHifzCompleted,
                 rating: previousHifzRating,
                 color: Colors.green,
@@ -370,7 +370,7 @@ class CompletedSessionCard extends StatelessWidget {
             if (previousMurajaCompleted != null) ...[
               const SizedBox(height: 8),
               _buildAssignmentEvaluation(
-                label: 'المراجعة',
+                label: ArabicLabels.muraja,
                 completed: previousMurajaCompleted,
                 rating: previousMurajaRating,
                 color: Colors.blue,
@@ -389,13 +389,13 @@ class CompletedSessionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.note, size: 16, color: Colors.orange),
-                        SizedBox(width: 6),
+                        const Icon(Icons.note, size: 16, color: Colors.orange),
+                        const SizedBox(width: 6),
                         Text(
-                          'ملاحظات الأداء:',
-                          style: TextStyle(
+                          '${ArabicLabels.performanceNotes}:',
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -414,18 +414,18 @@ class CompletedSessionCard extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          // ✅ التكليف الجديد المعطى
+          // New assignments given
           if (hifzAssignment != null || murajaAssignment != null) ...[
             _buildSectionHeader(
               icon: Icons.assignment,
-              title: 'التكليف المعطى للجلسة القادمة',
+              title: ArabicLabels.nextAssignments,
               color: AppTheme.primaryAmber,
             ),
             const SizedBox(height: 12),
 
             if (hifzAssignment != null && hifzAssignment.isNotEmpty)
               _buildAssignmentDisplay(
-                label: 'الحفظ',
+                label: ArabicLabels.hifz,
                 content: hifzAssignment,
                 color: Colors.green,
               ),
@@ -433,7 +433,7 @@ class CompletedSessionCard extends StatelessWidget {
             if (murajaAssignment != null && murajaAssignment.isNotEmpty) ...[
               const SizedBox(height: 8),
               _buildAssignmentDisplay(
-                label: 'المراجعة',
+                label: ArabicLabels.muraja,
                 content: murajaAssignment,
                 color: Colors.blue,
               ),
@@ -441,11 +441,11 @@ class CompletedSessionCard extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          // ✅ الملاحظات العامة
+          // General notes
           if (sessionNotes != null && sessionNotes.isNotEmpty) ...[
             _buildSectionHeader(
               icon: Icons.notes,
-              title: 'ملاحظات عامة',
+              title: ArabicLabels.notes,
               color: Colors.purple,
             ),
             const SizedBox(height: 12),
@@ -465,19 +465,23 @@ class CompletedSessionCard extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          // معلومات الجلسة
+          // Session information
           _buildSectionHeader(
             icon: Icons.info_outline,
-            title: 'تفاصيل الجلسة',
+            title: ArabicLabels.sessionDetails,
             color: Colors.grey,
           ),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.category, 'النوع', sessionType),
-          _buildInfoRow(Icons.location_on, 'المكان', location),
+          _buildInfoRow(
+            Icons.category,
+            ArabicLabels.type,
+            ArabicLabels.getSessionTypeLabel(sessionType),
+          ),
+          _buildInfoRow(Icons.location_on, ArabicLabels.location, location),
           if (sessionDate != null)
             _buildInfoRow(
               Icons.event,
-              'تاريخ الجلسة',
+              ArabicLabels.sessionDate,
               DateFormat('dd/MM/yyyy', 'ar').format(sessionDate),
             ),
         ],
@@ -556,7 +560,7 @@ class CompletedSessionCard extends StatelessWidget {
             ),
           ] else
             Text(
-              'لم يُكمل',
+              ArabicLabels.assignmentNotCompleted,
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.red.shade700,
@@ -586,7 +590,7 @@ class CompletedSessionCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                label == 'الحفظ' ? Icons.menu_book : Icons.history_edu,
+                label == ArabicLabels.hifz ? Icons.menu_book : Icons.history_edu,
                 size: 16,
                 color: color,
               ),
@@ -628,7 +632,7 @@ class CompletedSessionCard extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              value,
+              value.isNotEmpty ? value : ArabicLabels.notSpecified,
               style: const TextStyle(fontSize: 13),
             ),
           ),

@@ -2,64 +2,108 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ============================================================================
+
+    // ============================================
     // HELPER FUNCTIONS
-    // ============================================================================
+    // ============================================
     
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
+
     function onlyUpdating(allowedFields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
     }
-    
-    // ============================================================================
-    // USERS COLLECTION - ENHANCED
-    // ============================================================================
+
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ============================================
+    // USER PROFILES & SETTINGS
+    // ============================================
     
     match /users/{userId} {
-      // ✅ READ: Any authenticated user can read any profile
       allow read: if isAuthenticated();
       
-      // CREATE: Users can create their own profile during signup
-      allow create: if isAuthenticated() 
-                    && request.auth.uid == userId;
+      allow create: if isAuthenticated() && 
+                    request.auth.uid == userId &&
+                    request.resource.data.uid == userId;
       
-      // UPDATE: Users can update their own profile OR update counters
-      allow update: if isOwner(userId) 
-                    || (isAuthenticated() && onlyUpdating(['followerCount', 'followingCount', 'fcmToken', 'fcmTokenUpdatedAt']));
+      allow update: if isOwner(userId) ||
+                    (isAuthenticated() && onlyUpdating(['followerCount', 'followingCount', 'fcmToken', 'fcmTokenUpdatedAt']));
       
       allow delete: if isOwner(userId);
-      
-      // Credentials subcollection
+
+      // Credentials
       match /credentials/{credentialId} {
-        allow read: if isAuthenticated() && 
-                    (resource == null || resource.data.status == 'approved' || request.auth.uid == userId);
-        allow write: if isOwner(userId);
+        allow read: if isAuthenticated() &&
+                    (resource == null || 
+                     resource.data.status == 'approved' || 
+                     request.auth.uid == userId);
+        
+        allow create: if isOwner(userId) &&
+                      request.resource.data.userId == userId &&
+                      request.resource.data.status == 'pending';
+        
+        allow update: if isOwner(userId) ||
+                      (isAdmin() && onlyUpdating(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason']));
+        
+        allow delete: if isOwner(userId);
       }
-      
-      // Availability subcollection  
+
+      // Availability schedules
       match /availability/{availabilityId} {
         allow read: if isAuthenticated();
-        allow write: if isOwner(userId);
+        
+        allow create: if isOwner(userId) &&
+                      request.resource.data.dayOfWeek is int &&
+                      request.resource.data.dayOfWeek >= 1 &&
+                      request.resource.data.dayOfWeek <= 7;
+        
+        allow update: if isOwner(userId);
+        
+        allow delete: if isOwner(userId);
       }
-      
-      // Unavailable dates subcollection
+
+      // Unavailable dates
       match /unavailableDates/{dateId} {
         allow read: if isAuthenticated();
         allow write: if isOwner(userId);
       }
+
+      // Privacy settings
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+
+      // Pricing plans
+      match /pricingPlans/{planId} {
+        allow read: if isAuthenticated();
+        
+        allow create: if isOwner(userId) &&
+                      request.resource.data.mohaffezId == userId &&
+                      request.resource.data.isActive == true &&
+                      request.resource.data.priceEGP > 0 &&
+                      request.resource.data.sessionsCount > 0;
+        
+        allow update: if isOwner(userId) &&
+                      request.resource.data.mohaffezId == userId;
+        
+        allow delete: if isOwner(userId);
+      }
     }
-    
-    // ============================================================================
-    // SESSION REQUESTS - FIXED
-    // ============================================================================
+
+    // ============================================
+    // SESSION REQUESTS (Booking Flow)
+    // ============================================
     
     match /sessionRequests/{requestId} {
       allow read: if isAuthenticated() && (
@@ -67,31 +111,29 @@ service cloud.firestore {
         request.auth.uid == resource.data.studentId ||
         request.auth.uid == resource.data.mohaffezId
       );
-      
-      allow create: if isAuthenticated()
-                    && request.auth.uid == request.resource.data.studentId
-                    && request.resource.data.status == 'pending';
-      
+
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.studentId &&
+                    request.resource.data.status == 'pending' &&
+                    request.resource.data.studentId is string &&
+                    request.resource.data.mohaffezId is string &&
+                    request.resource.data.sessionType in ['home', 'mosque', 'online'];
+
+      // TEMPORARY: Allow any authenticated participant to update
+      // REMOVE THIS AFTER DEBUGGING
       allow update: if isAuthenticated() && (
-        // Mohaffez accepts/rejects
-        (request.auth.uid == resource.data.mohaffezId &&
-         resource.data.status == 'pending' &&
-         request.resource.data.status in ['accepted', 'rejected'])
-        ||
-        // Student cancels
-        (request.auth.uid == resource.data.studentId &&
-         resource.data.status == 'pending' &&
-         request.resource.data.status == 'cancelled')
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
       );
-      
-      allow delete: if isAuthenticated() 
-                    && request.auth.uid == resource.data.studentId
-                    && resource.data.status == 'pending';
+
+      allow delete: if isAuthenticated() &&
+                    request.auth.uid == resource.data.studentId &&
+                    resource.data.status in ['pending', 'cancelled', 'rejected'];
     }
-    
-    // ============================================================================
-    // HAFIZ SESSIONS - FIXED
-    // ============================================================================
+
+    // ============================================
+    // HAFIZ SESSIONS
+    // ============================================
     
     match /hafizSessions/{sessionId} {
       allow read: if isAuthenticated() && (
@@ -99,60 +141,269 @@ service cloud.firestore {
         request.auth.uid == resource.data.studentId ||
         request.auth.uid == resource.data.mohaffezId
       );
-      
-      allow create: if isAuthenticated()
-                    && request.auth.uid == request.resource.data.mohaffezId;
-      
+
+      allow create: if isAuthenticated() &&
+                    (
+                      // Mohaffez creating
+                      (request.auth.uid == request.resource.data.mohaffezId &&
+                       request.resource.data.mohaffezId is string &&
+                       request.resource.data.studentId is string)
+                      ||
+                      // Student creating from paid request (including free sessions)
+                      (request.auth.uid == request.resource.data.studentId &&
+                      request.resource.data.requestId is string &&
+                      request.resource.data.status == 'accepted' &&
+                      request.resource.data.isPaid == true &&
+                      exists(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)) &&
+                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.studentId == request.auth.uid &&
+                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.mohaffezId == request.resource.data.mohaffezId &&
+                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.status == 'accepted' &&
+                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.isPaid == true)
+                    );
+
       allow update: if isAuthenticated() && (
-        // Mohaffez updates session
-        (request.auth.uid == resource.data.mohaffezId)
-        ||
-        // Student updates feedback only
+        (request.auth.uid == resource.data.mohaffezId) ||
         (request.auth.uid == resource.data.studentId &&
-         onlyUpdating(['studentFeedback', 'studentNotes']))
+         onlyUpdating(['studentFeedback', 'studentNotes', 'studentRating', 'updatedAt'])) ||
+        (onlyUpdating(['reminder24hSent', 'reminder24hSentAt', 'reminder1hSent', 'reminder1hSentAt', 'updatedAt']))
       );
-      
-      allow delete: if isAuthenticated()
-                    && request.auth.uid == resource.data.mohaffezId;
+
+      allow delete: if isAuthenticated() &&
+                    request.auth.uid == resource.data.mohaffezId &&
+                    resource.data.status == 'cancelled';
     }
+
+    // ============================================
+    // PAYMENTS & SUBSCRIPTIONS
+    // ============================================
     
-    // ============================================================================
-    // FOLLOWS
-    // ============================================================================
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.studentId &&
+                    request.resource.data.status == 'pending' &&
+                    request.resource.data.amount >= 0 &&
+                    request.resource.data.studentId is string &&
+                    request.resource.data.mohaffezId is string;
+
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.studentId &&
+         resource.data.status in ['pending', 'processing'] &&
+         onlyUpdating(['updatedAt', 'gatewayOrderId'])) ||
+        (request.auth.uid == resource.data.mohaffezId &&
+         resource.data.method == 'cash' &&
+         resource.data.status == 'pending' &&
+         request.resource.data.status == 'completed' &&
+         onlyUpdating(['status', 'completedAt', 'paidAt', 'updatedAt'])) ||
+        (onlyUpdating(['status', 'completedAt', 'updatedAt', 'paidAt', 'gatewayTransactionId', 
+                       'transactionReference', 'gatewayResponse', 'failureReason', 
+                       'processingStartedAt', 'processedAt', 'idempotencyKey', 'subscriptionId', 
+                       'method', 'gateway', 'notes', 'sessionId']))
+      );
+
+      allow delete: if false;
+    }
+
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.studentId &&
+                    request.resource.data.status == 'active' &&
+                    request.resource.data.remainingSessions > 0 &&
+                    request.resource.data.totalSessions > 0 &&
+                    request.resource.data.studentId is string &&
+                    request.resource.data.mohaffezId is string;
+
+      allow update: if isAuthenticated() && (
+        (request.resource.data.remainingSessions == resource.data.remainingSessions - 1 &&
+         resource.data.remainingSessions > 0 &&
+         request.resource.data.status in ['active', 'expired', 'depleted'] &&
+         onlyUpdating(['remainingSessions', 'lastUsedAt', 'status', 'updatedAt'])) ||
+        (request.auth.uid == resource.data.studentId &&
+         resource.data.status == 'active' &&
+         request.resource.data.status == 'cancelled' &&
+         onlyUpdating(['status', 'cancelledAt', 'updatedAt'])) ||
+        (resource.data.status == 'active' &&
+         request.resource.data.status == 'expired' &&
+         onlyUpdating(['status', 'expiredAt', 'updatedAt']))
+      );
+
+      allow delete: if false;
+    }
+
+    // ============================================
+    // EVENT SOURCING & ANALYTICS
+    // ============================================
+    
+    match /paymentEvents/{eventId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.userId
+      );
+      allow write: if false;
+    }
+
+    match /paymentAnalytics/{analyticsId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ============================================
+    // SLOT LOCKING
+    // ============================================
+    
+    match /slotLocks/{lockId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.studentId &&
+                    request.resource.data.released == false &&
+                    request.resource.data.expiresAt is timestamp;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================
+    // PROMO CODES (SINGULAR - for backward compatibility)
+    // ============================================
+    
+    match /promocodes/{promoCode} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() &&
+                    onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']);
+      allow delete: if isAdmin();
+    }
+
+    // ========================== ==================
+    // PROMO CODES (PLURAL - used by the app and Cloud Function)
+    // ============================================
+    
+    match /promoCodes/{promoCode} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() &&
+                    onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']);
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // SOCIAL FEATURES
+    // ============================================
     
     match /follows/{followId} {
       allow read: if isAuthenticated();
-      
-      allow create: if isAuthenticated()
-                    && request.auth.uid == request.resource.data.studentId;
-      
-      allow delete: if isAuthenticated()
-                    && request.auth.uid == resource.data.studentId;
-      
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.studentId &&
+                    request.resource.data.studentId is string &&
+                    request.resource.data.mohaffezId is string &&
+                    request.resource.data.studentId != request.resource.data.mohaffezId;
+      allow delete: if isAuthenticated() &&
+                    request.auth.uid == resource.data.studentId;
       allow update: if false;
     }
-    
-    // ============================================================================
+
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.studentId &&
+                    request.resource.data.rating >= 1 &&
+                    request.resource.data.rating <= 5 &&
+                    request.resource.data.studentId is string &&
+                    request.resource.data.mohaffezId is string;
+      allow update: if isAuthenticated() &&
+                    request.auth.uid == resource.data.studentId &&
+                    onlyUpdating(['rating', 'comment', 'updatedAt']);
+      allow delete: if isAuthenticated() &&
+                    request.auth.uid == resource.data.studentId;
+    }
+
+    // ============================================
     // NOTIFICATIONS
-    // ============================================================================
+    // ============================================
     
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated()
-                  && request.auth.uid == resource.data.userId;
-      
+      allow read: if isAuthenticated() &&
+                  (resource == null ||
+                   request.auth.uid == resource.data.userId ||
+                   request.auth.uid == resource.data.recipientId);
       allow create: if isAuthenticated();
-      
-      allow update: if isAuthenticated()
-                    && request.auth.uid == resource.data.userId
-                    && onlyUpdating(['isRead', 'readAt']);
-      
-      allow delete: if isAuthenticated()
-                    && request.auth.uid == resource.data.userId;
+      allow update: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.userId ||
+                     request.auth.uid == resource.data.recipientId) &&
+                    onlyUpdating(['isRead', 'readAt', 'updatedAt']);
+      allow delete: if isAuthenticated() &&
+                    (request.auth.uid == resource.data.userId ||
+                     request.auth.uid == resource.data.recipientId);
     }
+
+    // ============================================
+    // ASSIGNMENTS & MISTAKES
+    // ============================================
     
-    // ============================================================================
-    // DEFAULT DENY
-    // ============================================================================
+    match /assignments/{assignmentId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.mohaffezId &&
+                    request.resource.data.studentId is string;
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.mohaffezId) ||
+        (request.auth.uid == resource.data.studentId &&
+         onlyUpdating(['status', 'completedAt', 'studentNotes', 'updatedAt']))
+      );
+      allow delete: if isAuthenticated() &&
+                    request.auth.uid == resource.data.mohaffezId;
+    }
+
+    match /quranMistakes/{mistakeId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+      allow create: if isAuthenticated() &&
+                    request.auth.uid == request.resource.data.mohaffezId;
+      allow update: if isAuthenticated() &&
+                    request.auth.uid == resource.data.mohaffezId;
+      allow delete: if isAuthenticated() &&
+                    request.auth.uid == resource.data.mohaffezId;
+    }
+
+    // ============================================
+    // ADMIN & OPERATIONS
+    // ============================================
+    
+    match /failedOperations/{operationId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /systemConfig/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /appVersions/{versionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ============================================
+    // CATCH-ALL
+    // ============================================
     
     match /{document=**} {
       allow read, write: if false;

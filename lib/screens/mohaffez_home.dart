@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
+import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
+import '../utils/arabic_labels.dart';
 
 class MohaffezHome extends ConsumerWidget {
   const MohaffezHome({super.key});
@@ -67,7 +69,10 @@ class MohaffezHomeContent extends ConsumerWidget {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                        colors: [
+                          AppThemeConstants.primaryAmber,
+                          AppThemeConstants.primaryAmberLight
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -84,28 +89,34 @@ class MohaffezHomeContent extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(12),
+                                    color: AppThemeConstants.surfaceWhite
+                                        .withValues(alpha: 0.2),
+                                    borderRadius:
+                                        AppThemeConstants.borderRadiusMd,
                                   ),
                                   child: const Icon(
                                     Icons.school,
                                     size: 32,
-                                    color: Colors.white,
+                                    color: AppThemeConstants.surfaceWhite,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Consumer(
                                     builder: (context, ref, _) {
-                                      final user = ref.watch(currentUserProvider).value;
+                                      final user =
+                                          ref.watch(currentUserProvider).value;
                                       return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          const Text(
+                                          Text(
                                             'أهلاً بك',
                                             style: TextStyle(
                                               fontSize: 16,
-                                              color: Colors.white70,
+                                              color: AppThemeConstants
+                                                  .surfaceWhite
+                                                  .withValues(alpha: 0.7),
                                             ),
                                           ),
                                           Text(
@@ -113,7 +124,8 @@ class MohaffezHomeContent extends ConsumerWidget {
                                             style: const TextStyle(
                                               fontSize: 24,
                                               fontWeight: FontWeight.bold,
-                                              color: Colors.white,
+                                              color: AppThemeConstants
+                                                  .surfaceWhite,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -144,11 +156,11 @@ class MohaffezHomeContent extends ConsumerWidget {
 
                     // Quick Stats
                     QuickStatsSection(mohaffezId: mohaffezId),
-                    const SizedBox(height: 24),
+                    Spacing.vLg,
 
                     // Quick Actions
                     QuickActionsSection(mohaffezId: mohaffezId),
-                    const SizedBox(height: 24),
+                    Spacing.vLg,
 
                     // Upcoming Sessions
                     UpcomingSessionsSection(mohaffezId: mohaffezId),
@@ -182,9 +194,9 @@ class MohaffezHomeContent extends ConsumerWidget {
 
     return Card(
       elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+      color: AppThemeConstants.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppThemeConstants.borderRadiusLg,
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -193,13 +205,13 @@ class MohaffezHomeContent extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.accentGreen.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+                borderRadius: AppThemeConstants.borderRadiusMd,
               ),
               child: Icon(
                 greetingIcon,
                 size: 28,
-                color: AppTheme.accentGreen,
+                color: AppThemeConstants.accentGreen,
               ),
             ),
             const SizedBox(width: 16),
@@ -212,7 +224,7 @@ class MohaffezHomeContent extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: AppThemeConstants.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -245,7 +257,8 @@ class QuickStatsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
-    final pendingRequests = ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
+    final pendingRequests =
+        ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,22 +268,22 @@ class QuickStatsSection extends ConsumerWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
+            color: AppThemeConstants.textPrimary,
           ),
         ),
-        const SizedBox(height: 16),
+        Spacing.vMd,
         Row(
           children: [
             Expanded(
               child: StatCard(
                 icon: Icons.event_available,
-                title: 'الجلسات القادمة',
+                title: ArabicLabels.upcomingSessions,
                 value: upcomingSessions.when(
                   data: (sessions) => sessions.length.toString(),
                   loading: () => '...',
                   error: (_, __) => '0',
                 ),
-                color: AppTheme.accentGreen,
+                color: AppThemeConstants.accentGreen,
                 onTap: () {
                   ref.read(upcomingSessionsFilterProvider.notifier).state =
                       UpcomingFilter.all;
@@ -282,7 +295,7 @@ class QuickStatsSection extends ConsumerWidget {
             Expanded(
               child: StatCard(
                 icon: Icons.pending_actions,
-                title: 'الطلبات المعلقة',
+                title: ArabicLabels.pendingRequests,
                 value: pendingRequests.when(
                   data: (requests) => requests
                       .where((r) => r['status'] == 'pending')
@@ -324,9 +337,9 @@ class StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: AppThemeConstants.surfaceWhite,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppThemeConstants.borderRadiusLg,
         side: BorderSide(
           color: color.withValues(alpha: 0.2),
           width: 1,
@@ -334,7 +347,7 @@ class StatCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppThemeConstants.borderRadiusLg,
         child: Container(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -347,7 +360,7 @@ class StatCard extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppThemeConstants.borderRadiusMd,
                     ),
                     child: Icon(icon, size: 28, color: color),
                   ),
@@ -358,7 +371,7 @@ class StatCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              Spacing.vMd,
               Text(
                 value,
                 style: TextStyle(
@@ -404,10 +417,10 @@ class QuickActionsSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
+            color: AppThemeConstants.textPrimary,
           ),
         ),
-        const SizedBox(height: 16),
+        Spacing.vMd,
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -419,7 +432,7 @@ class QuickActionsSection extends StatelessWidget {
             // Pending Requests
             ActionCard(
               icon: Icons.pending_actions,
-              title: 'الطلبات المعلقة',
+              title: ArabicLabels.pendingRequests,
               gradient: const LinearGradient(
                 colors: [Colors.orange, Color(0xFFFFB74D)],
                 begin: Alignment.topLeft,
@@ -433,9 +446,9 @@ class QuickActionsSection extends StatelessWidget {
             // Upcoming Sessions
             ActionCard(
               icon: Icons.event_available,
-              title: 'الجلسات القادمة',
+              title: ArabicLabels.upcomingSessions,
               gradient: const LinearGradient(
-                colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
+                colors: [AppThemeConstants.accentGreen, Color(0xFF66BB6A)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -522,28 +535,28 @@ class ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppThemeConstants.borderRadiusLg,
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppThemeConstants.borderRadiusLg,
         child: Container(
           decoration: BoxDecoration(
             gradient: gradient,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppThemeConstants.borderRadiusLg,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 40, color: Colors.white),
-              const SizedBox(height: 8),
+              Icon(icon, size: 40, color: AppThemeConstants.surfaceWhite),
+              Spacing.vSm,
               Text(
                 title,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppThemeConstants.surfaceWhite,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -572,11 +585,11 @@ class UpcomingSessionsSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'الجلسات القادمة',
+          ArabicLabels.upcomingSessions,
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
+            color: AppThemeConstants.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -585,9 +598,9 @@ class UpcomingSessionsSection extends ConsumerWidget {
             if (sessions.isEmpty) {
               return Card(
                 elevation: 0,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                color: AppThemeConstants.surfaceWhite,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: AppThemeConstants.borderRadiusLg,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(40),
@@ -606,7 +619,7 @@ class UpcomingSessionsSection extends ConsumerWidget {
                             color: Colors.grey.shade400,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        Spacing.vMd,
                         Text(
                           'لا توجد جلسات قادمة',
                           style: TextStyle(
@@ -624,16 +637,18 @@ class UpcomingSessionsSection extends ConsumerWidget {
 
             return Column(
               children: sessions.take(3).map((session) {
-                final studentName = session['studentName'] as String? ?? 'غير محدد';
+                final studentName = session['studentName'] as String? ??
+                    ArabicLabels.notSpecified;
                 final sessionDate = session['sessionDate'] as DateTime?;
-                final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
+                final timeSlot =
+                    session['preferredTimeSlot'] as String? ?? '08:00';
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   elevation: 0,
-                  color: Colors.white,
+                  color: AppThemeConstants.surfaceWhite,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: AppThemeConstants.borderRadiusLg,
                     side: BorderSide(
                       color: Colors.grey.shade200,
                       width: 1,
@@ -646,12 +661,13 @@ class UpcomingSessionsSection extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppTheme.accentGreen.withValues(alpha: 0.1),
+                            color: AppThemeConstants.accentGreen
+                                .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
                             Icons.school,
-                            color: AppTheme.accentGreen,
+                            color: AppThemeConstants.accentGreen,
                             size: 22,
                           ),
                         ),
@@ -678,8 +694,9 @@ class UpcomingSessionsSection extends ConsumerWidget {
                                   const SizedBox(width: 4),
                                   Text(
                                     sessionDate != null
-                                        ? DateFormat('dd/MM/yyyy', 'ar').format(sessionDate)
-                                        : 'غير محدد',
+                                        ? DateFormat('dd/MM/yyyy', 'ar')
+                                            .format(sessionDate)
+                                        : ArabicLabels.notSpecified,
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
@@ -720,8 +737,8 @@ class UpcomingSessionsSection extends ConsumerWidget {
           error: (e, _) => Card(
             elevation: 0,
             color: Colors.red.shade50,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+            shape: const RoundedRectangleBorder(
+              borderRadius: AppThemeConstants.borderRadiusLg,
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),

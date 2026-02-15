@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
+
+val dotenv = Properties().apply {
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.inputStream().use { load(it) }
+    }
+}
+
+val mapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY")?.takeIf { it.isNotBlank() }
+    ?: (project.findProperty("GOOGLE_MAPS_API_KEY") as String?)?.takeIf { it.isNotBlank() }
+    ?: dotenv.getProperty("GOOGLE_MAPS_API_KEY")?.takeIf { it.isNotBlank() }
+    ?: ""
 
 android {
     namespace = "com.imam.mohaffez_app"
@@ -16,6 +30,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

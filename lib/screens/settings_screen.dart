@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
+import '../shared/theme/theme_extensions.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -42,7 +43,7 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
             
-            const SizedBox(height: 24),
+            Spacing.vLg,
             
             // الحساب
             buildSection(
@@ -70,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
             
-            const SizedBox(height: 24),
+            Spacing.vLg,
             
             // معلومات
             buildSection(
@@ -117,8 +118,8 @@ class SettingsScreen extends ConsumerWidget {
         ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: AppThemeConstants.surfaceWhite,
+            borderRadius: AppThemeConstants.borderRadiusMd,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -140,7 +141,7 @@ class SettingsScreen extends ConsumerWidget {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: AppTheme.primaryAmber),
+      leading: Icon(icon, color: AppThemeConstants.primaryAmber),
       title: Text(title),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -160,7 +161,7 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               ListTile(
                 title: const Text('العربية'),
-                trailing: const Icon(Icons.check, color: AppTheme.primaryAmber),
+                trailing: const Icon(Icons.check, color: AppThemeConstants.primaryAmber),
                 onTap: () => Navigator.pop(ctx),
               ),
               ListTile(
@@ -201,7 +202,7 @@ class SettingsScreen extends ConsumerWidget {
                   border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
               TextField(
                 controller: newPasswordController,
                 obscureText: true,
@@ -210,7 +211,7 @@ class SettingsScreen extends ConsumerWidget {
                   border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
               TextField(
                 controller: confirmPasswordController,
                 obscureText: true,
@@ -290,16 +291,16 @@ class SettingsScreen extends ConsumerWidget {
                   'للتواصل معنا:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 8),
+                Spacing.vSm,
                 const Text('📧 البريد: support@mohaffez.com'),
                 const SizedBox(height: 4),
                 const Text('📱 الهاتف: 0123456789'),
-                const SizedBox(height: 16),
+                Spacing.vMd,
                 const Text(
                   'الأسئلة الشائعة:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 8),
+                Spacing.vSm,
                 _buildFAQItem('• كيف أحجز جلسة مع محفظ؟'),
                 _buildFAQItem('• كيف أتابع تقدمي في الحفظ؟'),
                 _buildFAQItem('• كيف أغير معلومات الحساب؟'),
@@ -429,3 +430,4 @@ class _EmailNotificationsScreenState extends State<EmailNotificationsScreen> {
     );
   }
 }
+

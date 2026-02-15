@@ -6,6 +6,7 @@ import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../models/session_model.dart';
+
 import 'session_details_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 

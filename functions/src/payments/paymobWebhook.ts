@@ -1,181 +1,220 @@
-// functions/src/payments/paymobWebhook.ts
+// Required Firestore index: payments collection on (idempotencyKey, status)
 import * as functions from 'firebase-functions';
 import admin, { db } from '../utils/admin';
 import { verifyPaymobHmac } from '../utils/paymobVerification';
-import {
-  confirmBookingAfterPayment,
-  consumeSubscriptionAndCreateSession,
-  createSubscriptionFromPayment,
-} from './handlers';
+import { PaymentOrchestrationService } from '../services/PaymentOrchestrationService';
+import { EventStore } from '../services/EventStore';
+import { NotificationService } from '../services/NotificationService';
+import { PaymentDocument, PaymentMetadata, serverTimestamp } from '../types/payment.types';
+import { PaymentEventType } from '../types/events.types';
+
+interface PaymobObject {
+  id: number;
+  pending: boolean;
+  amount_cents: number;
+  success: boolean;
+  order: {
+    id: number;
+    merchant_order_id: string;
+  };
+  error_occured: boolean;
+}
 
 interface PaymobCallback {
-  obj: {
-    id: number;
-    pending: boolean;
-    amount_cents: number;
-    success: boolean;
-    is_auth: boolean;
-    is_capture: boolean;
-    is_standalone_payment: boolean;
-    is_voided: boolean;
-    is_refunded: boolean;
-    is_3d_secure: boolean;
-    integration_id: number;
-    profile_id: number;
-    has_parent_transaction: boolean;
-    order: {
-      id: number;
-      merchant_order_id: string; // Our paymentId
-    };
-    created_at: string;
-    currency: string;
-    source_data: {
-      type: string;
-      sub_type: string;
-      pan: string;
-    };
-    owner: number;
-    error_occured: boolean;
-  };
+  obj: PaymobObject;
   type: string;
   hmac: string;
 }
 
-/**
- * Paymob webhook endpoint
- * Called by Paymob after payment success/failure
- */
+interface PaymentLockResult {
+  state: 'ready' | 'already_processed' | 'amount_mismatch';
+  payment: PaymentDocument;
+}
+
+const eventStore = new EventStore();
+const notificationService = new NotificationService();
+const orchestrationService = new PaymentOrchestrationService(
+  eventStore,
+  notificationService
+);
+
 export const paymobWebhook = functions.https.onRequest(async (req, res) => {
   try {
-    // Only accept POST
     if (req.method !== 'POST') {
       res.status(405).send('Method not allowed');
       return;
     }
 
-    const data: PaymobCallback = req.body;
-    const receivedHmac = data.hmac;
+    const callback = req.body as PaymobCallback;
+    if (!callback?.obj || !callback?.hmac) {
+      res.status(400).send('Invalid payload');
+      return;
+    }
 
-    // 1. Verify HMAC
-    const isValid = verifyPaymobHmac(data.obj, receivedHmac);
+    const isValid = verifyPaymobHmac(callback.obj, callback.hmac);
     if (!isValid) {
-      functions.logger.warn('Invalid HMAC', { data });
+      functions.logger.warn('Invalid HMAC in webhook');
       res.status(400).send('Invalid HMAC');
       return;
     }
 
-    const paymentId = data.obj.order.merchant_order_id;
-    const transactionId = data.obj.id.toString();
-    const success = data.obj.success && !data.obj.error_occured;
-    const amountEGP = data.obj.amount_cents / 100;
+    const paymentId = callback.obj.order.merchant_order_id;
+    const transactionId = callback.obj.id.toString();
+    const amountEGP = callback.obj.amount_cents / 100;
+    const success = callback.obj.success && !callback.obj.error_occured;
 
     functions.logger.info('Paymob callback received', {
       paymentId,
       transactionId,
-      success,
       amountEGP,
+      success,
+      eventType: callback.type,
     });
 
-    // 2. Get payment document
-    const paymentRef = db.collection('payments').doc(paymentId);
-    const paymentSnap = await paymentRef.get();
+    const lockResult = await lockPaymentForProcessing(
+      paymentId,
+      transactionId,
+      amountEGP
+    );
 
-    if (!paymentSnap.exists) {
-      functions.logger.error('Payment not found', { paymentId });
-      res.status(404).send('Payment not found');
-      return;
-    }
-
-    const payment = paymentSnap.data()!;
-
-    // 3. Validate payment is still pending/processing (idempotency)
-    if (payment.status === 'completed') {
-      functions.logger.info('Payment already completed', { paymentId });
+    if (lockResult.state === 'already_processed') {
+      functions.logger.info('Payment already processed', { paymentId, transactionId });
       res.status(200).send('OK - already processed');
       return;
     }
 
-    // 4. Validate amount
-    if (Math.abs(payment.amount - amountEGP) > 0.01) {
+    if (lockResult.state === 'amount_mismatch') {
       functions.logger.error('Amount mismatch', {
         paymentId,
-        expected: payment.amount,
-        received: amountEGP,
-      });
-      await paymentRef.update({
-        status: 'failed',
-        failureReason: 'Amount mismatch',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        expectedAmount: lockResult.payment.amount,
+        receivedAmount: amountEGP,
       });
       res.status(400).send('Amount mismatch');
       return;
     }
 
-    if (success) {
-      // Payment successful - handle based on metadata
-      await handleSuccessfulPayment(paymentId, payment, transactionId);
-      res.status(200).send('OK - payment processed');
-    } else {
-      // Payment failed
-      await paymentRef.update({
+    await eventStore.appendPaymentEvent({
+      eventType: PaymentEventType.PAYMENT_PROCESSING,
+      paymentId,
+      userId: lockResult.payment.studentId,
+      data: {
+        transactionId,
+      },
+      metadata: {
+        source: 'webhook',
+        transactionId,
+        ipAddress: req.ip,
+      },
+    });
+
+    if (!success) {
+      await db.collection('payments').doc(paymentId).update({
         status: 'failed',
         failureReason: 'Payment declined by gateway',
         gatewayTransactionId: transactionId,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
-      functions.logger.info('Payment failed', { paymentId });
+
+      await eventStore.appendPaymentEvent({
+        eventType: PaymentEventType.PAYMENT_FAILED,
+        paymentId,
+        userId: lockResult.payment.studentId,
+        data: {
+          reason: 'Payment declined by gateway',
+        },
+        metadata: {
+          source: 'webhook',
+          transactionId,
+          ipAddress: req.ip,
+        },
+      });
+
       res.status(200).send('OK - payment failed');
+      return;
     }
+
+    const result = await orchestrationService.processSuccessfulPayment({
+      paymentId,
+      payment: lockResult.payment,
+      transactionId,
+      metadata: (lockResult.payment.metadata ?? {}) as PaymentMetadata,
+      ipAddress: req.ip,
+    });
+
+    if (!result.success) {
+      res.status(500).send(result.error ?? 'Payment processing failed');
+      return;
+    }
+
+    res.status(200).send('OK - payment processed');
   } catch (error) {
-    functions.logger.error('Webhook error', error);
+    const message = error instanceof Error ? error.message : 'Unknown webhook error';
+    functions.logger.error('Webhook error', { error: message });
     res.status(500).send('Internal server error');
   }
 });
 
-/**
- * Handle successful payment based on metadata
- */
-async function handleSuccessfulPayment(
+async function lockPaymentForProcessing(
   paymentId: string,
-  payment: any,
-  transactionId: string
-): Promise<void> {
-  const batch = db.batch();
-  const paymentRef = db.collection('payments').doc(paymentId);
+  transactionId: string,
+  amountEGP: number
+): Promise<PaymentLockResult> {
+  return db.runTransaction(async (transaction) => {
+    const paymentRef = db.collection('payments').doc(paymentId);
+    const paymentSnap = await transaction.get(paymentRef);
 
-  // Mark payment as completed
-  batch.update(paymentRef, {
-    status: 'completed',
-    gatewayTransactionId: transactionId,
-    paidAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    if (!paymentSnap.exists) {
+      throw new Error('Payment not found');
+    }
+
+    const payment = paymentSnap.data() as PaymentDocument;
+    const expectedIdempotencyKey = `${paymentId}_${transactionId}`;
+
+    if (payment.idempotencyKey === expectedIdempotencyKey) {
+      return {
+        state: 'already_processed',
+        payment,
+      };
+    }
+
+    if (payment.status === 'completed' || payment.status === 'processing') {
+      return {
+        state: 'already_processed',
+        payment,
+      };
+    }
+
+    if (payment.status !== 'pending') {
+      return {
+        state: 'already_processed',
+        payment,
+      };
+    }
+
+    if (Math.abs(payment.amount - amountEGP) > 0.01) {
+      transaction.update(paymentRef, {
+        status: 'failed',
+        failureReason: 'Amount mismatch',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        state: 'amount_mismatch',
+        payment,
+      };
+    }
+
+    transaction.update(paymentRef, {
+      status: 'processing',
+      gatewayTransactionId: transactionId,
+      processingStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      idempotencyKey: expectedIdempotencyKey,
+    });
+
+    return {
+      state: 'ready',
+      payment,
+    };
   });
-
-  const metadata = payment.metadata || {};
-
-  // Route based on metadata
-  if (metadata.confirmBooking && metadata.requestId) {
-    // SCENARIO: Confirm existing booking request
-    await confirmBookingAfterPayment(
-      batch,
-      metadata.requestId,
-      metadata.sessionDetails || {},
-      payment,
-      transactionId
-    );
-  } else if (metadata.subscriptionId) {
-    // SCENARIO: Consume subscription credit and create session
-    await consumeSubscriptionAndCreateSession(
-      batch,
-      metadata.subscriptionId,
-      payment,
-      transactionId
-    );
-  } else {
-    // SCENARIO: Create new subscription from plan
-    await createSubscriptionFromPayment(batch, payment, transactionId);
-  }
-
-  await batch.commit();
-  functions.logger.info('Payment processed successfully', { paymentId });
 }

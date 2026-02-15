@@ -2,16 +2,20 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../shared/constants/app_theme.dart';
 import '../providers/session_provider_paginated.dart';
 import '../shared/utils/error_handler.dart';
+import '../models/quran_mistake_model.dart';
+import '../shared/widgets/interactive_quran_page.dart';
+import '../utils/arabic_labels.dart';
 
 class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String sessionId;
   final String studentName;
   final String? previousHifz;
   final String? previousMuraja;
-  final bool isLateCompletion; // ✅ NEW PARAMETER
+  final bool isLateCompletion;
 
   const SessionCompletionScreen({
     super.key,
@@ -19,7 +23,7 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
     required this.studentName,
     this.previousHifz,
     this.previousMuraja,
-    this.isLateCompletion = false, // ✅ DEFAULT FALSE
+    this.isLateCompletion = false,
   });
 
   @override
@@ -31,22 +35,26 @@ class _SessionCompletionScreenState
     extends ConsumerState<SessionCompletionScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // التكليف السابق
+  // Previous assignment evaluation
   bool previousHifzCompleted = false;
   int previousHifzRating = 5;
   bool previousMurajaCompleted = false;
   int previousMurajaRating = 5;
   final performanceNotesController = TextEditingController();
 
-  // التكليف الجديد
+  // New assignments
   final newHifzController = TextEditingController();
   final newMurajaController = TextEditingController();
 
-  // التقييم العام
+  // General session rating
   int sessionRating = 7;
   final generalNotesController = TextEditingController();
 
   bool isSubmitting = false;
+
+  // Quran mistake tracking state
+  int currentQuranPage = 1;
+  final List<QuranMistake> sessionMistakes = [];
 
   @override
   void dispose() {
@@ -59,13 +67,14 @@ class _SessionCompletionScreenState
 
   Future<void> _completeSession() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => isSubmitting = true);
 
     try {
-      await ref.read(sessionActionsProvider.notifier).completeSessionWithDetails(
+      await ref
+          .read(sessionActionsProvider.notifier)
+          .completeSessionWithDetails(
             sessionId: widget.sessionId,
-            // تقييم التكليف السابق
+            // Previous assignment evaluation
             previousHifzCompleted:
                 widget.previousHifz != null ? previousHifzCompleted : null,
             previousHifzRating:
@@ -77,25 +86,30 @@ class _SessionCompletionScreenState
             performanceNotes: performanceNotesController.text.trim().isEmpty
                 ? null
                 : performanceNotesController.text.trim(),
-            // التكليف الجديد
+            // New assignments
             newHifzAssignment: newHifzController.text.trim().isEmpty
                 ? null
                 : newHifzController.text.trim(),
             newMurajaAssignment: newMurajaController.text.trim().isEmpty
                 ? null
                 : newMurajaController.text.trim(),
-            // التقييم العام
+            // General rating
             sessionRating: sessionRating,
             generalNotes: generalNotesController.text.trim().isEmpty
                 ? null
                 : generalNotesController.text.trim(),
-            // ✅ NEW: Flag for late completion
+            // Late completion flag
             isLateCompletion: widget.isLateCompletion,
+            // Quran mistakes payload
+            mistakes: sessionMistakes,
+            pagesRead:
+                sessionMistakes.map((m) => m.pageNumber).toSet().toList(),
+            currentPage: currentQuranPage,
           );
 
       if (!mounted) return;
 
-      // رجوع مع رسالة نجاح
+      // Return with success message
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -104,7 +118,8 @@ class _SessionCompletionScreenState
                 ? 'تم إكمال الجلسة المتأخرة بنجاح ✓'
                 : 'تم إكمال الجلسة بنجاح ✓',
           ),
-          backgroundColor: widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
+          backgroundColor:
+              widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
         ),
       );
     } catch (e) {
@@ -116,6 +131,39 @@ class _SessionCompletionScreenState
         setState(() => isSubmitting = false);
       }
     }
+  }
+
+  void _openQuranMarking() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('تحديد الأخطاء على المصحف'),
+            backgroundColor: AppTheme.accentGreen,
+          ),
+          body: InteractiveQuranPage(
+            pageNumber: currentQuranPage,
+            existingMistakes: sessionMistakes
+                .where((m) => m.pageNumber == currentQuranPage)
+                .toList(),
+            onMistakeAdded: (mistake) {
+              setState(() {
+                sessionMistakes.add(mistake);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('تم تسجيل الخطأ')),
+              );
+            },
+            onPageChanged: (page) {
+              setState(() {
+                currentQuranPage = page;
+              });
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -130,14 +178,15 @@ class _SessionCompletionScreenState
           title: Text(
             widget.isLateCompletion ? 'إكمال جلسة متأخرة' : 'إكمال الجلسة',
           ),
-          backgroundColor: widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
+          backgroundColor:
+              widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
         ),
         body: Form(
           key: _formKey,
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // ✅ Late Warning Banner
+              // Late Warning Banner
               if (widget.isLateCompletion)
                 Container(
                   margin: const EdgeInsets.only(bottom: 16),
@@ -166,7 +215,7 @@ class _SessionCompletionScreenState
                   ),
                 ),
 
-              // معلومات الطالب
+              // Student info card
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -175,7 +224,7 @@ class _SessionCompletionScreenState
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppTheme.accentGreen.withOpacity(0.1),
+                          color: AppTheme.accentGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -211,9 +260,10 @@ class _SessionCompletionScreenState
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
 
-              // ✅ القسم الأول: مراجعة التكليف السابق
+              // Section 1: Previous assignment review
               if (hasPreviousAssignment) ...[
                 _buildSectionHeader(
                   icon: Icons.assignment_turned_in,
@@ -227,7 +277,7 @@ class _SessionCompletionScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // الحفظ السابق
+                        // Previous Hifz
                         if (widget.previousHifz != null) ...[
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -280,14 +330,14 @@ class _SessionCompletionScreenState
                           const SizedBox(height: 8),
                           _buildRatingSlider(
                             value: previousHifzRating,
-                            onChanged: (val) =>
-                                setState(() => previousHifzRating = val.toInt()),
+                            onChanged: (val) => setState(
+                                () => previousHifzRating = val.toInt()),
                             color: Colors.green,
                           ),
                           const SizedBox(height: 16),
                         ],
 
-                        // المراجعة السابقة
+                        // Previous Muraja
                         if (widget.previousMuraja != null) ...[
                           Container(
                             padding: const EdgeInsets.all(12),
@@ -347,7 +397,7 @@ class _SessionCompletionScreenState
                           const SizedBox(height: 16),
                         ],
 
-                        // ملاحظات الأداء
+                        // Performance notes
                         TextFormField(
                           controller: performanceNotesController,
                           maxLines: 3,
@@ -368,7 +418,111 @@ class _SessionCompletionScreenState
                 const SizedBox(height: 24),
               ],
 
-              // ✅ القسم الثاني: إسناد التكليف الجديد
+              // Section 2: Quran mistake tracking
+              _buildSectionHeader(
+                icon: Icons.menu_book,
+                title: 'تسجيل الأخطاء على المصحف',
+                color: AppTheme.accentGreen,
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _openQuranMarking,
+                            icon: const Icon(Icons.book),
+                            label: const Text('فتح المصحف'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryAmber,
+                            ),
+                          ),
+                          Text(
+                            'صفحة حالية: $currentQuranPage',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: sessionMistakes.isEmpty
+                              ? Colors.green.shade50
+                              : Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: sessionMistakes.isEmpty
+                                ? Colors.green.shade200
+                                : Colors.orange.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              sessionMistakes.isEmpty
+                                  ? Icons.check_circle
+                                  : Icons.error_outline,
+                              color: sessionMistakes.isEmpty
+                                  ? Colors.green
+                                  : Colors.orange,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              sessionMistakes.isEmpty
+                                  ? 'لم يتم تسجيل أخطاء بعد'
+                                  : 'تم تسجيل ${sessionMistakes.length} خطأ',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (sessionMistakes.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        ...sessionMistakes.map((m) {
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              backgroundColor: _mistakeColor(m.type),
+                              radius: 16,
+                              child: Icon(
+                                _mistakeIcon(m.type),
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                            title: Text(
+                                'صفحة ${m.pageNumber} - آية ${m.ayahNumber}'),
+                            subtitle:
+                                m.wordText != null ? Text(m.wordText!) : null,
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  sessionMistakes.remove(m);
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Section 3: New assignments
               _buildSectionHeader(
                 icon: Icons.assignment,
                 title: 'التكليف الجديد للجلسة القادمة',
@@ -380,7 +534,7 @@ class _SessionCompletionScreenState
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      // حفظ جديد
+                      // New hifz
                       TextFormField(
                         controller: newHifzController,
                         maxLines: 2,
@@ -397,8 +551,7 @@ class _SessionCompletionScreenState
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // مراجعة جديدة
+                      // New muraja
                       TextFormField(
                         controller: newMurajaController,
                         maxLines: 2,
@@ -418,9 +571,10 @@ class _SessionCompletionScreenState
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
 
-              // ✅ القسم الثالث: التقييم العام للجلسة
+              // Section 4: General session rating
               _buildSectionHeader(
                 icon: Icons.star,
                 title: 'تقييم الجلسة الحالية',
@@ -449,8 +603,7 @@ class _SessionCompletionScreenState
                         showStars: true,
                       ),
                       const SizedBox(height: 20),
-
-                      // ملاحظات عامة
+                      // General notes
                       TextFormField(
                         controller: generalNotesController,
                         maxLines: 4,
@@ -468,9 +621,10 @@ class _SessionCompletionScreenState
                   ),
                 ),
               ),
+
               const SizedBox(height: 32),
 
-              // زر الحفظ
+              // Submit button
               SizedBox(
                 height: 56,
                 child: ElevatedButton.icon(
@@ -486,20 +640,25 @@ class _SessionCompletionScreenState
                         )
                       : const Icon(Icons.check_circle),
                   label: Text(
-                    isSubmitting ? 'جاري الحفظ...' : 'إكمال الجلسة وحفظ التقييم',
+                    isSubmitting
+                        ? ArabicLabels.loading
+                        : 'إكمال الجلسة وحفظ التقييم',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
+                    backgroundColor: widget.isLateCompletion
+                        ? Colors.orange
+                        : AppTheme.accentGreen,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
               ),
+
               const SizedBox(height: 16),
             ],
           ),
@@ -518,7 +677,7 @@ class _SessionCompletionScreenState
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: color, size: 24),
@@ -577,9 +736,9 @@ class _SessionCompletionScreenState
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: color,
-            inactiveTrackColor: color.withOpacity(0.3),
+            inactiveTrackColor: color.withValues(alpha: 0.3),
             thumbColor: color,
-            overlayColor: color.withOpacity(0.2),
+            overlayColor: color.withValues(alpha: 0.2),
             valueIndicatorColor: color,
           ),
           child: Slider(
@@ -606,5 +765,39 @@ class _SessionCompletionScreenState
         ),
       ],
     );
+  }
+
+  Color _mistakeColor(MistakeType type) {
+    switch (type) {
+      case MistakeType.tajweed:
+        return Colors.orange;
+      case MistakeType.pronunciation:
+        return Colors.red;
+      case MistakeType.reading:
+        return Colors.purple;
+      case MistakeType.skip:
+        return Colors.blue;
+      case MistakeType.addition:
+        return Colors.green;
+      case MistakeType.other:
+        return Colors.grey;
+    }
+  }
+
+  IconData _mistakeIcon(MistakeType type) {
+    switch (type) {
+      case MistakeType.tajweed:
+        return Icons.auto_fix_high;
+      case MistakeType.pronunciation:
+        return Icons.record_voice_over;
+      case MistakeType.reading:
+        return Icons.error_outline;
+      case MistakeType.skip:
+        return Icons.fast_forward;
+      case MistakeType.addition:
+        return Icons.add_circle_outline;
+      case MistakeType.other:
+        return Icons.help_outline;
+    }
   }
 }

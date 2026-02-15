@@ -2,7 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
+import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/offline_banner.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -83,7 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(state.error.toString()),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -91,7 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم تسجيل الدخول بنجاح'),
-          backgroundColor: AppTheme.accentGreen,
+          backgroundColor: AppThemeConstants.accentGreen,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -115,9 +116,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppTheme.primaryAmber,
-                    AppTheme.lightAmber,
-                    Colors.white,
+                    AppThemeConstants.primaryAmber,
+                    AppThemeConstants.primaryAmberLight,
+                    AppThemeConstants.surfaceWhite,
                   ],
                   stops: [0.0, 0.3, 1.0],
                 ),
@@ -129,7 +130,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
                   child: FadeTransition(
                     opacity: _fadeAnimation,
                     child: Form(
@@ -145,9 +146,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           Hero(
                             tag: 'app-logo',
                             child: Container(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppThemeConstants.surfaceWhite,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
@@ -159,17 +160,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ),
                               child: Image.asset(
                                 'assets/images/icon.png',
-                                width: 100,
-                                height: 100,
+                                width: AppThemeConstants.icon3xl,
+                                height: AppThemeConstants.icon3xl,
                                 errorBuilder: (_, __, ___) => const Icon(
                                   Icons.school,
-                                  size: 100,
-                                  color: AppTheme.primaryAmber,
+                                  size: AppThemeConstants.icon3xl,
+                                  color: AppThemeConstants.primaryAmber,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 32),
+                          Spacing.vXl,
                           // Title
                           Text(
                             _isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد',
@@ -177,27 +178,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 .textTheme
                                 .headlineMedium
                                 ?.copyWith(
-                                  color: AppTheme.textPrimary,
+                                  color: AppThemeConstants.textPrimary,
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
-                          const SizedBox(height: 8),
+                          Spacing.vSm,
                           Text(
                             _isLogin
                                 ? 'مرحبًا بعودتك!'
                                 : 'انضم إلى مجتمع المحفظين',
                             style: TextStyle(
                               fontSize: 14,
-                              color: Colors.grey.shade600,
+                              color: AppThemeConstants.textSecondary,
                             ),
                           ),
-                          const SizedBox(height: 40),
+                          const SizedBox(height: AppThemeConstants.spaceXl + AppThemeConstants.spaceSm),
                           // Form Card
                           Container(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
+                              color: AppThemeConstants.surfaceWhite,
+                              borderRadius: AppThemeConstants.borderRadiusXl,
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.08),
@@ -216,10 +217,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       labelText: 'الاسم الكامل',
                                       prefixIcon: const Icon(Icons.person_outline),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: AppThemeConstants.borderRadiusMd,
                                       ),
                                       filled: true,
-                                      fillColor: Colors.grey.shade50,
+                                      fillColor: AppThemeConstants.backgroundLight,
                                       // ✅ NEW: Error styling
                                       errorMaxLines: 2,
                                     ),
@@ -234,7 +235,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       return null;
                                     },
                                   ),
-                                  const SizedBox(height: 16),
+                                  Spacing.vMd,
                                 ],
                                 // Email Field
                                 TextFormField(
@@ -245,10 +246,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     labelText: 'البريد الإلكتروني',
                                     prefixIcon: const Icon(Icons.email_outlined),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: AppThemeConstants.borderRadiusMd,
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey.shade50,
+                                    fillColor: AppThemeConstants.backgroundLight,
                                     errorMaxLines: 2,
                                   ),
                                   // ✅ IMPROVED: Better email validation
@@ -265,7 +266,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     return null;
                                   },
                                 ),
-                                const SizedBox(height: 16),
+                                Spacing.vMd,
                                 // Password Field
                                 TextFormField(
                                   controller: _passwordController,
@@ -286,10 +287,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       },
                                     ),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: AppThemeConstants.borderRadiusMd,
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey.shade50,
+                                    fillColor: AppThemeConstants.backgroundLight,
                                     errorMaxLines: 3,
                                   ),
                                   // ✅ IMPROVED: More detailed password validation
@@ -314,7 +315,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                                 // Role Selection (Sign Up Only)
                                 if (!_isLogin) ...[
-                                  const SizedBox(height: 20),
+                                  const SizedBox(height: AppThemeConstants.spaceLg - AppThemeConstants.spaceSm),
                                   const Text(
                                     'اختر نوع الحساب',
                                     style: TextStyle(
@@ -322,7 +323,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
                                   Row(
                                     children: [
                                       Expanded(
@@ -330,7 +331,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           icon: Icons.school,
                                           title: 'محفّظ',
                                           subtitle: 'معلم القرآن',
-                                          color: AppTheme.primaryAmber,
+                                          color: AppThemeConstants.primaryAmber,
                                           isSelected: _selectedRole == 'mohaffez',
                                           onTap: () {
                                             setState(() {
@@ -339,13 +340,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                           },
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(width: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
                                       Expanded(
                                         child: _RoleCard(
                                           icon: Icons.person,
                                           title: 'طالب',
                                           subtitle: 'دارس القرآن',
-                                          color: AppTheme.accentGreen,
+                                          color: AppThemeConstants.accentGreen,
                                           isSelected: _selectedRole == 'student',
                                           onTap: () {
                                             setState(() {
@@ -357,19 +358,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     ],
                                   ),
                                 ],
-                                const SizedBox(height: 24),
+                                Spacing.vLg,
                                 // Submit Button
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 56,
+                                  height: AppThemeConstants.buttonHeightLarge,
                                   child: ElevatedButton(
                                     onPressed: isLoading ? null : _submit,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primaryAmber,
+                                      backgroundColor: AppThemeConstants.primaryAmber,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: AppThemeConstants.borderRadiusMd,
                                       ),
-                                      elevation: 2,
+                                      elevation: AppThemeConstants.elevationSm,
                                     ),
                                     child: isLoading
                                         ? const SizedBox(
@@ -379,7 +380,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               strokeWidth: 2,
                                               valueColor:
                                                   AlwaysStoppedAnimation<Color>(
-                                                      Colors.white),
+                                                      AppThemeConstants.surfaceWhite),
                                             ),
                                           )
                                         : Text(
@@ -396,7 +397,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ],
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          Spacing.vLg,
                           // Toggle Login/SignUp
                           TextButton(
                             onPressed: () {
@@ -410,7 +411,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             child: RichText(
                               text: TextSpan(
                                 style: const TextStyle(
-                                  color: Colors.black87,
+                                  color: AppThemeConstants.textPrimary,
                                   fontSize: 15,
                                 ),
                                 children: [
@@ -424,7 +425,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         ? 'إنشاء حساب جديد'
                                         : 'تسجيل الدخول',
                                     style: const TextStyle(
-                                      color: AppTheme.primaryAmber,
+                                      color: AppThemeConstants.primaryAmber,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -470,12 +471,12 @@ class _RoleCard extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? color.withOpacity(0.1) : AppThemeConstants.backgroundLight,
+          borderRadius: AppThemeConstants.borderRadiusMd,
           border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
+            color: isSelected ? color : AppThemeConstants.divider,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -484,15 +485,15 @@ class _RoleCard extends StatelessWidget {
             Icon(
               icon,
               size: 48,
-              color: isSelected ? color : Colors.grey.shade400,
+              color: isSelected ? color : AppThemeConstants.textDisabled,
             ),
-            const SizedBox(height: 8),
+            Spacing.vSm,
             Text(
               title,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? color : Colors.grey.shade700,
+                color: isSelected ? color : AppThemeConstants.textSecondary,
               ),
             ),
             const SizedBox(height: 4),
@@ -500,7 +501,7 @@ class _RoleCard extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: AppThemeConstants.textSecondary,
               ),
             ),
           ],
@@ -509,3 +510,5 @@ class _RoleCard extends StatelessWidget {
     );
   }
 }
+
+

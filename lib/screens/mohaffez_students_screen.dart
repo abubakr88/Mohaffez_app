@@ -7,6 +7,7 @@ import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
+import '../utils/arabic_labels.dart';
 
 class MohaffezStudentsScreen extends ConsumerWidget {
   const MohaffezStudentsScreen({super.key});
@@ -20,13 +21,12 @@ class MohaffezStudentsScreen extends ConsumerWidget {
         if (user == null) {
           return const Scaffold(
             body: Center(
-              child: Text('المستخدم غير موجود'),
+              child: Text(ArabicLabels.userNotFound),
             ),
           );
         }
 
-        final studentsAsync =
-            ref.watch(mohaffezStudentsProvider(user.uid));
+        final studentsAsync = ref.watch(mohaffezStudentsProvider(user.uid));
 
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -67,8 +67,8 @@ class MohaffezStudentsScreen extends ConsumerWidget {
                   ),
                   error: (error, _) => SliverFillRemaining(
                     child: ErrorDisplay.dataLoad(
-                      onRetry: () => ref
-                          .invalidate(mohaffezStudentsProvider(user.uid)),
+                      onRetry: () =>
+                          ref.invalidate(mohaffezStudentsProvider(user.uid)),
                     ),
                   ),
                 ),
@@ -88,8 +88,7 @@ class MohaffezStudentsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAppBar(
-      BuildContext context, WidgetRef ref, String mohaffezId) {
+  Widget _buildAppBar(BuildContext context, WidgetRef ref, String mohaffezId) {
     return SliverAppBar(
       expandedHeight: 120,
       floating: true,
@@ -97,9 +96,8 @@ class MohaffezStudentsScreen extends ConsumerWidget {
       actions: [
         IconButton(
           icon: const Icon(Icons.refresh),
-          onPressed: () =>
-              ref.invalidate(mohaffezStudentsProvider(mohaffezId)),
-          tooltip: 'تحديث',
+          onPressed: () => ref.invalidate(mohaffezStudentsProvider(mohaffezId)),
+          tooltip: ArabicLabels.refresh,
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -113,8 +111,7 @@ class MohaffezStudentsScreen extends ConsumerWidget {
           ),
           child: SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(12, 8, 16, 12),
+              padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -136,8 +133,7 @@ class MohaffezStudentsScreen extends ConsumerWidget {
                       const SizedBox(width: 16),
                       const Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'طلابي',
@@ -184,7 +180,8 @@ class StudentCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final studentName = student['studentName'] as String? ?? 'طالب';
+    final studentName =
+        student['studentName'] as String? ?? ArabicLabels.student;
     final lastSessionDate = student['lastSessionDate'] as DateTime?;
     final hifzAssignment = student['hifzAssignment'] as String? ?? '';
     final murajaAssignment = student['murajaAssignment'] as String? ?? '';
@@ -192,16 +189,11 @@ class StudentCard extends ConsumerWidget {
     final status = student['status'] as String? ?? 'accepted';
 
     // Evaluation fields
-    final previousHifzCompleted =
-        student['previousHifzCompleted'] as bool?;
-    final previousHifzRating =
-        student['previousHifzRating'] as int? ?? 0;
-    final previousMurajaCompleted =
-        student['previousMurajaCompleted'] as bool?;
-    final previousMurajaRating =
-        student['previousMurajaRating'] as int? ?? 0;
-    final performanceNotes =
-        student['performanceNotes'] as String?;
+    final previousHifzCompleted = student['previousHifzCompleted'] as bool?;
+    final previousHifzRating = student['previousHifzRating'] as int? ?? 0;
+    final previousMurajaCompleted = student['previousMurajaCompleted'] as bool?;
+    final previousMurajaRating = student['previousMurajaRating'] as int? ?? 0;
+    final performanceNotes = student['performanceNotes'] as String?;
 
     final sessionCountAsync = ref.watch(
       studentSessionCountProvider({
@@ -224,8 +216,7 @@ class StudentCard extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
               Row(
@@ -243,8 +234,7 @@ class StudentCard extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           studentName,
@@ -274,24 +264,18 @@ class StudentCard extends ConsumerWidget {
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding:
-                                  const EdgeInsets.symmetric(
+                              padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
                                 color: status == 'completed'
-                                    ? Colors.green
-                                        .withValues(alpha: 0.1)
-                                    : Colors.blue
-                                        .withValues(alpha: 0.1),
-                                borderRadius:
-                                    BorderRadius.circular(8),
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.blue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                status == 'completed'
-                                    ? 'مكتملة'
-                                    : 'مقبولة',
+                                status == 'completed' ? 'مكتملة' : 'مقبولة',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -308,22 +292,18 @@ class StudentCard extends ConsumerWidget {
                   ),
                   sessionCountAsync.when(
                     data: (count) => Container(
-                      padding:
-                          const EdgeInsets.symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.blue
-                            .withValues(alpha: 0.1),
-                        borderRadius:
-                            BorderRadius.circular(20),
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.book,
-                              size: 14, color: Colors.blue),
+                          const Icon(Icons.book, size: 14, color: Colors.blue),
                           const SizedBox(width: 4),
                           Text(
                             '$count جلسة',
@@ -343,8 +323,7 @@ class StudentCard extends ConsumerWidget {
                         strokeWidth: 2,
                       ),
                     ),
-                    error: (_, __) =>
-                        const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -398,23 +377,18 @@ class StudentCard extends ConsumerWidget {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
-                      borderRadius:
-                          BorderRadius.circular(8),
-                      border: Border.all(
-                          color: Colors.orange.shade200),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
                     ),
                     child: Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.note,
-                            size: 16, color: Colors.orange),
+                        const Icon(Icons.note, size: 16, color: Colors.orange),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             performanceNotes,
-                            style: const TextStyle(
-                                fontSize: 13),
+                            style: const TextStyle(fontSize: 13),
                           ),
                         ),
                       ],
@@ -456,8 +430,7 @@ class StudentCard extends ConsumerWidget {
                     hifzAssignment,
                     Colors.green,
                   ),
-                if (hifzAssignment.isNotEmpty &&
-                    murajaAssignment.isNotEmpty)
+                if (hifzAssignment.isNotEmpty && murajaAssignment.isNotEmpty)
                   const SizedBox(height: 8),
                 if (murajaAssignment.isNotEmpty)
                   _buildAssignmentItem(
@@ -473,8 +446,7 @@ class StudentCard extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Icon(Icons.star,
-                        size: 20, color: Colors.amber),
+                    const Icon(Icons.star, size: 20, color: Colors.amber),
                     const SizedBox(width: 8),
                     Text(
                       '$sessionRating/10',
@@ -530,8 +502,7 @@ class StudentCard extends ConsumerWidget {
                   ...List.generate(
                     rating,
                     (index) =>
-                        const Icon(Icons.star,
-                            size: 14, color: Colors.amber),
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -586,8 +557,7 @@ class StudentCard extends ConsumerWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,

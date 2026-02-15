@@ -3,13 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../repositories/session_repository.dart';
+import '../models/quran_mistake_model.dart';
 
 // ============================================================================
 // FILTER ENUM AND PROVIDER
 // ============================================================================
-
 enum UpcomingFilter {
   all, // الكل
   today, // اليوم
@@ -24,7 +25,6 @@ final upcomingSessionsFilterProvider = StateProvider((ref) {
 // ============================================================================
 // COUNTERS - Real-time StreamProviders for MohaffezHome
 // ============================================================================
-
 final completedSessionsCountProvider = StreamProvider.family<int, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
@@ -43,6 +43,7 @@ final acceptedSessionsCountProvider = StreamProvider.family<int, String>(
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', isEqualTo: 'accepted')
+        .where('isPaid', isEqualTo: true)
         .snapshots()
         .map((snapshot) => snapshot.docs.length);
   },
@@ -51,95 +52,96 @@ final acceptedSessionsCountProvider = StreamProvider.family<int, String>(
 // ============================================================================
 // PENDING REQUESTS - First Page Real-time
 // ============================================================================
-
-final pendingRequestsFirstPageProvider = StreamProvider.family<List<Map<String, dynamic>>, String>(
+final pendingRequestsFirstPageProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending')
+        .where('status', whereIn: ['pending', 'awaiting_payment'])
         .orderBy('createdAt', descending: true)
         .limit(20)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-
-        // CRITICAL FIX: Properly parse Timestamp fields
-        DateTime? slotDate;
-        DateTime? slotStart;
-        DateTime? slotEnd;
-        DateTime? createdAt;
-
-        try {
-          if (data['slotDate'] != null) {
-            if (data['slotDate'] is Timestamp) {
-              slotDate = (data['slotDate'] as Timestamp).toDate();
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            // CRITICAL FIX: Properly parse Timestamp fields
+            DateTime? slotDate;
+            DateTime? slotStart;
+            DateTime? slotEnd;
+            DateTime? createdAt;
+            try {
+              if (data['slotDate'] != null) {
+                if (data['slotDate'] is Timestamp) {
+                  slotDate = (data['slotDate'] as Timestamp).toDate();
+                }
+              }
+              if (data['slotStart'] != null) {
+                if (data['slotStart'] is Timestamp) {
+                  slotStart = (data['slotStart'] as Timestamp).toDate();
+                }
+              }
+              if (data['slotEnd'] != null) {
+                if (data['slotEnd'] is Timestamp) {
+                  slotEnd = (data['slotEnd'] as Timestamp).toDate();
+                }
+              }
+              if (data['createdAt'] != null) {
+                if (data['createdAt'] is Timestamp) {
+                  createdAt = (data['createdAt'] as Timestamp).toDate();
+                }
+              }
+            } catch (e) {
+              print('❌ Error parsing timestamps for request ${doc.id}: $e');
             }
-          }
-
-          if (data['slotStart'] != null) {
-            if (data['slotStart'] is Timestamp) {
-              slotStart = (data['slotStart'] as Timestamp).toDate();
-            }
-          }
-
-          if (data['slotEnd'] != null) {
-            if (data['slotEnd'] is Timestamp) {
-              slotEnd = (data['slotEnd'] as Timestamp).toDate();
-            }
-          }
-
-          if (data['createdAt'] != null) {
-            if (data['createdAt'] is Timestamp) {
-              createdAt = (data['createdAt'] as Timestamp).toDate();
-            }
-          }
-        } catch (e) {
-          print('❌ Error parsing timestamps for request ${doc.id}: $e');
-        }
-
-        return {
-          'id': doc.id,
-          'studentName': data['studentName'] as String? ?? '',
-          'mohaffezName': data['mohaffezName'] as String? ?? '',
-          'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-          'imamAddressText': data['imamAddressText'] as String?,
-          'imamAddressLat': data['imamAddressLat'] as double?,
-          'imamAddressLng': data['imamAddressLng'] as double?,
-          'slotDate': slotDate,
-          'slotStart': slotStart,
-          'slotEnd': slotEnd,
-          'createdAt': createdAt,
-          'status': data['status'] as String? ?? 'pending',
-          'mohaffezId': data['mohaffezId'] as String?,
-          'studentId': data['studentId'] as String?,
-          // ✅ NEW: Payment tracking fields
-          'isPaid': data['isPaid'] as bool? ?? false,
-          'subscriptionId': data['subscriptionId'] as String?,
-          'requiresPaymentOnAcceptance': data['requiresPaymentOnAcceptance'] as bool? ?? false,
-        };
-      }).toList();
-    });
+            return {
+              'id': doc.id,
+              'studentName': data['studentName'] as String? ?? '',
+              'mohaffezName': data['mohaffezName'] as String? ?? '',
+              'sessionType': data['sessionType'] as String? ?? '',
+              'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+                  data['timeSlot'] as String? ??
+                  '08:00',
+              'imamAddressText': data['imamAddressText'] as String?,
+              'imamAddressLat': data['imamAddressLat'] as double?,
+              'imamAddressLng': data['imamAddressLng'] as double?,
+              'slotDate': slotDate,
+              'slotStart': slotStart,
+              'slotEnd': slotEnd,
+              'createdAt': createdAt,
+              'status': data['status'] as String? ?? 'pending',
+              'mohaffezId': data['mohaffezId'] as String?,
+              'studentId': data['studentId'] as String?,
+              'paymentDeadline': data['paymentDeadline'] as Timestamp?,
+              'reminderSent': data['reminderSent'] as bool? ?? false,
+              'slotLockId': data['slotLockId'] as String?,
+              'acceptedAt': data['acceptedAt'] as Timestamp?,
+              // ✅ NEW: Payment tracking fields
+              'isPaid': data['isPaid'] as bool? ?? false,
+              'subscriptionId': data['subscriptionId'] as String?,
+              'requiresPaymentOnAcceptance':
+                  data['requiresPaymentOnAcceptance'] as bool? ?? false,
+            };
+          }).toList();
+        });
   },
 );
 
 // ============================================================================
 // UPCOMING SESSIONS - ALL upcoming sessions (ACCEPTED status only)
 // ============================================================================
-
 final upcomingSessionsProvider =
     StreamProvider.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
-
     return FirebaseFirestore.instance
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', isEqualTo: 'accepted') // ✅ ONLY ACCEPTED
-        .where('sessionDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('isPaid', isEqualTo: true)
+        .where('sessionDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
         .orderBy('sessionDate', descending: false)
         .limit(100)
         .snapshots()
@@ -151,9 +153,13 @@ final upcomingSessionsProvider =
           'studentName': data['studentName'] as String? ?? '',
           'mohaffezName': data['mohaffezName'] as String? ?? '',
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+              data['timeSlot'] as String? ??
+              '08:00',
           'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
-          'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
+          'location': data['location'] as String? ??
+              data['imamAddressText'] as String? ??
+              '',
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
           'sessionRating': data['sessionRating'] as int?,
@@ -170,33 +176,29 @@ final upcomingSessionsProvider =
 );
 
 // ✅ NEW: Filtered sessions based on selected filter
-final filteredUpcomingSessionsProvider = Provider.family<List<Map<String, dynamic>>, String>(
+final filteredUpcomingSessionsProvider =
+    Provider.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     final allSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
     final filter = ref.watch(upcomingSessionsFilterProvider);
-
     return allSessions.when(
       data: (sessions) {
         final now = DateTime.now();
-
         switch (filter) {
           case UpcomingFilter.all:
             return sessions;
-
           case UpcomingFilter.today:
             final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
             return sessions.where((session) {
               final date = (session['sessionDate'] as DateTime?);
               return date != null && date.isBefore(endOfDay);
             }).toList();
-
           case UpcomingFilter.thisWeek:
             final endOfWeek = now.add(const Duration(days: 7));
             return sessions.where((session) {
               final date = (session['sessionDate'] as DateTime?);
               return date != null && date.isBefore(endOfWeek);
             }).toList();
-
           case UpcomingFilter.thisMonth:
             final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
             return sessions.where((session) {
@@ -214,7 +216,6 @@ final filteredUpcomingSessionsProvider = Provider.family<List<Map<String, dynami
 // ============================================================================
 // COMPLETED SESSIONS - Stream Provider (Real-time)
 // ============================================================================
-
 final completedSessionsProvider =
     StreamProvider.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
@@ -236,24 +237,24 @@ final completedSessionsProvider =
           'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
           'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-          'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
-
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+              data['timeSlot'] as String? ??
+              '08:00',
+          'location': data['location'] as String? ??
+              data['imamAddressText'] as String? ??
+              '',
           // ✅ التكليف الحالي
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
-
           // ✅ تقييم التكليف السابق
           'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
           'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
           'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
           'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
           'performanceNotes': data['performanceNotes'] as String?,
-
           // ✅ التقييم العام
           'sessionRating': data['sessionRating'] as int? ?? 0,
           'sessionNotes': data['sessionNotes'] as String?,
-
           // ✅ NEW: Late completion flag
           'isLateCompletion': data['isLateCompletion'] as bool? ?? false,
         };
@@ -265,7 +266,6 @@ final completedSessionsProvider =
 // ============================================================================
 // COMPLETED SESSIONS - Paginated (Legacy - kept for compatibility)
 // ============================================================================
-
 class CompletedSessionsState {
   final List<Map<String, dynamic>> sessions;
   final DocumentSnapshot? lastDocument;
@@ -310,9 +310,7 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
 
   Future<void> loadMore() async {
     if (state.isLoadingMore || !state.hasMore) return;
-
     state = state.copyWith(isLoadingMore: true, error: null);
-
     try {
       Query query = FirebaseFirestore.instance
           .collection('hafizSessions')
@@ -326,7 +324,6 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
       }
 
       final snapshot = await query.get();
-
       if (snapshot.docs.isEmpty) {
         state = state.copyWith(hasMore: false, isLoadingMore: false);
         return;
@@ -341,8 +338,12 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
           'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
           'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
-          'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+              data['timeSlot'] as String? ??
+              '08:00',
+          'location': data['location'] as String? ??
+              data['imamAddressText'] as String? ??
+              '',
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
           'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
@@ -363,7 +364,6 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
       }).toList();
 
       final newIds = uniqueNewSessions.map((s) => s['id'] as String).toSet();
-
       state = state.copyWith(
         sessions: [...state.sessions, ...uniqueNewSessions],
         lastDocument: snapshot.docs.last,
@@ -395,7 +395,6 @@ final completedSessionsPaginatedProvider = StateNotifierProvider.family<
 // ============================================================================
 // STUDENT SESSIONS - Paginated
 // ============================================================================
-
 class StudentSessionsState {
   final List<Map<String, dynamic>> sessions;
   final DocumentSnapshot? lastDocument;
@@ -440,9 +439,7 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
 
   Future<void> loadMore() async {
     if (state.isLoadingMore || !state.hasMore) return;
-
     state = state.copyWith(isLoadingMore: true, error: null);
-
     try {
       Query query = FirebaseFirestore.instance
           .collection('hafizSessions')
@@ -455,7 +452,6 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
       }
 
       final snapshot = await query.get();
-
       if (snapshot.docs.isEmpty) {
         state = state.copyWith(hasMore: false, isLoadingMore: false);
         return;
@@ -466,9 +462,13 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
         return {
           'id': doc.id,
           'mohaffezName': data['mohaffezName'] as String? ?? '',
-          'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
+          'location': data['location'] as String? ??
+              data['imamAddressText'] as String? ??
+              '',
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+              data['timeSlot'] as String? ??
+              '08:00',
           'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
           'hifzAssignment': data['hifzAssignment'] as String?,
           'murajaAssignment': data['murajaAssignment'] as String?,
@@ -491,7 +491,6 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
       }).toList();
 
       final newIds = uniqueNewSessions.map((s) => s['id'] as String).toSet();
-
       state = state.copyWith(
         sessions: [...state.sessions, ...uniqueNewSessions],
         lastDocument: snapshot.docs.last,
@@ -539,9 +538,13 @@ final studentSessionsFirstPageProvider =
       return {
         'id': doc.id,
         'mohaffezName': data['mohaffezName'] as String? ?? '',
-        'location': data['location'] as String? ?? data['imamAddressText'] as String? ?? '',
+        'location': data['location'] as String? ??
+            data['imamAddressText'] as String? ??
+            '',
         'sessionType': data['sessionType'] as String? ?? '',
-        'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+        'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+            data['timeSlot'] as String? ??
+            '08:00',
         'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
         'hifzAssignment': data['hifzAssignment'] as String?,
         'murajaAssignment': data['murajaAssignment'] as String?,
@@ -574,15 +577,24 @@ final studentRequestsFirstPageProvider =
         return {
           'id': doc.id,
           'mohaffezName': data['mohaffezName'] as String? ?? '',
+          'mohaffezId': data['mohaffezId'] as String?,
           'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ?? '08:00',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+              data['timeSlot'] as String? ??
+              '08:00',
           'status': data['status'] as String? ?? 'pending',
           'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+          'slotDate': data['slotDate'] as Timestamp?,
+          'paymentDeadline': data['paymentDeadline'] as Timestamp?,
+          'reminderSent': data['reminderSent'] as bool? ?? false,
+          'slotLockId': data['slotLockId'] as String?,
           'imamAddressText': data['imamAddressText'] as String?,
+          'location': data['location'] as String?,
           'rejectionReason': data['rejectionReason'] as String?,
           // ✅ NEW: Payment tracking
           'isPaid': data['isPaid'] as bool? ?? false,
-          'requiresPaymentOnAcceptance': data['requiresPaymentOnAcceptance'] as bool? ?? false,
+          'requiresPaymentOnAcceptance':
+              data['requiresPaymentOnAcceptance'] as bool? ?? false,
         };
       }).toList();
     });
@@ -590,9 +602,8 @@ final studentRequestsFirstPageProvider =
 );
 
 // ============================================================================
-// SESSION ACTIONS - UPDATED WITH PAYMENT WORKFLOW
+// SESSION ACTIONS - UPDATED WITH PAYMENT WORKFLOW + SLOT REMOVAL
 // ============================================================================
-
 final sessionActionsProvider =
     StateNotifierProvider<SessionActionsNotifier, AsyncValue<void>>(
   (ref) => SessionActionsNotifier(),
@@ -600,7 +611,6 @@ final sessionActionsProvider =
 
 class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   SessionActionsNotifier() : super(const AsyncValue.data(null));
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// ✅ NEW: Accept request and handle payment/subscription logic
@@ -610,22 +620,19 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
 
     print('🎯 Accepting request: $requestId');
-
     state = const AsyncValue.loading();
-
     try {
       // Get request details
-      final requestDoc = await _firestore
-          .collection('sessionRequests')
-          .doc(requestId)
-          .get();
+      final requestDoc =
+          await _firestore.collection('sessionRequests').doc(requestId).get();
 
       if (!requestDoc.exists) {
         throw Exception('Request not found');
       }
 
       final requestData = requestDoc.data()!;
-      final requiresPayment = requestData['requiresPaymentOnAcceptance'] as bool? ?? false;
+      final requiresPayment =
+          requestData['requiresPaymentOnAcceptance'] as bool? ?? false;
       final subscriptionId = requestData['subscriptionId'] as String?;
       final studentId = requestData['studentId'] as String;
       final mohaffezName = requestData['mohaffezName'] as String;
@@ -648,17 +655,34 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
           'status': 'accepted',
           'acceptedAt': FieldValue.serverTimestamp(),
         });
+        await _releaseSlotLockById(requestData['slotLockId'] as String?);
+
+        // ✅ حذف التوقيت من availability
+        await _removeBookedSlotFromAvailability(
+          mohaffezId: requestData['mohaffezId'] as String,
+          slotDate: requestData['slotDate'] as Timestamp,
+          timeSlot: requestData['preferredTimeSlot'] as String,
+          sessionType: requestData['sessionType'] as String,
+        );
 
         print('✅ Session created with subscription payment');
       } else if (requiresPayment) {
         // PATH B: No subscription - Request payment from student
         print('💰 Path B: Requesting payment from student');
 
+        final paymentDeadline = Timestamp.fromDate(
+          DateTime.now().add(const Duration(hours: 10)),
+        );
+
         // Update request to awaiting_payment status
         await _firestore.collection('sessionRequests').doc(requestId).update({
           'status': 'awaiting_payment',
           'acceptedAt': FieldValue.serverTimestamp(),
+          'paymentDeadline': paymentDeadline,
+          'reminderSent': false,
+          'updatedAt': FieldValue.serverTimestamp(),
         });
+        requestData['paymentDeadline'] = paymentDeadline;
 
         // Send payment notification to student
         await _sendPaymentRequestNotification(
@@ -669,18 +693,24 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         );
 
         print('📧 Payment notification sent to student');
-
         // NOTE: Session will be created after student completes payment
       } else {
         // PATH C: Free session (trial/promotional)
         print('🎁 Path C: Free session');
-
         await _createSessionFromRequest(requestId, requestData);
-
         await _firestore.collection('sessionRequests').doc(requestId).update({
           'status': 'accepted',
           'acceptedAt': FieldValue.serverTimestamp(),
         });
+        await _releaseSlotLockById(requestData['slotLockId'] as String?);
+
+        // ✅ حذف التوقيت من availability
+        await _removeBookedSlotFromAvailability(
+          mohaffezId: requestData['mohaffezId'] as String,
+          slotDate: requestData['slotDate'] as Timestamp,
+          timeSlot: requestData['preferredTimeSlot'] as String,
+          sessionType: requestData['sessionType'] as String,
+        );
 
         print('✅ Free session created');
       }
@@ -691,6 +721,70 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       print('Stack trace: $stack');
       state = AsyncValue.error(e, stack);
       rethrow;
+    }
+  }
+
+  /// ✅ NEW: حذف/تعطيل توقيت محجوز من availability
+  Future<void> _removeBookedSlotFromAvailability({
+    required String mohaffezId,
+    required Timestamp slotDate,
+    required String timeSlot,
+    required String sessionType,
+  }) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != mohaffezId) {
+      return;
+    }
+
+    try {
+      final date = slotDate.toDate();
+      final dayOfWeek = date.weekday;
+
+      // جلب availability للمحفظ
+      final availabilitySnapshot = await _firestore
+          .collection('users')
+          .doc(mohaffezId)
+          .collection('availability')
+          .where('dayOfWeek', isEqualTo: dayOfWeek)
+          .limit(1)
+          .get();
+
+      if (availabilitySnapshot.docs.isEmpty) {
+        print('⚠️ No availability found for day $dayOfWeek');
+        return;
+      }
+
+      final availabilityDoc = availabilitySnapshot.docs.first;
+      final data = availabilityDoc.data();
+      final timeSlots =
+          List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
+
+      // البحث عن التوقيت المحجوز وتعطيله
+      bool updated = false;
+      final selectedSlot = _normalizeTimeSlot(timeSlot);
+      for (var slot in timeSlots) {
+        final slotTime =
+            _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
+        if (slotTime == selectedSlot &&
+            slot['sessionType'] == sessionType &&
+            slot['enabled'] == true) {
+          slot['enabled'] = false; // تعطيل التوقيت
+          updated = true;
+          break;
+        }
+      }
+
+      if (updated) {
+        await availabilityDoc.reference.update({
+          'timeSlots': timeSlots,
+        });
+        print('✅ Slot removed from availability: $timeSlot on day $dayOfWeek');
+      } else {
+        print('⚠️ Slot not found or already disabled: $timeSlot');
+      }
+    } catch (e) {
+      print('❌ Error removing slot from availability: $e');
+      // لا نرمي خطأ حتى لا نعطل عملية القبول
     }
   }
 
@@ -720,7 +814,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'lastUsedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ Subscription credit consumed: $remainingSessions → $newRemaining');
+      print(
+          '✅ Subscription credit consumed: $remainingSessions → $newRemaining');
     });
   }
 
@@ -733,21 +828,25 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   }) async {
     try {
       final notificationRef = _firestore.collection('notifications').doc();
-
       await notificationRef.set({
         'userId': studentId,
+        'recipientId': studentId,
+        'senderId': sessionDetails['mohaffezId'],
         'title': 'تم قبول طلب الحجز! 🎉',
         'body': '$mohaffezName قبل طلبك. اضغط للدفع وتأكيد الجلسة.',
         'type': 'payment_required',
         'isRead': false,
         'requestId': requestId,
+        'mohaffezId': sessionDetails['mohaffezId'],
         'mohaffezName': mohaffezName,
         'sessionType': sessionDetails['sessionType'],
         'sessionDate': sessionDetails['slotDate'],
         'timeSlot': sessionDetails['preferredTimeSlot'],
+        'location':
+            sessionDetails['imamAddressText'] ?? sessionDetails['location'],
+        'paymentDeadline': sessionDetails['paymentDeadline'],
         'createdAt': FieldValue.serverTimestamp(),
       });
-
       print('✅ Payment notification created: ${notificationRef.id}');
     } catch (e) {
       print('❌ Error creating payment notification: $e');
@@ -762,7 +861,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   ) async {
     try {
       print('📝 Creating session from request: $requestId');
-
       final sessionData = {
         'mohaffezId': requestData['mohaffezId'],
         'studentId': requestData['studentId'],
@@ -773,20 +871,26 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'slotStart': requestData['slotStart'],
         'slotEnd': requestData['slotEnd'],
         'timeSlot': requestData['preferredTimeSlot'],
+        'preferredTimeSlot': requestData['preferredTimeSlot'],
         'status': 'accepted',
-        'isPaid': requestData['subscriptionId'] != null, // Paid if using subscription
+        'isPaid':
+            requestData['subscriptionId'] != null, // Paid if using subscription
         'subscriptionId': requestData['subscriptionId'],
         'requestId': requestId,
+        'slotLockId': requestData['slotLockId'],
         'imamAddressText': requestData['imamAddressText'],
+        'location': requestData['imamAddressText'] ?? requestData['location'],
         'imamAddressLat': requestData['imamAddressLat'],
         'imamAddressLng': requestData['imamAddressLng'],
         'mohaffezPhone': requestData['mohaffezPhone'],
+        'reminder24hSent': false,
+        'reminder1hSent': false,
         'createdAt': FieldValue.serverTimestamp(),
         'acceptedAt': FieldValue.serverTimestamp(),
       };
 
-      final sessionRef = await _firestore.collection('hafizSessions').add(sessionData);
-
+      final sessionRef =
+          await _firestore.collection('hafizSessions').add(sessionData);
       print('✅ Session created: ${sessionRef.id}');
 
       // Send acceptance notification
@@ -832,10 +936,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       print('🚫 Rejecting request: $requestId');
 
       // Get request details
-      final requestDoc = await _firestore
-          .collection('sessionRequests')
-          .doc(requestId)
-          .get();
+      final requestDoc =
+          await _firestore.collection('sessionRequests').doc(requestId).get();
 
       if (!requestDoc.exists) {
         throw Exception('Request not found');
@@ -850,6 +952,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'rejectionReason': reason,
         'rejectedAt': FieldValue.serverTimestamp(),
       });
+      await _releaseSlotLockById(requestData['slotLockId'] as String?);
 
       // NOTE: Subscription credit is NOT consumed on rejection
       // It remains available for the student to use for another booking
@@ -894,6 +997,293 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  Future<void> cancelSession(String sessionId) async {
+    if (sessionId.trim().isEmpty) {
+      throw ArgumentError('Session ID cannot be empty');
+    }
+
+    state = const AsyncValue.loading();
+    try {
+      final sessionDoc =
+          await _firestore.collection('hafizSessions').doc(sessionId).get();
+      if (!sessionDoc.exists) {
+        throw Exception('Session not found');
+      }
+
+      final sessionData = sessionDoc.data()!;
+      final requestId = sessionData['requestId'] as String?;
+
+      await _firestore.collection('hafizSessions').doc(sessionId).update({
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+      });
+
+      if (requestId != null && requestId.trim().isNotEmpty) {
+        final requestRef =
+            _firestore.collection('sessionRequests').doc(requestId);
+        final requestDoc = await requestRef.get();
+        final slotLockId = requestDoc.data()?['slotLockId'] as String?;
+        await requestRef.update({
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+        });
+        await _releaseSlotLockById(slotLockId);
+      }
+
+      await restoreAvailabilitySlot(
+        mohaffezId: sessionData['mohaffezId'] as String,
+        slotDate: sessionData['sessionDate'] as Timestamp,
+        timeSlot: sessionData['timeSlot'] as String? ??
+            sessionData['preferredTimeSlot'] as String? ??
+            '',
+        sessionType: sessionData['sessionType'] as String,
+      );
+
+      await sendCancellationNotifications(
+        studentId: sessionData['studentId'] as String,
+        mohaffezId: sessionData['mohaffezId'] as String,
+        sessionId: sessionId,
+      );
+
+      state = const AsyncValue.data(null);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> cancelRequest(String requestId) async {
+    if (requestId.trim().isEmpty) {
+      throw ArgumentError('Request ID cannot be empty');
+    }
+
+    state = const AsyncValue.loading();
+    try {
+      final requestDoc =
+          await _firestore.collection('sessionRequests').doc(requestId).get();
+      if (!requestDoc.exists) {
+        throw Exception('Request not found');
+      }
+
+      final requestData = requestDoc.data()!;
+      final status = requestData['status'] as String? ?? 'pending';
+
+      if (status == 'completed') {
+        throw Exception('Cannot cancel completed session');
+      }
+
+      await _firestore.collection('sessionRequests').doc(requestId).update({
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+      });
+      await _releaseSlotLockById(requestData['slotLockId'] as String?);
+
+      if (status == 'awaiting_payment' || status == 'accepted') {
+        await restoreAvailabilitySlot(
+          mohaffezId: requestData['mohaffezId'] as String,
+          slotDate: requestData['slotDate'] as Timestamp,
+          timeSlot: requestData['preferredTimeSlot'] as String,
+          sessionType: requestData['sessionType'] as String,
+        );
+      }
+
+      state = const AsyncValue.data(null);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> restoreAvailabilitySlot({
+    required String mohaffezId,
+    required Timestamp slotDate,
+    required String timeSlot,
+    required String sessionType,
+  }) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != mohaffezId) {
+      return;
+    }
+
+    if (timeSlot.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      final date = slotDate.toDate();
+      final dayOfWeek = date.weekday;
+
+      final availabilitySnapshot = await _firestore
+          .collection('users')
+          .doc(mohaffezId)
+          .collection('availability')
+          .where('dayOfWeek', isEqualTo: dayOfWeek)
+          .limit(1)
+          .get();
+
+      if (availabilitySnapshot.docs.isEmpty) {
+        return;
+      }
+
+      final availabilityDoc = availabilitySnapshot.docs.first;
+      final data = availabilityDoc.data();
+      final timeSlots =
+          List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
+
+      var restored = false;
+      final selectedSlot = _normalizeTimeSlot(timeSlot);
+      for (final slot in timeSlots) {
+        final slotTime =
+            _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
+        if (slotTime == selectedSlot && slot['sessionType'] == sessionType) {
+          slot['enabled'] = true;
+          slot.remove('lockedBy');
+          slot.remove('lockId');
+          slot.remove('lockedAt');
+          restored = true;
+          break;
+        }
+      }
+
+      if (restored) {
+        await availabilityDoc.reference.update({
+          'timeSlots': timeSlots,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (_) {
+      // ignore restoration errors to avoid breaking cancellation flow
+    }
+  }
+
+  Future<void> _releaseSlotLockById(String? slotLockId) async {
+    if (slotLockId == null || slotLockId.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
+      final lockDoc = await lockRef.get();
+      if (!lockDoc.exists) {
+        return;
+      }
+
+      final data = lockDoc.data()!;
+      final mohaffezId = data['mohaffezId'] as String?;
+      final availabilityDocId = data['availabilityDocId'] as String?;
+      final timeSlot = data['timeSlot'] as String?;
+      final sessionType = data['sessionType'] as String?;
+
+      if (mohaffezId != null &&
+          availabilityDocId != null &&
+          timeSlot != null &&
+          sessionType != null) {
+        await _releaseSlotLockFieldsFromAvailability(
+          mohaffezId: mohaffezId,
+          availabilityDocId: availabilityDocId,
+          timeSlot: timeSlot,
+          sessionType: sessionType,
+          lockId: slotLockId,
+        );
+      }
+
+      await lockRef.delete();
+    } catch (_) {
+      // lock cleanup should not block the main flow
+    }
+  }
+
+  Future<void> _releaseSlotLockFieldsFromAvailability({
+    required String mohaffezId,
+    required String availabilityDocId,
+    required String timeSlot,
+    required String sessionType,
+    required String lockId,
+  }) async {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != mohaffezId) {
+      return;
+    }
+
+    final availabilityRef = _firestore
+        .collection('users')
+        .doc(mohaffezId)
+        .collection('availability')
+        .doc(availabilityDocId);
+
+    await _firestore.runTransaction((transaction) async {
+      final availabilityDoc = await transaction.get(availabilityRef);
+      if (!availabilityDoc.exists) {
+        return;
+      }
+
+      final data = availabilityDoc.data() ?? <String, dynamic>{};
+      final slots = List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
+      var changed = false;
+
+      final normalizedSelected = _normalizeTimeSlot(timeSlot);
+      for (var i = 0; i < slots.length; i++) {
+        final slot = slots[i];
+        final slotTime =
+            _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
+        if (slotTime == normalizedSelected &&
+            slot['sessionType'] == sessionType &&
+            slot['lockId'] == lockId) {
+          final updated = Map<String, dynamic>.from(slot)
+            ..remove('lockedBy')
+            ..remove('lockId')
+            ..remove('lockedAt');
+          slots[i] = updated;
+          changed = true;
+          break;
+        }
+      }
+
+      if (changed) {
+        transaction.update(availabilityRef, {
+          'timeSlots': slots,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    });
+  }
+
+  String _normalizeTimeSlot(String raw) => raw.replaceAll(' ', '');
+
+  Future<void> sendCancellationNotifications({
+    required String studentId,
+    required String mohaffezId,
+    required String sessionId,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': studentId,
+        'recipientId': studentId,
+        'senderId': mohaffezId,
+        'title': 'تم إلغاء الجلسة',
+        'body': 'تم إلغاء الجلسة المحجوزة',
+        'type': 'session_cancelled',
+        'isRead': false,
+        'sessionId': sessionId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      await _firestore.collection('notifications').add({
+        'userId': mohaffezId,
+        'recipientId': mohaffezId,
+        'senderId': studentId,
+        'title': 'تم إلغاء الجلسة',
+        'body': 'قام الطالب بإلغاء الجلسة المحجوزة',
+        'type': 'session_cancelled',
+        'isRead': false,
+        'sessionId': sessionId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // notification failures should not fail cancellation
+    }
+  }
+
   /// Update generic session details
   Future<void> updateSession(
     String sessionId,
@@ -901,7 +1291,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   ) async {
     state = const AsyncValue.loading();
     try {
-      await _firestore.collection('hafizSessions').doc(sessionId).update(updates);
+      await _firestore
+          .collection('hafizSessions')
+          .doc(sessionId)
+          .update(updates);
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -928,7 +1321,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  /// ✅ Complete session with full details + status = COMPLETED
+  /// ✅ Complete session with full details + status = COMPLETED + Quran mistakes
   Future<void> completeSessionWithDetails({
     required String sessionId,
     // تقييم التكليف السابق
@@ -943,36 +1336,35 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     // التقييم العام
     int sessionRating = 7,
     String? generalNotes,
-    // ✅ NEW: Late completion flag
+    // ✅ Late completion flag
     bool isLateCompletion = false,
+    // ✅ NEW: Quran mistake tracking
+    List<QuranMistake>? mistakes,
+    List<int>? pagesRead,
+    int? currentPage,
   }) async {
     state = const AsyncValue.loading();
-
     try {
       final updates = <String, dynamic>{
-        'status': 'completed', // ✅ CHANGE STATUS TO COMPLETED
+        'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
         'sessionRating': sessionRating,
-        'isLateCompletion': isLateCompletion, // ✅ NEW FIELD
+        'isLateCompletion': isLateCompletion,
       };
 
       // تقييم التكليف السابق
       if (previousHifzCompleted != null) {
         updates['previousHifzCompleted'] = previousHifzCompleted;
       }
-
       if (previousHifzRating != null) {
         updates['previousHifzRating'] = previousHifzRating;
       }
-
       if (previousMurajaCompleted != null) {
         updates['previousMurajaCompleted'] = previousMurajaCompleted;
       }
-
       if (previousMurajaRating != null) {
         updates['previousMurajaRating'] = previousMurajaRating;
       }
-
       if (performanceNotes != null && performanceNotes.isNotEmpty) {
         updates['performanceNotes'] = performanceNotes;
       }
@@ -981,7 +1373,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       if (newHifzAssignment != null && newHifzAssignment.isNotEmpty) {
         updates['hifzAssignment'] = newHifzAssignment;
       }
-
       if (newMurajaAssignment != null && newMurajaAssignment.isNotEmpty) {
         updates['murajaAssignment'] = newMurajaAssignment;
       }
@@ -991,7 +1382,35 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         updates['sessionNotes'] = generalNotes;
       }
 
-      await _firestore.collection('hafizSessions').doc(sessionId).update(updates);
+      // ✅ NEW: Quran mistake tracking
+      if (mistakes != null && mistakes.isNotEmpty) {
+        updates['mistakes'] = mistakes.map((m) => m.toJson()).toList();
+        // Calculate mistake counts by type
+        updates['tajweedMistakesCount'] =
+            mistakes.where((m) => m.type == MistakeType.tajweed).length;
+        updates['pronunciationMistakesCount'] =
+            mistakes.where((m) => m.type == MistakeType.pronunciation).length;
+        updates['readingMistakesCount'] =
+            mistakes.where((m) => m.type == MistakeType.reading).length;
+        updates['skipMistakesCount'] =
+            mistakes.where((m) => m.type == MistakeType.skip).length;
+        updates['additionMistakesCount'] =
+            mistakes.where((m) => m.type == MistakeType.addition).length;
+        updates['otherMistakesCount'] =
+            mistakes.where((m) => m.type == MistakeType.other).length;
+      }
+
+      if (pagesRead != null && pagesRead.isNotEmpty) {
+        updates['pagesRead'] = pagesRead;
+      }
+      if (currentPage != null) {
+        updates['currentPage'] = currentPage;
+      }
+
+      await _firestore
+          .collection('hafizSessions')
+          .doc(sessionId)
+          .update(updates);
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -1003,13 +1422,11 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
 // ============================================================================
 // MOHAFFEZ STUDENTS PROVIDERS
 // ============================================================================
-
 /// Provider for mohaffez students list with their last session
-final mohaffezStudentsProvider = StreamProvider.family<
-    List<Map<String, dynamic>>,
-    String>((ref, mohaffezId) {
+final mohaffezStudentsProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, mohaffezId) {
   final firestore = FirebaseFirestore.instance;
-
   return firestore
       .collection('hafizSessions')
       .where('mohaffezId', isEqualTo: mohaffezId)
@@ -1034,29 +1451,20 @@ final mohaffezStudentsProvider = StreamProvider.family<
           // Identity
           'studentId': studentId,
           'studentName': data['studentName'] as String? ?? '',
-
           // Latest session info
           'lastSessionDate': lastSessionDate,
           'status': data['status'] as String? ?? 'accepted',
-
           // Current assignments from latest session
           'hifzAssignment': data['hifzAssignment'] as String? ?? '',
           'murajaAssignment': data['murajaAssignment'] as String? ?? '',
-
           // Latest session rating
           'sessionRating': data['sessionRating'] as int? ?? 0,
-
           // Performance evaluation saved on the session
-          'previousHifzCompleted':
-              data['previousHifzCompleted'] as bool?,
-          'previousHifzRating':
-              data['previousHifzRating'] as int? ?? 0,
-          'previousMurajaCompleted':
-              data['previousMurajaCompleted'] as bool?,
-          'previousMurajaRating':
-              data['previousMurajaRating'] as int? ?? 0,
-          'performanceNotes':
-              data['performanceNotes'] as String?,
+          'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
+          'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
+          'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
+          'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
+          'performanceNotes': data['performanceNotes'] as String?,
         };
       }
     }
@@ -1065,9 +1473,9 @@ final mohaffezStudentsProvider = StreamProvider.family<
   });
 });
 
-
 /// Provider for student session count with specific mohaffez
-final studentSessionCountProvider = FutureProvider.family<int, Map<String, String>>(
+final studentSessionCountProvider =
+    FutureProvider.family<int, Map<String, String>>(
   (ref, params) async {
     final firestore = FirebaseFirestore.instance;
     final repository = SessionRepository(firestore);

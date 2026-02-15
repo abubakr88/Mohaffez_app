@@ -71,20 +71,3 @@ class TimestampConverter implements JsonConverter<DateTime?, Object?> {
     return Timestamp.fromDate(date);
   }
 }
-
-// Extension for calculations
-extension PricingPlanExtension on PricingPlanModel {
-  double get pricePerSession => priceEGP / sessionsCount;
-  
-  bool get isSubscription => type == PlanType.subscription;
-  bool get isBundle => type == PlanType.bundle;
-  bool get isSingle => type == PlanType.single;
-  
-  String get displayPrice => '${priceEGP.toStringAsFixed(0)} جنيه';
-  
-  String get displaySavings {
-    if (sessionsCount <= 1) return '';
-    final perSession = pricePerSession;
-    return 'السعر للجلسة: ${perSession.toStringAsFixed(0)} ج.م';
-  }
-}

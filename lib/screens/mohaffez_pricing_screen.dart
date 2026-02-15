@@ -1,12 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/pricing_plan_model.dart';
 import '../providers/pricing_provider.dart';
 import '../providers/user_provider.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/widgets/add_pricing_plan_sheet.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../shared/widgets/add_pricing_plan_sheet.dart';
+import '../utils/arabic_labels.dart';
 
 class MohaffezPricingScreen extends ConsumerWidget {
   const MohaffezPricingScreen({super.key});
@@ -14,15 +16,18 @@ class MohaffezPricingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
-    
+
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(
-            body: Center(child: Text('الرجاء تسجيل الدخول')),
+          return const Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: Center(child: Text('الرجاء تسجيل الدخول')),
+            ),
           );
         }
-        
+
         final mohaffezId = user.uid;
         final plansAsync = ref.watch(pricingPlansProvider(mohaffezId));
 
@@ -30,6 +35,7 @@ class MohaffezPricingScreen extends ConsumerWidget {
           textDirection: TextDirection.rtl,
           child: Scaffold(
             appBar: AppBar(
+              // CHANGED: Clean Arabic UTF-8 text.
               title: const Text('إدارة الأسعار'),
             ),
             body: plansAsync.when(
@@ -53,7 +59,7 @@ class MohaffezPricingScreen extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        body: Center(child: Text('خطأ: $e')),
+        body: Center(child: Text('${ArabicLabels.error}: $e')),
       ),
     );
   }
@@ -72,7 +78,6 @@ class MohaffezPricingScreen extends ConsumerWidget {
       );
     }
 
-    // Group by session mode
     final onlinePlans = plans.where((p) => p.mode == SessionMode.online).toList();
     final homePlans = plans.where((p) => p.mode == SessionMode.home).toList();
     final mosquePlans = plans.where((p) => p.mode == SessionMode.mosque).toList();
@@ -81,7 +86,7 @@ class MohaffezPricingScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       children: [
         if (onlinePlans.isNotEmpty) ...[
-          _buildSectionHeader('جلسات أونلاين', Icons.videocam),
+          _buildSectionHeader(ArabicLabels.onlineSession, Icons.videocam),
           ...onlinePlans.map((plan) => PricingPlanCard(
                 plan: plan,
                 mohaffezId: mohaffezId,
@@ -89,7 +94,7 @@ class MohaffezPricingScreen extends ConsumerWidget {
           const SizedBox(height: 24),
         ],
         if (homePlans.isNotEmpty) ...[
-          _buildSectionHeader('جلسات منزلية', Icons.home),
+          _buildSectionHeader(ArabicLabels.homeSession, Icons.home),
           ...homePlans.map((plan) => PricingPlanCard(
                 plan: plan,
                 mohaffezId: mohaffezId,
@@ -97,7 +102,7 @@ class MohaffezPricingScreen extends ConsumerWidget {
           const SizedBox(height: 24),
         ],
         if (mosquePlans.isNotEmpty) ...[
-          _buildSectionHeader('جلسات في المسجد', Icons.mosque),
+          _buildSectionHeader(ArabicLabels.mosqueSession, Icons.mosque),
           ...mosquePlans.map((plan) => PricingPlanCard(
                 plan: plan,
                 mohaffezId: mohaffezId,
@@ -139,7 +144,6 @@ class MohaffezPricingScreen extends ConsumerWidget {
   }
 }
 
-// Pricing Plan Card Widget
 class PricingPlanCard extends ConsumerWidget {
   final PricingPlanModel plan;
   final String mohaffezId;
@@ -187,7 +191,7 @@ class PricingPlanCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${plan.priceEGP.toStringAsFixed(0)} جنيه',
+                      '${plan.priceEGP.toStringAsFixed(0)} ${ArabicLabels.currency}',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -196,7 +200,7 @@ class PricingPlanCard extends ConsumerWidget {
                     ),
                     if (plan.sessionsCount > 1)
                       Text(
-                        '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} ج/جلسة',
+                        '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} ${ArabicLabels.currency}/${ArabicLabels.singleSession}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -259,7 +263,7 @@ class PricingPlanCard extends ConsumerWidget {
                   onChanged: (val) => _togglePlanStatus(context, ref, val),
                   activeColor: AppTheme.accentGreen,
                 ),
-                const Text('مفعّل'),
+                const Text('مفعل'),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.edit, size: 20),
@@ -308,16 +312,15 @@ class PricingPlanCard extends ConsumerWidget {
   String _getPlanDescription() {
     switch (plan.type) {
       case PlanType.single:
-        return 'جلسة واحدة';
+        return ArabicLabels.singleSession;
       case PlanType.bundle:
-        return 'باقة ${plan.sessionsCount} جلسات';
+        return '${ArabicLabels.sessionPackage} ${plan.sessionsCount}';
       case PlanType.subscription:
         return 'اشتراك شهري - ${plan.sessionsPerWeek}x أسبوعياً';
     }
   }
 
   void _togglePlanStatus(BuildContext context, WidgetRef ref, bool isActive) {
-    // FIX: Call on the notifier, not the state
     ref.read(pricingActionsProvider.notifier).updatePlanStatus(
           mohaffezId,
           plan.id!,
@@ -347,7 +350,7 @@ class PricingPlanCard extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('إلغاء'),
+              child: const Text(ArabicLabels.cancel),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -360,7 +363,6 @@ class PricingPlanCard extends ConsumerWidget {
     );
 
     if (confirm == true) {
-      // FIX: Call on the notifier, not the state
       await ref.read(pricingActionsProvider.notifier).deletePlan(
             plan.id!,
             mohaffezId,

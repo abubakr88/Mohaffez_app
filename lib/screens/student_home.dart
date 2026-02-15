@@ -1,15 +1,15 @@
 // FILE: lib/screens/student_home.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart'; // ✅ Added for navigation
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
+import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
+import '../utils/arabic_labels.dart';
 import 'student_assignments_screen.dart';
-import 'student_requests_screen.dart';
 
 class StudentHome extends ConsumerWidget {
   const StudentHome({super.key});
@@ -22,11 +22,10 @@ class StudentHome extends ConsumerWidget {
       data: (user) {
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('المستخدم غير موجود')),
+            body: Center(child: Text('لم يتم العثور على بيانات المستخدم')),
           );
         }
-
-        return _StudentHomeContent(studentId: user.uid);
+        return StudentHomeContent(studentId: user.uid);
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -40,17 +39,17 @@ class StudentHome extends ConsumerWidget {
   }
 }
 
-class _StudentHomeContent extends ConsumerWidget {
+class StudentHomeContent extends ConsumerWidget {
   final String studentId;
 
-  const _StudentHomeContent({required this.studentId});
+  const StudentHomeContent({required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: AppThemeConstants.backgroundLight,
         body: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(currentUserProvider);
@@ -62,7 +61,7 @@ class _StudentHomeContent extends ConsumerWidget {
             slivers: [
               // Modern App Bar
               _buildAppBar(context, ref),
-
+              
               // Content
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -71,17 +70,20 @@ class _StudentHomeContent extends ConsumerWidget {
                     // Welcome Message Card
                     _buildWelcomeCard(ref),
                     const SizedBox(height: 20),
-
+                    
                     // Quick Stats
-                    _QuickStatsSection(studentId: studentId),
-                    const SizedBox(height: 24),
-
-                    // Quick Actions
-                    _QuickActionsSection(studentId: studentId),
-                    const SizedBox(height: 24),
-
-                    // Recent Assignments
-                    _RecentAssignmentsSection(studentId: studentId),
+                    QuickStatsSection(studentId: studentId),
+                    
+                    Spacing.vLg,
+                    
+                    // Quick Actions - UPDATED WITH CLEAR SEPARATION
+                    QuickActionsSection(studentId: studentId),
+                    
+                    Spacing.vLg,
+                    
+                    // Recent Assignments Preview
+                    RecentAssignmentsSection(studentId: studentId),
+                    
                     const SizedBox(height: 32),
                   ]),
                 ),
@@ -99,12 +101,15 @@ class _StudentHomeContent extends ConsumerWidget {
       floating: false,
       pinned: true,
       elevation: 0,
-      backgroundColor: AppTheme.primaryAmber,
+      backgroundColor: AppThemeConstants.primaryAmber,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+              colors: [
+                AppThemeConstants.primaryAmber,
+                AppThemeConstants.primaryAmberLight,
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -121,22 +126,22 @@ class _StudentHomeContent extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.2),
+                          borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
                         child: const Icon(
                           Icons.waving_hand,
                           size: 28,
-                          color: Colors.white,
+                          color: AppThemeConstants.surfaceWhite,
                         ),
                       ),
                       const SizedBox(width: 12),
                       const Text(
-                        'السلام عليكم',
+                        'مرحباً بك',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: AppThemeConstants.surfaceWhite,
                         ),
                       ),
                     ],
@@ -150,10 +155,18 @@ class _StudentHomeContent extends ConsumerWidget {
                         style: const TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppThemeConstants.surfaceWhite,
                         ),
                       );
                     },
+                  ),
+                  Spacing.vSm,
+                  Text(
+                    DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now()),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
                   ),
                 ],
               ),
@@ -167,25 +180,26 @@ class _StudentHomeContent extends ConsumerWidget {
   Widget _buildWelcomeCard(WidgetRef ref) {
     final now = DateTime.now();
     final hour = now.hour;
+
     String greeting;
     IconData greetingIcon;
 
     if (hour < 12) {
-      greeting = 'صباح الخير ☀️';
+      greeting = 'صباح الخير';
       greetingIcon = Icons.wb_sunny;
     } else if (hour < 17) {
-      greeting = 'مساء الخير 🌤️';
+      greeting = 'مساء الخير';
       greetingIcon = Icons.wb_cloudy;
     } else {
-      greeting = 'مساء الخير 🌙';
+      greeting = 'مساء الخير';
       greetingIcon = Icons.nights_stay;
     }
 
     return Card(
       elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+      color: AppThemeConstants.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppThemeConstants.borderRadiusLg,
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -194,13 +208,13 @@ class _StudentHomeContent extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.accentGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+                borderRadius: AppThemeConstants.borderRadiusMd,
               ),
               child: Icon(
                 greetingIcon,
                 size: 28,
-                color: AppTheme.accentGreen,
+                color: AppThemeConstants.accentGreen,
               ),
             ),
             const SizedBox(width: 16),
@@ -213,12 +227,12 @@ class _StudentHomeContent extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: AppThemeConstants.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    DateFormat('EEEE، d MMMM yyyy', 'ar').format(now),
+                    'ابدأ يومك بحفظ القرآن الكريم',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -234,13 +248,13 @@ class _StudentHomeContent extends ConsumerWidget {
   }
 }
 
-// ============================================================================
+// ========================================
 // QUICK STATS SECTION
-// ============================================================================
-class _QuickStatsSection extends ConsumerWidget {
+// ========================================
+class QuickStatsSection extends ConsumerWidget {
   final String studentId;
 
-  const _QuickStatsSection({required this.studentId});
+  const QuickStatsSection({required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -255,42 +269,42 @@ class _QuickStatsSection extends ConsumerWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
+            color: AppThemeConstants.textPrimary,
           ),
         ),
-        const SizedBox(height: 16),
+        Spacing.vMd,
         Row(
           children: [
             Expanded(
-              child: _StatCard(
+              child: StatCard(
                 icon: Icons.event_available,
-                title: 'الجلسات المقبولة',
+                title: 'جلساتي',
                 value: sessionsAsync.when(
                   data: (sessions) => sessions
-                      .where((s) => s['status'] == 'accepted')
+                      .where((s) => (s['status']) == 'accepted')
                       .length
                       .toString(),
                   loading: () => '...',
                   error: (_, __) => '0',
                 ),
-                color: AppTheme.accentGreen,
+                color: AppThemeConstants.accentGreen,
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StudentAssignmentsScreen(),
-                    ),
-                  );
+                  // Navigate to My Sessions screen (NEW)
+                  context.go('/my-sessions');
                 },
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _StatCard(
+              child: StatCard(
                 icon: Icons.pending_actions,
                 title: 'الطلبات المعلقة',
                 value: requestsAsync.when(
                   data: (requests) => requests
-                      .where((r) => r['status'] == 'pending')
+                      .where((r) {
+                        final status = (r['status'] as String?)?.toLowerCase();
+                        return status == 'pending' || status == 'awaitingpayment';
+                      })
                       .length
                       .toString(),
                   loading: () => '...',
@@ -298,11 +312,7 @@ class _QuickStatsSection extends ConsumerWidget {
                 ),
                 color: Colors.orange,
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const StudentRequestsScreen(),
-                    ),
-                  );
+                  context.go('/requests');
                 },
               ),
             ),
@@ -313,14 +323,14 @@ class _QuickStatsSection extends ConsumerWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
+class StatCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
   final Color color;
   final VoidCallback onTap;
 
-  const _StatCard({
+  const StatCard({
     required this.icon,
     required this.title,
     required this.value,
@@ -332,17 +342,17 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: AppThemeConstants.surfaceWhite,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppThemeConstants.borderRadiusLg,
         side: BorderSide(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppThemeConstants.borderRadiusLg,
         child: Container(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -354,10 +364,14 @@ class _StatCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: AppThemeConstants.borderRadiusMd,
                     ),
-                    child: Icon(icon, size: 28, color: color),
+                    child: Icon(
+                      icon,
+                      size: 28,
+                      color: color,
+                    ),
                   ),
                   Icon(
                     Icons.arrow_forward_ios,
@@ -366,7 +380,7 @@ class _StatCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              Spacing.vMd,
               Text(
                 value,
                 style: TextStyle(
@@ -393,13 +407,13 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// QUICK ACTIONS SECTION - ✅ UPDATED: SCHEDULE NOW WORKS
-// ============================================================================
-class _QuickActionsSection extends StatelessWidget {
+// ========================================
+// QUICK ACTIONS SECTION - UPDATED
+// ========================================
+class QuickActionsSection extends StatelessWidget {
   final String studentId;
 
-  const _QuickActionsSection({required this.studentId});
+  const QuickActionsSection({required this.studentId});
 
   @override
   Widget build(BuildContext context) {
@@ -407,14 +421,14 @@ class _QuickActionsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'إجراءات سريعة',
+          'الإجراءات السريعة',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textPrimary,
+            color: AppThemeConstants.textPrimary,
           ),
         ),
-        const SizedBox(height: 16),
+        Spacing.vMd,
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -423,73 +437,73 @@ class _QuickActionsSection extends StatelessWidget {
           crossAxisSpacing: 12,
           childAspectRatio: 1.5,
           children: [
-            // ✅ SEARCH FOR NEARBY MOHAFFEZ
-            _ActionCard(
+            // SEARCH FOR NEARBY MOHAFFEZ
+            ActionCard(
               icon: Icons.search,
               title: 'ابحث عن محفظ',
               gradient: const LinearGradient(
-                colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                colors: [
+                  AppThemeConstants.primaryAmber,
+                  AppThemeConstants.primaryAmberLight,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               onTap: () {
-                // ✅ Navigate to nearby screen using GoRouter
                 context.go('/nearby');
               },
             ),
 
-            // ASSIGNMENTS
-            _ActionCard(
+            // MY SESSIONS (NEW - Dedicated Screen)
+            ActionCard(
+              icon: Icons.event_available,
+              title: 'جلساتي',
+              gradient: const LinearGradient(
+                colors: [
+                  AppThemeConstants.accentGreen,
+                  Color(0xFF66BB6A),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () {
+                // Navigate to dedicated My Sessions screen
+                context.go('/my-sessions');
+              },
+            ),
+
+            // MY ASSIGNMENTS (Existing - But clearer purpose)
+            ActionCard(
               icon: Icons.assignment,
               title: 'واجباتي',
-              gradient: const LinearGradient(
-                colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const StudentAssignmentsScreen(),
-                  ),
-                );
-              },
-            ),
-
-            // REQUESTS
-            _ActionCard(
-              icon: Icons.send,
-              title: 'طلباتي',
               gradient: LinearGradient(
-                colors: [Colors.orange, Colors.orange.shade300],
+                colors: [
+                  Colors.blue,
+                  Colors.blue.shade300,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const StudentRequestsScreen(),
-                  ),
-                );
+                context.go('/assignments');
               },
             ),
 
-            // ✅✅✅ SCHEDULE - NOW ACTIVATED! ✅✅✅
-            _ActionCard(
+            // MY SCHEDULE (NEW - Calendar View)
+            ActionCard(
               icon: Icons.calendar_today,
-              title: 'الجدول',
+              title: 'الجدول الزمني',
               gradient: LinearGradient(
-                colors: [Colors.blue, Colors.blue.shade300],
+                colors: [
+                  Colors.purple,
+                  Colors.purple.shade300,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               onTap: () {
-                // ✅ Navigate to StudentAssignmentsScreen (schedule view)
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const StudentAssignmentsScreen(),
-                  ),
-                );
+                // Navigate to dedicated Schedule screen
+                context.go('/my-schedule');
               },
             ),
           ],
@@ -499,13 +513,13 @@ class _QuickActionsSection extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
+class ActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final Gradient gradient;
   final VoidCallback onTap;
 
-  const _ActionCard({
+  const ActionCard({
     required this.icon,
     required this.title,
     required this.gradient,
@@ -516,26 +530,32 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppThemeConstants.borderRadiusLg,
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppThemeConstants.borderRadiusLg,
         child: Container(
           decoration: BoxDecoration(
             gradient: gradient,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppThemeConstants.borderRadiusLg,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 40, color: Colors.white),
-              const SizedBox(height: 8),
+              Icon(
+                icon,
+                size: 40,
+                color: AppThemeConstants.surfaceWhite,
+              ),
+              Spacing.vSm,
               Text(
                 title,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppThemeConstants.surfaceWhite,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -547,13 +567,13 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-// ============================================================================
+// ========================================
 // RECENT ASSIGNMENTS SECTION
-// ============================================================================
-class _RecentAssignmentsSection extends ConsumerWidget {
+// ========================================
+class RecentAssignmentsSection extends ConsumerWidget {
   final String studentId;
 
-  const _RecentAssignmentsSection({required this.studentId});
+  const RecentAssignmentsSection({required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -570,78 +590,48 @@ class _RecentAssignmentsSection extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: AppThemeConstants.textPrimary,
               ),
             ),
             TextButton.icon(
               onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const StudentAssignmentsScreen(),
-                  ),
-                );
+                context.go('/assignments');
               },
               icon: const Icon(Icons.arrow_forward, size: 18),
               label: const Text('عرض الكل'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.primaryAmber,
-              ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        Spacing.vMd,
         sessionsAsync.when(
           data: (sessions) {
             final assignments = sessions
                 .where((s) =>
-                    (s['hifzAssignment'] as String? ?? '').isNotEmpty ||
-                    (s['murajaAssignment'] as String? ?? '').isNotEmpty)
+                    ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
+                    ((s['murajaAssignment'] as String?) ?? '').isNotEmpty)
                 .take(3)
                 .toList();
 
             if (assignments.isEmpty) {
               return Card(
                 elevation: 0,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                color: Colors.amber.shade50,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: AppThemeConstants.borderRadiusLg,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.assignment_outlined,
-                            size: 48,
-                            color: Colors.grey.shade400,
-                          ),
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.amber.shade700),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'لا توجد واجبات جديدة حالياً',
+                          style: TextStyle(fontSize: 14),
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'لا توجد واجبات حالياً',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'ابحث عن محفظ لبدء رحلة الحفظ',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -649,17 +639,17 @@ class _RecentAssignmentsSection extends ConsumerWidget {
 
             return Column(
               children: assignments.map((session) {
-                final mohaffezName = session['mohaffezName'] as String? ?? '';
-                final hifz = session['hifzAssignment'] as String? ?? '';
-                final muraja = session['murajaAssignment'] as String? ?? '';
+                final mohaffezName = (session['mohaffezName'] as String?) ?? 'محفظ';
+                final hifz = (session['hifzAssignment'] as String?) ?? '';
+                final muraja = (session['murajaAssignment'] as String?) ?? '';
                 final sessionDate = session['sessionDate'] as DateTime?;
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   elevation: 0,
-                  color: Colors.white,
+                  color: AppThemeConstants.surfaceWhite,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: AppThemeConstants.borderRadiusLg,
                     side: BorderSide(
                       color: Colors.grey.shade200,
                       width: 1,
@@ -675,51 +665,33 @@ class _RecentAssignmentsSection extends ConsumerWidget {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: AppTheme.accentGreen.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
+                                color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+                                borderRadius: AppThemeConstants.borderRadiusSm,
                               ),
                               child: const Icon(
-                                Icons.school,
-                                color: AppTheme.accentGreen,
-                                size: 22,
+                                Icons.person,
+                                size: 18,
+                                color: AppThemeConstants.accentGreen,
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    mohaffezName,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  if (sessionDate != null) ...[
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_today,
-                                          size: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          DateFormat('dd/MM/yyyy', 'ar')
-                                              .format(sessionDate),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
+                              child: Text(
+                                mohaffezName,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
+                            if (sessionDate != null)
+                              Text(
+                                '${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
                           ],
                         ),
                         if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
@@ -727,13 +699,13 @@ class _RecentAssignmentsSection extends ConsumerWidget {
                           const Divider(height: 1),
                           const SizedBox(height: 12),
                           if (hifz.isNotEmpty)
-                            _AssignmentRow(
+                            AssignmentRow(
                               label: 'حفظ',
                               text: hifz,
                               color: Colors.green,
                             ),
                           if (muraja.isNotEmpty)
-                            _AssignmentRow(
+                            AssignmentRow(
                               label: 'مراجعة',
                               text: muraja,
                               color: Colors.blue,
@@ -755,8 +727,8 @@ class _RecentAssignmentsSection extends ConsumerWidget {
           error: (e, _) => Card(
             elevation: 0,
             color: Colors.red.shade50,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+            shape: const RoundedRectangleBorder(
+              borderRadius: AppThemeConstants.borderRadiusLg,
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -764,14 +736,8 @@ class _RecentAssignmentsSection extends ConsumerWidget {
                 children: [
                   Icon(Icons.error_outline, color: Colors.red.shade700),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'حدث خطأ في تحميل الواجبات',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                  const Expanded(
+                    child: Text('حدث خطأ أثناء تحميل البيانات'),
                   ),
                 ],
               ),
@@ -783,12 +749,12 @@ class _RecentAssignmentsSection extends ConsumerWidget {
   }
 }
 
-class _AssignmentRow extends StatelessWidget {
+class AssignmentRow extends StatelessWidget {
   final String label;
   final String text;
   final Color color;
 
-  const _AssignmentRow({
+  const AssignmentRow({
     required this.label,
     required this.text,
     required this.color,
@@ -804,10 +770,10 @@ class _AssignmentRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: color.withOpacity(0.3),
+                color: color.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -826,7 +792,8 @@ class _AssignmentRow extends StatelessWidget {
               text,
               style: const TextStyle(
                 fontSize: 14,
-                height: 1.4,              ),
+                height: 1.4,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

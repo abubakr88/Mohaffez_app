@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/pricing_plan_model.dart';
 import '../repositories/pricing_repository.dart';
+import 'auth_provider.dart';
 
 // Repository provider (already exists)
 final pricingRepositoryProvider = Provider<PricingRepository>((ref) {
@@ -10,11 +11,21 @@ final pricingRepositoryProvider = Provider<PricingRepository>((ref) {
 
 // Plans stream providers (already exist)
 final pricingPlansProvider = StreamProvider.family<List<PricingPlanModel>, String>((ref, mohaffezId) {
+  final authAsync = ref.watch(authStateProvider);
+  if (authAsync.isLoading || authAsync.value == null) {
+    return const Stream.empty();
+  }
+
   final repository = ref.watch(pricingRepositoryProvider);
   return repository.watchMohaffezPlans(mohaffezId);
 });
 
 final activePricingPlansProvider = StreamProvider.family<List<PricingPlanModel>, String>((ref, mohaffezId) {
+  final authAsync = ref.watch(authStateProvider);
+  if (authAsync.isLoading || authAsync.value == null) {
+    return const Stream.empty();
+  }
+
   final repository = ref.watch(pricingRepositoryProvider);
   return repository.watchActivePlans(mohaffezId);
 });

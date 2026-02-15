@@ -28,10 +28,13 @@ import '../screens/student_assignments_screen.dart';
 import '../screens/student_home.dart';
 import '../screens/student_requests_screen.dart';
 import '../screens/upcoming_sessions_screen.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
+import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
 import '../screens/student_payment_screen.dart';
 import '../screens/mohaffez_pricing_screen.dart';
+import '../screens/student_sessions_screen.dart'; // ADD THIS
+import '../screens/student_schedule_screen.dart'; // ADD THIS
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -92,6 +95,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'student-home',
             builder: (context, state) => const StudentHome(),
           ),
+          // NEW: My Sessions Route
+          GoRoute(
+            path: '/my-sessions',
+            name: 'my-sessions',
+            builder: (context, state) => const StudentSessionsScreen(),
+          ),
+          GoRoute(
+            path: '/my-schedule',
+            name: 'my-schedule',
+            builder: (context, state) => const StudentScheduleScreen(),
+          ),
+
           GoRoute(
             path: '/nearby',
             name: 'nearby',
@@ -165,9 +180,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) {
               final mohaffezId = state.pathParameters['mohaffezId']!;
               final mohaffezName = state.uri.queryParameters['name'] ?? '';
+              final requestId = state.uri.queryParameters['requestId'];
               return StudentPaymentScreen(
                 mohaffezId: mohaffezId,
                 mohaffezName: mohaffezName,
+                requestId: requestId,
               );
             },
           ),
@@ -182,16 +199,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/pending-requests',
             name: 'pending-requests',
-            builder: (context, state) {
-              final mohaffezId = state.uri.queryParameters['mohaffezId'];
-              if (mohaffezId == null || mohaffezId.isEmpty) {
-                return ErrorScreen(
-                  error: 'معرف المحفظ مطلوب',
-                  onRetry: () => context.go('/mohaffez-home'),
-                );
-              }
-              return PendingRequestsScreen(mohaffezId: mohaffezId);
-            },
+            builder: (context, state) => const PendingRequestsScreen(),
           ),
           GoRoute(
             path: '/completed-sessions',
@@ -324,7 +332,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+            colors: [AppThemeConstants.primaryAmber, AppThemeConstants.primaryAmberLight],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -335,10 +343,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             children: [
               // Logo
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
+                  color: AppThemeConstants.surfaceWhite,
+                  borderRadius: AppThemeConstants.borderRadiusXl,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.3),
@@ -349,48 +357,38 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 ),
                 child: Image.asset(
                   'assets/images/icon.png',
-                  width: 80,
-                  height: 80,
+                  width: AppThemeConstants.icon3xl,
+                  height: AppThemeConstants.icon3xl,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const Icon(
                     Icons.school,
-                    size: 80,
-                    color: AppTheme.primaryAmber,
+                    size: AppThemeConstants.icon3xl,
+                    color: AppThemeConstants.primaryAmber,
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              Spacing.vXl,
               // App Title
-              const Text(
+              Text(
                 'محفظ',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+                style: context.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold, color: AppThemeConstants.surfaceWhite),
               ),
-              const SizedBox(height: 10),
-              const Text(
+              Spacing.vMd,
+              Text(
                 'تطبيق تحفيظ القرآن الكريم',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white70,
-                ),
+                style: context.textTheme.bodyLarge?.copyWith(color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7)),
               ),
-              const SizedBox(height: 50),
+              const SizedBox(height: AppThemeConstants.space2xl),
               // Loading Indicator
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                valueColor: AlwaysStoppedAnimation<Color>(AppThemeConstants.surfaceWhite),
                 strokeWidth: 3,
               ),
-              const SizedBox(height: 16),
+              Spacing.vMd,
               // Status Text
               Text(
                 _getStatusText(authAsync),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
+                style: context.textTheme.bodyMedium?.copyWith(color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7)),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -405,22 +403,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+            colors: [AppThemeConstants.primaryAmber, AppThemeConstants.primaryAmberLight],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(32.0),
+            padding: const EdgeInsets.all(AppThemeConstants.spaceXl),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Error Icon
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppThemeConstants.surfaceWhite,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -432,32 +430,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                   child: const Icon(
                     Icons.wifi_off,
-                    size: 64,
-                    color: Colors.orange,
+                    size: AppThemeConstants.icon2xl,
+                    color: AppThemeConstants.warning,
                   ),
                 ),
-                const SizedBox(height: 32),
+                Spacing.vXl,
                 // Error Title
-                const Text(
+                Text(
                   'مشكلة في الاتصال',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                  style: context.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: AppThemeConstants.surfaceWhite),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
+                Spacing.vMd,
                 // Error Message
                 Text(
                   errorMessage ?? 'حدث خطأ في الاتصال',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
+                  style: context.textTheme.bodyLarge?.copyWith(color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7)),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: AppThemeConstants.spaceXl + AppThemeConstants.spaceSm),
                 // Action Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -468,32 +459,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                       icon: const Icon(Icons.refresh),
                       label: const Text('إعادة المحاولة'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.primaryAmber,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
+                        backgroundColor: AppThemeConstants.surfaceWhite,
+                        foregroundColor: AppThemeConstants.primaryAmber,
+                        padding: const EdgeInsets.symmetric(horizontal: AppThemeConstants.spaceLg, vertical: AppThemeConstants.spaceMd),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    Spacing.hMd,
                     // Go to Login Button
                     OutlinedButton.icon(
                       onPressed: _goToLogin,
                       icon: const Icon(Icons.login),
                       label: const Text('تسجيل الدخول'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white, width: 2),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
+                        foregroundColor: AppThemeConstants.surfaceWhite,
+                        side: const BorderSide(color: AppThemeConstants.surfaceWhite, width: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: AppThemeConstants.spaceLg, vertical: AppThemeConstants.spaceMd),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
                       ),
                     ),
@@ -535,28 +520,22 @@ class ErrorScreen extends StatelessWidget {
       child: Scaffold(
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(
                   Icons.error_outline,
-                  size: 64,
-                  color: Colors.red,
+                  size: AppThemeConstants.icon2xl,
+                  color: AppThemeConstants.error,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'حدث خطأ',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                Spacing.vMd,
+                Text('حدث خطأ', style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Spacing.vSm,
                 Text(
                   error,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14),
+                  style: context.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
@@ -564,10 +543,7 @@ class ErrorScreen extends StatelessWidget {
                   icon: const Icon(Icons.refresh),
                   label: const Text('إعادة المحاولة'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: AppThemeConstants.spaceXl, vertical: AppThemeConstants.spaceMd),
                   ),
                 ),
               ],
@@ -578,3 +554,6 @@ class ErrorScreen extends StatelessWidget {
     );
   }
 }
+
+
+

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -55,7 +55,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     _buildBasicInfo(profile),
                     const SizedBox(height: 16),
 
-                    // ✅ NEW: Pricing Preview Banner (Prominent)
+                    // Pricing Preview Banner
                     _buildPricingPreviewBanner(plansAsync),
                     const SizedBox(height: 16),
 
@@ -67,7 +67,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     _buildCredentialsSection(ref),
                     const SizedBox(height: 16),
 
-                    // ✅ NEW: Trust Badges Section
+                    // Trust Badges Section
                     _buildTrustBadgesSection(),
                     const SizedBox(height: 16),
 
@@ -75,7 +75,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     _buildSessionTypeSelector(),
                     const SizedBox(height: 16),
 
-                    // ✅ Detailed Pricing Plans (Horizontal Scroll)
+                    // Detailed Pricing Plans (Horizontal Scroll)
                     _buildPricingSection(plansAsync),
                     const SizedBox(height: 16),
 
@@ -221,7 +221,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // ✅ NEW: Pricing Preview Banner (Most Prominent)
+  // Pricing Preview Banner (Most Prominent)
   Widget _buildPricingPreviewBanner(
       AsyncValue<List<PricingPlanModel>> plansAsync) {
     return plansAsync.when(
@@ -354,7 +354,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // ✅ NEW: Trust Badges Section
+  // Trust Badges Section
   Widget _buildTrustBadgesSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -466,7 +466,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // ✅ FIX 2: Make "عرض جميع الخطط والدفع" button LARGER and MORE VISIBLE
+  // Pricing Section with horizontal cards and main button
   Widget _buildPricingSection(AsyncValue<List<PricingPlanModel>> plansAsync) {
     return plansAsync.when(
       data: (plans) {
@@ -540,8 +540,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
-            // ✅ LARGER, MORE PROMINENT BUTTON
+
+            // Main button to view all plans and pay
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SizedBox(
@@ -555,6 +555,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           mohaffezId: widget.mohaffezId,
                           mohaffezName: _getMohaffezName(),
                           preselectedSessionType: selectedSessionType,
+                          preselectedTimeSlot: selectedTimeSlot,
+                          preselectedDate: selectedDate,
                         ),
                       ),
                     );
@@ -563,7 +565,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   label: const Text(
                     'عرض جميع الخطط والدفع',
                     style: TextStyle(
-                      fontSize: 18, // ✅ Increased from 14 to 18
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -587,15 +589,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-
- // ... (keep all imports and class declaration as before until _buildPricingCard)
-
-  // ✅ FIX 1: Make pricing cards CLICKABLE
+  // Pricing card (clickable)
   Widget _buildPricingCard(PricingPlanModel plan) {
     final pricePerSession = plan.priceEGP / plan.sessionsCount;
     return GestureDetector(
       onTap: () {
-        // ✅ Navigate to payment screen when card is tapped
+        // Navigate to payment screen when card is tapped
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -603,6 +602,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               mohaffezId: widget.mohaffezId,
               mohaffezName: _getMohaffezName(),
               preselectedSessionType: selectedSessionType,
+              preselectedTimeSlot: selectedTimeSlot,
+              preselectedDate: selectedDate,
             ),
           ),
         );
@@ -698,14 +699,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-
   String _getMohaffezName() {
     final profileValue =
         ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
     return profileValue?['name'] ?? '';
   }
 
-  // ✅ MAIN BOOKING FUNCTION - Handles payment flow
+  // MAIN BOOKING FUNCTION - Handles payment flow
   Future<void> sendBookingRequest(Map<String, dynamic> profile) async {
     if (selectedTimeSlot == null || selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -744,7 +744,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     setState(() => isBooking = true);
 
     try {
-      // ✅ CHECK: Does student have active subscription?
+      // CHECK: Does student have active subscription?
       final paymentRepo = ref.read(paymentRepositoryProvider);
       final activeSubscription = await paymentRepo.getActiveSubscription(
         user.uid,
@@ -752,10 +752,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       );
 
       if (activeSubscription != null && activeSubscription.remainingSessions > 0) {
-        // ✅ HAS SUBSCRIPTION: Send request directly (credit on hold)
+        // HAS SUBSCRIPTION: Send request directly (credit on hold)
         await _sendRequestWithSubscription(profile, activeSubscription);
       } else {
-        // ✅ NO SUBSCRIPTION: Show options
+        // NO SUBSCRIPTION: Show options
         await _showBookingOptionsDialog(profile);
       }
     } catch (e) {
@@ -774,7 +774,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     }
   }
 
-  // ✅ Send request with existing subscription (credit held, consumed on acceptance)
+  // Send request with existing subscription (credit held, consumed on acceptance)
   Future<void> _sendRequestWithSubscription(
     Map<String, dynamic> profile,
     dynamic subscription,
@@ -822,8 +822,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           imamAddressLat: profile['addressLat'],
           imamAddressLng: profile['addressLng'],
           mohaffezPhone: profile['phoneNumber'],
-          subscriptionId: subscription.id, // ✅ LINK subscription
-          isPaid: false, // ✅ Not paid yet, credit on hold
+          subscriptionId: subscription.id,
+          isPaid: false,
         );
 
     if (result.isSuccess && mounted) {
@@ -845,7 +845,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     }
   }
 
-  // ✅ Show dialog: Buy package OR send free request (pay later)
+  // Show dialog: Buy package OR send free request (pay later)
   Future<void> _showBookingOptionsDialog(Map<String, dynamic> profile) async {
     if (!mounted) return;
 
@@ -936,7 +936,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
 
     if (choice == 'buy_package' && mounted) {
-      // Navigate to payment screen to buy package
+      // Navigate to payment screen to buy package, passing the selected slot
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
@@ -944,7 +944,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             mohaffezId: widget.mohaffezId,
             mohaffezName: profile['name'] ?? '',
             preselectedSessionType: selectedSessionType,
-            showSubscriptionsOnly: true, // ✅ Show packages/subscriptions only
+            preselectedTimeSlot: selectedTimeSlot,
+            preselectedDate: selectedDate,
+            showSubscriptionsOnly: true,
           ),
         ),
       );
@@ -967,7 +969,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     }
   }
 
-  // ✅ Send free request (payment happens AFTER teacher accepts)
+  // Send free request (payment happens AFTER teacher accepts)
   Future<void> _sendFreeRequest(Map<String, dynamic> profile) async {
     final user = ref.read(currentUserProvider).value!;
 
@@ -1011,8 +1013,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           imamAddressLat: profile['addressLat'],
           imamAddressLng: profile['addressLng'],
           mohaffezPhone: profile['phoneNumber'],
-          isPaid: false, // ✅ Payment pending until acceptance
-          requiresPaymentOnAcceptance: true, // ✅ NEW FLAG
+          isPaid: false,
+          requiresPaymentOnAcceptance: true,
         );
 
     if (result.isSuccess && mounted) {

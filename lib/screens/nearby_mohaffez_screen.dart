@@ -9,12 +9,14 @@ import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/mohaffez_provider.dart';
 import '../models/mohaffez_model.dart';
+import '../utils/arabic_labels.dart';
 
 class NearbyMohaffezScreen extends ConsumerStatefulWidget {
   const NearbyMohaffezScreen({super.key});
 
   @override
-  ConsumerState<NearbyMohaffezScreen> createState() => _NearbyMohaffezScreenState();
+  ConsumerState<NearbyMohaffezScreen> createState() =>
+      _NearbyMohaffezScreenState();
 }
 
 class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
@@ -35,7 +37,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
   Future<void> _getCurrentLocation() async {
     try {
       if (!mounted) return;
-      
+
       setState(() {
         isLoadingLocation = true;
         locationError = null;
@@ -68,7 +70,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
 
       // FIXED: Check mounted before setState
       if (!mounted) return;
-      
+
       setState(() {
         userLat = position.latitude;
         userLng = position.longitude;
@@ -77,7 +79,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
     } catch (e) {
       // FIXED: Check mounted before setState
       if (!mounted) return;
-      
+
       setState(() {
         locationError = e.toString();
         isLoadingLocation = false;
@@ -123,7 +125,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
             mohaffezAsync.when(
               data: (mohaffezList) {
                 if (mohaffezList.isEmpty) {
-                  return const SliverFillRemaining(
+                  return SliverFillRemaining(
                     child: EmptyState(
                       icon: Icons.search_off,
                       title: 'لا يوجد محفظون',
@@ -138,12 +140,14 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final mohaffez = mohaffezList[index];
-                        final distance = mohaffez.getDistanceFrom(userLat, userLng);
+                        final distance =
+                            mohaffez.getDistanceFrom(userLat, userLng);
 
                         return MohaffezCard(
                           mohaffez: mohaffez,
                           distance: distance,
-                          onTap: () => context.go('/mohaffez/${mohaffez.id}', extra: {
+                          onTap: () =>
+                              context.go('/mohaffez/${mohaffez.id}', extra: {
                             'lat': userLat?.toString(),
                             'lng': userLng?.toString(),
                           }),
@@ -205,22 +209,22 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'المحفظون القريبون',
-                              style: TextStyle(
+                              ArabicLabels.nearby,
+                              style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
-                              'ابحث عن محفظ قريب منك',
-                              style: TextStyle(
+                              ArabicLabels.searchForMohaffez,
+                              style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.white70,
                               ),
@@ -229,7 +233,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.my_location, color: Colors.white),
+                        icon:
+                            const Icon(Icons.my_location, color: Colors.white),
                         onPressed: _getCurrentLocation,
                         tooltip: 'تحديث الموقع',
                       ),
@@ -254,17 +259,17 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.blue.shade200),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            SizedBox(
+            const SizedBox(
               width: 20,
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text(
-              'جاري تحديد موقعك...',
-              style: TextStyle(fontSize: 14, color: Colors.blue),
+              '${ArabicLabels.loading} ${ArabicLabels.location}...',
+              style: const TextStyle(fontSize: 14, color: Colors.blue),
             ),
           ],
         ),
@@ -292,7 +297,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
             ),
             TextButton(
               onPressed: _getCurrentLocation,
-              child: const Text('إعادة المحاولة'),
+              child: Text(ArabicLabels.retry),
             ),
           ],
         ),
@@ -316,7 +321,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryAmber.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),

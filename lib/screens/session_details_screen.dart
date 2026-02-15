@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+
 import '../models/session_model.dart';
+import '../models/quran_mistake_model.dart';
+
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
+import '../shared/widgets/interactive_quran_page.dart';
 
 class SessionDetailsScreen extends ConsumerWidget {
   final SessionModel session;
@@ -83,7 +87,7 @@ class SessionDetailsScreen extends ConsumerWidget {
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        _getStatusLabel(session.status!),
+                                        _getStatusLabel(session.status ?? ''),
                                         style: const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
@@ -108,146 +112,276 @@ class SessionDetailsScreen extends ConsumerWidget {
             SliverPadding(
               padding: const EdgeInsets.all(16),
               sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Session Info Card
-                  _SectionCard(
-                    title: 'معلومات الجلسة',
-                    icon: Icons.info_outline,
-                    color: Colors.blue,
-                    child: Column(
-                      children: [
-                        _InfoRow(
-                          icon: Icons.event,
-                          label: 'النوع',
-                          value: _getSessionTypeLabel(session.sessionType),
-                        ),
-                        const Divider(height: 24),
-                        _InfoRow(
-                          icon: Icons.access_time,
-                          label: 'الوقت',
-                          value: session.preferredTimeSlot!,
-                        ),
-                        if (session.sessionDate != null) ...[
-                          const Divider(height: 24),
-                          _InfoRow(
-                            icon: Icons.calendar_today,
-                            label: 'التاريخ',
-                            value: DateFormat('dd MMMM yyyy', 'ar')
-                                .format(session.sessionDate!),
-                          ),
-                        ],
-                        if (session.location.isNotEmpty) ...[
-                          const Divider(height: 24),
-                          _InfoRow(
-                            icon: Icons.location_on,
-                            label: 'المكان',
-                            value: session.location,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Assignments Section
-                  if ((session.hifzAssignment?.isNotEmpty ?? false) ||
-                      (session.murajaAssignment?.isNotEmpty ?? false))
+                delegate: SliverChildListDelegate(
+                  [
+                    // Session Info Card
                     _SectionCard(
-                      title: 'الواجبات',
-                      icon: Icons.assignment,
-                      color: AppTheme.accentGreen,
+                      title: 'معلومات الجلسة',
+                      icon: Icons.info_outline,
+                      color: Colors.blue,
                       child: Column(
                         children: [
-                          if (session.hifzAssignment?.isNotEmpty ?? false)
-                            _AssignmentCard(
-                              title: 'حفظ',
-                              content: session.hifzAssignment!,
-                              color: Colors.green,
-                              icon: Icons.book,
+                          _InfoRow(
+                            icon: Icons.event,
+                            label: 'النوع',
+                            value: _getSessionTypeLabel(session.sessionType),
+                          ),
+                          const Divider(height: 24),
+                          if (session.preferredTimeSlot != null)
+                            _InfoRow(
+                              icon: Icons.access_time,
+                              label: 'الوقت',
+                              value: session.preferredTimeSlot!,
                             ),
-                          if ((session.hifzAssignment?.isNotEmpty ?? false) &&
-                              (session.murajaAssignment?.isNotEmpty ?? false))
-                            const SizedBox(height: 12),
-                          if (session.murajaAssignment?.isNotEmpty ?? false)
-                            _AssignmentCard(
-                              title: 'مراجعة',
-                              content: session.murajaAssignment!,
-                              color: Colors.blue,
-                              icon: Icons.refresh,
+                          if (session.sessionDate != null) ...[
+                            const Divider(height: 24),
+                            _InfoRow(
+                              icon: Icons.calendar_today,
+                              label: 'التاريخ',
+                              value: DateFormat('dd MMMM yyyy', 'ar')
+                                  .format(session.sessionDate!),
                             ),
+                          ],
+                          if (session.location.isNotEmpty) ...[
+                            const Divider(height: 24),
+                            _InfoRow(
+                              icon: Icons.location_on,
+                              label: 'المكان',
+                              value: session.location,
+                            ),
+                          ],
                         ],
                       ),
                     ),
 
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Rating Section
-                  if (session.sessionRating > 0)
-                    _SectionCard(
-                      title: 'التقييم',
-                      icon: Icons.star,
-                      color: Colors.amber,
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                '${session.sessionRating}/10',
-                                style: const TextStyle(
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.amber,
-                                ),
+                    // Assignments Section
+                    if ((session.hifzAssignment?.isNotEmpty ?? false) ||
+                        (session.murajaAssignment?.isNotEmpty ?? false))
+                      _SectionCard(
+                        title: 'الواجبات',
+                        icon: Icons.assignment,
+                        color: AppTheme.accentGreen,
+                        child: Column(
+                          children: [
+                            if (session.hifzAssignment?.isNotEmpty ?? false)
+                              _AssignmentCard(
+                                title: 'حفظ',
+                                content: session.hifzAssignment!,
+                                color: Colors.green,
+                                icon: Icons.book,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(10, (index) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 2),
-                                child: Icon(
-                                  index < session.sessionRating
-                                      ? Icons.star
-                                      : Icons.star_border,
-                                  color: Colors.amber,
-                                  size: 28,
+                            if ((session.hifzAssignment?.isNotEmpty ?? false) &&
+                                (session.murajaAssignment?.isNotEmpty ?? false))
+                              const SizedBox(height: 12),
+                            if (session.murajaAssignment?.isNotEmpty ?? false)
+                              _AssignmentCard(
+                                title: 'مراجعة',
+                                content: session.murajaAssignment!,
+                                color: Colors.blue,
+                                icon: Icons.refresh,
+                              ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Rating Section
+                    if (session.sessionRating > 0)
+                      _SectionCard(
+                        title: 'التقييم',
+                        icon: Icons.star,
+                        color: Colors.amber,
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '${session.sessionRating}/10',
+                                  style: const TextStyle(
+                                    fontSize: 48,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber,
+                                  ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(10, (index) {
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 2),
+                                  child: Icon(
+                                    index < session.sessionRating
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color: Colors.amber,
+                                    size: 28,
+                                  ),
+                                );
+                              }),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Performance notes
+                    if (session.performanceNotes?.isNotEmpty ?? false)
+                      _SectionCard(
+                        title: 'ملاحظات على التكليف السابق',
+                        icon: Icons.fact_check,
+                        color: Colors.teal,
+                        child: Text(
+                          session.performanceNotes!,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Notes Section
+                    if (session.sessionNotes?.isNotEmpty ?? false)
+                      _SectionCard(
+                        title: 'ملاحظات',
+                        icon: Icons.notes,
+                        color: Colors.purple,
+                        child: Text(
+                          session.sessionNotes!,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // ✅ Quran mistakes section
+                    if (session.mistakes.isNotEmpty)
+                      _SectionCard(
+                        title: 'الأخطاء على المصحف',
+                        icon: Icons.menu_book,
+                        color: AppTheme.accentGreen,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Summary
+                            Row(
+                              children: [
+                                Icon(Icons.error_outline,
+                                    color: Colors.orange.shade700),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'تم تسجيل ${session.mistakes.length} خطأ في هذه الجلسة',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Grouped by page
+                            ...session.mistakesByPage.entries.map((entry) {
+                              final page = entry.key;
+                              final mistakes = entry.value;
+                              return ExpansionTile(
+                                tilePadding: EdgeInsets.zero,
+                                title: Text(
+                                    'صفحة $page (${mistakes.length} أخطاء)'),
+                                children: mistakes.map((m) {
+                                  return ListTile(
+                                    dense: true,
+                                    leading: CircleAvatar(
+                                      backgroundColor: _mistakeColor(m.type),
+                                      child: Icon(
+                                        _mistakeIcon(m.type),
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    title: Text(
+                                        'آية ${m.ayahNumber} - ${_getMistakeLabel(m.type)}'),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (m.wordText != null)
+                                          Text(
+                                            m.wordText!,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        if (m.correctionNote != null)
+                                          Text(
+                                            m.correctionNote!,
+                                            style: TextStyle(
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
                               );
                             }),
-                          ),
-                        ],
-                      ),
-                    ),
 
-                  const SizedBox(height: 16),
-
-                  // Notes Section
-                  if (session.sessionNotes?.isNotEmpty ?? false)
-                    _SectionCard(
-                      title: 'ملاحظات',
-                      icon: Icons.notes,
-                      color: Colors.purple,
-                      child: Text(
-                        session.sessionNotes!,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => Scaffold(
+                                        appBar: AppBar(
+                                          title: const Text(
+                                              'عرض الأخطاء على المصحف'),
+                                        ),
+                                        body: InteractiveQuranPage(
+                                          pageNumber:
+                                              session.mistakes.first.pageNumber,
+                                          existingMistakes: session.mistakes,
+                                          onMistakeAdded: (_) {},
+                                          isEditable: false,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.book),
+                                label: const Text('عرض على المصحف'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primaryAmber,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
 
-                  const SizedBox(height: 32),
-                ]),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ],
         ),
 
-        // Action Buttons (for mohaffez only)
+        // Action Buttons (for mohaffez only) - MOVED HERE
         bottomNavigationBar: isMohaffez && session.status == 'accepted'
             ? SafeArea(
                 child: Padding(
@@ -257,7 +391,7 @@ class SessionDetailsScreen extends ConsumerWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () {
-                            // Complete session
+                            // Navigate to completion screen
                           },
                           icon: const Icon(Icons.check_circle),
                           label: const Text('إنهاء الجلسة'),
@@ -319,6 +453,65 @@ class SessionDetailsScreen extends ConsumerWidget {
         return 'عن بُعد';
       default:
         return type;
+    }
+  }
+
+  // Helper to avoid ambiguous extension
+  String _getMistakeLabel(MistakeType type) {
+    switch (type) {
+      case MistakeType.tajweed:
+        return 'خطأ تجويد';
+      case MistakeType.pronunciation:
+        return 'خطأ نطق';
+      case MistakeType.reading:
+        return 'قراءة خاطئة';
+      case MistakeType.skip:
+        return 'تجاوز';
+      case MistakeType.addition:
+        return 'زيادة';
+      case MistakeType.other:
+        return 'أخرى';
+      default:  // ✅ ADD THIS
+        return 'غير محدد';
+    }
+  }
+
+  Color _mistakeColor(MistakeType type) {
+    switch (type) {
+      case MistakeType.tajweed:
+        return Colors.orange;
+      case MistakeType.pronunciation:
+        return Colors.red;
+      case MistakeType.reading:
+        return Colors.purple;
+      case MistakeType.skip:
+        return Colors.blue;
+      case MistakeType.addition:
+        return Colors.green;
+      case MistakeType.other:
+        return Colors.grey;
+      default:  // ✅ ADD THIS
+        return Colors.grey;
+    }
+  }
+
+  IconData _mistakeIcon(MistakeType type) {
+    switch (type) {
+      case MistakeType.tajweed:
+        return Icons.auto_fix_high;
+      case MistakeType.pronunciation:
+        return Icons.record_voice_over;
+      case MistakeType.reading:
+        return Icons.error_outline;
+      case MistakeType.skip:
+        return Icons.fast_forward;
+      case MistakeType.addition:
+        return Icons.add_circle_outline;
+      case MistakeType.other:
+        return Icons.help_outline;
+      default:  // ✅ ADD THIS
+        return Icons.help_outline;
+
     }
   }
 }

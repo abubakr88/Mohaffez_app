@@ -3,10 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendNotification = void 0;
 // functions/src/notifications/sendNotification.ts
 const functions = require("firebase-functions");
+const app_check_1 = require("firebase-admin/app-check");
 const admin_1 = require("../utils/admin");
 /**
  * HTTP endpoint to send FCM notifications
  */
+// This endpoint requires Firebase App Check to be enabled in your project
 exports.sendNotification = functions.https.onRequest(async (req, res) => {
     // Set CORS headers
     res.set('Access-Control-Allow-Origin', '*');
@@ -14,6 +16,18 @@ exports.sendNotification = functions.https.onRequest(async (req, res) => {
     res.set('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') {
         res.status(204).send('');
+        return;
+    }
+    const appCheckToken = req.header('X-Firebase-AppCheck');
+    if (!appCheckToken) {
+        res.status(401).json({ success: false, error: 'Missing App Check token' });
+        return;
+    }
+    try {
+        await (0, app_check_1.getAppCheck)().verifyToken(appCheckToken);
+    }
+    catch (error) {
+        res.status(401).json({ success: false, error: 'Invalid App Check token' });
         return;
     }
     try {
@@ -45,7 +59,6 @@ exports.sendNotification = functions.https.onRequest(async (req, res) => {
                 },
             },
         };
-        // FIX: Use messaging directly, not messaging()
         const response = await admin_1.messaging.send(message);
         functions.logger.info('Successfully sent message:', response);
         res.status(200).json({ success: true, messageId: response });

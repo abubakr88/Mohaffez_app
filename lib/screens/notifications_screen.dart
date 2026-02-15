@@ -8,6 +8,7 @@ import '../shared/widgets/empty_state.dart';
 import '../providers/notification_provider_paginated.dart';
 import '../providers/user_provider.dart';
 import '../models/notification_model.dart';
+import '../utils/arabic_labels.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -71,9 +72,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'الإشعارات',
-                                    style: TextStyle(
+                                  Text(
+                                    ArabicLabels.notifications,
+                                    style: const TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
@@ -128,7 +129,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   child: Row(
                     children: [
                       _FilterChip(
-                        label: 'الكل',
+                        label: ArabicLabels.all,
                         count: paginatedState.items.length,
                         isSelected: selectedFilter == 'all',
                         onTap: () => setState(() => selectedFilter = 'all'),
@@ -161,10 +162,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
             // Notifications List
             if (paginatedState.items.isEmpty && !paginatedState.isLoadingMore)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 child: EmptyState(
                   icon: Icons.notifications_none,
-                  title: 'لا توجد إشعارات',
+                  title: ArabicLabels.noNotifications,
                   message: 'ستظهر إشعاراتك هنا',
                 ),
               )
@@ -219,7 +220,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
                           _handleNotificationTap(
                             context,
-                            notification as NotificationModel,
+                            notification,
                           );
                         },
                         onDismiss: () {
@@ -308,7 +309,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('حسناً'),
+                child: Text(ArabicLabels.ok),
               ),
             ],
           ),

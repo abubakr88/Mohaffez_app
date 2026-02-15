@@ -7,6 +7,7 @@ import '../providers/user_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/notification_provider_paginated.dart';
+import '../utils/arabic_labels.dart';
 
 class HomeShell extends ConsumerWidget {
   final Widget child;
@@ -21,11 +22,12 @@ class HomeShell extends ConsumerWidget {
 
     final currentIndex = ref.watch(bottomNavIndexProvider);
     final isMohaffez = user.role == 'mohaffez';
-    
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: _buildAppBar(context, ref, isMohaffez, currentIndex, user.uid, user.name),
+        appBar: _buildAppBar(
+            context, ref, isMohaffez, currentIndex, user.uid, user.name),
         drawer: _buildDrawer(context, ref, isMohaffez, user),
         body: Column(
           children: [
@@ -33,7 +35,8 @@ class HomeShell extends ConsumerWidget {
             Expanded(child: child),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavBar(context, ref, isMohaffez, currentIndex),
+        bottomNavigationBar:
+            _buildBottomNavBar(context, ref, isMohaffez, currentIndex),
       ),
     );
   }
@@ -50,24 +53,24 @@ class HomeShell extends ConsumerWidget {
       if (isMohaffez) {
         switch (currentIndex) {
           case 0:
-            return 'الرئيسية';
+            return ArabicLabels.home;
           case 1:
-            return 'الإشعارات';
+            return ArabicLabels.notifications;
           case 2:
-            return 'الملف الشخصي';
+            return ArabicLabels.profile;
           default:
             return 'محفظ';
         }
       } else {
         switch (currentIndex) {
           case 0:
-            return 'الرئيسية';
+            return ArabicLabels.home;
           case 1:
-            return 'البحث';
+            return ArabicLabels.search;
           case 2:
-            return 'الإشعارات';
+            return ArabicLabels.notifications;
           case 3:
-            return 'الملف الشخصي';
+            return ArabicLabels.profile;
           default:
             return 'محفظ';
         }
@@ -77,7 +80,7 @@ class HomeShell extends ConsumerWidget {
     return PreferredSize(
       preferredSize: const Size.fromHeight(60),
       child: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
             begin: Alignment.topLeft,
@@ -95,7 +98,7 @@ class HomeShell extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -123,7 +126,7 @@ class HomeShell extends ConsumerWidget {
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu),
               onPressed: () => Scaffold.of(context).openDrawer(),
-              tooltip: 'القائمة',
+              tooltip: ArabicLabels.menu,
             ),
           ),
           actions: [
@@ -141,16 +144,19 @@ class HomeShell extends ConsumerWidget {
     bool isMohaffez,
     String userId,
   ) {
-    final unreadCountAsync = ref.watch(unreadNotificationsCountProvider(userId));
+    final unreadCountAsync =
+        ref.watch(unreadNotificationsCountProvider(userId));
     return unreadCountAsync.when(
       data: (unreadCount) {
         return Stack(
           children: [
             IconButton(
               icon: const Icon(Icons.notifications),
-              tooltip: 'الإشعارات',
+              tooltip: ArabicLabels.notifications,
               onPressed: () {
-                ref.read(bottomNavIndexProvider.notifier).setIndex(isMohaffez ? 1 : 2);
+                ref
+                    .read(bottomNavIndexProvider.notifier)
+                    .setIndex(isMohaffez ? 1 : 2);
                 context.go('/notifications');
               },
             ),
@@ -205,7 +211,7 @@ class HomeShell extends ConsumerWidget {
         children: [
           // Drawer Header
           DrawerHeader(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
                 begin: Alignment.topLeft,
@@ -251,17 +257,17 @@ class HomeShell extends ConsumerWidget {
               ],
             ),
           ),
-          
+
           // Profile
           ListTile(
             leading: const Icon(Icons.person, color: AppTheme.primaryAmber),
-            title: const Text('الملف الشخصي'),
+            title: const Text(ArabicLabels.profile),
             onTap: () {
               Navigator.pop(context);
               context.go('/profile');
             },
           ),
-          
+
           // Mohaffez-only sections
           if (isMohaffez) ...[
             const Divider(),
@@ -282,31 +288,31 @@ class HomeShell extends ConsumerWidget {
               },
             ),
           ],
-          
+
           const Divider(),
-          
+
           // Settings - COMPLETED TODO
           ListTile(
             leading: const Icon(Icons.settings, color: Colors.grey),
-            title: const Text('الإعدادات'),
+            title: const Text(ArabicLabels.settings),
             onTap: () {
               Navigator.pop(context);
               context.go('/settings');
             },
           ),
-          
+
           // Privacy - COMPLETED TODO
           ListTile(
             leading: const Icon(Icons.privacy_tip, color: Colors.grey),
-            title: const Text('الخصوصية'),
+            title: const Text(ArabicLabels.privacy),
             onTap: () {
               Navigator.pop(context);
               context.go('/privacy-settings');
             },
           ),
-          
+
           const Divider(),
-          
+
           // Logout
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
@@ -335,7 +341,7 @@ class HomeShell extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء'),
+              child: const Text(ArabicLabels.cancel),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -383,9 +389,13 @@ class HomeShell extends ConsumerWidget {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'الإشعارات'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'الملف الشخصي'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.home), label: ArabicLabels.home),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.notifications),
+              label: ArabicLabels.notifications),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person), label: ArabicLabels.profile),
         ],
       );
     } else {
@@ -412,10 +422,15 @@ class HomeShell extends ConsumerWidget {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'البحث'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'الإشعارات'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'الملف الشخصي'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.home), label: ArabicLabels.home),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.search), label: ArabicLabels.search),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.notifications),
+              label: ArabicLabels.notifications),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person), label: ArabicLabels.profile),
         ],
       );
     }

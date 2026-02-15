@@ -3,14 +3,15 @@ import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/pricing_plan_model.dart';
-import '../models/payment_model.dart'; // ✅ ADD THIS
+import '../models/payment_model.dart'; // âœ… ADD THIS
 import '../providers/pricing_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/payment_provider.dart';
 import '../shared/constants/app_theme.dart';
+import '../widgets/location_picker_widget.dart';
 import 'payment_webview_screen.dart';
 
-/// Unified booking flow: Pricing → Details → Payment
+/// Unified booking flow: Pricing â†’ Details â†’ Payment
 class UnifiedBookingFlowScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
   final String mohaffezName;
@@ -36,6 +37,9 @@ class _UnifiedBookingFlowScreenState
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
   int? selectedDayOfWeek;
+  String? selectedAddress;
+  double? selectedLat;
+  double? selectedLng;
 
   @override
   Widget build(BuildContext context) {
@@ -45,22 +49,25 @@ class _UnifiedBookingFlowScreenState
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('إتمام الحجز'),
+          title: const Text('Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø­Ø¬Ø²'),
           backgroundColor: AppTheme.accentGreen,
         ),
         body: Column(
           children: [
             // Progress Indicator
             _buildProgressIndicator(),
-            
+
             // Content
             Expanded(
               child: plansAsync.when(
                 data: (plans) {
                   final filteredPlans = plans.where((p) {
-                    if (selectedSessionType == 'home') return p.mode == SessionMode.home;
-                    if (selectedSessionType == 'mosque') return p.mode == SessionMode.mosque;
-                    if (selectedSessionType == 'online') return p.mode == SessionMode.online;
+                    if (selectedSessionType == 'home')
+                      return p.mode == SessionMode.home;
+                    if (selectedSessionType == 'mosque')
+                      return p.mode == SessionMode.mosque;
+                    if (selectedSessionType == 'online')
+                      return p.mode == SessionMode.online;
                     return false;
                   }).toList();
 
@@ -76,7 +83,7 @@ class _UnifiedBookingFlowScreenState
                   }
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('خطأ: $e')),
+                error: (e, _) => Center(child: Text('Ø®Ø·Ø£: $e')),
               ),
             ),
 
@@ -103,11 +110,11 @@ class _UnifiedBookingFlowScreenState
       ),
       child: Row(
         children: [
-          _buildStepIndicator(0, 'اختر الباقة', Icons.payment),
+          _buildStepIndicator(0, 'Ø§Ø®ØªØ± Ø§Ù„Ø¨Ø§Ù‚Ø©', Icons.payment),
           _buildStepConnector(0),
-          _buildStepIndicator(1, 'التفاصيل', Icons.event),
+          _buildStepIndicator(1, 'Ø§Ù„ØªÙØ§ØµÙŠÙ„', Icons.event),
           _buildStepConnector(1),
-          _buildStepIndicator(2, 'التأكيد', Icons.check_circle),
+          _buildStepIndicator(2, 'Ø§Ù„ØªØ£ÙƒÙŠØ¯', Icons.check_circle),
         ],
       ),
     );
@@ -172,7 +179,7 @@ class _UnifiedBookingFlowScreenState
 
         // Session Type Selector
         const Text(
-          'نوع الجلسة',
+          'Ù†ÙˆØ¹ Ø§Ù„Ø¬Ù„Ø³Ø©',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
@@ -181,7 +188,7 @@ class _UnifiedBookingFlowScreenState
 
         // Pricing Plans
         const Text(
-          'اختر الباقة المناسبة',
+          'Ø§Ø®ØªØ± Ø§Ù„Ø¨Ø§Ù‚Ø© Ø§Ù„Ù…Ù†Ø§Ø³Ø¨Ø©',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
@@ -190,7 +197,8 @@ class _UnifiedBookingFlowScreenState
           const Center(
             child: Padding(
               padding: EdgeInsets.all(40),
-              child: Text('لا توجد باقات متاحة لهذا النوع'),
+              child: Text(
+                  'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨Ø§Ù‚Ø§Øª Ù…ØªØ§Ø­Ø© Ù„Ù‡Ø°Ø§ Ø§Ù„Ù†ÙˆØ¹'),
             ),
           )
         else
@@ -226,9 +234,9 @@ class _UnifiedBookingFlowScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildFeatureBadge(Icons.lock, 'دفع آمن'),
+              _buildFeatureBadge(Icons.lock, 'Ø¯ÙØ¹ Ø¢Ù…Ù†'),
               const SizedBox(width: 12),
-              _buildFeatureBadge(Icons.replay, 'استرجاع مضمون'),
+              _buildFeatureBadge(Icons.replay, 'Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ù…Ø¶Ù…ÙˆÙ†'),
             ],
           ),
         ],
@@ -263,7 +271,7 @@ class _UnifiedBookingFlowScreenState
         Expanded(
           child: _buildSessionTypeCard(
             'home',
-            'المنزل',
+            'Ø§Ù„Ù…Ù†Ø²Ù„',
             Icons.home,
             Colors.blue,
           ),
@@ -272,7 +280,7 @@ class _UnifiedBookingFlowScreenState
         Expanded(
           child: _buildSessionTypeCard(
             'mosque',
-            'المسجد',
+            'Ø§Ù„Ù…Ø³Ø¬Ø¯',
             Icons.mosque,
             Colors.green,
           ),
@@ -281,7 +289,7 @@ class _UnifiedBookingFlowScreenState
         Expanded(
           child: _buildSessionTypeCard(
             'online',
-            'أونلاين',
+            'Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†',
             Icons.videocam,
             Colors.purple,
           ),
@@ -404,7 +412,7 @@ class _UnifiedBookingFlowScreenState
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${plan.sessionsCount} ${plan.sessionsCount == 1 ? "جلسة" : "جلسات"}',
+                            '${plan.sessionsCount} ${plan.sessionsCount == 1 ? "Ø¬Ù„Ø³Ø©" : "Ø¬Ù„Ø³Ø§Øª"}',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey.shade600,
@@ -418,7 +426,7 @@ class _UnifiedBookingFlowScreenState
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${plan.priceEGP.toStringAsFixed(0)} ج.م',
+                          '${plan.priceEGP.toStringAsFixed(0)} Ø¬.Ù…',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -429,7 +437,7 @@ class _UnifiedBookingFlowScreenState
                         ),
                         if (plan.sessionsCount > 1)
                           Text(
-                            '${pricePerSession.toStringAsFixed(0)} ج.م/جلسة',
+                            '${pricePerSession.toStringAsFixed(0)} Ø¬.Ù…/Ø¬Ù„Ø³Ø©',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
@@ -439,7 +447,7 @@ class _UnifiedBookingFlowScreenState
                     ),
                   ],
                 ),
-                
+
                 // Savings Badge
                 if (savings > 0) ...[
                   const SizedBox(height: 12),
@@ -458,7 +466,7 @@ class _UnifiedBookingFlowScreenState
                             size: 16, color: Colors.orange),
                         const SizedBox(width: 6),
                         Text(
-                          'وفر $savings ج.م',
+                          'ÙˆÙØ± $savings Ø¬.Ù…',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -486,7 +494,7 @@ class _UnifiedBookingFlowScreenState
             ),
 
             // Best Value Badge
-            if (plan.isSubscription || savings > 100)
+            if (plan.type == PlanType.subscription || savings > 100)
               Positioned(
                 top: 0,
                 left: 0,
@@ -503,7 +511,7 @@ class _UnifiedBookingFlowScreenState
                     ),
                   ),
                   child: const Text(
-                    'الأفضل قيمة',
+                    'Ø§Ù„Ø£ÙØ¶Ù„ Ù‚ÙŠÙ…Ø©',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -529,7 +537,7 @@ class _UnifiedBookingFlowScreenState
 
         // Date Selection
         const Text(
-          'اختر التاريخ والوقت',
+          'Ø§Ø®ØªØ± Ø§Ù„ØªØ§Ø±ÙŠØ® ÙˆØ§Ù„ÙˆÙ‚Øª',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
@@ -540,6 +548,24 @@ class _UnifiedBookingFlowScreenState
 
         // Time Slot Selector
         if (selectedDate != null) _buildTimeSlotSelector(),
+        if (selectedSessionType != 'online') ...[
+          const SizedBox(height: 20),
+          const Text(
+            'Ø­Ø¯Ø¯ Ù…ÙˆÙ‚Ø¹ Ø§Ù„Ø¬Ù„Ø³Ø©',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          LocationPickerWidget(
+            initialAddress: selectedAddress,
+            onLocationSelected: (address, lat, lng) {
+              setState(() {
+                selectedAddress = address;
+                selectedLat = lat;
+                selectedLng = lng;
+              });
+            },
+          ),
+        ],
       ],
     );
   }
@@ -568,7 +594,7 @@ class _UnifiedBookingFlowScreenState
                   ),
                 ),
                 Text(
-                  '${selectedPlan!.priceEGP.toStringAsFixed(0)} ج.م',
+                  '${selectedPlan!.priceEGP.toStringAsFixed(0)} Ø¬.Ù…',
                   style: TextStyle(
                     color: Colors.grey.shade700,
                     fontSize: 14,
@@ -590,8 +616,8 @@ class _UnifiedBookingFlowScreenState
         itemCount: 14, // Next 14 days
         itemBuilder: (context, index) {
           final date = DateTime.now().add(Duration(days: index));
-          final isSelected = selectedDate != null &&
-              DateUtils.isSameDay(selectedDate, date);
+          final isSelected =
+              selectedDate != null && DateUtils.isSameDay(selectedDate, date);
 
           return GestureDetector(
             onTap: () {
@@ -608,9 +634,8 @@ class _UnifiedBookingFlowScreenState
                 color: isSelected ? AppTheme.accentGreen : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelected
-                      ? AppTheme.accentGreen
-                      : Colors.grey.shade300,
+                  color:
+                      isSelected ? AppTheme.accentGreen : Colors.grey.shade300,
                   width: isSelected ? 2 : 1,
                 ),
               ),
@@ -664,9 +689,7 @@ class _UnifiedBookingFlowScreenState
               color: isSelected ? AppTheme.accentGreen : Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isSelected
-                    ? AppTheme.accentGreen
-                    : Colors.grey.shade300,
+                color: isSelected ? AppTheme.accentGreen : Colors.grey.shade300,
                 width: isSelected ? 2 : 1,
               ),
             ),
@@ -700,24 +723,25 @@ class _UnifiedBookingFlowScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'ملخص الحجز',
+                'Ù…Ù„Ø®Øµ Ø§Ù„Ø­Ø¬Ø²',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const Divider(height: 24),
-              
-              _buildSummaryRow(Icons.person, 'المحفظ', widget.mohaffezName),
+              _buildSummaryRow(
+                  Icons.person, 'Ø§Ù„Ù…Ø­ÙØ¸', widget.mohaffezName),
               const SizedBox(height: 12),
               _buildSummaryRow(
                 Icons.event,
-                'التاريخ',
+                'Ø§Ù„ØªØ§Ø±ÙŠØ®',
                 selectedDate != null
-                    ? DateFormat('EEEE, dd MMMM yyyy', 'ar').format(selectedDate!)
+                    ? DateFormat('EEEE, dd MMMM yyyy', 'ar')
+                        .format(selectedDate!)
                     : '-',
               ),
               const SizedBox(height: 12),
               _buildSummaryRow(
                 Icons.access_time,
-                'الوقت',
+                'Ø§Ù„ÙˆÙ‚Øª',
                 selectedTimeSlot != null
                     ? '${selectedTimeSlot!['startTime']} - ${selectedTimeSlot!['endTime']}'
                     : '-',
@@ -728,21 +752,23 @@ class _UnifiedBookingFlowScreenState
                 'نوع الجلسة',
                 _getSessionTypeLabel(selectedSessionType),
               ),
-              
+              if (selectedAddress != null && selectedAddress!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildSummaryRow(Icons.location_on, 'الموقع', selectedAddress!),
+              ],
               const Divider(height: 24),
-              
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'الإجمالي',
+                    'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
-                    '${selectedPlan?.priceEGP.toStringAsFixed(0)} ج.م',
+                    '${selectedPlan?.priceEGP.toStringAsFixed(0)} Ø¬.Ù…',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -804,9 +830,9 @@ class _UnifiedBookingFlowScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildTrustBadge(Icons.lock, 'دفع آمن'),
-              _buildTrustBadge(Icons.verified_user, 'معتمد'),
-              _buildTrustBadge(Icons.support_agent, 'دعم 24/7'),
+              _buildTrustBadge(Icons.lock, 'Ø¯ÙØ¹ Ø¢Ù…Ù†'),
+              _buildTrustBadge(Icons.verified_user, 'Ù…Ø¹ØªÙ…Ø¯'),
+              _buildTrustBadge(Icons.support_agent, 'Ø¯Ø¹Ù… 24/7'),
             ],
           ),
           const SizedBox(height: 12),
@@ -855,7 +881,7 @@ class _UnifiedBookingFlowScreenState
           child: GestureDetector(
             onTap: () => setState(() => agreedToTerms = !agreedToTerms),
             child: const Text(
-              'أوافق على الشروط والأحكام وسياسة الاسترجاع',
+              'Ø£ÙˆØ§ÙÙ‚ Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø±ÙˆØ· ÙˆØ§Ù„Ø£Ø­ÙƒØ§Ù… ÙˆØ³ÙŠØ§Ø³Ø© Ø§Ù„Ø§Ø³ØªØ±Ø¬Ø§Ø¹',
               style: TextStyle(fontSize: 13),
             ),
           ),
@@ -887,7 +913,7 @@ class _UnifiedBookingFlowScreenState
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('رجوع'),
+                child: const Text('Ø±Ø¬ÙˆØ¹'),
               ),
             ),
           if (currentStep > 0) const SizedBox(width: 12),
@@ -900,7 +926,7 @@ class _UnifiedBookingFlowScreenState
                 backgroundColor: AppTheme.accentGreen,
               ),
               child: Text(
-                currentStep == 2 ? 'ادفع الآن' : 'التالي',
+                currentStep == 2 ? 'Ø§Ø¯ÙØ¹ Ø§Ù„Ø¢Ù†' : 'Ø§Ù„ØªØ§Ù„ÙŠ',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -918,7 +944,13 @@ class _UnifiedBookingFlowScreenState
       case 0:
         return selectedPlan != null;
       case 1:
-        return selectedDate != null && selectedTimeSlot != null;
+        if (selectedDate == null || selectedTimeSlot == null) {
+          return false;
+        }
+        if (selectedSessionType != 'online') {
+          return selectedAddress != null && selectedAddress!.trim().isNotEmpty;
+        }
+        return true;
       case 2:
         return agreedToTerms;
       default:
@@ -946,7 +978,7 @@ class _UnifiedBookingFlowScreenState
     );
 
     try {
-      // ✅ FIXED: Create PaymentModel properly
+      // âœ… FIXED: Create PaymentModel properly
       final payment = PaymentModel(
         studentId: user.uid,
         studentName: user.name,
@@ -965,6 +997,9 @@ class _UnifiedBookingFlowScreenState
           'sessionType': selectedSessionType,
           'sessionDate': selectedDate?.toIso8601String(),
           'timeSlot': selectedTimeSlot,
+          'location': selectedAddress,
+          'locationLat': selectedLat,
+          'locationLng': selectedLng,
         },
       );
 
@@ -980,7 +1015,8 @@ class _UnifiedBookingFlowScreenState
 
       if (paymentResult == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل إنشاء رابط الدفع')),
+          const SnackBar(
+              content: Text('ÙØ´Ù„ Ø¥Ù†Ø´Ø§Ø¡ Ø±Ø§Ø¨Ø· Ø§Ù„Ø¯ÙØ¹')),
         );
         return;
       }
@@ -1002,7 +1038,7 @@ class _UnifiedBookingFlowScreenState
         Navigator.of(context).popUntil((route) => route.isFirst);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم الدفع بنجاح! 🎉'),
+            content: Text('ØªÙ… Ø§Ù„Ø¯ÙØ¹ Ø¨Ù†Ø¬Ø§Ø­! ðŸŽ‰'),
             backgroundColor: AppTheme.accentGreen,
           ),
         );
@@ -1011,14 +1047,22 @@ class _UnifiedBookingFlowScreenState
       if (mounted) {
         Navigator.pop(context); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
+          SnackBar(content: Text('Ø®Ø·Ø£: $e')),
         );
       }
     }
   }
 
   String _getArabicDayName(int weekday) {
-    const days = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
+    const days = [
+      'Ø§Ù„Ø¥Ø«Ù†ÙŠÙ†',
+      'Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡',
+      'Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡',
+      'Ø§Ù„Ø®Ù…ÙŠØ³',
+      'Ø§Ù„Ø¬Ù…Ø¹Ø©',
+      'Ø§Ù„Ø³Ø¨Øª',
+      'Ø§Ù„Ø£Ø­Ø¯'
+    ];
     return days[weekday - 1];
   }
 
@@ -1038,11 +1082,11 @@ class _UnifiedBookingFlowScreenState
   String _getSessionTypeLabel(String type) {
     switch (type) {
       case 'home':
-        return 'المنزل';
+        return 'Ø§Ù„Ù…Ù†Ø²Ù„';
       case 'mosque':
-        return 'المسجد';
+        return 'Ø§Ù„Ù…Ø³Ø¬Ø¯';
       case 'online':
-        return 'أونلاين';
+        return 'Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†';
       default:
         return type;
     }
@@ -1056,7 +1100,7 @@ class PaymentProcessingDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: ui.TextDirection.rtl, // ✅ FIXED
+      textDirection: ui.TextDirection.rtl, // âœ… FIXED
       child: AlertDialog(
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1064,12 +1108,12 @@ class PaymentProcessingDialog extends StatelessWidget {
             const CircularProgressIndicator(),
             const SizedBox(height: 20),
             const Text(
-              'جاري تأمين عملية الدفع...',
+              'Ø¬Ø§Ø±ÙŠ ØªØ£Ù…ÙŠÙ† Ø¹Ù…Ù„ÙŠØ© Ø§Ù„Ø¯ÙØ¹...',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              'يرجى الانتظار',
+              'ÙŠØ±Ø¬Ù‰ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±',
               style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
           ],
