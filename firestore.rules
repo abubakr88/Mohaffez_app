@@ -102,33 +102,46 @@ service cloud.firestore {
     }
 
     // ============================================
-    // SESSION REQUESTS (Booking Flow)
+    // SESSION REQUESTS (Booking Flow) - FIXED
     // ============================================
     
     match /sessionRequests/{requestId} {
-      allow read: if isAuthenticated() && (
-        resource == null ||
-        request.auth.uid == resource.data.studentId ||
-        request.auth.uid == resource.data.mohaffezId
-      );
-
-      allow create: if isAuthenticated() &&
-                    request.auth.uid == request.resource.data.studentId &&
-                    request.resource.data.status == 'pending' &&
-                    request.resource.data.studentId is string &&
-                    request.resource.data.mohaffezId is string &&
-                    request.resource.data.sessionType in ['home', 'mosque', 'online'];
-
-      // TEMPORARY: Allow any authenticated participant to update
-      // REMOVE THIS AFTER DEBUGGING
-      allow update: if isAuthenticated() && (
-        request.auth.uid == resource.data.studentId ||
-        request.auth.uid == resource.data.mohaffezId
-      );
-
-      allow delete: if isAuthenticated() &&
-                    request.auth.uid == resource.data.studentId &&
-                    resource.data.status in ['pending', 'cancelled', 'rejected'];
+      // Allow read if user is involved
+      allow read: if request.auth != null 
+                   && (request.auth.uid == resource.data.studentId 
+                       || request.auth.uid == resource.data.mohaffezId);
+      
+      // Allow create by students
+      allow create: if request.auth != null 
+                     && request.auth.uid == request.resource.data.studentId;
+      
+      // Allow update by mohaffez for specific status transitions
+      allow update: if request.auth != null 
+                    && request.auth.uid == resource.data.mohaffezId
+                    && (
+                      // [NEW] From pending to awaitingpayment (payment required)
+                      (request.resource.data.status == 'awaitingpayment'
+                        && resource.data.status == 'pending'
+                        && onlyUpdating(['status', 'acceptedAt', 'paymentDeadline', 'reminderSent', 'updatedAt']))
+                      ||
+                      // Existing: accept
+                      (request.resource.data.status == 'accepted' 
+                        && resource.data.status in ['pending', 'awaitingpayment']
+                        && onlyUpdating(['status', 'acceptedAt', 'updatedAt', 'sessionId']))
+                      ||
+                      // Existing: reject
+                      (request.resource.data.status == 'rejected'
+                        && resource.data.status in ['pending', 'awaitingpayment']
+                        && onlyUpdating(['status', 'rejectedAt', 'rejectionReason', 'updatedAt']))
+                      ||
+                      // Existing: cancel
+                      (request.resource.data.status == 'cancelled'
+                        && request.auth.uid in [resource.data.studentId, resource.data.mohaffezId])
+                    );      
+      // Allow delete only by creator before acceptance
+      allow delete: if request.auth != null 
+                     && request.auth.uid == resource.data.studentId
+                     && resource.data.status in ['pending', 'awaitingpayment', 'rejected'];
     }
 
     // ============================================
@@ -273,7 +286,7 @@ service cloud.firestore {
     }
 
     // ============================================
-    // PROMO CODES (SINGULAR - for backward compatibility)
+    // PROMO CODES
     // ============================================
     
     match /promocodes/{promoCode} {
@@ -284,10 +297,6 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ========================== ==================
-    // PROMO CODES (PLURAL - used by the app and Cloud Function)
-    // ============================================
-    
     match /promoCodes/{promoCode} {
       allow read: if isAuthenticated();
       allow create: if isAdmin();

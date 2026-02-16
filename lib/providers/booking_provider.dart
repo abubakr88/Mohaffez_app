@@ -723,7 +723,7 @@ class BookingService {
     return _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', whereIn: ['pending', 'awaiting_payment'])
+        .where('status', whereIn: ['pending', 'awaitingpayment'])
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>

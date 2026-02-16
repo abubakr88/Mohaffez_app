@@ -163,7 +163,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                         stream: FirebaseFirestore.instance
                             .collection('sessionRequests')
                             .where('mohaffezId', isEqualTo: mohaffezId)
-                            .where('status', whereIn: ['pending', 'awaiting_payment'])
+                            .where('status', whereIn: ['pending', 'awaitingpayment'])
                             .snapshots(),
                         builder: (context, snapshot) {
                           final count = snapshot.data?.docs.length ?? 0;
@@ -222,8 +222,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
             _FilterChip(
               label: 'في انتظار الدفع',
               icon: Icons.payment,
-              isSelected: _selectedFilter == 'awaiting_payment',
-              onTap: () => setState(() => _selectedFilter = 'awaiting_payment'),
+              isSelected: _selectedFilter == 'awaitingpayment',
+              onTap: () => setState(() => _selectedFilter = 'awaitingpayment'),
             ),
           ],
         ),
@@ -236,7 +236,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       stream: FirebaseFirestore.instance
           .collection('sessionRequests')
           .where('mohaffezId', isEqualTo: mohaffezId)
-          .where('status', whereIn: ['pending', 'awaiting_payment'])
+          .where('status', whereIn: ['pending', 'awaitingpayment'])
           .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
@@ -275,8 +275,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
             
             if (_selectedFilter == 'pending') {
               return status == 'pending';
-            } else if (_selectedFilter == 'awaiting_payment') {
-              return status == 'awaiting_payment' || status == 'awaitingpayment';
+            } else if (_selectedFilter == 'awaitingpayment') {
+              return status == 'awaitingpayment' || status == 'awaitingpayment';
             }
             return true;
           }).toList();
@@ -339,7 +339,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
     final status = (data['status'] as String? ?? '').toLowerCase();
     
     // Check if payment is required
-    if (status == 'awaiting_payment' || status == 'awaitingpayment') {
+    if (status == 'awaitingpayment' || status == 'awaitingpayment') {
       // Show dialog that payment is pending
       showDialog(
         context: context,
@@ -386,14 +386,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
     if (confirmed != true) return;
 
     try {
-      // Direct Firestore update
-      await FirebaseFirestore.instance
-          .collection('sessionRequests')
-          .doc(requestId)
-          .update({
-        'status': 'accepted',
-        'acceptedAt': FieldValue.serverTimestamp(),
-      });
+      // ✅ USE PROVIDER: Handles subscription credits, payment deadlines, notifications
+      await ref.read(sessionActionsProvider.notifier).acceptRequestAndCreateSession(requestId);
 
       if (!mounted) return;
 
@@ -462,15 +456,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           ? 'لم يذكر سبب'
           : reasonController.text.trim();
       
-      // Direct Firestore update
-      await FirebaseFirestore.instance
-          .collection('sessionRequests')
-          .doc(requestId)
-          .update({
-        'status': 'rejected',
-        'rejectedAt': FieldValue.serverTimestamp(),
-        'rejectionReason': reason,
-      });
+      // ✅ USE PROVIDER: Handles slot lock release and notifications
+      await ref.read(sessionActionsProvider.notifier).rejectRequest(requestId, reason);
 
       if (!mounted) return;
 
@@ -586,7 +573,7 @@ class PendingRequestCard extends StatelessWidget {
     final timeSlot = request['preferredTimeSlot'] as String? ??
         request['timeSlot'] as String? ?? '';
 
-    final isAwaitingPayment = status == 'awaiting_payment' || status == 'awaitingpayment';
+    final isAwaitingPayment = status == 'awaitingpayment' || status == 'awaitingpayment';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),

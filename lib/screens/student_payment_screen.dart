@@ -33,15 +33,16 @@ class StudentPaymentScreen extends ConsumerStatefulWidget {
     this.timeSlot,
     this.location,
     this.sessionDetails,
-    this.preselectedSessionType,
-    this.preselectedTimeSlot,
-    this.preselectedDate,
+    this.preselectedSessionType, // ✅ NEW: From mohaffez profile
+    this.preselectedTimeSlot, // ✅ NEW: From mohaffez profile
+    this.preselectedDate, // ✅ NEW: From mohaffez profile
     this.autoBookAfterPayment = false,
     this.showSubscriptionsOnly = false,
     this.mohaffezAddress,
     this.mohaffezLat,
     this.mohaffezLng,
     this.mohaffezPhone,
+    this.lockedRequest,
   });
 
   final String mohaffezId;
@@ -52,15 +53,19 @@ class StudentPaymentScreen extends ConsumerStatefulWidget {
   final String? timeSlot;
   final String? location;
   final Map<String, dynamic>? sessionDetails;
+  
+  // ✅ NEW: Preselected slot data from mohaffez profile
   final String? preselectedSessionType;
   final Map<String, dynamic>? preselectedTimeSlot;
   final DateTime? preselectedDate;
+  
   final bool autoBookAfterPayment;
   final bool showSubscriptionsOnly;
   final String? mohaffezAddress;
   final double? mohaffezLat;
   final double? mohaffezLng;
   final String? mohaffezPhone;
+  final Map<String, dynamic>? lockedRequest;
 
   @override
   ConsumerState<StudentPaymentScreen> createState() =>
@@ -74,15 +79,27 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   PricingResult? _pricingResult;
   bool _isProcessingPayment = false;
 
+  // ✅ UPDATED: Get session type from multiple sources (priority order)
   String get _lockedSessionType =>
-      widget.sessionType ?? widget.preselectedSessionType ?? 'online';
-  
-  DateTime? get _lockedDate => widget.sessionDate ?? widget.preselectedDate;
+      widget.sessionType ?? 
+      widget.preselectedSessionType ?? 
+      _lockedRequestSessionType ?? 
+      'online';
 
+  // ✅ UPDATED: Get date from multiple sources
+  DateTime? get _lockedDate => 
+      widget.sessionDate ?? 
+      widget.preselectedDate ?? 
+      _lockedRequestSlotDate;
+
+  // ✅ UPDATED: Get time slot from multiple sources
   String get _lockedTimeSlot {
+    // Priority 1: Direct timeSlot parameter
     if (widget.timeSlot != null && widget.timeSlot!.trim().isNotEmpty) {
       return widget.timeSlot!;
     }
+    
+    // Priority 2: Preselected time slot from mohaffez profile
     if (widget.preselectedTimeSlot != null) {
       final start = widget.preselectedTimeSlot!['startTime']?.toString() ?? '';
       final end = widget.preselectedTimeSlot!['endTime']?.toString();
@@ -91,10 +108,41 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       }
       return start;
     }
+    
+    // Priority 3: Locked request time slot
+    if (_lockedRequestTimeSlot != null && _lockedRequestTimeSlot!.isNotEmpty) {
+      return _lockedRequestTimeSlot!;
+    }
+    
     return '';
   }
 
+  // ✅ UPDATED: Check if slot is selected from any source
   bool get _hasSelectedSlot => _lockedTimeSlot.isNotEmpty && _lockedDate != null;
+
+  /// Check if this is a locked request from payment notification
+  bool get _isLockedRequest => widget.lockedRequest != null;
+
+  /// Get the session type from locked request
+  String? get _lockedRequestSessionType =>
+      _isLockedRequest ? widget.lockedRequest!['sessionType'] as String? : null;
+
+  /// Get the slot date from locked request
+  DateTime? get _lockedRequestSlotDate {
+    if (!_isLockedRequest) return null;
+    final timestamp = widget.lockedRequest!['slotDate'];
+    if (timestamp is DateTime) return timestamp;
+    if (timestamp is Timestamp) return timestamp.toDate();
+    return null;
+  }
+
+  /// Get the time slot from locked request
+  String? get _lockedRequestTimeSlot =>
+      _isLockedRequest ? widget.lockedRequest!['preferredTimeSlot'] as String? : null;
+
+  /// Get the location from locked request
+  String? get _lockedRequestLocation =>
+      _isLockedRequest ? widget.lockedRequest!['imamAddressText'] as String? : null;
 
   @override
   void dispose() {
@@ -151,13 +199,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               }
               return p.mode == SessionMode.online;
             }).toList();
-            
+
             if (widget.showSubscriptionsOnly) {
               filteredPlans = filteredPlans
                   .where((p) => p.type != PlanType.single)
                   .toList();
             }
-            
+
             if (filteredPlans.isEmpty) {
               return const EmptyState(
                 icon: Icons.payments_outlined,
@@ -170,7 +218,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 _buildLockedSessionDetailsCard(),
-                if (widget.sessionDetails != null) const SizedBox(height: 14),
+                if (widget.sessionDetails != null || _hasSelectedSlot) 
+                  const SizedBox(height: 14),
                 ...filteredPlans.map(_buildPlanCard),
                 if (selectedPlan != null) ...[
                   const SizedBox(height: 14),
@@ -197,56 +246,132 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     );
   }
 
+  // ✅ UPDATED: Better button logic with helpful message
   Widget _buildPaymentButton(PricingResult pricing) {
     final isFreeSession = pricing.finalPrice <= 0.01;
-    final canPay = !_isProcessingPayment && (!isFreeSession || _hasSelectedSlot);
+    
+    // ✅ For free sessions from payment notification (requestId exists), don't require slot
+    final requiresSlot = isFreeSession && widget.requestId == null;
+    final canPay = !_isProcessingPayment && (!requiresSlot || _hasSelectedSlot);
 
-    return ElevatedButton.icon(
-      onPressed: canPay ? () => _proceedToPayment(context, ref) : null,
-      icon: _isProcessingPayment
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
+    // ✅ Show helpful message if slot selection is required but missing
+    if (requiresSlot && !_hasSelectedSlot) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'يرجى العودة لصفحة المحفّظ واختيار موعد الجلسة أولاً',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('العودة لاختيار الموعد'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(color: Colors.orange.shade300),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Original button
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton.icon(
+        onPressed: canPay ? () => _proceedToPayment(context, ref) : null,
+        icon: _isProcessingPayment
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Icon(
+                isFreeSession ? Icons.check_circle : Icons.payment,
                 color: Colors.white,
               ),
-            )
-          : Icon(
-              isFreeSession ? Icons.check_circle : Icons.payment,
-              color: Colors.white,
-            ),
-      label: Text(
-        isFreeSession
-            ? '🎉 تأكيد الجلسة المجانية'
-            : '${pricing.finalPrice.toStringAsFixed(0)} ${ArabicLabels.egp} - ${ArabicLabels.payNow}',
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
+        label: Text(
+          _isProcessingPayment
+              ? 'جاري المعالجة...'
+              : isFreeSession
+                  ? '🎉 تأكيد الجلسة المجانية'
+                  : '${pricing.finalPrice.toStringAsFixed(0)} ${ArabicLabels.egp} - ${ArabicLabels.payNow}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
         ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isFreeSession ? Colors.green : AppTheme.accentGreen,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isFreeSession ? Colors.green : AppTheme.accentGreen,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: isFreeSession ? 4 : 2,
+          disabledBackgroundColor: Colors.grey.shade300,
+          disabledForegroundColor: Colors.grey.shade600,
         ),
-        elevation: isFreeSession ? 4 : 2,
       ),
     );
   }
 
   Widget _buildLockedSessionDetailsCard() {
-    if (widget.sessionDetails == null) {
+    // Check for lockedRequest first (new parameter from notification)
+    Map<String, dynamic>? details;
+
+    if (_isLockedRequest) {
+      details = widget.lockedRequest;
+    } else if (widget.sessionDetails != null) {
+      details = widget.sessionDetails;
+    } else if (_hasSelectedSlot) {
+      // ✅ NEW: Show preselected slot details
+      details = {
+        'sessionType': _lockedSessionType,
+        'slotDate': _lockedDate != null ? Timestamp.fromDate(_lockedDate!) : null,
+        'preferredTimeSlot': _lockedTimeSlot,
+        'location': widget.location ?? widget.mohaffezAddress,
+      };
+    }
+
+    if (details == null) {
       return const SizedBox.shrink();
     }
 
-    final details = widget.sessionDetails!;
     final sessionType = details['sessionType'] as String?;
     final slotDate = details['slotDate'] as Timestamp?;
-    final timeSlot = details['timeSlot'] as String?;
-    final location = details['location'] as String?;
+    final timeSlot = details['timeSlot'] as String? ?? 
+                     details['preferredTimeSlot'] as String?;
+    final location = details['location'] as String? ?? 
+                     details['imamAddressText'] as String?;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -264,7 +389,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'تفاصيل الجلسة مؤكدة من المحفظ',
+                  _isLockedRequest 
+                      ? 'تفاصيل الجلسة مؤكدة من المحفظ'
+                      : 'تفاصيل الجلسة المختارة',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -299,9 +426,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'لا يمكن تغيير هذه التفاصيل. الباقات المعروضة تطابق نوع الجلسة المختار.',
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                    _isLockedRequest
+                        ? 'لا يمكن تغيير هذه التفاصيل. الباقات المعروضة تطابق نوع الجلسة المختار.'
+                        : 'تم تحديد موعد الجلسة. الباقات المعروضة تطابق نوع الجلسة المختار.',
+                    style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
                   ),
                 ),
               ],
@@ -340,7 +468,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     final promoError = promoState.hasError ? promoState.error.toString() : null;
     final promoCodeValid = _appliedPromoCode != null;
     final discount = _appliedPromoCode?.discount ?? 0;
-    
+
     final pricing = _resolvePricing();
     final isFreeSession = pricing.finalPrice <= 0.01;
 
@@ -407,7 +535,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               ),
             ),
           ],
-          
+
           TextField(
             controller: _promoCodeController,
             onChanged: (_) {
@@ -458,14 +586,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               backgroundColor: promoCodeValid ? Colors.green : null,
             ),
             child: Text(
-              isValidatingPromo 
-                  ? 'جاري التحقق...' 
-                  : promoCodeValid 
-                      ? 'تم التطبيق ✓' 
+              isValidatingPromo
+                  ? 'جاري التحقق...'
+                  : promoCodeValid
+                      ? 'تم التطبيق ✓'
                       : ArabicLabels.apply,
             ),
           ),
-          
+
           if (promoError != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -482,7 +610,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 ],
               ),
             ),
-          
+
           if (promoCodeValid && discount > 0 && !isFreeSession)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -530,11 +658,11 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   Widget _buildPriceSummary() {
     final pricing = _resolvePricing();
     final isFreeSession = pricing.finalPrice <= 0.01;
-    
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isFreeSession 
+        color: isFreeSession
             ? Colors.green.withOpacity(0.1)
             : AppTheme.primaryAmber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
@@ -554,8 +682,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 Text(
                   '${pricing.originalPrice.toStringAsFixed(2)} ${ArabicLabels.currency}',
                   style: TextStyle(
-                    decoration: pricing.discount > 0 
-                        ? TextDecoration.lineThrough 
+                    decoration: pricing.discount > 0
+                        ? TextDecoration.lineThrough
                         : null,
                     color: Colors.grey,
                   ),
@@ -691,9 +819,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     await _handleRegularPayment(context, ref, user, pricing);
   }
 
-  // ============================================
-  // ✅ FIXED: Use Cloud Function via bookingFlowProvider
-  // ============================================
+  // ✅ Use Cloud Function via bookingFlowProvider
   Future<void> _handleFreeSession(
     BuildContext context,
     WidgetRef ref,
@@ -716,12 +842,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       // Parse slot details
       final slotDate = _lockedDate!;
       final timeSlotParts = _lockedTimeSlot.split('-');
-      
+
       final startParts = timeSlotParts.first.split(':');
-      final endParts = timeSlotParts.length > 1 
-          ? timeSlotParts.last.split(':') 
+      final endParts = timeSlotParts.length > 1
+          ? timeSlotParts.last.split(':')
           : startParts;
-      
+
       final slotStart = DateTime(
         slotDate.year,
         slotDate.month,
@@ -729,7 +855,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         int.tryParse(startParts[0]) ?? 0,
         int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0,
       );
-      
+
       final slotEnd = DateTime(
         slotDate.year,
         slotDate.month,
@@ -855,12 +981,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       }
 
       if (result.paymentUrl.isEmpty) {
-        // This case should not happen for paid sessions, but handle gracefully
-        if (_appliedPromoCode != null) {
-          await ref
-              .read(promoCodeProvider.notifier)
-              .applyPromoCode(_appliedPromoCode!.code);
-        }
+        // Free session - promo code will be handled by cloud function
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -884,11 +1005,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       );
 
       if (success == true) {
-        if (_appliedPromoCode != null) {
-          await ref
-              .read(promoCodeProvider.notifier)
-              .applyPromoCode(_appliedPromoCode!.code);
-        }
+        // Promo code usage count is handled by cloud function after payment
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

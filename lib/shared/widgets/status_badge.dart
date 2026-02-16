@@ -49,7 +49,7 @@ class StatusBadge extends StatelessWidget {
           textColor: Colors.blue.shade700,
           borderColor: Colors.blue.shade300,
         );
-      case 'awaiting_payment':
+      case 'awaitingpayment':
         return _StatusConfig(
           label: 'في انتظار الدفع',
           icon: Icons.payment,

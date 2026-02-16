@@ -548,15 +548,25 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
+                    // ✅ Get mohaffez profile data for location
+                    final profileValue = ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
+                    
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (ctx) => StudentPaymentScreen(
                           mohaffezId: widget.mohaffezId,
                           mohaffezName: _getMohaffezName(),
+                          // ✅ Pass preselected slot data
                           preselectedSessionType: selectedSessionType,
                           preselectedTimeSlot: selectedTimeSlot,
                           preselectedDate: selectedDate,
+                          // ✅ Pass location data
+                          location: profileValue?['addressText'] as String?,
+                          mohaffezAddress: profileValue?['addressText'] as String?,
+                          mohaffezLat: profileValue?['addressLat'] as double?,
+                          mohaffezLng: profileValue?['addressLng'] as double?,
+                          mohaffezPhone: profileValue?['phoneNumber'] as String?,
                         ),
                       ),
                     );
@@ -592,8 +602,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // Pricing card (clickable)
   Widget _buildPricingCard(PricingPlanModel plan) {
     final pricePerSession = plan.priceEGP / plan.sessionsCount;
+    
     return GestureDetector(
       onTap: () {
+        // ✅ Get mohaffez profile data for location
+        final profileValue = ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
+        
         // Navigate to payment screen when card is tapped
         Navigator.push(
           context,
@@ -601,9 +615,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             builder: (ctx) => StudentPaymentScreen(
               mohaffezId: widget.mohaffezId,
               mohaffezName: _getMohaffezName(),
+              // ✅ Pass preselected slot data
               preselectedSessionType: selectedSessionType,
               preselectedTimeSlot: selectedTimeSlot,
               preselectedDate: selectedDate,
+              // ✅ Pass location data
+              location: profileValue?['addressText'] as String?,
+              mohaffezAddress: profileValue?['addressText'] as String?,
+              mohaffezLat: profileValue?['addressLat'] as double?,
+              mohaffezLng: profileValue?['addressLng'] as double?,
+              mohaffezPhone: profileValue?['phoneNumber'] as String?,
             ),
           ),
         );
@@ -936,16 +957,24 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
 
     if (choice == 'buy_package' && mounted) {
-      // Navigate to payment screen to buy package, passing the selected slot
+      // ✅ Navigate to payment screen to buy package, passing the selected slot + location data
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (ctx) => StudentPaymentScreen(
             mohaffezId: widget.mohaffezId,
             mohaffezName: profile['name'] ?? '',
+            // ✅ Pass preselected slot data
             preselectedSessionType: selectedSessionType,
             preselectedTimeSlot: selectedTimeSlot,
             preselectedDate: selectedDate,
+            // ✅ Pass location data from profile
+            location: profile['addressText'] as String?,
+            mohaffezAddress: profile['addressText'] as String?,
+            mohaffezLat: profile['addressLat'] as double?,
+            mohaffezLng: profile['addressLng'] as double?,
+            mohaffezPhone: profile['phoneNumber'] as String?,
+            // Show only subscription packages
             showSubscriptionsOnly: true,
           ),
         ),

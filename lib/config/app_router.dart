@@ -33,8 +33,8 @@ import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
 import '../screens/student_payment_screen.dart';
 import '../screens/mohaffez_pricing_screen.dart';
-import '../screens/student_sessions_screen.dart'; // ADD THIS
-import '../screens/student_schedule_screen.dart'; // ADD THIS
+import '../screens/student_sessions_screen.dart';
+import '../screens/student_schedule_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -95,7 +95,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'student-home',
             builder: (context, state) => const StudentHome(),
           ),
-          // NEW: My Sessions Route
           GoRoute(
             path: '/my-sessions',
             name: 'my-sessions',
@@ -106,7 +105,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'my-schedule',
             builder: (context, state) => const StudentScheduleScreen(),
           ),
-
           GoRoute(
             path: '/nearby',
             name: 'nearby',
@@ -174,6 +172,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'privacy-settings',
             builder: (context, state) => const PrivacySettingsScreen(),
           ),
+          
+          // ============================================
+          // ✅ UPDATED: PAYMENT ROUTE WITH SLOT DATA
+          // ============================================
           GoRoute(
             path: '/payment/:mohaffezId',
             name: 'payment',
@@ -181,13 +183,60 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               final mohaffezId = state.pathParameters['mohaffezId']!;
               final mohaffezName = state.uri.queryParameters['name'] ?? '';
               final requestId = state.uri.queryParameters['requestId'];
+              
+              // ✅ NEW: Parse slot data from query parameters
+              final sessionType = state.uri.queryParameters['sessionType'];
+              final timeSlot = state.uri.queryParameters['timeSlot'];
+              final sessionDateStr = state.uri.queryParameters['sessionDate'];
+              final location = state.uri.queryParameters['location'];
+              final latStr = state.uri.queryParameters['lat'];
+              final lngStr = state.uri.queryParameters['lng'];
+              final phone = state.uri.queryParameters['phone'];
+              
+              // Parse timeSlot (format: "08:00-08:45")
+              Map<String, dynamic>? preselectedTimeSlot;
+              if (timeSlot != null && timeSlot.contains('-')) {
+                final parts = timeSlot.split('-');
+                if (parts.length == 2) {
+                  preselectedTimeSlot = {
+                    'startTime': parts[0].trim(),
+                    'endTime': parts[1].trim(),
+                  };
+                }
+              }
+              
+              // Parse session date
+              DateTime? preselectedDate;
+              if (sessionDateStr != null && sessionDateStr.isNotEmpty) {
+                preselectedDate = DateTime.tryParse(sessionDateStr);
+              }
+              
+              // Parse coordinates
+              double? lat;
+              double? lng;
+              if (latStr != null && latStr.isNotEmpty) {
+                lat = double.tryParse(latStr);
+              }
+              if (lngStr != null && lngStr.isNotEmpty) {
+                lng = double.tryParse(lngStr);
+              }
+              
               return StudentPaymentScreen(
                 mohaffezId: mohaffezId,
                 mohaffezName: mohaffezName,
                 requestId: requestId,
+                preselectedSessionType: sessionType,
+                preselectedTimeSlot: preselectedTimeSlot,
+                preselectedDate: preselectedDate,
+                location: location,
+                mohaffezAddress: location,
+                mohaffezLat: lat,
+                mohaffezLng: lng,
+                mohaffezPhone: phone,
               );
             },
           ),
+          
           // ============================================
           // MOHAFFEZ ROUTES
           // ============================================
@@ -239,7 +288,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'availability',
             builder: (context, state) => const AvailabilityManagementScreen(),
           ),
-          // ✅ MY STUDENTS ROUTE - FIXED
           GoRoute(
             path: '/my-students',
             name: 'my-students',
@@ -371,12 +419,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               // App Title
               Text(
                 'محفظ',
-                style: context.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold, color: AppThemeConstants.surfaceWhite),
+                style: context.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeConstants.surfaceWhite,
+                ),
               ),
               Spacing.vMd,
               Text(
                 'تطبيق تحفيظ القرآن الكريم',
-                style: context.textTheme.bodyLarge?.copyWith(color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7)),
+                style: context.textTheme.bodyLarge?.copyWith(
+                  color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
+                ),
               ),
               const SizedBox(height: AppThemeConstants.space2xl),
               // Loading Indicator
@@ -388,7 +441,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               // Status Text
               Text(
                 _getStatusText(authAsync),
-                style: context.textTheme.bodyMedium?.copyWith(color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7)),
+                style: context.textTheme.bodyMedium?.copyWith(
+                  color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -438,14 +493,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 // Error Title
                 Text(
                   'مشكلة في الاتصال',
-                  style: context.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: AppThemeConstants.surfaceWhite),
+                  style: context.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeConstants.surfaceWhite,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 Spacing.vMd,
                 // Error Message
                 Text(
                   errorMessage ?? 'حدث خطأ في الاتصال',
-                  style: context.textTheme.bodyLarge?.copyWith(color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7)),
+                  style: context.textTheme.bodyLarge?.copyWith(
+                    color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppThemeConstants.spaceXl + AppThemeConstants.spaceSm),
@@ -461,7 +521,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppThemeConstants.surfaceWhite,
                         foregroundColor: AppThemeConstants.primaryAmber,
-                        padding: const EdgeInsets.symmetric(horizontal: AppThemeConstants.spaceLg, vertical: AppThemeConstants.spaceMd),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppThemeConstants.spaceLg,
+                          vertical: AppThemeConstants.spaceMd,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
@@ -476,7 +539,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppThemeConstants.surfaceWhite,
                         side: const BorderSide(color: AppThemeConstants.surfaceWhite, width: 2),
-                        padding: const EdgeInsets.symmetric(horizontal: AppThemeConstants.spaceLg, vertical: AppThemeConstants.spaceMd),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppThemeConstants.spaceLg,
+                          vertical: AppThemeConstants.spaceMd,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
@@ -530,7 +596,10 @@ class ErrorScreen extends StatelessWidget {
                   color: AppThemeConstants.error,
                 ),
                 Spacing.vMd,
-                Text('حدث خطأ', style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'حدث خطأ',
+                  style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
                 Spacing.vSm,
                 Text(
                   error,
@@ -543,7 +612,10 @@ class ErrorScreen extends StatelessWidget {
                   icon: const Icon(Icons.refresh),
                   label: const Text('إعادة المحاولة'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: AppThemeConstants.spaceXl, vertical: AppThemeConstants.spaceMd),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppThemeConstants.spaceXl,
+                      vertical: AppThemeConstants.spaceMd,
+                    ),
                   ),
                 ),
               ],
@@ -554,6 +626,3 @@ class ErrorScreen extends StatelessWidget {
     );
   }
 }
-
-
-

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
@@ -211,14 +212,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
                       return _NotificationCard(
                         notification: notification,
-                        onTap: () {
+                        onTap: () async {
                           if (!notification.isRead) {
                             ref
                                 .read(notificationActionsProvider)
                                 .markAsRead(user.uid, notification.id!);
                           }
 
-                          _handleNotificationTap(
+                          await _handleNotificationTap(
                             context,
                             notification,
                           );
@@ -242,13 +243,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   /// Handle notification tap with proper navigation
-  void _handleNotificationTap(
-      BuildContext context, NotificationModel notification) {
+  Future<void> _handleNotificationTap(
+      BuildContext context, NotificationModel notification) async {
     final type = notification.type;
 
     switch (type) {
       case 'payment_required':
-      case 'paymentrequired':
+      case 'paymentrequired': {
         final Map<String, dynamic> data =
             notification.data ?? <String, dynamic>{};
 
@@ -261,16 +262,47 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         if (requestId != null &&
             mohaffezId != null &&
             mohaffezName.isNotEmpty) {
-          // Navigate to payment confirmation screen with request ID
-          context.push(
-            '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
-            extra: {
-              'requestId': requestId,
-              'mohaffezId': mohaffezId,
-              'mohaffezName': mohaffezName,
-              'sessionDetails': data,
-            },
-          );
+          // ✅ Fetch full request details to lock payment screen
+          try {
+            final requestSnapshot = await FirebaseFirestore.instance
+                .collection('sessionRequests')
+                .doc(requestId)
+                .get();
+            
+            if (requestSnapshot.exists && context.mounted) {
+              context.push(
+                '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
+                extra: {
+                  'requestId': requestId,
+                  'mohaffezId': mohaffezId,
+                  'mohaffezName': mohaffezName,
+                  'lockedRequest': requestSnapshot.data(),
+                },
+              );
+            } else if (context.mounted) {
+              context.push(
+                '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
+                extra: {
+                  'requestId': requestId,
+                  'mohaffezId': mohaffezId,
+                  'mohaffezName': mohaffezName,
+                  'sessionDetails': data,
+                },
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              context.push(
+                '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
+                extra: {
+                  'requestId': requestId,
+                  'mohaffezId': mohaffezId,
+                  'mohaffezName': mohaffezName,
+                  'sessionDetails': data,
+                },
+              );
+            }
+          }
         } else if (mohaffezId != null && mohaffezName.isNotEmpty) {
           // Fallback: generic payment screen
           final sessionType = data['sessionType'] as String?;
@@ -294,12 +326,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           );
         }
         break;
+      }
 
       case 'session_accepted':
+      case 'sessionaccepted':
+      case 'accepted':
         context.go('/home');
         break;
 
       case 'session_rejected':
+      case 'sessionrejected':
+      case 'rejected': {
         final reason = notification.body ?? 'لم يذكر سبب الرفض';
         showDialog(
           context: context,
@@ -315,6 +352,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
         );
         break;
+      }
 
       case 'session_request':
         // Navigate to pending requests

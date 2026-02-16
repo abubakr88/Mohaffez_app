@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 
 import '../providers/booking_provider.dart';
 import '../providers/auth_provider.dart';
@@ -488,10 +489,24 @@ class _RequestCard extends StatelessWidget {
     final slotDate = request['slotDate'] is Timestamp 
         ? (request['slotDate'] as Timestamp).toDate()
         : request['slotDate'] as DateTime?;
+    final rejectionReason = request['rejectionReason'] as String?;
 
     final (statusText, statusColor, statusIcon) = _getStatusInfo(status);
 
     final canCancel = ['pending', 'awaitingpayment', 'accepted'].contains(status);
+
+    // Show special card for rejected requests with rejection reason
+    if (status == 'rejected') {
+      return _RejectedRequestCard(
+        mohaffezName: mohaffezName,
+        sessionType: sessionType,
+        rejectionReason: rejectionReason,
+        requestDate: createdAt,
+        slotDate: slotDate,
+        preferredTimeSlot: preferredTimeSlot,
+        onDismiss: onCancel,
+      );
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -617,6 +632,54 @@ class _RequestCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+              
+              // ✅ Pay Now button (GREEN, prominent)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // Navigate to payment screen
+                    final requestId = request['id'] as String?;
+                    final mohaffezId = request['mohaffezId'] as String?;
+                    final mohaffezName = request['mohaffezName'] as String?;
+                    
+                    if (requestId != null && mohaffezId != null) {
+                      context.push(
+                        '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName ?? '')}&requestId=$requestId',
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.payment, size: 20),
+                  label: const Text(
+                    'ادفع الآن',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // Cancel button (text button, less prominent)
+              TextButton.icon(
+                onPressed: onCancel,
+                icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
+                label: const Text(
+                  'إلغاء الطلب',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
             ],
           ],
         ),
@@ -649,22 +712,225 @@ class _RequestCard extends StatelessWidget {
   }
 
   (String, Color, IconData) _getStatusInfo(String status) {
-    switch (status) {
+    // Normalize status: trim whitespace and convert to lowercase
+    final normalizedStatus = status.trim().toLowerCase();
+    
+    switch (normalizedStatus) {
       case 'pending':
         return ('قيد الانتظار', Colors.orange, Icons.pending);
       case 'awaitingpayment':
+      case 'awaitingpayment':
+      case 'awaiting payment':
         return ('في انتظار الدفع', Colors.blue, Icons.payment);
       case 'accepted':
+      case 'confirmed':
         return ('مقبول', Colors.green, Icons.check_circle);
       case 'rejected':
+      case 'declined':
         return ('مرفوض', Colors.red, Icons.cancel);
       case 'cancelled':
+      case 'canceled':
         return ('ملغي', Colors.grey, Icons.block);
       case 'completed':
+      case 'done':
         return ('مكتمل', Colors.purple, Icons.done_all);
+      case 'expired':
+        return ('منتهي', Colors.red.shade300, Icons.timer_off);
       default:
+        // Debug: Print the unrecognized status value
+        debugPrint('⚠️ Unknown status value: "$status"');
         return ('غير معروف', Colors.grey, Icons.help);
     }
+  }
+
+  String _getSessionTypeLabel(String type) {
+    switch (type) {
+      case 'home':
+        return 'في المنزل';
+      case 'mosque':
+        return 'في المسجد';
+      case 'online':
+        return 'أونلاين';
+      default:
+        return type;
+    }
+  }
+}
+
+// ============================================================================
+// REJECTED REQUEST CARD WIDGET
+// ============================================================================
+class _RejectedRequestCard extends StatelessWidget {
+  final String mohaffezName;
+  final String sessionType;
+  final String? rejectionReason;
+  final DateTime? requestDate;
+  final DateTime? slotDate;
+  final String preferredTimeSlot;
+  final VoidCallback onDismiss;
+
+  const _RejectedRequestCard({
+    required this.mohaffezName,
+    required this.sessionType,
+    required this.rejectionReason,
+    required this.requestDate,
+    required this.slotDate,
+    required this.preferredTimeSlot,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      color: Colors.red.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.red.shade300, width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cancel, size: 16, color: Colors.red),
+                      const SizedBox(width: 6),
+                      Text(
+                        'مرفوض',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: onDismiss,
+                  tooltip: 'حذف',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Mohaffez Name
+            Text(
+              mohaffezName,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // Session Details
+            Row(
+              children: [
+                _buildDetailChip(Icons.schedule, preferredTimeSlot),
+                const SizedBox(width: 8),
+                _buildDetailChip(Icons.location_on, _getSessionTypeLabel(sessionType)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Date Info
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                const SizedBox(width: 6),
+                Text(
+                  slotDate != null
+                      ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate!)}'
+                      : 'التاريخ غير محدد',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  requestDate != null
+                      ? 'طُلب ${DateFormat('dd/MM', 'ar').format(requestDate!)}'
+                      : '',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+            
+            // Rejection Reason
+            if (rejectionReason != null && rejectionReason!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange.shade900, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'السبب: $rejectionReason',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.grey.shade700),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade800,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _getSessionTypeLabel(String type) {

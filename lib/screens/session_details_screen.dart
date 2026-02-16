@@ -7,17 +7,26 @@ import '../models/quran_mistake_model.dart';
 
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
+import '../providers/session_provider_paginated.dart';
 import '../shared/widgets/interactive_quran_page.dart';
+import 'rate_session_screen.dart';
 
-class SessionDetailsScreen extends ConsumerWidget {
+class SessionDetailsScreen extends ConsumerStatefulWidget {
   final SessionModel session;
 
   const SessionDetailsScreen({super.key, required this.session});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SessionDetailsScreen> createState() => _SessionDetailsScreenState();
+}
+
+class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
+  @override
+  Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider).value;
     final isMohaffez = currentUser?.role == 'mohaffez';
+    final isStudent = currentUser?.role == 'student';
+    final session = widget.session;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -381,51 +390,325 @@ class SessionDetailsScreen extends ConsumerWidget {
           ],
         ),
 
-        // Action Buttons (for mohaffez only) - MOVED HERE
-        bottomNavigationBar: isMohaffez && session.status == 'accepted'
-            ? SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            // Navigate to completion screen
-                          },
-                          icon: const Icon(Icons.check_circle),
-                          label: const Text('إنهاء الجلسة'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(
-                              color: AppTheme.accentGreen,
-                              width: 2,
-                            ),
-                            foregroundColor: AppTheme.accentGreen,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            // Edit assignment
-                          },
-                          icon: const Icon(Icons.edit),
-                          label: const Text('تعديل الواجب'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: AppTheme.primaryAmber,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : null,
+        // Action Buttons
+        bottomNavigationBar: _buildBottomNavigationBar(
+          isMohaffez: isMohaffez,
+          isStudent: isStudent,
+          session: session,
+        ),
       ),
     );
+  }
+
+  // ==========================================================================
+  // BOTTOM NAVIGATION BAR BUILDER
+  // ==========================================================================
+  Widget? _buildBottomNavigationBar({
+    required bool isMohaffez,
+    required bool isStudent,
+    required SessionModel session,
+  }) {
+    // Mohaffez: Show complete session button
+    if (isMohaffez && session.status == 'accepted') {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    // Navigate to completion screen
+                  },
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('إنهاء الجلسة'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(
+                      color: AppTheme.accentGreen,
+                      width: 2,
+                    ),
+                    foregroundColor: AppTheme.accentGreen,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // Edit assignment
+                  },
+                  icon: const Icon(Icons.edit),
+                  label: const Text('تعديل الواجب'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: AppTheme.primaryAmber,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Student: Show cancel button for accepted sessions that haven't happened yet
+    if (isStudent && 
+        session.status == 'accepted' && 
+        session.sessionDate != null &&
+        session.sessionDate!.isAfter(DateTime.now())) {
+      final hoursUntil = session.sessionDate!.difference(DateTime.now()).inHours;
+      
+      // Calculate refund policy
+      String refundPolicy;
+      Color policyColor;
+      if (hoursUntil > 24) {
+        refundPolicy = '✅ استرداد كامل';
+        policyColor = Colors.green;
+      } else if (hoursUntil > 2) {
+        refundPolicy = '⚠️ استرداد 50%';
+        policyColor = Colors.orange;
+      } else {
+        refundPolicy = '❌ لا استرداد';
+        policyColor = Colors.red;
+      }
+      
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Refund policy warning
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              color: policyColor.withOpacity(0.1),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline, color: policyColor, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'سياسة الإلغاء: $refundPolicy',
+                    style: TextStyle(color: policyColor, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Cancel button
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: ElevatedButton.icon(
+                onPressed: () => _showCancellationDialog(session, refundPolicy),
+                icon: const Icon(Icons.cancel),
+                label: const Text('إلغاء الجلسة'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Student: Show rating button for completed sessions that haven't been rated
+    if (isStudent && 
+        session.status == 'completed' &&
+        (session.sessionRating == null || session.sessionRating == 0)) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: ElevatedButton.icon(
+            onPressed: () => _navigateToRating(session),
+            icon: const Icon(Icons.star, color: Colors.white),
+            label: const Text('قيّم الجلسة', style: TextStyle(fontSize: 16)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return null;
+  }
+
+  // ==========================================================================
+  // CANCELLATION DIALOG
+  // ==========================================================================
+  Future<void> _showCancellationDialog(SessionModel session, [String? precalculatedRefundPolicy]) async {
+    final hoursUntilSession = 
+        session.sessionDate!.difference(DateTime.now()).inHours;
+    
+    String refundPolicy;
+    Color policyColor;
+    
+    if (hoursUntilSession > 24) {
+      refundPolicy = '✅ استرداد كامل المبلغ';
+      policyColor = Colors.green;
+    } else if (hoursUntilSession > 2) {
+      refundPolicy = '⚠️ استرداد 50% من المبلغ';
+      policyColor = Colors.orange;
+    } else {
+      refundPolicy = '❌ لا يمكن الاسترداد';
+      policyColor = Colors.red;
+    }
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning, color: Colors.red),
+              SizedBox(width: 8),
+              Text('تأكيد الإلغاء'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'هل تريد إلغاء هذه الجلسة؟',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: policyColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: policyColor),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: policyColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        refundPolicy,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: policyColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('لا'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('نعم، إلغاء الجلسة'),
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    if (confirmed != true || !mounted) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('جاري إلغاء الجلسة...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    try {
+      final sessionId = session.id;
+      if (sessionId == null) {
+        throw Exception('معرف الجلسة غير متاح');
+      }
+      
+      await ref.read(sessionActionsProvider.notifier)
+        .cancelSession(sessionId);
+      
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        Navigator.pop(context); // Close details screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إلغاء الجلسة بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // ==========================================================================
+  // NAVIGATE TO RATING
+  // ==========================================================================
+  Future<void> _navigateToRating(SessionModel session) async {
+    final sessionId = session.id;
+    if (sessionId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('معرف الجلسة غير متاح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RateSessionScreen(
+          sessionId: sessionId,
+          mohaffezName: session.mohaffezName,
+        ),
+      ),
+    );
+    
+    if (result == true && mounted) {
+      // Refresh the current session details
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('شكراً لتقييمك!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   String _getStatusLabel(String status) {

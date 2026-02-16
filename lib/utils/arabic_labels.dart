@@ -411,7 +411,7 @@ class ArabicLabels {
     switch (status.toLowerCase()) {
       case 'pending':
         return statusPending;
-      case 'awaiting_payment':
+      case 'awaitingpayment':
       case 'awaitingpayment':
       case 'awaiting payment':
         return statusAwaitingPayment;

@@ -97,11 +97,12 @@ class SessionRepository {
   // ============================================================================
 
   /// Watch first page of pending requests (real-time)
+  /// ✅ FIXED: Now includes both 'pending' and 'awaitingpayment' statuses
   Stream<List<SessionRequestModel>> watchPendingRequestsFirstPage(String mohaffezId) {
     return _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending')
+        .where('status', whereIn: ['pending', 'awaitingpayment'])
         .orderBy('createdAt', descending: true)
         .limit(pageSize)
         .snapshots()
@@ -318,11 +319,12 @@ class SessionRepository {
   // ============================================================================
 
   /// Get all pending requests for a mohaffez (non-paginated)
+  /// ✅ FIXED: Now includes both 'pending' and 'awaitingpayment' statuses
   Future<List<SessionRequestModel>> getPendingRequests(String mohaffezId) async {
     final snapshot = await _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending')
+        .where('status', whereIn: ['pending', 'awaitingpayment'])
         .orderBy('createdAt', descending: true)
         .get();
 
@@ -335,11 +337,12 @@ class SessionRepository {
   }
 
   /// Watch pending requests (real-time, all)
+  /// ✅ FIXED: Now includes both 'pending' and 'awaitingpayment' statuses
   Stream<List<SessionRequestModel>> watchPendingRequests(String mohaffezId) {
     return _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending')
+        .where('status', whereIn: ['pending', 'awaitingpayment'])
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs

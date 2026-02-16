@@ -46,11 +46,7 @@ class PromoCodeNotifier extends StateNotifier<AsyncValue<PromoCodeModel?>> {
     state = const AsyncValue.data(null);
   }
 
-  Future<void> applyPromoCode(String code) async {
-    await _repository.incrementUsageCount(code);
-  }
-
-  Future<void> incrementPromoCodeUsage(String code) async {
-    await _repository.incrementUsageCount(code);
-  }
+  // NOTE: Promo code usage count is now atomically incremented by cloud functions
+  // after successful payment. Client-side increment has been removed to prevent
+  // double-counting.
 }

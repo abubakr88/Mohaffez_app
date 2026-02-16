@@ -29,14 +29,7 @@ class PromoCodeRepository {
     }
   }
 
-  /// زيادة عداد الاستخدام
-  Future<void> incrementUsageCount(String code) async {
-    try {
-      await _firestore.collection('promocodes').doc(code.toUpperCase()).update({
-        'usedCount': FieldValue.increment(1),
-      });
-    } catch (e) {
-      print('❌ Error incrementing usage count: $e');
-    }
-  }
+  // NOTE: Usage count increment has been moved to cloud functions
+  // to prevent double-counting. The cloud function handles this
+  // atomically within a Firestore transaction after successful payment.
 }

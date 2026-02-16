@@ -58,7 +58,7 @@ final pendingRequestsFirstPageProvider =
     return FirebaseFirestore.instance
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', whereIn: ['pending', 'awaiting_payment'])
+        .where('status', whereIn: ['pending', 'awaitingpayment'])
         .orderBy('createdAt', descending: true)
         .limit(20)
         .snapshots()
@@ -676,7 +676,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
         // Update request to awaiting_payment status
         await _firestore.collection('sessionRequests').doc(requestId).update({
-          'status': 'awaiting_payment',
+          'status': 'awaitingpayment',
           'acceptedAt': FieldValue.serverTimestamp(),
           'paymentDeadline': paymentDeadline,
           'reminderSent': false,
@@ -1078,7 +1078,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       });
       await _releaseSlotLockById(requestData['slotLockId'] as String?);
 
-      if (status == 'awaiting_payment' || status == 'accepted') {
+      if (status == 'awaitingpayment' || status == 'accepted') {
         await restoreAvailabilitySlot(
           mohaffezId: requestData['mohaffezId'] as String,
           slotDate: requestData['slotDate'] as Timestamp,
