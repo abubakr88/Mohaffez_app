@@ -146,6 +146,7 @@ class SessionRepository {
     return _firestore
         .collection('sessionRequests')
         .where('studentId', isEqualTo: studentId)
+        .where('status', whereIn: ['pending', 'awaiting_payment', 'rejected']) // ✅ Exclude 'accepted'
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs

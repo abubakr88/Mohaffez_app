@@ -12,6 +12,7 @@ import '../providers/auth_provider.dart';
 import '../repositories/user_repository.dart';
 import '../utils/arabic_labels.dart';
 import 'location_settings_screen.dart';
+import 'mohaffez_wallet_settings_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -509,32 +510,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       // ✅ FIXED: Mohaffez-only sections - Now Clickable
                       if (isMohaffez) ...[
                         _ProfileSection(
-                          title: 'الشهادات والمؤهلات',
+                          title: 'إدارة الحساب',
                           icon: Icons.verified_user,
                           color: Colors.purple,
                           child: Column(
                             children: [
                               _ManagementTile(
                                 icon: Icons.verified_user,
-                                title: 'الشهادات',
-                                subtitle: 'إدارة شهاداتك',
+                                title: 'الاعتمادات',
+                                subtitle: 'شهاداتك وتخصصاتك',
                                 color: Colors.purple,
-                                onTap: () =>
-                                    context.push('/credentials'), // ✅ FIXED
+                                onTap: () => context.push('/credentials'),
                               ),
                               const SizedBox(height: 12),
                               _ManagementTile(
                                 icon: Icons.schedule,
-                                title: 'إدارة الأوقات',
-                                subtitle: 'تفعيل الأوقات المتاحة',
+                                title: 'إدارة المواعيد',
+                                subtitle: 'أوقات الجلسات المتاحة',
                                 color: Colors.blue,
-                                onTap: () =>
-                                    context.push('/availability'), // ✅ FIXED
+                                onTap: () => context.push('/availability'),
+                              ),
+                              const SizedBox(height: 12),   // ← ADD THIS
+                              _ManagementTile(               // ← ADD THIS TILE
+                                icon: Icons.account_balance_wallet,
+                                title: 'محافظ الدفع المباشر',
+                                subtitle: 'InstaPay، فودافون كاش، أورانج موني، ...',
+                                color: Colors.green,
+                                onTap: () => context.push('/wallet-settings'),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
                       ],
 
                       // ✅ FIXED: Settings - Now Clickable

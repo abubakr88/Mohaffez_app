@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../repositories/session_repository.dart';
 import '../models/quran_mistake_model.dart';
+import '../models/mohaffez_student_summary.dart';
 
 // ============================================================================
 // FILTER ENUM AND PROVIDER
@@ -140,8 +141,7 @@ final upcomingSessionsProvider =
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', isEqualTo: 'accepted') // ✅ ONLY ACCEPTED
         .where('isPaid', isEqualTo: true)
-        .where('sessionDate',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('sessionDate', isGreaterThanOrEqualTo: startOfDay) // ✅ Include today
         .orderBy('sessionDate', descending: false)
         .limit(100)
         .snapshots()
@@ -1423,68 +1423,68 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
 // MOHAFFEZ STUDENTS PROVIDERS
 // ============================================================================
 /// Provider for mohaffez students list with their last session
-final mohaffezStudentsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
-        (ref, mohaffezId) {
-  final firestore = FirebaseFirestore.instance;
-  return firestore
+final mohaffezStudentsProvider = FutureProvider.autoDispose
+    .family<List<MohaffezStudentSummary>, String>((ref, mohaffezId) async {
+  if (mohaffezId.isEmpty) return [];
+
+  // Single query — no orderBy to avoid composite index requirement
+  final snapshot = await FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('mohaffezId', isEqualTo: mohaffezId)
-      .orderBy('sessionDate', descending: true)
-      .snapshots()
-      .map((snapshot) {
-    // One aggregated entry per student
-    final Map<String, Map<String, dynamic>> students = {};
+      .limit(300)                              // FIX: pagination cap
+      .get()
+      .timeout(const Duration(seconds: 15));
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      final String? studentId = data['studentId'] as String?;
-      if (studentId == null) continue;
+  // Client-side sort: descending by sessionDate (over ≤300 docs = fast)
+  final docs = snapshot.docs
+    ..sort((a, b) {
+      final aDate =
+          (a.data()['sessionDate'] as Timestamp?)?.toDate() ?? DateTime(0);
+      final bDate =
+          (b.data()['sessionDate'] as Timestamp?)?.toDate() ?? DateTime(0);
+      return bDate.compareTo(aDate);
+    });
 
-      // We process sessions in descending order, so the first one we see
-      // per student is the latest (and we keep it).
-      if (!students.containsKey(studentId)) {
-        final DateTime? lastSessionDate =
-            (data['sessionDate'] as Timestamp?)?.toDate();
+  final Map<String, MohaffezStudentSummary> students = {};
+  final Map<String, int> counts = {};
 
-        students[studentId] = {
-          // Identity
-          'studentId': studentId,
-          'studentName': data['studentName'] as String? ?? '',
-          // Latest session info
-          'lastSessionDate': lastSessionDate,
-          'status': data['status'] as String? ?? 'accepted',
-          // Current assignments from latest session
-          'hifzAssignment': data['hifzAssignment'] as String? ?? '',
-          'murajaAssignment': data['murajaAssignment'] as String? ?? '',
-          // Latest session rating
-          'sessionRating': data['sessionRating'] as int? ?? 0,
-          // Performance evaluation saved on the session
-          'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
-          'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
-          'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
-          'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
-          'performanceNotes': data['performanceNotes'] as String?,
-        };
-      }
+  for (final doc in docs) {
+    final data = doc.data();
+    final studentId = data['studentId'] as String?;
+    if (studentId == null) continue;
+
+    // FIX N+1: tally count in same loop, no extra Firestore call per student
+    counts[studentId] = (counts[studentId] ?? 0) + 1;
+
+    // Keep only the FIRST (=latest) session per student
+    if (!students.containsKey(studentId)) {
+      students[studentId] = MohaffezStudentSummary(
+        studentId: studentId,
+        studentName: data['studentName'] as String? ?? '',
+        lastSessionDate:
+            (data['sessionDate'] as Timestamp?)?.toDate(),
+        lastSessionStatus: data['status'] as String? ?? 'accepted',
+        hifzAssignment: data['hifzAssignment'] as String? ?? '',
+        murajaAssignment: data['murajaAssignment'] as String? ?? '',
+        sessionRating: data['sessionRating'] as int? ?? 0,
+        sessionCount: 0, // filled below
+        previousHifzCompleted:
+            data['previousHifzCompleted'] as bool?,
+        previousHifzRating:
+            data['previousHifzRating'] as int? ?? 0,
+        previousMurajaCompleted:
+            data['previousMurajaCompleted'] as bool?,
+        previousMurajaRating:
+            data['previousMurajaRating'] as int? ?? 0,
+        performanceNotes: data['performanceNotes'] as String?,
+      );
     }
+  }
 
-    return students.values.toList();
-  });
+  return students.values
+      .map((s) => s.copyWith(sessionCount: counts[s.studentId] ?? 1))
+      .toList();
 });
-
-/// Provider for student session count with specific mohaffez
-final studentSessionCountProvider =
-    FutureProvider.family<int, Map<String, String>>(
-  (ref, params) async {
-    final firestore = FirebaseFirestore.instance;
-    final repository = SessionRepository(firestore);
-    return repository.getStudentSessionCountWithMohaffez(
-      params['mohaffezId']!,
-      params['studentId']!,
-    );
-  },
-);
 
 /// Repository provider
 final sessionRepositoryProvider = Provider((ref) {

@@ -41,6 +41,7 @@ class RoleGuard implements RouteGuard {
     '/upcoming-sessions',
     '/credentials',
     '/availability',
+    '/wallet-settings',
   ];
 
   // Student-only routes.

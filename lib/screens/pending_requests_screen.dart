@@ -13,6 +13,7 @@ import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../utils/arabic_labels.dart';
+import 'direct_payment_confirmations_screen.dart';
 
 class PendingRequestsScreen extends ConsumerStatefulWidget {
   const PendingRequestsScreen({super.key});
@@ -163,7 +164,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                         stream: FirebaseFirestore.instance
                             .collection('sessionRequests')
                             .where('mohaffezId', isEqualTo: mohaffezId)
-                            .where('status', whereIn: ['pending', 'awaitingpayment'])
+                            .where('status', whereIn: ['pending', 'awaitingpayment', 'awaiting_direct_payment_confirmation'])
                             .snapshots(),
                         builder: (context, snapshot) {
                           final count = snapshot.data?.docs.length ?? 0;
@@ -236,7 +237,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       stream: FirebaseFirestore.instance
           .collection('sessionRequests')
           .where('mohaffezId', isEqualTo: mohaffezId)
-          .where('status', whereIn: ['pending', 'awaitingpayment'])
+          .where('status', whereIn: ['pending', 'awaitingpayment', 'awaiting_direct_payment_confirmation'])
           .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
@@ -276,7 +277,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
             if (_selectedFilter == 'pending') {
               return status == 'pending';
             } else if (_selectedFilter == 'awaitingpayment') {
-              return status == 'awaitingpayment' || status == 'awaitingpayment';
+              return status == 'awaitingpayment' ||
+                  status == 'awaiting_direct_payment_confirmation';
             }
             return true;
           }).toList();
@@ -338,6 +340,25 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
   Future<void> _handleAccept(String requestId, Map<String, dynamic> data) async {
     final status = (data['status'] as String? ?? '').toLowerCase();
     
+    if (status == 'awaiting_direct_payment_confirmation') {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('في انتظار تأكيد الدفع المباشر'),
+          content: const Text(
+            'هذا الطلب بانتظار تأكيد الدفع المباشر من شاشة "تأكيد المدفوعات".',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(ArabicLabels.ok),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     // Check if payment is required
     if (status == 'awaitingpayment' || status == 'awaitingpayment') {
       // Show dialog that payment is pending
@@ -637,6 +658,49 @@ class PendingRequestCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+
+            if (status == 'awaiting_direct_payment_confirmation') ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.shade300),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.payments_outlined, color: Colors.blue, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'الطالب أرسل إشعار دفع مباشر — اذهب لـ "تأكيد المدفوعات" لقبوله أو رفضه',
+                      style: TextStyle(fontSize: 13, color: Colors.blue),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DirectPaymentConfirmationsScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+                  label: const Text('تأكيد الدفع المباشر',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade600,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
 
             // Session details
             _buildDetailRow(

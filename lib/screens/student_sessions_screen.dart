@@ -54,15 +54,17 @@ class _StudentSessionsScreenState extends ConsumerState<StudentSessionsScreen> {
                 // Apply additional filters
                 if (selectedFilter == 'upcoming') {
                   final now = DateTime.now();
+                  final todayStart = DateTime(now.year, now.month, now.day);
                   filteredSessions = filteredSessions.where((s) {
                     final date = s['sessionDate'] as DateTime?;
-                    return date != null && date.isAfter(now);
+                    return date != null && !date.isBefore(todayStart);
                   }).toList();
                 } else if (selectedFilter == 'completed') {
                   final now = DateTime.now();
+                  final todayStart = DateTime(now.year, now.month, now.day);
                   filteredSessions = filteredSessions.where((s) {
                     final date = s['sessionDate'] as DateTime?;
-                    return date != null && date.isBefore(now);
+                    return date != null && date.isBefore(todayStart);
                   }).toList();
                 }
 
@@ -285,7 +287,9 @@ class _SessionCard extends StatelessWidget {
     final hifz = (session['hifzAssignment'] as String?) ?? '';
     final muraja = (session['murajaAssignment'] as String?) ?? '';
 
-    final isUpcoming = sessionDate != null && sessionDate.isAfter(DateTime.now());
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final isUpcoming = sessionDate != null && !sessionDate.isBefore(todayStart);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),

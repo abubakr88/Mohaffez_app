@@ -1,94 +1,298 @@
 "use strict";
+// functions/src/bookings/confirmFreeSession.ts
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.confirmFreeSession = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
 exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
-    console.log('✅ confirmFreeSession – UPDATED VERSION_15_2_2025'); // <-- add this line
+    functions.logger.info("🎫 confirmFreeSession v6.0 (17/2/2026) - Enhanced Logging");
     // 1. Verify authentication
     if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'المستخدم غير مصادق عليه');
+        throw new functions.https.HttpsError("unauthenticated", "المستخدم غير مصادق عليه");
     }
     const studentId = context.auth.uid;
     // 2. Validate input
-    const { mohaffezId, mohaffezName, studentName, sessionType, preferredTimeSlot, slotDate, slotStart, slotEnd, imamAddressText, imamAddressLat, imamAddressLng, mohaffezPhone, promoCode, } = data;
-    if (!mohaffezId || !mohaffezName || !studentName || !sessionType ||
-        !preferredTimeSlot || !slotDate || !slotStart || !slotEnd || !promoCode) {
-        throw new functions.https.HttpsError('invalid-argument', 'بيانات غير مكتملة');
+    const { mohaffezId, mohaffezName, studentName, sessionType, preferredTimeSlot, slotDate, slotStart, slotEnd, imamAddressText, imamAddressLat, imamAddressLng, mohaffezPhone, promoCode, requestId, paymentId, } = data;
+    // ✅ LOG INPUT PARAMETERS
+    functions.logger.info("📥 Input parameters received", {
+        hasRequestId: !!requestId,
+        requestId: requestId || "NOT_PROVIDED",
+        hasPaymentId: !!paymentId,
+        paymentId: paymentId || null,
+        studentId,
+        mohaffezId,
+        promoCode,
+    });
+    if (!mohaffezId ||
+        !mohaffezName ||
+        !studentName ||
+        !sessionType ||
+        !preferredTimeSlot ||
+        !slotDate ||
+        !slotStart ||
+        !slotEnd ||
+        !promoCode) {
+        throw new functions.https.HttpsError("invalid-argument", "بيانات غير مكتملة");
     }
-    // 3. Verify promo code
+    // 3. ✅ QUICK PRE-CHECK (non-blocking, advisory only)
+    if (requestId) {
+        const quickCheck = await admin_1.db
+            .collection("hafizSessions")
+            .where("requestId", "==", requestId)
+            .limit(1)
+            .get();
+        if (!quickCheck.empty) {
+            const session = quickCheck.docs[0];
+            functions.logger.warn("⚠️ Session already exists (quick pre-check)", {
+                requestId,
+                sessionId: session.id,
+            });
+            return {
+                success: true,
+                sessionId: session.id,
+                requestId: requestId,
+                message: "الجلسة موجودة بالفعل",
+            };
+        }
+    }
+    // 4. Verify promo code
     const promoSnapshot = await admin_1.db
-        .collection('promocodes')
-        .where('code', '==', promoCode)
+        .collection("promoCodes")
+        .where("code", "==", promoCode)
         .limit(1)
         .get();
     if (promoSnapshot.empty) {
-        throw new functions.https.HttpsError('not-found', 'كود الخصم غير صحيح');
+        throw new functions.https.HttpsError("not-found", "كود الخصم غير موجود");
     }
     const promoDoc = promoSnapshot.docs[0];
     const promoData = promoDoc.data();
     // Validate promo code
     if (!promoData.isActive) {
-        throw new functions.https.HttpsError('failed-precondition', 'كود الخصم غير نشط');
+        throw new functions.https.HttpsError("failed-precondition", "كود الخصم غير نشط");
     }
     if (promoData.discountPercent !== 100) {
-        throw new functions.https.HttpsError('failed-precondition', 'هذا الكود ليس للجلسات المجانية');
+        throw new functions.https.HttpsError("failed-precondition", "كود الخصم يجب أن يكون 100%");
     }
     if (promoData.expiryDate && promoData.expiryDate.toDate() < new Date()) {
-        throw new functions.https.HttpsError('failed-precondition', 'كود الخصم منتهي الصلاحية');
+        throw new functions.https.HttpsError("failed-precondition", "كود الخصم منتهي الصلاحية");
     }
     if (promoData.usageLimit && promoData.usedCount >= promoData.usageLimit) {
-        throw new functions.https.HttpsError('failed-precondition', 'تم استخدام هذا الكود بالكامل');
+        throw new functions.https.HttpsError("failed-precondition", "تم استخدام كود الخصم بالكامل");
     }
-    // 4. Use transaction to ensure atomicity
+    functions.logger.info("✅ Promo code validated", {
+        promoCode,
+        discountPercent: promoData.discountPercent,
+        usedCount: promoData.usedCount,
+        usageLimit: promoData.usageLimit,
+    });
+    // 5. ✅ CRITICAL FIX: Move ALL logic inside transaction
     return admin_1.db.runTransaction(async (transaction) => {
-        // ---- READ FIRST: availability document ----
-        const slotDateObj = new Date(slotDate);
-        const dayOfWeek = slotDateObj.getDay() === 0 ? 7 : slotDateObj.getDay();
-        const availabilityQuery = admin_1.db
-            .collection('users')
-            .doc(mohaffezId)
-            .collection('availability')
-            .where('dayOfWeek', '==', dayOfWeek)
-            .limit(1);
-        const availabilitySnapshot = await transaction.get(availabilityQuery);
-        const availabilityDoc = availabilitySnapshot.docs[0];
-        // ---- NOW PERFORM ALL WRITES ----
-        const requestRef = admin_1.db.collection('sessionRequests').doc();
-        const sessionRef = admin_1.db.collection('hafizSessions').doc();
+        var _a;
+        functions.logger.info("🔄 Transaction started");
         const slotDateTimestamp = admin.firestore.Timestamp.fromDate(new Date(slotDate));
         const slotStartTimestamp = admin.firestore.Timestamp.fromDate(new Date(slotStart));
         const slotEndTimestamp = admin.firestore.Timestamp.fromDate(new Date(slotEnd));
-        // Create session request
-        transaction.set(requestRef, {
-            studentId,
-            mohaffezId,
-            studentName,
-            mohaffezName,
-            sessionType,
-            preferredTimeSlot,
-            slotDate: slotDateTimestamp,
-            slotStart: slotStartTimestamp,
-            slotEnd: slotEndTimestamp,
-            imamAddressText: imamAddressText || null,
-            imamAddressLat: imamAddressLat || null,
-            imamAddressLng: imamAddressLng || null,
-            mohaffezPhone: mohaffezPhone || null,
-            status: 'accepted',
+        // ============================================
+        // ✅ STEP 1: IDEMPOTENCY CHECK INSIDE TRANSACTION
+        // ============================================
+        // Check 1: By requestId
+        if (requestId) {
+            const existingByRequestQuery = admin_1.db
+                .collection("hafizSessions")
+                .where("requestId", "==", requestId)
+                .limit(1);
+            const existingByRequest = await transaction.get(existingByRequestQuery);
+            if (!existingByRequest.empty) {
+                const session = existingByRequest.docs[0];
+                functions.logger.warn("⚠️ Session already exists (requestId check inside transaction)", {
+                    requestId,
+                    sessionId: session.id,
+                });
+                throw new functions.https.HttpsError("already-exists", JSON.stringify({
+                    success: true,
+                    sessionId: session.id,
+                    requestId: requestId,
+                    message: "الجلسة موجودة بالفعل",
+                }));
+            }
+        }
+        // Check 2: By paymentId
+        if (paymentId) {
+            const existingByPaymentQuery = admin_1.db
+                .collection("hafizSessions")
+                .where("paymentId", "==", paymentId)
+                .limit(1);
+            const existingByPayment = await transaction.get(existingByPaymentQuery);
+            if (!existingByPayment.empty) {
+                const session = existingByPayment.docs[0];
+                const sessionData = session.data();
+                functions.logger.warn("⚠️ Session already exists (paymentId check)", {
+                    paymentId,
+                    sessionId: session.id,
+                });
+                throw new functions.https.HttpsError("already-exists", JSON.stringify({
+                    success: true,
+                    sessionId: session.id,
+                    requestId: sessionData.requestId || null,
+                    message: "الجلسة موجودة بالفعل",
+                }));
+            }
+        }
+        // ============================================
+        // ✅ STEP 2: CHECK FOR EXISTING SESSION ON THIS SLOT
+        // ============================================
+        const existingSessionOnSlotQuery = admin_1.db
+            .collection("hafizSessions")
+            .where("mohaffezId", "==", mohaffezId)
+            .where("sessionDate", "==", slotDateTimestamp)
+            .where("preferredTimeSlot", "==", preferredTimeSlot)
+            .where("status", "in", ["accepted", "pending"]);
+        const existingSessionsOnSlot = await transaction.get(existingSessionOnSlotQuery);
+        if (!existingSessionsOnSlot.empty) {
+            functions.logger.error("❌ Slot already booked", {
+                mohaffezId,
+                slotDate,
+                preferredTimeSlot,
+                existingSessionId: existingSessionsOnSlot.docs[0].id,
+            });
+            throw new functions.https.HttpsError("resource-exhausted", "هذا التوقيت محجوز بالفعل");
+        }
+        // ============================================
+        // ✅ STEP 3: READ AVAILABILITY AND VERIFY SLOT IS ENABLED
+        // ============================================
+        const slotDateObj = new Date(slotDate);
+        const dayOfWeek = slotDateObj.getDay() === 0 ? 7 : slotDateObj.getDay();
+        const availabilityQuery = admin_1.db
+            .collection("users")
+            .doc(mohaffezId)
+            .collection("availability")
+            .where("dayOfWeek", "==", dayOfWeek)
+            .limit(1);
+        const availabilitySnapshot = await transaction.get(availabilityQuery);
+        const availabilityDoc = !availabilitySnapshot.empty
+            ? availabilitySnapshot.docs[0]
+            : null;
+        // Verify slot is actually available
+        if (availabilityDoc) {
+            const availabilityData = availabilityDoc.data();
+            if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
+                const timeSlots = availabilityData.timeSlots;
+                const normalizedSlot = preferredTimeSlot.replace(/ /g, "");
+                let slotFound = false;
+                let slotEnabled = false;
+                for (const slot of timeSlots) {
+                    const slotTime = `${slot.startTime}-${slot.endTime}`.replace(/ /g, "");
+                    if (slotTime === normalizedSlot && slot.sessionType === sessionType) {
+                        slotFound = true;
+                        slotEnabled = slot.enabled === true;
+                        break;
+                    }
+                }
+                if (slotFound && !slotEnabled) {
+                    functions.logger.error("❌ Slot is disabled", {
+                        mohaffezId,
+                        dayOfWeek,
+                        timeSlot: normalizedSlot,
+                    });
+                    throw new functions.https.HttpsError("failed-precondition", "هذا التوقيت غير متاح حالياً");
+                }
+            }
+        }
+        // ============================================
+        // ✅ STEP 4: HANDLE REQUEST DOCUMENT
+        // ============================================
+        let requestRef;
+        let isUpdatingExisting = false;
+        if (requestId) {
+            requestRef = admin_1.db.collection('sessionRequests').doc(requestId);
+            const existingRequest = await transaction.get(requestRef);
+            // ✅ LOG: Check if request exists
+            functions.logger.info("🔍 Checking existing request document", {
+                requestId,
+                exists: existingRequest.exists,
+                status: existingRequest.exists ? (_a = existingRequest.data()) === null || _a === void 0 ? void 0 : _a.status : "N/A",
+            });
+            if (!existingRequest.exists) {
+                functions.logger.error("❌ Request document not found!", {
+                    requestId,
+                    studentId,
+                    mohaffezId,
+                });
+                throw new functions.https.HttpsError('not-found', 'طلب الجلسة غير موجود');
+            }
+            const requestData = existingRequest.data();
+            // ✅ CHECK: If already accepted
+            if (requestData && requestData.status === 'accepted') {
+                const sessionId = requestData.sessionId;
+                if (sessionId) {
+                    functions.logger.warn("⚠️ Request already accepted!", {
+                        requestId,
+                        sessionId,
+                        oldStatus: requestData.status,
+                    });
+                    throw new functions.https.HttpsError('already-exists', JSON.stringify({
+                        success: true,
+                        sessionId: sessionId,
+                        requestId: requestId,
+                        message: 'الجلسة مؤكدة بالفعل'
+                    }));
+                }
+            }
+            isUpdatingExisting = true;
+            // ✅ LOG: Will update existing request
+            functions.logger.info("✅ Will UPDATE existing request", {
+                requestId,
+                currentStatus: requestData === null || requestData === void 0 ? void 0 : requestData.status,
+                isUpdatingExisting: true,
+            });
+        }
+        else {
+            // ✅ LOG: No requestId provided
+            functions.logger.error("❌ No requestId provided!", {
+                studentId,
+                mohaffezId,
+                promoCode,
+            });
+            throw new functions.https.HttpsError('invalid-argument', 'معرف الطلب مطلوب للجلسات المجانية');
+        }
+        const sessionRef = admin_1.db.collection("hafizSessions").doc();
+        // ============================================
+        // ✅ STEP 5: WRITE PHASE
+        // ============================================
+        const requestUpdateData = {
+            status: "accepted",
             isPaid: true,
             paymentAmount: 0.0,
             promoCode,
             promoDiscount: 100,
-            requiresPaymentOnAcceptance: false,
-            selectedPaymentMethod: 'free_session',
             sessionId: sessionRef.id,
-            createdAt: admin_1.FieldValue.serverTimestamp(),
             acceptedAt: admin_1.FieldValue.serverTimestamp(),
             paidAt: admin_1.FieldValue.serverTimestamp(),
             updatedAt: admin_1.FieldValue.serverTimestamp(),
-        });
-        // Create session
+        };
+        if (isUpdatingExisting) {
+            // ✅ UPDATE existing request
+            transaction.update(requestRef, requestUpdateData);
+            functions.logger.info("📝 Updating existing sessionRequest", {
+                requestId: requestRef.id,
+                operation: "UPDATE",
+            });
+        }
+        else {
+            // ✅ CREATE new request
+            transaction.set(requestRef, Object.assign(Object.assign({}, requestUpdateData), { studentId,
+                mohaffezId,
+                studentName,
+                mohaffezName,
+                sessionType,
+                preferredTimeSlot, slotDate: slotDateTimestamp, slotStart: slotStartTimestamp, slotEnd: slotEndTimestamp, imamAddressText: imamAddressText || null, imamAddressLat: imamAddressLat || null, imamAddressLng: imamAddressLng || null, mohaffezPhone: mohaffezPhone || null, requiresPaymentOnAcceptance: false, selectedPaymentMethod: "freesession", createdAt: admin_1.FieldValue.serverTimestamp() }));
+            functions.logger.info("📝 Creating NEW sessionRequest", {
+                requestId: requestRef.id,
+                operation: "CREATE",
+            });
+        }
+        // Create hafizSession
         transaction.set(sessionRef, {
             requestId: requestRef.id,
             mohaffezId,
@@ -96,58 +300,167 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             mohaffezName,
             studentName,
             sessionType,
-            location: imamAddressText || '',
+            location: imamAddressText || "",
             mohaffezPhone: mohaffezPhone || null,
             imamAddressLat: imamAddressLat || null,
             imamAddressLng: imamAddressLng || null,
+            imamAddressText: imamAddressText || null,
             preferredTimeSlot,
+            timeSlot: preferredTimeSlot,
             sessionDate: slotDateTimestamp,
             slotStart: slotStartTimestamp,
             slotEnd: slotEndTimestamp,
-            status: 'accepted',
+            status: "accepted",
             isPaid: true,
             sessionPrice: 0.0,
             promoCode,
+            paymentId: paymentId || null,
             createdAt: admin_1.FieldValue.serverTimestamp(),
+            acceptedAt: admin_1.FieldValue.serverTimestamp(),
+            reminder24hSent: false,
+            reminder1hSent: false,
             juzCount: 1,
             sessionRating: 10,
         });
+        functions.logger.info("📝 Creating hafizSession", {
+            sessionId: sessionRef.id,
+            requestId: requestRef.id,
+        });
+        // Update payment (if provided)
+        if (paymentId) {
+            const paymentRef = admin_1.db.collection("payments").doc(paymentId);
+            transaction.update(paymentRef, {
+                status: "completed",
+                paidAt: admin_1.FieldValue.serverTimestamp(),
+                updatedAt: admin_1.FieldValue.serverTimestamp(),
+                subscriptionId: sessionRef.id,
+                notes: "Free session via promo code",
+            });
+            // Log payment event
+            const eventRef = admin_1.db.collection("paymentEvents").doc();
+            transaction.set(eventRef, {
+                eventId: eventRef.id,
+                eventType: "payment_completed",
+                paymentId: paymentId,
+                userId: studentId,
+                data: {
+                    amount: 0,
+                    method: "free",
+                    promoCode: promoCode,
+                    sessionId: sessionRef.id,
+                },
+                metadata: {
+                    source: "cloud_function",
+                    notes: "Free session confirmed via confirmFreeSession",
+                },
+                timestamp: admin_1.FieldValue.serverTimestamp(),
+            });
+        }
         // Increment promo code usage
         transaction.update(promoDoc.ref, {
             usedCount: admin_1.FieldValue.increment(1),
             lastUsedAt: admin_1.FieldValue.serverTimestamp(),
             lastUsedBy: studentId,
         });
-        // Update availability slot (if document exists)
-        if (!availabilitySnapshot.empty) {
+        // Disable availability slot
+        if (availabilityDoc) {
             const availabilityData = availabilityDoc.data();
-            const timeSlots = availabilityData.timeSlots || [];
-            const normalizedSlot = preferredTimeSlot.replace(/\s/g, '');
-            const updatedSlots = timeSlots.map((slot) => {
-                const slotTime = `${slot.startTime}-${slot.endTime}`.replace(/\s/g, '');
-                if (slotTime === normalizedSlot && slot.sessionType === sessionType && slot.enabled) {
-                    return Object.assign(Object.assign({}, slot), { enabled: false });
-                }
-                return slot;
-            });
-            transaction.update(availabilityDoc.ref, {
-                timeSlots: updatedSlots,
-                updatedAt: admin_1.FieldValue.serverTimestamp(),
+            if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
+                const timeSlots = availabilityData.timeSlots;
+                const normalizedSlot = preferredTimeSlot.replace(/ /g, "");
+                const updatedSlots = timeSlots.map((slot) => {
+                    const slotTime = `${slot.startTime}-${slot.endTime}`.replace(/ /g, "");
+                    if (slotTime === normalizedSlot && slot.sessionType === sessionType && slot.enabled) {
+                        return Object.assign(Object.assign({}, slot), { enabled: false });
+                    }
+                    return slot;
+                });
+                transaction.update(availabilityDoc.ref, {
+                    timeSlots: updatedSlots,
+                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+                });
+                functions.logger.info("🔒 Availability slot disabled", {
+                    mohaffezId,
+                    dayOfWeek,
+                    timeSlot: normalizedSlot,
+                    sessionType,
+                });
+            }
+        }
+        else {
+            functions.logger.warn("⚠️ No availability document found", {
+                mohaffezId,
+                dayOfWeek,
+                slotDate,
             });
         }
-        functions.logger.info('Free session created successfully', {
+        // Send notifications
+        const notificationRef = admin_1.db.collection("notifications").doc();
+        transaction.set(notificationRef, {
+            userId: studentId,
+            recipientId: studentId,
+            senderId: mohaffezId,
+            title: "تم تأكيد الجلسة المجانية! 🎉",
+            body: `تم تأكيد حجز جلستك مع ${mohaffezName}`,
+            type: "session_confirmed",
+            isRead: false,
+            data: {
+                sessionId: sessionRef.id,
+                requestId: requestRef.id,
+                mohaffezId: mohaffezId,
+            },
+            createdAt: admin_1.FieldValue.serverTimestamp(),
+        });
+        const mohaffezNotificationRef = admin_1.db.collection("notifications").doc();
+        transaction.set(mohaffezNotificationRef, {
+            userId: mohaffezId,
+            recipientId: mohaffezId,
+            senderId: studentId,
+            title: "جلسة مجانية جديدة! 🎁",
+            body: `تم حجز جلسة مجانية مع الطالب ${studentName}`,
+            type: "session_confirmed",
+            isRead: false,
+            data: {
+                sessionId: sessionRef.id,
+                requestId: requestRef.id,
+                studentId: studentId,
+            },
+            createdAt: admin_1.FieldValue.serverTimestamp(),
+        });
+        // ✅ FINAL SUCCESS LOG
+        functions.logger.info("✅ FREE SESSION COMPLETED SUCCESSFULLY", {
             sessionId: sessionRef.id,
             requestId: requestRef.id,
+            paymentId: paymentId || null,
             studentId,
             mohaffezId,
             promoCode,
+            isUpdatingExisting,
+            operation: isUpdatingExisting ? "UPDATE" : "CREATE",
+            transactionComplete: true,
         });
         return {
             success: true,
             sessionId: sessionRef.id,
             requestId: requestRef.id,
-            message: 'تم تأكيد الجلسة المجانية بنجاح',
+            paymentId: paymentId || null,
+            message: "تم إنشاء الجلسة المجانية بنجاح",
+            isUpdatingExisting, // ✅ Include in response
         };
+    }).catch((error) => {
+        // Handle "already-exists" pseudo-error (used for early return)
+        if (error.code === "already-exists") {
+            const result = JSON.parse(error.message);
+            functions.logger.info("✅ Returning existing session (no duplicate created)", result);
+            return result;
+        }
+        // ✅ LOG ANY OTHER ERRORS
+        functions.logger.error("❌ Transaction failed", {
+            errorCode: error.code,
+            errorMessage: error.message,
+            stack: error.stack,
+        });
+        throw error;
     });
 });
 //# sourceMappingURL=confirmFreeSession.js.map

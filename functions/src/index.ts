@@ -17,3 +17,5 @@ export { onPaymentCreated } from './payments/triggers';
 export { releaseExpiredSlotLocks } from './cleanup/releaseExpiredSlotLocks';
 
 export { confirmFreeSession } from './bookings/confirmFreeSession';
+export { studentMarkedDirectPayment, mohaffezConfirmDirectPayment, mohaffezRejectDirectPayment } from './payments/directPayment';
+export { processWeeklyCommissions, markCommissionPaid } from './payments/commissions';

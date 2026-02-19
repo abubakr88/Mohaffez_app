@@ -306,6 +306,27 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Direct Payment
+    // ============================================
+
+    match /directPaymentRequests/{id} {
+      allow read: if request.auth != null &&
+        (request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId);
+      allow write: if false; // Cloud Functions only
+    }
+    match /weeklyCommissionSummaries/{id} {
+      allow read: if request.auth != null &&
+        request.auth.uid == resource.data.mohaffezId;
+      allow write: if false;
+    }
+    match /commissions/{id} {
+      allow read: if request.auth != null &&
+        request.auth.uid == resource.data.mohaffezId;
+      allow write: if false;
+    }
+
+    // ============================================
     // SOCIAL FEATURES
     // ============================================
     

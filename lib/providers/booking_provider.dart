@@ -100,6 +100,8 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
     double? imamAddressLng,
     String? mohaffezPhone,
     required String promoCode,
+    String? requestId, 
+    String? paymentId, // ✅ NEW: Accept payment ID
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -119,6 +121,8 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
         imamAddressLng: imamAddressLng,
         mohaffezPhone: mohaffezPhone,
         promoCode: promoCode,
+        requestId: requestId,
+        paymentId: paymentId,
       );
 
       if (result.isSuccess) {
@@ -242,6 +246,8 @@ class BookingService {
     double? imamAddressLng,
     String? mohaffezPhone,
     required String promoCode,
+    String? requestId,
+    String? paymentId,
   }) async {
     try {
       debugPrint('🔄 [FREE SESSION] Starting Cloud Function call...');
@@ -249,6 +255,7 @@ class BookingService {
       debugPrint('👤 Student: $studentId');
       debugPrint('👨‍🏫 Mohaffez: $mohaffezId');
       debugPrint('🎟️ Promo: $promoCode');
+      debugPrint('RequestId: $requestId'); 
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'confirmFreeSession',
@@ -272,6 +279,8 @@ class BookingService {
         'imamAddressLng': imamAddressLng,
         'mohaffezPhone': mohaffezPhone,
         'promoCode': promoCode,
+        if (requestId != null) 'requestId': requestId,
+        if (paymentId != null) 'paymentId': paymentId, 
       };
 
       debugPrint('📦 Payload: ${data.keys.join(", ")}');
@@ -709,14 +718,21 @@ class BookingService {
     }
   }
 
+  // ✅ CORRECTED: Explicit type casting
   Stream<List<Map<String, dynamic>>> getStudentRequests(String studentId) {
     return _firestore
-        .collection('sessionRequests')
-        .where('studentId', isEqualTo: studentId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
+      .collection('sessionRequests')
+      .where('studentId', isEqualTo: studentId)
+      .where('status', whereIn: ['pending', 'awaiting_payment', 'rejected', 'cancelled'])
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return <String, dynamic>{
+          ...data,
+          'id': doc.id,
+        };
+      }).toList());
   }
 
   Stream<List<Map<String, dynamic>>> getMohaffezRequests(String mohaffezId) {

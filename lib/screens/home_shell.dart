@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/notification_provider_paginated.dart';
 import '../utils/arabic_labels.dart';
+import 'direct_payment_confirmations_screen.dart';
 
 class HomeShell extends ConsumerWidget {
   final Widget child;
@@ -285,6 +286,19 @@ class HomeShell extends ConsumerWidget {
               onTap: () {
                 Navigator.pop(context);
                 context.go('/availability');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.payment, color: Colors.orange),
+              title: const Text('مدفوعات بانتظار التأكيد'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DirectPaymentConfirmationsScreen(),
+                  ),
+                );
               },
             ),
           ],

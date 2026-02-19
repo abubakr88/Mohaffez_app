@@ -35,6 +35,7 @@ import '../screens/student_payment_screen.dart';
 import '../screens/mohaffez_pricing_screen.dart';
 import '../screens/student_sessions_screen.dart';
 import '../screens/student_schedule_screen.dart';
+import '../screens/mohaffez_wallet_settings_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -176,6 +177,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           // ============================================
           // ✅ UPDATED: PAYMENT ROUTE WITH SLOT DATA
           // ============================================
+            GoRoute(
+            path: '/wallet-settings',
+            name: 'wallet-settings',
+            builder: (context, state) =>
+                const MohaffezWalletSettingsScreen(),
+          ),
           GoRoute(
             path: '/payment/:mohaffezId',
             name: 'payment',
@@ -184,7 +191,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               final mohaffezName = state.uri.queryParameters['name'] ?? '';
               final requestId = state.uri.queryParameters['requestId'];
               
-              // ✅ NEW: Parse slot data from query parameters
+              // ✅ FIX: Extract lockedRequest from extra
+              final extra = state.extra as Map<String, dynamic>?;
+              final lockedRequest = extra?['lockedRequest'] as Map<String, dynamic>?;
+              
+              // Parse query parameters (for backward compatibility)
               final sessionType = state.uri.queryParameters['sessionType'];
               final timeSlot = state.uri.queryParameters['timeSlot'];
               final sessionDateStr = state.uri.queryParameters['sessionDate'];
@@ -193,7 +204,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               final lngStr = state.uri.queryParameters['lng'];
               final phone = state.uri.queryParameters['phone'];
               
-              // Parse timeSlot (format: "08:00-08:45")
+              // Parse timeSlot format "08:00-08:45"
               Map<String, dynamic>? preselectedTimeSlot;
               if (timeSlot != null && timeSlot.contains('-')) {
                 final parts = timeSlot.split('-');
@@ -233,6 +244,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 mohaffezLat: lat,
                 mohaffezLng: lng,
                 mohaffezPhone: phone,
+                lockedRequest: lockedRequest, // ✅ Pass the locked request!
               );
             },
           ),
@@ -292,6 +304,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/my-students',
             name: 'my-students',
             builder: (context, state) => const MohaffezStudentsScreen(),
+          ),
+          GoRoute(
+            path: 'mohaffez/students',
+            redirect: (context, state) => '/my-students',
           ),
           GoRoute(
             path: '/complete-session/:sessionId',

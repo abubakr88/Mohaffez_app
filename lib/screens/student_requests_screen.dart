@@ -13,6 +13,7 @@ import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../utils/arabic_labels.dart';
+import 'student_payment_screen.dart';
 
 // ============================================================================
 // FILTER ENUM AND PROVIDER
@@ -349,14 +350,18 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         return requests;
       case RequestFilter.pending:
         return requests.where((r) => r['status'] == 'pending').toList();
-      case RequestFilter.awaitingPayment:
-        return requests.where((r) => r['status'] == 'awaitingpayment').toList();
       case RequestFilter.accepted:
         return requests.where((r) => r['status'] == 'accepted').toList();
       case RequestFilter.rejected:
         return requests.where((r) => r['status'] == 'rejected').toList();
       case RequestFilter.cancelled:
         return requests.where((r) => r['status'] == 'cancelled').toList();
+      case RequestFilter.awaitingPayment:
+        return requests.where((r) {
+          final s = r['status'] as String? ?? '';
+          return s == 'awaitingpayment' ||
+                s == 'awaiting_direct_payment_confirmation';
+        }).toList();
     }
   }
 
@@ -482,20 +487,21 @@ class _RequestCard extends StatelessWidget {
     final mohaffezName = request['mohaffezName'] as String? ?? 'غير معروف';
     final sessionType = request['sessionType'] as String? ?? '';
     final status = request['status'] as String? ?? 'pending';
-    final preferredTimeSlot = request['preferredTimeSlot'] as String? ?? 
-                                request['timeSlot'] as String? ?? 
-                                '08:00';
+    final preferredTimeSlot = request['preferredTimeSlot'] as String? ??
+        request['timeSlot'] as String? ??
+        '08:00';
     final createdAt = request['createdAt'] as DateTime?;
-    final slotDate = request['slotDate'] is Timestamp 
+    final slotDate = request['slotDate'] is Timestamp
         ? (request['slotDate'] as Timestamp).toDate()
         : request['slotDate'] as DateTime?;
     final rejectionReason = request['rejectionReason'] as String?;
 
     final (statusText, statusColor, statusIcon) = _getStatusInfo(status);
 
+    // Only allow cancel for statuses where it still makes sense
     final canCancel = ['pending', 'awaitingpayment', 'accepted'].contains(status);
 
-    // Show special card for rejected requests with rejection reason
+    // Rejected requests get their own dedicated card
     if (status == 'rejected') {
       return _RejectedRequestCard(
         mohaffezName: mohaffezName,
@@ -523,11 +529,12 @@ class _RequestCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: Status and Cancel Button
+            // ── Header: Status badge + Cancel ──────────────────────────────
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -558,8 +565,8 @@ class _RequestCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            
-            // Mohaffez Name
+
+            // ── Mohaffez Name ───────────────────────────────────────────────
             Text(
               mohaffezName,
               style: const TextStyle(
@@ -568,21 +575,24 @@ class _RequestCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            
-            // Session Details
+
+            // ── Session type + time chips ───────────────────────────────────
             Row(
               children: [
-                _buildDetailChip(Icons.schedule, preferredTimeSlot),
+                _buildDetailChip(
+                    Icons.schedule, preferredTimeSlot),
                 const SizedBox(width: 8),
-                _buildDetailChip(Icons.location_on, _getSessionTypeLabel(sessionType)),
+                _buildDetailChip(
+                    Icons.location_on, _getSessionTypeLabel(sessionType)),
               ],
             ),
             const SizedBox(height: 12),
-            
-            // Date Info
+
+            // ── Date row ────────────────────────────────────────────────────
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                Icon(Icons.calendar_today,
+                    size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 6),
                 Text(
                   slotDate != null
@@ -605,8 +615,8 @@ class _RequestCard extends StatelessWidget {
                 ),
               ],
             ),
-            
-            // Payment deadline warning (if applicable)
+
+            // ── AWAITING PAYMENT — pay now block ────────────────────────────
             if (status == 'awaitingpayment') ...[
               const SizedBox(height: 12),
               Container(
@@ -618,7 +628,8 @@ class _RequestCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 20),
+                    Icon(Icons.warning_amber,
+                        color: Colors.orange.shade700, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -633,52 +644,86 @@ class _RequestCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              
-              // ✅ Pay Now button (GREEN, prominent)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Navigate to payment screen
-                    final requestId = request['id'] as String?;
-                    final mohaffezId = request['mohaffezId'] as String?;
-                    final mohaffezName = request['mohaffezName'] as String?;
-                    
-                    if (requestId != null && mohaffezId != null) {
-                      context.push(
-                        '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName ?? '')}&requestId=$requestId',
-                      );
-                    }
-                  },
+                  onPressed: () => _navigateToPayment(context),
                   icon: const Icon(Icons.payment, size: 20),
                   label: const Text(
                     'ادفع الآن',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
-              
               const SizedBox(height: 8),
-              
-              // Cancel button (text button, less prominent)
               TextButton.icon(
                 onPressed: onCancel,
-                icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
-                label: const Text(
-                  'إلغاء الطلب',
-                  style: TextStyle(color: Colors.red),
+                icon: const Icon(Icons.cancel_outlined,
+                    color: Colors.red, size: 18),
+                label: const Text('إلغاء الطلب',
+                    style: TextStyle(color: Colors.red)),
+              ),
+            ],
+
+            // ── AWAITING DIRECT PAYMENT CONFIRMATION ────────────────────────
+            if (status == 'awaiting_direct_payment_confirmation') ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.blue.shade200),
                 ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.hourglass_top,
+                        color: Colors.blue.shade600, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'تم إرسال إشعار الدفع بنجاح ✅',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'في انتظار تأكيد المعلم باستلام المبلغ. ستصلك إشعار فور التأكيد.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Allow cancel even in this state
+              TextButton.icon(
+                onPressed: onCancel,
+                icon: const Icon(Icons.cancel_outlined,
+                    color: Colors.red, size: 18),
+                label: const Text('إلغاء الطلب',
+                    style: TextStyle(color: Colors.red)),
               ),
             ],
           ],
@@ -686,6 +731,57 @@ class _RequestCard extends StatelessWidget {
       ),
     );
   }
+
+  // ── Navigate to payment screen ──────────────────────────────────────────
+  void _navigateToPayment(BuildContext context) {
+    final requestId = request['id'] as String?;
+    final mohaffezId = request['mohaffezId'] as String?;
+    final mohaffezName = request['mohaffezName'] as String? ?? '';
+
+    if (requestId == null || mohaffezId == null) return;
+
+    DateTime? slotDate;
+    DateTime? slotStart;
+    DateTime? slotEnd;
+
+    final rawSlotDate = request['slotDate'];
+    final rawSlotStart = request['slotStart'];
+    final rawSlotEnd = request['slotEnd'];
+
+    if (rawSlotDate is Timestamp) slotDate = rawSlotDate.toDate();
+    if (rawSlotDate is DateTime) slotDate = rawSlotDate;
+    if (rawSlotStart is Timestamp) slotStart = rawSlotStart.toDate();
+    if (rawSlotStart is DateTime) slotStart = rawSlotStart;
+    if (rawSlotEnd is Timestamp) slotEnd = rawSlotEnd.toDate();
+    if (rawSlotEnd is DateTime) slotEnd = rawSlotEnd;
+
+    slotDate ??= DateTime.now();
+    slotStart ??= slotDate;
+    slotEnd ??= slotDate.add(const Duration(hours: 1));
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StudentPaymentScreen(
+          mohaffezId: mohaffezId!,
+          mohaffezName: mohaffezName,
+          requestId: requestId,
+          lockedRequest: request,
+          sessionType: request['sessionType'] as String?,
+          sessionDate: slotDate,
+          timeSlot: request['preferredTimeSlot'] as String? ??
+              request['timeSlot'] as String?,
+          location: request['imamAddressText'] as String?,
+          mohaffezAddress: request['imamAddressText'] as String?,
+          mohaffezLat: request['imamAddressLat'] as double?,
+          mohaffezLng: request['imamAddressLng'] as double?,
+          mohaffezPhone: request['mohaffezPhone'] as String?,
+        ),
+      ),
+    );
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
 
   Widget _buildDetailChip(IconData icon, String label) {
     return Container(
@@ -701,10 +797,7 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade800,
-            ),
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
           ),
         ],
       ),
@@ -712,34 +805,44 @@ class _RequestCard extends StatelessWidget {
   }
 
   (String, Color, IconData) _getStatusInfo(String status) {
-    // Normalize status: trim whitespace and convert to lowercase
-    final normalizedStatus = status.trim().toLowerCase();
-    
-    switch (normalizedStatus) {
+    // Normalize: trim + lowercase to catch any Firestore inconsistencies
+    final s = status.trim().toLowerCase();
+
+    switch (s) {
       case 'pending':
         return ('قيد الانتظار', Colors.orange, Icons.pending);
+
+      // Both spellings — with and without space — handled
       case 'awaitingpayment':
-      case 'awaitingpayment':
+      case 'awaiting_payment':
       case 'awaiting payment':
-        return ('في انتظار الدفع', Colors.blue, Icons.payment);
+        return ('في انتظار الدفع', Colors.orange.shade700, Icons.payment);
+
+      case 'awaiting_direct_payment_confirmation':
+        return ('في انتظار تأكيد المعلم', Colors.blue, Icons.hourglass_top);
+
       case 'accepted':
       case 'confirmed':
         return ('مقبول', Colors.green, Icons.check_circle);
+
       case 'rejected':
       case 'declined':
         return ('مرفوض', Colors.red, Icons.cancel);
+
       case 'cancelled':
       case 'canceled':
         return ('ملغي', Colors.grey, Icons.block);
+
       case 'completed':
       case 'done':
         return ('مكتمل', Colors.purple, Icons.done_all);
+
       case 'expired':
         return ('منتهي', Colors.red.shade300, Icons.timer_off);
+
       default:
-        // Debug: Print the unrecognized status value
-        debugPrint('⚠️ Unknown status value: "$status"');
-        return ('غير معروف', Colors.grey, Icons.help);
+        debugPrint('⚠️ Unknown request status: "$status"');
+        return ('غير معروف', Colors.grey, Icons.help_outline);
     }
   }
 
@@ -752,10 +855,11 @@ class _RequestCard extends StatelessWidget {
       case 'online':
         return 'أونلاين';
       default:
-        return type;
+        return type.isNotEmpty ? type : 'غير محدد';
     }
   }
 }
+
 
 // ============================================================================
 // REJECTED REQUEST CARD WIDGET

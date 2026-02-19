@@ -1,3 +1,5 @@
+// src/services/PaymentOrchestrationService.ts
+
 import * as functions from 'firebase-functions';
 import { db } from '../utils/admin';
 import {
@@ -9,29 +11,32 @@ import {
   confirmBookingAfterPayment,
   consumeSubscriptionAndCreateSession,
   createSubscriptionFromPayment,
+  SlotInfo,
 } from '../payments/handlers';
-import { EventStore } from './EventStore';
-import { PaymentEventType } from '../types/events.types';
+import { EventStore }          from './EventStore';
+import { PaymentEventType }    from '../types/events.types';
 import { NotificationService } from './NotificationService';
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export class PaymentOrchestrationService {
   constructor(
-    private readonly eventStore: EventStore,
-    private readonly notificationService: NotificationService
+    private readonly eventStore:          EventStore,
+    private readonly notificationService: NotificationService,
   ) {}
+
+  // ─── Public entry point ───────────────────────────────────────────────────
 
   async processSuccessfulPayment(context: PaymentContext): Promise<PaymentResult> {
     await this.eventStore.appendPaymentEvent({
       eventType: PaymentEventType.WEBHOOK_RECEIVED,
       paymentId: context.paymentId,
-      userId: context.payment.studentId,
-      data: {
+      userId:    context.payment.studentId,
+      data:      { transactionId: context.transactionId },
+      metadata:  {
+        source:        'webhook',
         transactionId: context.transactionId,
-      },
-      metadata: {
-        source: 'webhook',
-        transactionId: context.transactionId,
-        ipAddress: context.ipAddress,
+        ipAddress:     context.ipAddress,
       },
     });
 
@@ -47,101 +52,106 @@ export class PaymentOrchestrationService {
       }
 
       await db.collection('payments').doc(context.paymentId).update({
-        status: 'completed',
-        paidAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        status:         'completed',
+        paidAt:         serverTimestamp(),
+        updatedAt:      serverTimestamp(),
         idempotencyKey: `${context.paymentId}_${context.transactionId}`,
-        processedAt: serverTimestamp(),
+        processedAt:    serverTimestamp(),
       });
 
       await this.eventStore.appendPaymentEvent({
         eventType: PaymentEventType.PAYMENT_COMPLETED,
         paymentId: context.paymentId,
-        userId: context.payment.studentId,
+        userId:    context.payment.studentId,
         data: {
-          sessionId: result.sessionId,
+          sessionId:      result.sessionId,
           subscriptionId: result.subscriptionId,
         },
         metadata: {
-          source: 'webhook',
+          source:        'webhook',
           transactionId: context.transactionId,
-          ipAddress: context.ipAddress,
+          ipAddress:     context.ipAddress,
         },
       });
 
       functions.logger.info('Payment orchestration completed', {
-        paymentId: context.paymentId,
-        sessionId: result.sessionId,
+        paymentId:      context.paymentId,
+        sessionId:      result.sessionId,
         subscriptionId: result.subscriptionId,
       });
 
       return result;
+
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown payment processing error';
+      const message =
+        error instanceof Error ? error.message : 'Unknown payment processing error';
 
       await db.collection('payments').doc(context.paymentId).update({
-        status: 'failed',
+        status:        'failed',
         failureReason: message,
-        updatedAt: serverTimestamp(),
+        updatedAt:     serverTimestamp(),
       });
 
       await this.eventStore.appendPaymentEvent({
         eventType: PaymentEventType.PAYMENT_FAILED,
         paymentId: context.paymentId,
-        userId: context.payment.studentId,
-        data: {
-          error: message,
-        },
+        userId:    context.payment.studentId,
+        data:      { error: message },
         metadata: {
-          source: 'webhook',
+          source:        'webhook',
           transactionId: context.transactionId,
-          ipAddress: context.ipAddress,
+          ipAddress:     context.ipAddress,
         },
       });
 
       functions.logger.error('Payment orchestration failed', {
-        paymentId: context.paymentId,
+        paymentId:     context.paymentId,
         transactionId: context.transactionId,
-        error: message,
+        error:         message,
       });
 
-      return {
-        success: false,
-        error: message,
-      };
+      return { success: false, error: message };
     }
   }
 
-  private async handleBookingConfirmation(context: PaymentContext): Promise<PaymentResult> {
-    const requestId = context.metadata.requestId;
-    const sessionDetails = context.metadata.sessionDetails;
+  // ─── Private handlers ─────────────────────────────────────────────────────
+
+  private async handleBookingConfirmation(
+    context: PaymentContext,
+  ): Promise<PaymentResult> {
+    const requestId      = context.metadata.requestId;
+    const sessionDetails = context.metadata.sessionDetails as Record<string, unknown>;
 
     if (!requestId || !sessionDetails || typeof sessionDetails !== 'object') {
       throw new Error('Missing booking confirmation metadata');
     }
 
+    // Build SlotInfo so the slot is disabled INSIDE the same Firestore transaction
+    // as the booking write — eliminates the double-booking race window entirely.
+    const slotInfo = this.buildSlotInfo(
+      context.payment.mohaffezId,
+      (sessionDetails as Record<string, unknown>)['slotDate'],
+      (sessionDetails as Record<string, unknown>)['preferredTimeSlot'],
+      (sessionDetails as Record<string, unknown>)['sessionType'],
+    );
+
+    // ✅ FIX: slotInfo is passed in; slot removal is now atomic with the booking.
     const bookingResult = await confirmBookingAfterPayment(
       requestId,
       sessionDetails as Record<string, unknown>,
       context.payment,
-      context.transactionId
+      context.transactionId,
+      slotInfo,
     );
-
-    await this.removeSlotFromAvailability({
-      mohaffezId: context.payment.mohaffezId,
-      slotDate: (sessionDetails as Record<string, unknown>).slotDate,
-      timeSlot: (sessionDetails as Record<string, unknown>).preferredTimeSlot,
-      sessionType: (sessionDetails as Record<string, unknown>).sessionType,
-    });
 
     await this.notificationService.send({
       recipientId: context.payment.studentId,
-      senderId: context.payment.mohaffezId,
-      type: 'session_confirmed',
-      title: 'Session Confirmed',
-      message: `Your booking with ${context.payment.mohaffezName} is confirmed after payment.`,
+      senderId:    context.payment.mohaffezId,
+      type:        'session_confirmed',
+      title:       'Session Confirmed',
+      message:     `Your booking with ${context.payment.mohaffezName} is confirmed after payment.`,
       data: {
-        sessionId: bookingResult.sessionId,
+        sessionId:  bookingResult.sessionId,
         requestId,
         mohaffezId: context.payment.mohaffezId,
       },
@@ -150,176 +160,149 @@ export class PaymentOrchestrationService {
     await this.eventStore.appendPaymentEvent({
       eventType: PaymentEventType.BOOKING_CONFIRMED,
       paymentId: context.paymentId,
-      userId: context.payment.studentId,
+      userId:    context.payment.studentId,
       data: {
         requestId,
         sessionId: bookingResult.sessionId,
       },
       metadata: {
-        source: 'webhook',
+        source:        'webhook',
         transactionId: context.transactionId,
       },
     });
 
-    return {
-      success: true,
-      sessionId: bookingResult.sessionId,
-    };
+    return { success: true, sessionId: bookingResult.sessionId };
   }
 
-  private async handleSubscriptionCreation(context: PaymentContext): Promise<PaymentResult> {
+  private async handleSubscriptionCreation(
+    context: PaymentContext,
+  ): Promise<PaymentResult> {
     const subscriptionResult = await createSubscriptionFromPayment(
       context.payment,
-      context.transactionId
+      context.transactionId,
     );
 
     await db.collection('payments').doc(context.paymentId).update({
       subscriptionId: subscriptionResult.subscriptionId,
-      updatedAt: serverTimestamp(),
+      updatedAt:      serverTimestamp(),
     });
 
     await this.notificationService.send({
       recipientId: context.payment.studentId,
-      senderId: context.payment.mohaffezId,
-      type: 'subscription_created',
-      title: 'Subscription Activated',
-      message: 'Your subscription purchase was completed successfully.',
+      senderId:    context.payment.mohaffezId,
+      type:        'subscription_created',
+      title:       'Subscription Activated',
+      message:     'Your subscription purchase was completed successfully.',
       data: {
         subscriptionId: subscriptionResult.subscriptionId,
-        mohaffezId: context.payment.mohaffezId,
+        mohaffezId:     context.payment.mohaffezId,
       },
     });
 
     await this.eventStore.appendPaymentEvent({
       eventType: PaymentEventType.SUBSCRIPTION_CREATED,
       paymentId: context.paymentId,
-      userId: context.payment.studentId,
-      data: {
-        subscriptionId: subscriptionResult.subscriptionId,
-      },
+      userId:    context.payment.studentId,
+      data:      { subscriptionId: subscriptionResult.subscriptionId },
       metadata: {
-        source: 'webhook',
+        source:        'webhook',
         transactionId: context.transactionId,
       },
     });
 
-    return {
-      success: true,
-      subscriptionId: subscriptionResult.subscriptionId,
-    };
+    return { success: true, subscriptionId: subscriptionResult.subscriptionId };
   }
 
-  private async handleSubscriptionConsumption(context: PaymentContext): Promise<PaymentResult> {
+  private async handleSubscriptionConsumption(
+    context: PaymentContext,
+  ): Promise<PaymentResult> {
     const subscriptionId = context.metadata.subscriptionId;
     if (!subscriptionId) {
       throw new Error('Missing subscriptionId in payment metadata');
     }
 
+    const sd = context.metadata.sessionDetails as Record<string, unknown> | undefined;
+
+    // Build SlotInfo so the slot is disabled INSIDE the same Firestore transaction
+    // as the subscription decrement — no separate call needed after.
+    const slotInfo = this.buildSlotInfo(
+      context.payment.mohaffezId,
+      sd?.['slotDate'],
+      sd?.['preferredTimeSlot'],
+      sd?.['sessionType'],
+    );
+
+    // ✅ FIX: slotInfo passed in; slot removal is now atomic with session creation.
     const consumptionResult = await consumeSubscriptionAndCreateSession(
       subscriptionId,
       context.payment,
       context.transactionId,
-      context.metadata
+      context.metadata,
+      slotInfo,
     );
-
-    if (consumptionResult.sessionId) {
-      await this.removeSlotFromAvailability({
-        mohaffezId: context.payment.mohaffezId,
-        slotDate: context.metadata.sessionDetails?.slotDate,
-        timeSlot: context.metadata.sessionDetails?.preferredTimeSlot,
-        sessionType: context.metadata.sessionDetails?.sessionType,
-      });
-    }
 
     await this.notificationService.send({
       recipientId: context.payment.studentId,
-      senderId: context.payment.mohaffezId,
-      type: 'subscription_session_consumed',
-      title: 'Session Booked',
-      message: 'A session was booked using your active subscription.',
+      senderId:    context.payment.mohaffezId,
+      type:        'subscription_session_consumed',
+      title:       'Session Booked',
+      message:     'A session was booked using your active subscription.',
       data: {
         subscriptionId,
-        sessionId: consumptionResult.sessionId,
+        sessionId:         consumptionResult.sessionId,
         remainingSessions: consumptionResult.remainingSessions,
       },
     });
 
     return {
-      success: true,
-      sessionId: consumptionResult.sessionId,
+      success:       true,
+      sessionId:     consumptionResult.sessionId,
       subscriptionId,
     };
   }
 
-  private async removeSlotFromAvailability(params: {
-    mohaffezId: string;
-    slotDate: unknown;
-    timeSlot: unknown;
-    sessionType: unknown;
-  }): Promise<void> {
-    const { mohaffezId, slotDate, timeSlot, sessionType } = params;
+  // ─── Private helpers ──────────────────────────────────────────────────────
 
+  /**
+   * Constructs a SlotInfo object only when all four fields are valid.
+   * Returns undefined (skips atomic slot removal) if any field is missing/invalid.
+   */
+  private buildSlotInfo(
+    mohaffezId:  unknown,
+    slotDate:    unknown,
+    timeSlot:    unknown,
+    sessionType: unknown,
+  ): SlotInfo | undefined {
     if (
-      typeof mohaffezId !== 'string' ||
-      !slotDate ||
-      typeof timeSlot !== 'string' ||
-      typeof sessionType !== 'string'
+      typeof mohaffezId  !== 'string' || !mohaffezId  ||
+      typeof timeSlot    !== 'string' || !timeSlot    ||
+      typeof sessionType !== 'string' || !sessionType ||
+      !slotDate
     ) {
-      functions.logger.warn('Skipping slot removal: invalid booking metadata', params);
-      return;
+      functions.logger.warn(
+        'buildSlotInfo: incomplete slot data — slot will NOT be disabled atomically',
+        { mohaffezId, timeSlot, sessionType, hasSlotDate: !!slotDate },
+      );
+      return undefined;
     }
 
-    const slotTimestamp = slotDate as FirebaseFirestore.Timestamp;
-    const date = slotTimestamp.toDate();
-    const jsDay = date.getDay();
-    const dayOfWeek = jsDay === 0 ? 7 : jsDay;
-
-    const availabilitySnapshot = await db
-      .collection('users')
-      .doc(mohaffezId)
-      .collection('availability')
-      .where('dayOfWeek', '==', dayOfWeek)
-      .limit(1)
-      .get();
-
-    if (availabilitySnapshot.empty) {
-      functions.logger.warn('Availability document not found for slot removal', {
-        mohaffezId,
-        dayOfWeek,
-      });
-      return;
-    }
-
-    const availabilityDoc = availabilitySnapshot.docs[0];
-    const data = availabilityDoc.data() as { timeSlots?: Array<Record<string, unknown>> };
-    const timeSlots = [...(data.timeSlots ?? [])];
-
-    let updated = false;
-    for (const slot of timeSlots) {
-      const slotTime = `${slot.startTime ?? ''}-${slot.endTime ?? ''}`;
-      if (
-        slotTime === timeSlot &&
-        slot.sessionType === sessionType &&
-        slot.enabled === true
-      ) {
-        slot.enabled = false;
-        updated = true;
-        break;
-      }
-    }
-
-    if (!updated) {
-      functions.logger.info('Slot not changed during post-payment removal', {
-        mohaffezId,
-        timeSlot,
-        sessionType,
-      });
-      return;
-    }
-
-    await availabilityDoc.ref.update({
-      timeSlots,
-      updatedAt: serverTimestamp(),
-    });
+    return {
+      mohaffezId,
+      slotDate,
+      timeSlot,
+      sessionType,
+    };
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // removeSlotFromAvailability has been intentionally removed.
+  //
+  // Previously this was called AFTER confirmBookingAfterPayment / consumeSubscription
+  // completed their own Firestore transactions, leaving a race window where two
+  // concurrent payments could both confirm against the same slot before either
+  // removal ran.
+  //
+  // The fix: slot removal is now done INSIDE handlers.ts transactions via
+  // readAvailabilityInTransaction(), passed through the SlotInfo parameter above.
+  // ─────────────────────────────────────────────────────────────────────────
 }
