@@ -190,270 +190,232 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
-            body: CustomScrollView(
-              slivers: [
-                // Profile Header
-                SliverAppBar(
-                  expandedHeight: 300,
-                  pinned: true,
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Gradient Background
-                        Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppTheme.primaryAmber,
-                                AppTheme.lightAmber,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+            body: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(currentUserProvider);
+                await ref
+                    .read(currentUserProvider.future)
+                    .catchError((_) => null);
+              },
+              child: CustomScrollView(
+                slivers: [
+                  // Profile Header
+                  SliverAppBar(
+                    expandedHeight: 300,
+                    pinned: true,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'تحديث',
+                        onPressed: () => ref.invalidate(currentUserProvider),
+                      ),
+                    ],
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Gradient Background
+                          Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppTheme.primaryAmber,
+                                  AppTheme.lightAmber,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
                             ),
                           ),
-                        ),
-                        // Profile Content
-                        SafeArea(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              // Avatar with edit button
-                              Stack(
-                                children: [
-                                  Hero(
-                                    tag: 'profile-avatar',
-                                    child: CachedAvatar(
-                                      imageUrl: user.photoUrl,
-                                      radius: 60,
-                                      semanticLabel: user.name,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: GestureDetector(
-                                      onTap: () =>
-                                          _pickAndUploadPhoto(user.uid),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryAmber,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.white,
-                                            width: 3,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.2),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Icon(
-                                          Icons.camera_alt,
-                                          color: Colors.white,
-                                          size: 20,
-                                        ),
+                          // Profile Content
+                          SafeArea(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                // Avatar with edit button
+                                Stack(
+                                  children: [
+                                    Hero(
+                                      tag: 'profile-avatar',
+                                      child: CachedAvatar(
+                                        imageUrl: user.photoUrl,
+                                        radius: 60,
+                                        semanticLabel: user.name,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              // Name
-                              Text(
-                                user.name,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              // Role
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  isMohaffez ? 'محفّظ' : 'طالب',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              // Stats (if mohaffez)
-                              if (isMohaffez)
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _StatItem(
-                                      label: 'المتابعون',
-                                      value: user.followerCount.toString(),
-                                    ),
-                                    const SizedBox(width: 32),
-                                    _StatItem(
-                                      label: 'التقييم',
-                                      value: user.rating.toStringAsFixed(1),
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: GestureDetector(
+                                        onTap: () =>
+                                            _pickAndUploadPhoto(user.uid),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primaryAmber,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 3,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withValues(alpha: 0.2),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
-                              const SizedBox(height: 16),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Content
-                SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      // Bio Section
-                      _ProfileSection(
-                        title: 'نبذة تعريفية',
-                        icon: Icons.info_outline,
-                        color: Colors.blue,
-                        child: isEditingBio
-                            ? Column(
-                                children: [
-                                  TextField(
-                                    controller: bioController,
-                                    maxLines: 4,
-                                    maxLength: 200,
-                                    decoration: const InputDecoration(
-                                      hintText: 'أضف نبذة عنك...',
-                                      border: OutlineInputBorder(),
+                                const SizedBox(height: 16),
+                                // Name
+                                Text(
+                                  user.name,
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                // Role
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    isMohaffez ? 'محفّظ' : 'طالب',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
+                                ),
+                                const SizedBox(height: 16),
+                                // Stats (if mohaffez)
+                                if (isMohaffez)
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      TextButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            isEditingBio = false;
-                                          });
-                                        },
-                                        child: const Text(ArabicLabels.cancel),
+                                      _StatItem(
+                                        label: 'المتابعون',
+                                        value: user.followerCount.toString(),
                                       ),
-                                      const SizedBox(width: 8),
-                                      ElevatedButton(
-                                        onPressed: () => _saveBio(user.uid),
-                                        child: const Text(ArabicLabels.save),
+                                      const SizedBox(width: 32),
+                                      _StatItem(
+                                        label: 'التقييم',
+                                        value: user.rating.toStringAsFixed(1),
                                       ),
                                     ],
                                   ),
-                                ],
-                              )
-                            : Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      (user.bio?.isEmpty ?? true)
-                                          ? 'لا توجد نبذة'
-                                          : user.bio!,
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        color: (user.bio?.isEmpty ?? true)
-                                            ? Colors.grey.shade500
-                                            : Colors.black87,
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, size: 20),
-                                    onPressed: () {
-                                      setState(() {
-                                        bioController.text = user.bio ?? '';
-                                        isEditingBio = true;
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-
-                      // ✅ FIXED: Contact Info - Now Clickable
-                      _ProfileSection(
-                        title: 'معلومات التواصل',
-                        icon: Icons.contact_page,
-                        color: Colors.green,
-                        child: Column(
-                          children: [
-                            // Email - Clickable
-                            InkWell(
-                              onTap: () => _sendEmail(user.email),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 8,
-                                ),
-                                child: Row(
+                    ),
+                  ),
+                  // Content
+                  SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        // Bio Section
+                        _ProfileSection(
+                          title: 'نبذة تعريفية',
+                          icon: Icons.info_outline,
+                          color: Colors.blue,
+                          child: isEditingBio
+                              ? Column(
                                   children: [
-                                    Icon(
-                                      Icons.email,
-                                      size: 20,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'البريد الإلكتروني',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            user.email,
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.blue,
-                                            ),
-                                          ),
-                                        ],
+                                    TextField(
+                                      controller: bioController,
+                                      maxLines: 4,
+                                      maxLength: 200,
+                                      decoration: const InputDecoration(
+                                        hintText: 'أضف نبذة عنك...',
+                                        border: OutlineInputBorder(),
                                       ),
                                     ),
-                                    const Icon(
-                                      Icons.arrow_forward_ios,
-                                      size: 14,
-                                      color: Colors.blue,
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              isEditingBio = false;
+                                            });
+                                          },
+                                          child:
+                                              const Text(ArabicLabels.cancel),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton(
+                                          onPressed: () => _saveBio(user.uid),
+                                          child: const Text(ArabicLabels.save),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        (user.bio?.isEmpty ?? true)
+                                            ? 'لا توجد نبذة'
+                                            : user.bio!,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: (user.bio?.isEmpty ?? true)
+                                              ? Colors.grey.shade500
+                                              : Colors.black87,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, size: 20),
+                                      onPressed: () {
+                                        setState(() {
+                                          bioController.text = user.bio ?? '';
+                                          isEditingBio = true;
+                                        });
+                                      },
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
+                        ),
+                        const SizedBox(height: 16),
 
-                            // Phone - Clickable
-                            if (user.phoneNumber?.isNotEmpty ?? false) ...[
-                              const Divider(height: 24),
+                        // ✅ FIXED: Contact Info - Now Clickable
+                        _ProfileSection(
+                          title: 'معلومات التواصل',
+                          icon: Icons.contact_page,
+                          color: Colors.green,
+                          child: Column(
+                            children: [
+                              // Email - Clickable
                               InkWell(
-                                onTap: () => _makePhoneCall(user.phoneNumber!),
+                                onTap: () => _sendEmail(user.email),
                                 borderRadius: BorderRadius.circular(8),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -463,7 +425,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   child: Row(
                                     children: [
                                       Icon(
-                                        Icons.phone,
+                                        Icons.email,
                                         size: 20,
                                         color: Colors.grey.shade600,
                                       ),
@@ -474,7 +436,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'رقم الهاتف',
+                                              'البريد الإلكتروني',
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 color: Colors.grey.shade600,
@@ -482,11 +444,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              user.phoneNumber!,
+                                              user.email,
                                               style: const TextStyle(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w600,
-                                                color: Colors.green,
+                                                color: Colors.blue,
                                               ),
                                             ),
                                           ],
@@ -495,112 +457,170 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       const Icon(
                                         Icons.arrow_forward_ios,
                                         size: 14,
-                                        color: Colors.green,
+                                        color: Colors.blue,
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
 
-                      // ✅ FIXED: Mohaffez-only sections - Now Clickable
-                      if (isMohaffez) ...[
+                              // Phone - Clickable
+                              if (user.phoneNumber?.isNotEmpty ?? false) ...[
+                                const Divider(height: 24),
+                                InkWell(
+                                  onTap: () =>
+                                      _makePhoneCall(user.phoneNumber!),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.phone,
+                                          size: 20,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'رقم الهاتف',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                user.phoneNumber!,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.green,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 14,
+                                          color: Colors.green,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ✅ FIXED: Mohaffez-only sections - Now Clickable
+                        if (isMohaffez) ...[
+                          _ProfileSection(
+                            title: 'إدارة الحساب',
+                            icon: Icons.verified_user,
+                            color: Colors.purple,
+                            child: Column(
+                              children: [
+                                _ManagementTile(
+                                  icon: Icons.verified_user,
+                                  title: 'الاعتمادات',
+                                  subtitle: 'شهاداتك وتخصصاتك',
+                                  color: Colors.purple,
+                                  onTap: () => context.push('/credentials'),
+                                ),
+                                const SizedBox(height: 12),
+                                _ManagementTile(
+                                  icon: Icons.schedule,
+                                  title: 'إدارة المواعيد',
+                                  subtitle: 'أوقات الجلسات المتاحة',
+                                  color: Colors.blue,
+                                  onTap: () => context.push('/availability'),
+                                ),
+                                const SizedBox(height: 12), // ← ADD THIS
+                                _ManagementTile(
+                                  // ← ADD THIS TILE
+                                  icon: Icons.account_balance_wallet,
+                                  title: 'محافظ الدفع المباشر',
+                                  subtitle:
+                                      'InstaPay، فودافون كاش، أورانج موني، ...',
+                                  color: Colors.green,
+                                  onTap: () => context.push('/wallet-settings'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // ✅ FIXED: Settings - Now Clickable
                         _ProfileSection(
-                          title: 'إدارة الحساب',
-                          icon: Icons.verified_user,
-                          color: Colors.purple,
+                          title: 'الإعدادات',
+                          icon: Icons.settings,
+                          color: Colors.orange,
                           child: Column(
                             children: [
-                              _ManagementTile(
-                                icon: Icons.verified_user,
-                                title: 'الاعتمادات',
-                                subtitle: 'شهاداتك وتخصصاتك',
-                                color: Colors.purple,
-                                onTap: () => context.push('/credentials'),
+                              _SettingsTile(
+                                icon: Icons.lock,
+                                title: 'تغيير كلمة المرور',
+                                onTap: _showChangePasswordDialog, // ✅ FIXED
                               ),
-                              const SizedBox(height: 12),
-                              _ManagementTile(
-                                icon: Icons.schedule,
-                                title: 'إدارة المواعيد',
-                                subtitle: 'أوقات الجلسات المتاحة',
-                                color: Colors.blue,
-                                onTap: () => context.push('/availability'),
-                              ),
-                              const SizedBox(height: 12),   // ← ADD THIS
-                              _ManagementTile(               // ← ADD THIS TILE
-                                icon: Icons.account_balance_wallet,
-                                title: 'محافظ الدفع المباشر',
-                                subtitle: 'InstaPay، فودافون كاش، أورانج موني، ...',
-                                color: Colors.green,
-                                onTap: () => context.push('/wallet-settings'),
+                              const Divider(height: 1),
+                              _SettingsTile(
+                                icon: Icons.privacy_tip,
+                                title: 'إعدادات الخصوصية',
+                                onTap: () => context
+                                    .push('/privacy-settings'), // ✅ FIXED
                               ),
                             ],
                           ),
                         ),
-                      ],
-
-                      // ✅ FIXED: Settings - Now Clickable
-                      _ProfileSection(
-                        title: 'الإعدادات',
-                        icon: Icons.settings,
-                        color: Colors.orange,
-                        child: Column(
-                          children: [
-                            _SettingsTile(
-                              icon: Icons.lock,
-                              title: 'تغيير كلمة المرور',
-                              onTap: _showChangePasswordDialog, // ✅ FIXED
-                            ),
-                            const Divider(height: 1),
-                            _SettingsTile(
-                              icon: Icons.privacy_tip,
-                              title: 'إعدادات الخصوصية',
-                              onTap: () =>
-                                  context.push('/privacy-settings'), // ✅ FIXED
-                            ),
-                          ],
+                        const SizedBox(height: 24),
+                        const SizedBox(height: 12),
+                        _ManagementTile(
+                          icon: Icons.location_on,
+                          title: 'إعدادات الموقع',
+                          subtitle: 'حدد موقعك للظهور في البحث',
+                          color: Colors.red,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LocationSettingsScreen(),
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      const SizedBox(height: 12),
-                      _ManagementTile(
-                        icon: Icons.location_on,
-                        title: 'إعدادات الموقع',
-                        subtitle: 'حدد موقعك للظهور في البحث',
-                        color: Colors.red,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const LocationSettingsScreen(),
-                            ),
-                          );
-                        },
-                      ),
 
-                      // Logout Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _showLogoutDialog(context),
-                          icon: const Icon(Icons.logout),
-                          label: const Text('تسجيل الخروج'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Colors.red, width: 2),
-                            foregroundColor: Colors.red,
+                        // Logout Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showLogoutDialog(context),
+                            icon: const Icon(Icons.logout),
+                            label: const Text('تسجيل الخروج'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              side:
+                                  const BorderSide(color: Colors.red, width: 2),
+                              foregroundColor: Colors.red,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                    ]),
+                        const SizedBox(height: 32),
+                      ]),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -1,16 +1,18 @@
 // FILE: lib/config/guards/auth_guard.dart
 // CHANGES:
-// - Fixed “stuck on splash until timeout”: when auth is resolved and user is unauthenticated, redirect from "/" -> "/login" immediately.
-// - Added extra loop protection: never redirect if already at "/login".
-// - Improved handling for auth errors: unauthenticated experience remains consistent (go to login).
+// - Fixed stuck on splash when auth is resolved but user is unauthenticated
+// - Added loop protection (never redirect if already at login)
+// - Improved auth error handling
+// - [FIX] Orphan account detection: authenticated + no Firestore doc → redirect to login
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../route_guard.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/user_provider.dart';
 
-/// Ensures user is authenticated.
 class AuthGuard implements RouteGuard {
   @override
   int get priority => 10;
@@ -18,8 +20,11 @@ class AuthGuard implements RouteGuard {
   static const String splashPath = '/';
   static const String loginPath = '/login';
 
-  // Public routes that don't require authentication.
-  static const Set<String> publicRoutes = {splashPath, loginPath};
+  static const Set<String> publicRoutes = {
+    splashPath,
+    loginPath,
+    '/maintenance',
+  };
 
   @override
   String? check(Ref ref, GoRouterState state) {
@@ -27,10 +32,10 @@ class AuthGuard implements RouteGuard {
     final currentPath = state.uri.path;
     final isPublicRoute = publicRoutes.contains(currentPath);
 
-    // Still loading auth state -> do nothing.
+    // Still loading auth — do nothing
     if (authState.isLoading) return null;
 
-    // Auth error -> force user to login screen (don’t get stuck).
+    // Auth error — force to login, don't get stuck
     if (authState.hasError) {
       if (currentPath == loginPath) return null;
       return loginPath;
@@ -38,14 +43,29 @@ class AuthGuard implements RouteGuard {
 
     final isAuthenticated = authState.value != null;
 
-    // ✅ Critical fix: unauthenticated users should not stay on splash.
-    if (!isAuthenticated && currentPath == splashPath) {
-      return loginPath;
-    }
+    // Unauthenticated on splash → go to login immediately
+    if (!isAuthenticated && currentPath == splashPath) return loginPath;
 
-    // Not authenticated -> redirect to login (unless already on a public route).
-    if (!isAuthenticated && !isPublicRoute) {
-      return loginPath;
+    // Unauthenticated on protected route → go to login
+    if (!isAuthenticated && !isPublicRoute) return loginPath;
+
+    // ✅ FIX: Orphan account detection.
+    // State: Firebase Auth session EXISTS but Firestore user doc is MISSING.
+    // Cause: previous signUp() created Auth account then failed writing to Firestore.
+    // Fix: redirect to login — LoginScreen will auto sign-out the orphan session.
+    if (isAuthenticated) {
+      final userState = ref.read(currentUserProvider);
+      final isUserDocMissing = userState.hasValue && userState.value == null;
+
+      if (isUserDocMissing && currentPath == splashPath) {
+        if (kDebugMode) {
+          debugPrint(
+            'AuthGuard: Orphan account detected (Auth exists, Firestore doc missing). '
+            'Redirecting to login for cleanup.',
+          );
+        }
+        return loginPath;
+      }
     }
 
     return null;

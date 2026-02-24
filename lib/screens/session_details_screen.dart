@@ -1,10 +1,14 @@
+﻿// lib/screens/session_details_screen.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
-import '../models/session_model.dart';
+import '../models/session_model.dart' hide MistakeTypeExtensions;
 import '../models/quran_mistake_model.dart';
-
+import '../utils/quran_mistake_utils.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
@@ -17,10 +21,141 @@ class SessionDetailsScreen extends ConsumerStatefulWidget {
   const SessionDetailsScreen({super.key, required this.session});
 
   @override
-  ConsumerState<SessionDetailsScreen> createState() => _SessionDetailsScreenState();
+  ConsumerState<SessionDetailsScreen> createState() =>
+      _SessionDetailsScreenState();
 }
 
 class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
+  // â”€â”€ Quran mistakes state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  List<QuranMistake> _loadedMistakes = [];
+  bool _mistakesLoading = true;
+  int _moshafStartPage = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuranMistakes();
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // LOAD MISTAKES FROM FIRESTORE
+  // Mistakes may already be embedded in session.mistakes (teacher view) or need
+  // to be fetched from the hafizSessions doc (student view reads them fresh).
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Future<void> _loadQuranMistakes() async {
+    // Use in-model list first (avoids an extra read when teacher opens the screen)
+    if (widget.session.mistakes.isNotEmpty) {
+      setState(() {
+        _loadedMistakes = widget.session.mistakes;
+        _moshafStartPage = widget.session.mistakes.first.pageNumber;
+        _mistakesLoading = false;
+      });
+      return;
+    }
+
+    final sessionId = widget.session.id;
+    if (sessionId == null || sessionId.isEmpty) {
+      setState(() => _mistakesLoading = false);
+      return;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('hafizSessions')
+          .doc(sessionId)
+          .get();
+
+      final data = doc.data();
+      if (data == null) {
+        setState(() => _mistakesLoading = false);
+        return;
+      }
+
+      final raw = data['quranMistakes'];
+      if (raw is List && raw.isNotEmpty) {
+        final mistakes = raw
+            .whereType<Map<String, dynamic>>()
+            .map(QuranMistake.fromMap)
+            .toList();
+        setState(() {
+          _loadedMistakes = mistakes;
+          _moshafStartPage = mistakes.first.pageNumber;
+          _mistakesLoading = false;
+        });
+      } else {
+        setState(() => _mistakesLoading = false);
+      }
+    } catch (e) {
+      debugPrint('SessionDetails: failed to load quran mistakes: $e');
+      setState(() => _mistakesLoading = false);
+    }
+  }
+
+  Future<void> _refreshScreen() async {
+    ref.invalidate(currentUserProvider);
+    await ref.read(currentUserProvider.future).catchError((_) => null);
+    await _loadQuranMistakes();
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // OPEN READ-ONLY MOSHAF
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  void _openReadOnlyMoshaf() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(
+              leading: context.canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_ios),
+                      onPressed: () => context.pop(),
+                      tooltip: 'Ø±Ø¬ÙˆØ¹',
+                    )
+                  : null,
+              title: const Text('Ù…Ø±Ø§Ø¬Ø¹Ø© Ø§Ù„ØªÙ„Ø§ÙˆØ©'),
+              backgroundColor: Colors.green.shade700,
+              foregroundColor: Colors.white,
+            ),
+            body: InteractiveQuranPage(
+              pageNumber: _moshafStartPage,
+              existingMistakes: _loadedMistakes,
+              onMistakeAdded: (_) {}, // read-only â€” no-op
+              isEditable: false,
+              onPageChanged: (p) => setState(() => _moshafStartPage = p),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // BUILD
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  Widget _buildMoshafButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _openReadOnlyMoshaf,
+        icon: const Icon(Icons.menu_book),
+        label: const Text('فتح المصحف'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green.shade700,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider).value;
@@ -31,122 +166,135 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            // Modern App Bar with Gradient
-            SliverAppBar(
-              expandedHeight: 130,
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+        body: RefreshIndicator(
+          onRefresh: _refreshScreen,
+          child: CustomScrollView(
+            slivers: [
+              // â”€â”€ App Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              SliverAppBar(
+                expandedHeight: 130,
+                pinned: true,
+                leading: context.canPop()
+                    ? IconButton(
+                        icon: const Icon(Icons.arrow_back_ios),
+                        onPressed: () => context.pop(),
+                        tooltip: 'Ø±Ø¬ÙˆØ¹',
+                      )
+                    : null,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'ØªØ­Ø¯ÙŠØ«',
+                    onPressed: _refreshScreen,
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Hero(
-                                tag: 'session_${session.id}',
-                                child: Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Icon(
-                                    Icons.school,
-                                    size: 32,
-                                    color: Colors.white,
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Hero(
+                                  tag: 'session_${session.id}',
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: const Icon(Icons.school,
+                                        size: 32, color: Colors.white),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      isMohaffez
-                                          ? session.studentName
-                                          : session.mohaffezName,
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        _getStatusLabel(session.status ?? ''),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isMohaffez
+                                            ? session.studentName
+                                            : session.mohaffezName,
                                         style: const TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 24,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          _getStatusLabel(session.status ?? ''),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Content
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  [
-                    // Session Info Card
+              // â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // Session Info
                     _SectionCard(
-                      title: 'معلومات الجلسة',
+                      title: 'Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¬Ù„Ø³Ø©',
                       icon: Icons.info_outline,
                       color: Colors.blue,
                       child: Column(
                         children: [
                           _InfoRow(
                             icon: Icons.event,
-                            label: 'النوع',
+                            label: 'Ø§Ù„Ù†ÙˆØ¹',
                             value: _getSessionTypeLabel(session.sessionType),
                           ),
-                          const Divider(height: 24),
-                          if (session.preferredTimeSlot != null)
+                          if (session.preferredTimeSlot != null) ...[
+                            const Divider(height: 24),
                             _InfoRow(
                               icon: Icons.access_time,
-                              label: 'الوقت',
+                              label: 'Ø§Ù„ÙˆÙ‚Øª',
                               value: session.preferredTimeSlot!,
                             ),
+                          ],
                           if (session.sessionDate != null) ...[
                             const Divider(height: 24),
                             _InfoRow(
                               icon: Icons.calendar_today,
-                              label: 'التاريخ',
+                              label: 'Ø§Ù„ØªØ§Ø±ÙŠØ®',
                               value: DateFormat('dd MMMM yyyy', 'ar')
                                   .format(session.sessionDate!),
                             ),
@@ -155,7 +303,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                             const Divider(height: 24),
                             _InfoRow(
                               icon: Icons.location_on,
-                              label: 'المكان',
+                              label: 'Ø§Ù„Ù…ÙƒØ§Ù†',
                               value: session.location,
                             ),
                           ],
@@ -165,18 +313,18 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Assignments Section
+                    // Assignments
                     if ((session.hifzAssignment?.isNotEmpty ?? false) ||
                         (session.murajaAssignment?.isNotEmpty ?? false))
                       _SectionCard(
-                        title: 'الواجبات',
+                        title: 'Ø§Ù„ÙˆØ§Ø¬Ø¨Ø§Øª',
                         icon: Icons.assignment,
                         color: AppTheme.accentGreen,
                         child: Column(
                           children: [
                             if (session.hifzAssignment?.isNotEmpty ?? false)
                               _AssignmentCard(
-                                title: 'حفظ',
+                                title: 'Ø­ÙØ¸',
                                 content: session.hifzAssignment!,
                                 color: Colors.green,
                                 icon: Icons.book,
@@ -186,7 +334,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                               const SizedBox(height: 12),
                             if (session.murajaAssignment?.isNotEmpty ?? false)
                               _AssignmentCard(
-                                title: 'مراجعة',
+                                title: 'Ù…Ø±Ø§Ø¬Ø¹Ø©',
                                 content: session.murajaAssignment!,
                                 color: Colors.blue,
                                 icon: Icons.refresh,
@@ -197,10 +345,10 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Rating Section
+                    // Rating
                     if (session.sessionRating > 0)
                       _SectionCard(
-                        title: 'التقييم',
+                        title: 'Ø§Ù„ØªÙ‚ÙŠÙŠÙ…',
                         icon: Icons.star,
                         color: Colors.amber,
                         child: Column(
@@ -244,153 +392,47 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                     // Performance notes
                     if (session.performanceNotes?.isNotEmpty ?? false)
                       _SectionCard(
-                        title: 'ملاحظات على التكليف السابق',
+                        title: 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø¹Ù„Ù‰ Ø§Ù„ØªÙƒÙ„ÙŠÙ Ø§Ù„Ø³Ø§Ø¨Ù‚',
                         icon: Icons.fact_check,
                         color: Colors.teal,
                         child: Text(
                           session.performanceNotes!,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.6,
-                          ),
+                          style: const TextStyle(fontSize: 15, height: 1.6),
                         ),
                       ),
 
                     const SizedBox(height: 16),
 
-                    // Notes Section
+                    // Session notes
                     if (session.sessionNotes?.isNotEmpty ?? false)
                       _SectionCard(
-                        title: 'ملاحظات',
+                        title: 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª',
                         icon: Icons.notes,
                         color: Colors.purple,
                         child: Text(
                           session.sessionNotes!,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.6,
-                          ),
+                          style: const TextStyle(fontSize: 15, height: 1.6),
                         ),
                       ),
 
                     const SizedBox(height: 16),
 
-                    // ✅ Quran mistakes section
-                    if (session.mistakes.isNotEmpty)
-                      _SectionCard(
-                        title: 'الأخطاء على المصحف',
-                        icon: Icons.menu_book,
-                        color: AppTheme.accentGreen,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Summary
-                            Row(
-                              children: [
-                                Icon(Icons.error_outline,
-                                    color: Colors.orange.shade700),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'تم تسجيل ${session.mistakes.length} خطأ في هذه الجلسة',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
+                    // â”€â”€ Quran Mistakes Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                    _buildQuranMistakesSection(isMohaffez: isMohaffez),
 
-                            // Grouped by page
-                            ...session.mistakesByPage.entries.map((entry) {
-                              final page = entry.key;
-                              final mistakes = entry.value;
-                              return ExpansionTile(
-                                tilePadding: EdgeInsets.zero,
-                                title: Text(
-                                    'صفحة $page (${mistakes.length} أخطاء)'),
-                                children: mistakes.map((m) {
-                                  return ListTile(
-                                    dense: true,
-                                    leading: CircleAvatar(
-                                      backgroundColor: _mistakeColor(m.type),
-                                      child: Icon(
-                                        _mistakeIcon(m.type),
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    title: Text(
-                                        'آية ${m.ayahNumber} - ${_getMistakeLabel(m.type)}'),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (m.wordText != null)
-                                          Text(
-                                            m.wordText!,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        if (m.correctionNote != null)
-                                          Text(
-                                            m.correctionNote!,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade700,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              );
-                            }),
-
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => Scaffold(
-                                        appBar: AppBar(
-                                          title: const Text(
-                                              'عرض الأخطاء على المصحف'),
-                                        ),
-                                        body: InteractiveQuranPage(
-                                          pageNumber:
-                                              session.mistakes.first.pageNumber,
-                                          existingMistakes: session.mistakes,
-                                          onMistakeAdded: (_) {},
-                                          isEditable: false,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: const Icon(Icons.book),
-                                label: const Text('عرض على المصحف'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryAmber,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildMoshafButton(),
+                    ),
 
                     const SizedBox(height: 32),
-                  ],
+                  ]),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-
-        // Action Buttons
         bottomNavigationBar: _buildBottomNavigationBar(
           isMohaffez: isMohaffez,
           isStudent: isStudent,
@@ -400,84 +442,397 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     );
   }
 
-  // ==========================================================================
-  // BOTTOM NAVIGATION BAR BUILDER
-  // ==========================================================================
-  Widget? _buildBottomNavigationBar({
-    required bool isMohaffez,
-    required bool isStudent,
-    required SessionModel session,
-  }) {
-    // Mohaffez: Show complete session button
-    if (isMohaffez && session.status == 'accepted') {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Navigate to completion screen
-                  },
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('إنهاء الجلسة'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(
-                      color: AppTheme.accentGreen,
-                      width: 2,
-                    ),
-                    foregroundColor: AppTheme.accentGreen,
-                  ),
-                ),
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // QURAN MISTAKES SECTION
+  // Teacher: full list grouped by page + open-on-moshaf button
+  // Student: stat summary + open-on-moshaf button (loads from Firestore)
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Widget _buildQuranMistakesSection({required bool isMohaffez}) {
+    // Still fetching
+    if (_mistakesLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    // Nothing recorded
+    if (_loadedMistakes.isEmpty) return const SizedBox.shrink();
+
+    return _SectionCard(
+      title: 'ØªÙ„Ø§ÙˆØ© Ø§Ù„Ø¬Ù„Ø³Ø©',
+      icon: Icons.menu_book,
+      color: Colors.green.shade700,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // â”€â”€ Stats row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          _buildMistakeStatsRow(),
+
+          const SizedBox(height: 16),
+
+          // â”€â”€ Type breakdown chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          _buildTypeBreakdownChips(),
+
+          const Divider(height: 28),
+
+          // â”€â”€ Teacher: full list grouped by page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          if (isMohaffez) _buildGroupedMistakeList(),
+
+          // â”€â”€ Student: summary tiles (tap to see detail) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          if (!isMohaffez) _buildStudentMistakeTiles(),
+        ],
+      ),
+    );
+  }
+
+  // Stats: total + with-comment count
+  Widget _buildMistakeStatsRow() {
+    final withComment = countWithComments(_loadedMistakes);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _StatCell(
+            icon: Icons.warning_amber_rounded,
+            color: Colors.orange,
+            label: 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ù„Ø§Ø­Ø¸Ø§Øª',
+            value: '${_loadedMistakes.length}',
+          ),
+          Container(width: 1, height: 36, color: Colors.green.shade200),
+          _StatCell(
+            icon: Icons.chat_bubble,
+            color: Colors.blue.shade700,
+            label: 'Ù…Ø¹ ØªØ¹Ù„ÙŠÙ‚',
+            value: '$withComment',
+          ),
+          Container(width: 1, height: 36, color: Colors.green.shade200),
+          _StatCell(
+            icon: Icons.auto_stories,
+            color: Colors.green.shade700,
+            label: 'ØµÙØ­Ø§Øª Ù…Ø®ØªÙ„ÙØ©',
+            value: '${_loadedMistakes.map((m) => m.pageNumber).toSet().length}',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Chips: one per mistake type with count
+  Widget _buildTypeBreakdownChips() {
+    final groups = groupMistakesByType(_loadedMistakes);
+    if (groups.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: groups.entries.map((e) {
+        return Chip(
+          avatar: Icon(getMistakeIcon(e.key), size: 14, color: Colors.white),
+          label: Text(
+            '${e.key.arabicLabel}: ${e.value}',
+            style: const TextStyle(fontSize: 11, color: Colors.white),
+          ),
+          backgroundColor: getMistakeColor(e.key),
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+        );
+      }).toList(),
+    );
+  }
+
+  // Teacher: ExpansionTile grouped by page, using buildSummaryTile()
+  Widget _buildGroupedMistakeList() {
+    final pages = _loadedMistakes.map((m) => m.pageNumber).toSet().toList()
+      ..sort();
+
+    return Column(
+      children: pages.map((page) {
+        final pageMistakes = getMistakesOnPage(_loadedMistakes, page);
+        return Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            leading: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 12),
+              child: Text(
+                'Øµ $page',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.green.shade800),
+              ),
+            ),
+            title: Text(
+              '${pageMistakes.length} ${pageMistakes.length == 1 ? 'Ù…Ù„Ø§Ø­Ø¸Ø©' : 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª'}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            children: pageMistakes.map((m) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: m.buildSummaryTile(
+                  onTap: () => _showMistakeDetailDialog(m),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // Student: flat list of summary tiles (no expansion needed)
+  Widget _buildStudentMistakeTiles() {
+    // Show max 5 inline, rest behind "show all" expansion
+    final preview = _loadedMistakes.take(5).toList();
+    final rest = _loadedMistakes.skip(5).toList();
+
+    return Column(
+      children: [
+        ...preview.map((m) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: m.buildSummaryTile(
+                onTap: () => _showMistakeDetailDialog(m),
+              ),
+            )),
+        if (rest.isNotEmpty)
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text(
+                'Ø¹Ø±Ø¶ ${rest.length} Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø¥Ø¶Ø§ÙÙŠØ©...',
+                style: TextStyle(fontSize: 13, color: Colors.green.shade700),
+              ),
+              children: rest
+                  .map((m) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: m.buildSummaryTile(
+                          onTap: () => _showMistakeDetailDialog(m),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Shared detail dialog (tap on tile)
+  void _showMistakeDetailDialog(QuranMistake mistake) {
+    final hasComment = mistake.hasComment;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: mistake.color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(mistake.icon, color: mistake.color, size: 20),
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Edit assignment
-                  },
-                  icon: const Icon(Icons.edit),
-                  label: const Text('تعديل الواجب'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: AppTheme.primaryAmber,
+                child: Text(
+                  mistake.label,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: mistake.color,
                   ),
                 ),
               ),
             ],
           ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Location
+              _dialogRow(Icons.menu_book, 'Ø§Ù„ØµÙØ­Ø©', '${mistake.pageNumber}'),
+              _dialogRow(
+                  Icons.format_list_numbered, 'Ø§Ù„Ø¢ÙŠØ©', '${mistake.ayahNumber}'),
+
+              // Word text
+              if (mistake.wordText?.isNotEmpty ?? false) ...[
+                const SizedBox(height: 12),
+                const Text('Ø§Ù„ÙƒÙ„Ù…Ø© / Ø§Ù„Ù…ÙˆØ¶Ø¹',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Text(
+                    mistake.wordText!,
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+
+              // Teacher comment
+              if (hasComment) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Icon(Icons.chat_bubble,
+                        size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      'ØªØ¹Ù„ÙŠÙ‚ Ø§Ù„Ù…Ø¹Ù„Ù…',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.blue.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Text(
+                    mistake.correctionNote!,
+                    style: TextStyle(
+                        fontSize: 14, color: Colors.blue.shade900, height: 1.6),
+                  ),
+                ),
+              ],
+
+              if (!hasComment) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.chat_bubble_outline,
+                        size: 14, color: Colors.grey.shade400),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Ù„Ø§ ÙŠÙˆØ¬Ø¯ ØªØ¹Ù„ÙŠÙ‚ Ù„Ù‡Ø°Ø§ Ø§Ù„Ø®Ø·Ø£',
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Ø¥ØºÙ„Ø§Ù‚'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade600),
+          const SizedBox(width: 6),
+          Text('$label: ',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // BOTTOM NAV BAR
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Widget? _buildBottomNavigationBar({
+    required bool isMohaffez,
+    required bool isStudent,
+    required SessionModel session,
+  }) {
+    // Mohaffez: complete / edit buttons
+    if (isMohaffez && session.status == 'accepted') {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/complete-session/${session.id}',
+                extra: {
+                  'studentName': session.studentName,
+                  'previousHifz': session.hifzAssignment,
+                  'previousMuraja': session.murajaAssignment,
+                }),
+            icon: const Icon(Icons.check_circle),
+            label: const Text('Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: const BorderSide(color: AppTheme.accentGreen, width: 2),
+              foregroundColor: AppTheme.accentGreen,
+            ),
+          ),
         ),
       );
     }
 
-    // Student: Show cancel button for accepted sessions that haven't happened yet
-    if (isStudent && 
-        session.status == 'accepted' && 
+    // Student: cancel button (with refund policy)
+    if (isStudent &&
+        session.status == 'accepted' &&
         session.sessionDate != null &&
         session.sessionDate!.isAfter(DateTime.now())) {
-      final hoursUntil = session.sessionDate!.difference(DateTime.now()).inHours;
-      
-      // Calculate refund policy
-      String refundPolicy;
-      Color policyColor;
+      final hoursUntil =
+          session.sessionDate!.difference(DateTime.now()).inHours;
+
+      final String refundPolicy;
+      final Color policyColor;
       if (hoursUntil > 24) {
-        refundPolicy = '✅ استرداد كامل';
+        refundPolicy = 'âœ… Ø§Ø³ØªØ±Ø¯Ø§Ø¯ ÙƒØ§Ù…Ù„';
         policyColor = Colors.green;
       } else if (hoursUntil > 2) {
-        refundPolicy = '⚠️ استرداد 50%';
+        refundPolicy = 'âš ï¸ Ø§Ø³ØªØ±Ø¯Ø§Ø¯ 50%';
         policyColor = Colors.orange;
       } else {
-        refundPolicy = '❌ لا استرداد';
+        refundPolicy = 'âŒ Ù„Ø§ Ø§Ø³ØªØ±Ø¯Ø§Ø¯';
         policyColor = Colors.red;
       }
-      
+
       return SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Refund policy warning
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8),
@@ -488,23 +843,25 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                   Icon(Icons.info_outline, color: policyColor, size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    'سياسة الإلغاء: $refundPolicy',
+                    'Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¥Ù„ØºØ§Ø¡: $refundPolicy',
                     style: TextStyle(color: policyColor, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            
-            // Cancel button
             Padding(
               padding: const EdgeInsets.all(16),
-              child: ElevatedButton.icon(
-                onPressed: () => _showCancellationDialog(session, refundPolicy),
-                icon: const Icon(Icons.cancel),
-                label: const Text('إلغاء الجلسة'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      _showCancellationDialog(session, refundPolicy),
+                  icon: const Icon(Icons.cancel),
+                  label: const Text('Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
                 ),
               ),
             ),
@@ -513,20 +870,23 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       );
     }
 
-    // Student: Show rating button for completed sessions that haven't been rated
-    if (isStudent && 
+    // Student: rate button for unrated completed sessions
+    if (isStudent &&
         session.status == 'completed' &&
         (session.sessionRating == null || session.sessionRating == 0)) {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: ElevatedButton.icon(
-            onPressed: () => _navigateToRating(session),
-            icon: const Icon(Icons.star, color: Colors.white),
-            label: const Text('قيّم الجلسة', style: TextStyle(fontSize: 16)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _navigateToRating(session),
+              icon: const Icon(Icons.star, color: Colors.white),
+              label: const Text('Ù‚ÙŠÙ‘Ù… Ø§Ù„Ø¬Ù„Ø³Ø©', style: TextStyle(fontSize: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
             ),
           ),
         ),
@@ -536,27 +896,28 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     return null;
   }
 
-  // ==========================================================================
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // CANCELLATION DIALOG
-  // ==========================================================================
-  Future<void> _showCancellationDialog(SessionModel session, [String? precalculatedRefundPolicy]) async {
-    final hoursUntilSession = 
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Future<void> _showCancellationDialog(SessionModel session,
+      [String? precalculatedRefundPolicy]) async {
+    final hoursUntilSession =
         session.sessionDate!.difference(DateTime.now()).inHours;
-    
-    String refundPolicy;
-    Color policyColor;
-    
+
+    final String refundPolicy;
+    final Color policyColor;
     if (hoursUntilSession > 24) {
-      refundPolicy = '✅ استرداد كامل المبلغ';
+      refundPolicy = 'âœ… Ø§Ø³ØªØ±Ø¯Ø§Ø¯ ÙƒØ§Ù…Ù„ Ø§Ù„Ù…Ø¨Ù„Øº';
       policyColor = Colors.green;
     } else if (hoursUntilSession > 2) {
-      refundPolicy = '⚠️ استرداد 50% من المبلغ';
+      refundPolicy = 'âš ï¸ Ø§Ø³ØªØ±Ø¯Ø§Ø¯ 50% Ù…Ù† Ø§Ù„Ù…Ø¨Ù„Øº';
       policyColor = Colors.orange;
     } else {
-      refundPolicy = '❌ لا يمكن الاسترداد';
+      refundPolicy = 'âŒ Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø§Ø³ØªØ±Ø¯Ø§Ø¯';
       policyColor = Colors.red;
     }
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -566,16 +927,14 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
             children: [
               Icon(Icons.warning, color: Colors.red),
               SizedBox(width: 8),
-              Text('تأكيد الإلغاء'),
+              Text('ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¥Ù„ØºØ§Ø¡'),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'هل تريد إلغاء هذه الجلسة؟',
-                style: TextStyle(fontSize: 16),
-              ),
+              const Text('Ù‡Ù„ ØªØ±ÙŠØ¯ Ø¥Ù„ØºØ§Ø¡ Ù‡Ø°Ù‡ Ø§Ù„Ø¬Ù„Ø³Ø©ØŸ',
+                  style: TextStyle(fontSize: 16)),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -592,9 +951,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                       child: Text(
                         refundPolicy,
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: policyColor,
-                        ),
+                            fontWeight: FontWeight.bold, color: policyColor),
                       ),
                     ),
                   ],
@@ -605,90 +962,83 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('لا'),
+              child: const Text('Ù„Ø§'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('نعم، إلغاء الجلسة'),
+              child: const Text('Ù†Ø¹Ù…ØŒ Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©'),
             ),
           ],
         ),
       ),
     );
-    
+
     if (confirmed != true || !mounted) return;
 
-    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(
         child: Card(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
-                Text('جاري إلغاء الجلسة...'),
+                Text('Ø¬Ø§Ø±ÙŠ Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©...'),
               ],
             ),
           ),
         ),
       ),
     );
-    
+
     try {
       final sessionId = session.id;
-      if (sessionId == null) {
-        throw Exception('معرف الجلسة غير متاح');
-      }
-      
-      await ref.read(sessionActionsProvider.notifier)
-        .cancelSession(sessionId);
-      
+      if (sessionId == null) throw Exception('Ù…Ø¹Ø±Ù Ø§Ù„Ø¬Ù„Ø³Ø© ØºÙŠØ± Ù…ØªØ§Ø­');
+
+      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId);
+
       if (mounted) {
-        Navigator.pop(context); // Close loading
-        Navigator.pop(context); // Close details screen
+        Navigator.pop(context); // close loading
+        Navigator.pop(context); // close details
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم إلغاء الجلسة بنجاح'),
+            content: Text('ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø© Ø¨Ù†Ø¬Ø§Ø­'),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Close loading
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Ø­Ø¯Ø« Ø®Ø·Ø£: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
-  // ==========================================================================
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // NAVIGATE TO RATING
-  // ==========================================================================
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   Future<void> _navigateToRating(SessionModel session) async {
     final sessionId = session.id;
     if (sessionId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('معرف الجلسة غير متاح'),
-            backgroundColor: Colors.red,
-          ),
+              content: Text('Ù…Ø¹Ø±Ù Ø§Ù„Ø¬Ù„Ø³Ø© ØºÙŠØ± Ù…ØªØ§Ø­'),
+              backgroundColor: Colors.red),
         );
       }
       return;
     }
-    
+
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -698,29 +1048,30 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         ),
       ),
     );
-    
+
     if (result == true && mounted) {
-      // Refresh the current session details
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('شكراً لتقييمك!'),
-          backgroundColor: Colors.green,
-        ),
+            content: Text('Ø´ÙƒØ±Ø§Ù‹ Ù„ØªÙ‚ÙŠÙŠÙ…Ùƒ!'), backgroundColor: Colors.green),
       );
     }
   }
 
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // LABEL HELPERS
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   String _getStatusLabel(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return 'مقبولة';
+        return 'Ù…Ù‚Ø¨ÙˆÙ„Ø©';
       case 'pending':
-        return 'قيد الانتظار';
+        return 'Ù‚ÙŠØ¯ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±';
       case 'completed':
-        return 'مكتملة';
+        return 'Ù…ÙƒØªÙ…Ù„Ø©';
       case 'cancelled':
-        return 'ملغية';
+        return 'Ù…Ù„ØºÙŠØ©';
       default:
         return status;
     }
@@ -729,73 +1080,52 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
   String _getSessionTypeLabel(String type) {
     switch (type.toLowerCase()) {
       case 'home':
-        return 'في المنزل';
+        return 'ÙÙŠ Ø§Ù„Ù…Ù†Ø²Ù„';
       case 'mosque':
-        return 'في المسجد';
+        return 'ÙÙŠ Ø§Ù„Ù…Ø³Ø¬Ø¯';
       case 'online':
-        return 'عن بُعد';
+        return 'Ø¹Ù† Ø¨ÙØ¹Ø¯';
       default:
         return type;
     }
   }
+}
 
-  // Helper to avoid ambiguous extension
-  String _getMistakeLabel(MistakeType type) {
-    switch (type) {
-      case MistakeType.tajweed:
-        return 'خطأ تجويد';
-      case MistakeType.pronunciation:
-        return 'خطأ نطق';
-      case MistakeType.reading:
-        return 'قراءة خاطئة';
-      case MistakeType.skip:
-        return 'تجاوز';
-      case MistakeType.addition:
-        return 'زيادة';
-      case MistakeType.other:
-        return 'أخرى';
-      default:  // ✅ ADD THIS
-        return 'غير محدد';
-    }
-  }
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PRIVATE WIDGETS
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  Color _mistakeColor(MistakeType type) {
-    switch (type) {
-      case MistakeType.tajweed:
-        return Colors.orange;
-      case MistakeType.pronunciation:
-        return Colors.red;
-      case MistakeType.reading:
-        return Colors.purple;
-      case MistakeType.skip:
-        return Colors.blue;
-      case MistakeType.addition:
-        return Colors.green;
-      case MistakeType.other:
-        return Colors.grey;
-      default:  // ✅ ADD THIS
-        return Colors.grey;
-    }
-  }
+class _StatCell extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String value;
 
-  IconData _mistakeIcon(MistakeType type) {
-    switch (type) {
-      case MistakeType.tajweed:
-        return Icons.auto_fix_high;
-      case MistakeType.pronunciation:
-        return Icons.record_voice_over;
-      case MistakeType.reading:
-        return Icons.error_outline;
-      case MistakeType.skip:
-        return Icons.fast_forward;
-      case MistakeType.addition:
-        return Icons.add_circle_outline;
-      case MistakeType.other:
-        return Icons.help_outline;
-      default:  // ✅ ADD THIS
-        return Icons.help_outline;
-
-    }
+  const _StatCell({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 4),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(label,
+            style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+      ],
+    );
   }
 }
 
@@ -811,7 +1141,6 @@ class _SectionCard extends StatelessWidget {
     required this.color,
     required this.child,
   });
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -833,13 +1162,9 @@ class _SectionCard extends StatelessWidget {
                   child: Icon(icon, color: color, size: 24),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 20),
@@ -861,29 +1186,21 @@ class _InfoRow extends StatelessWidget {
     required this.label,
     required this.value,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Icon(icon, size: 20, color: Colors.grey.shade600),
         const SizedBox(width: 12),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 15,
-            color: Colors.grey.shade700,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text('$label: ',
+            style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600)),
         Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          child: Text(value,
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         ),
       ],
     );
@@ -902,7 +1219,6 @@ class _AssignmentCard extends StatelessWidget {
     required this.color,
     required this.icon,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -920,26 +1236,18 @@ class _AssignmentCard extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 20),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold, color: color)),
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            content,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.6,
-            ),
-          ),
+          Text(content, style: const TextStyle(fontSize: 15, height: 1.6)),
         ],
       ),
     );
   }
 }
+
+
+

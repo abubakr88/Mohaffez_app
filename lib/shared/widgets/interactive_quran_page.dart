@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../models/quran_mistake_model.dart';
 import '../../services/quran_service.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // ✅ Add this
+import 'package:cached_network_image/cached_network_image.dart';
 
 class InteractiveQuranPage extends StatefulWidget {
   final int pageNumber;
@@ -54,14 +54,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
   void _changePage(int newPage) {
     if (newPage < 1 || newPage > QuranService.totalPages) return;
-
-    setState(() {
-      currentPage = newPage;
-    });
-
+    setState(() => currentPage = newPage);
     widget.onPageChanged?.call(newPage);
     _loadPageData();
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +71,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
     return Column(
       children: [
-        // Mistake type selector (for teacher)
+        // Mistake type selector — teacher only
         if (widget.isEditable) _buildMistakeTypeSelector(),
 
         // Quran page with tap detection
@@ -80,15 +80,15 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
             onTapDown: widget.isEditable ? _handleTapDown : null,
             child: Stack(
               children: [
-                // Quran page image
                 _buildQuranPageImage(),
-
-                // Overlay existing mistakes
                 ..._buildMistakeMarkers(),
               ],
             ),
           ),
         ),
+
+        // Comment legend — only when there are mistakes with comments
+        if (_hasAnyComments()) _buildCommentLegend(),
 
         // Page navigation
         _buildPageNavigation(),
@@ -96,11 +96,15 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // QURAN PAGE IMAGE
+  // ─────────────────────────────────────────────────────────────────────────────
+
   Widget _buildQuranPageImage() {
     return Container(
       color: const Color(0xFFF5F3E8),
       child: Center(
-        child: CachedNetworkImage( // ✅ Changed from Image.asset
+        child: CachedNetworkImage(
           imageUrl: QuranService().getPageImageUrl(currentPage),
           fit: BoxFit.contain,
           placeholder: (context, url) => Column(
@@ -119,12 +123,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 const SizedBox(height: 16),
                 Text(
                   'صفحة $currentPage',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'الجزء ${pageInfo?['juz'] ?? ''}',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  style:
+                      TextStyle(fontSize: 16, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -138,8 +144,12 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       ),
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TAP HANDLER
+  // ─────────────────────────────────────────────────────────────────────────────
+
   void _handleTapDown(TapDownDetails details) {
-    // Get relative position (0.0 to 1.0)
     final RenderBox? box = context.findRenderObject() as RenderBox?;
     if (box == null) return;
 
@@ -149,9 +159,12 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     final xPosition = localPosition.dx / size.width;
     final yPosition = localPosition.dy / size.height;
 
-    // Show mistake details dialog
     _showMistakeDialog(xPosition, yPosition);
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ADD MISTAKE DIALOG  (teacher)
+  // ─────────────────────────────────────────────────────────────────────────────
 
   Future<void> _showMistakeDialog(double x, double y) async {
     if (pageInfo == null) return;
@@ -169,14 +182,16 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
     int selectedAyah = verses.first['verse'] ?? 1;
     int selectedSurah = verses.first['surah'] ?? 1;
-    MistakeType dialogMistakeType = selectedMistakeType; // ✅ Local state for dialog
+    MistakeType dialogMistakeType = selectedMistakeType;
 
     final result = await showDialog<QuranMistake>(
       context: context,
-      builder: (ctx) => StatefulBuilder( // ✅ Use StatefulBuilder for dialog state
+      builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
             title: const Text('تحديد الخطأ'),
             content: SingleChildScrollView(
               child: Column(
@@ -184,7 +199,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 children: [
                   // Ayah selector
                   DropdownButtonFormField<int>(
-                    decoration: const InputDecoration(labelText: 'رقم الآية'),
+                    decoration:
+                        const InputDecoration(labelText: 'رقم الآية'),
                     value: selectedAyah,
                     items: verses.map((verse) {
                       final ayahNum = verse['verse'] as int;
@@ -197,7 +213,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                       if (val != null) {
                         setDialogState(() {
                           selectedAyah = val;
-                          final verse = verses.firstWhere((v) => v['verse'] == val);
+                          final verse = verses
+                              .firstWhere((v) => v['verse'] == val);
                           selectedSurah = verse['surah'] as int;
                         });
                       }
@@ -217,31 +234,44 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
                   // Mistake type
                   DropdownButtonFormField<MistakeType>(
-                    decoration: const InputDecoration(labelText: 'نوع الخطأ'),
+                    decoration:
+                        const InputDecoration(labelText: 'نوع الخطأ'),
                     value: dialogMistakeType,
                     items: MistakeType.values.map((type) {
                       return DropdownMenuItem(
                         value: type,
-                        child: Text(_getMistakeTypeLabel(type)),
+                        child: Row(
+                          children: [
+                            Icon(_getMistakeIcon(type),
+                                size: 16,
+                                color: _getMistakeColor(type)),
+                            const SizedBox(width: 8),
+                            Text(_getMistakeTypeLabel(type)),
+                          ],
+                        ),
                       );
                     }).toList(),
                     onChanged: (val) {
                       if (val != null) {
-                        setDialogState(() {
-                          dialogMistakeType = val;
-                        });
+                        setDialogState(() => dialogMistakeType = val);
                       }
                     },
                   ),
                   const SizedBox(height: 12),
 
-                  // Correction note
+                  // Correction note — hint emphasises it will appear as blue badge
                   TextField(
                     controller: noteController,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'ملاحظة التصحيح',
+                    decoration: InputDecoration(
+                      labelText: 'تعليق التصحيح',
                       hintText: 'اشرح الخطأ وكيفية التصحيح...',
+                      helperText:
+                          'إضافة تعليق ستظهر علامة زرقاء 🔵 على الآية',
+                      helperStyle:
+                          TextStyle(color: Colors.blue.shade700),
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.chat_bubble_outline),
                     ),
                   ),
                 ],
@@ -255,19 +285,23 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               ElevatedButton(
                 onPressed: () {
                   final mistake = QuranMistake(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(), // ✅ ADD THIS
+                    id: DateTime.now()
+                        .millisecondsSinceEpoch
+                        .toString(),
                     pageNumber: currentPage,
-                    surahNumber: selectedSurah, // ✅ ADD THIS
+                    surahNumber: selectedSurah,
                     ayahNumber: selectedAyah,
-                    type: dialogMistakeType, // ✅ Use dialog state
+                    type: dialogMistakeType,
                     xPosition: x,
                     yPosition: y,
-                    wordText: wordController.text.trim().isEmpty
-                        ? null
-                        : wordController.text.trim(),
-                    correctionNote: noteController.text.trim().isEmpty
-                        ? null
-                        : noteController.text.trim(),
+                    wordText:
+                        wordController.text.trim().isEmpty
+                            ? null
+                            : wordController.text.trim(),
+                    correctionNote:
+                        noteController.text.trim().isEmpty
+                            ? null
+                            : noteController.text.trim(),
                     markedAt: DateTime.now(),
                   );
                   Navigator.pop(ctx, mistake);
@@ -285,6 +319,10 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MISTAKE MARKERS  (with comment badge)
+  // ─────────────────────────────────────────────────────────────────────────────
+
   List<Widget> _buildMistakeMarkers() {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -292,83 +330,220 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     return widget.existingMistakes
         .where((m) => m.pageNumber == currentPage)
         .map((mistake) {
+      final hasComment = mistake.correctionNote != null &&
+          mistake.correctionNote!.isNotEmpty;
+
       return Positioned(
         left: (mistake.xPosition ?? 0) * screenWidth,
         top: (mistake.yPosition ?? 0) * screenHeight,
         child: GestureDetector(
           onTap: () => _showMistakeDetails(mistake),
-          child: Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: _getMistakeColor(mistake.type).withOpacity(0.8),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // ── Main mistake circle ────────────────────────────────────
+              Tooltip(
+                message: _getMistakeTypeLabel(mistake.type),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: _getMistakeColor(mistake.type)
+                        .withOpacity(0.85),
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _getMistakeIcon(mistake.type),
+                    size: 16,
+                    color: Colors.white,
+                  ),
                 ),
-              ],
-            ),
-            child: Icon(
-              _getMistakeIcon(mistake.type),
-              size: 16,
-              color: Colors.white,
-            ),
+              ),
+
+              // ── Blue comment badge — only when correctionNote exists ──
+              if (hasComment)
+                Positioned(
+                  top: -5,
+                  right: -5,
+                  child: Container(
+                    width: 15,
+                    height: 15,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade700,
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: Colors.white, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(0.4),
+                          blurRadius: 3,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.chat_bubble,
+                      size: 8,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       );
     }).toList();
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // VIEW MISTAKE DETAILS DIALOG  (teacher + student read-only)
+  // ─────────────────────────────────────────────────────────────────────────────
+
   void _showMistakeDetails(QuranMistake mistake) {
+    final hasComment = mistake.correctionNote != null &&
+        mistake.correctionNote!.isNotEmpty;
+
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+
+          // ── Title: type badge ──────────────────────────────────────────
           title: Row(
             children: [
-              Icon(_getMistakeIcon(mistake.type), 
-                   color: _getMistakeColor(mistake.type)),
-              const SizedBox(width: 8),
-              Expanded(child: Text(_getMistakeTypeLabel(mistake.type))),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _getMistakeColor(mistake.type).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _getMistakeIcon(mistake.type),
+                  color: _getMistakeColor(mistake.type),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _getMistakeTypeLabel(mistake.type),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _getMistakeColor(mistake.type),
+                  ),
+                ),
+              ),
             ],
           ),
+
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('الصفحة: ${mistake.pageNumber}'),
-              Text('الآية: ${mistake.ayahNumber}'),
-              if (mistake.wordText != null) ...[
+              // ── Location row ─────────────────────────────────────────
+              _detailRow(Icons.menu_book, 'الصفحة',
+                  '${mistake.pageNumber}'),
+              _detailRow(Icons.format_list_numbered, 'الآية',
+                  '${mistake.ayahNumber}'),
+
+              // ── Word text ────────────────────────────────────────────
+              if (mistake.wordText != null &&
+                  mistake.wordText!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Text(
-                  'الكلمة:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  'الكلمة / الموضع',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  mistake.wordText!,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Text(
+                    mistake.wordText!,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
-              if (mistake.correctionNote != null) ...[
-                const SizedBox(height: 12),
-                const Text(
-                  'ملاحظة التصحيح:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+
+              // ── Teacher comment ──────────────────────────────────────
+              if (hasComment) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Icon(Icons.chat_bubble,
+                        size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      'تعليق المعلم',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.blue.shade800,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(mistake.correctionNote!),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Text(
+                    mistake.correctionNote!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue.shade900,
+                      height: 1.6,
+                    ),
+                  ),
+                ),
+              ],
+
+              // ── No comment hint (teacher view only) ──────────────────
+              if (!hasComment && widget.isEditable) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.chat_bubble_outline,
+                        size: 14, color: Colors.grey.shade400),
+                    const SizedBox(width: 6),
+                    Text(
+                      'لا يوجد تعليق لهذا الخطأ',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
               ],
             ],
           ),
+
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -379,6 +554,10 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       ),
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MISTAKE TYPE SELECTOR  (teacher toolbar)
+  // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _buildMistakeTypeSelector() {
     return Container(
@@ -405,7 +584,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 selectedColor: _getMistakeColor(type),
                 labelStyle: TextStyle(
                   color: isSelected ? Colors.white : Colors.black87,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight:
+                      isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             );
@@ -415,7 +595,51 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COMMENT LEGEND
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  bool _hasAnyComments() {
+    return widget.existingMistakes
+        .where((m) => m.pageNumber == currentPage)
+        .any((m) =>
+            m.correctionNote != null && m.correctionNote!.isNotEmpty);
+  }
+
+  Widget _buildCommentLegend() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      color: Colors.blue.shade50,
+      child: Row(
+        children: [
+          Container(
+            width: 13,
+            height: 13,
+            decoration: BoxDecoration(
+              color: Colors.blue.shade700,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.chat_bubble, size: 7, color: Colors.white),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'العلامة الزرقاء = يوجد تعليق من المعلم — اضغط على العلامة لعرضه',
+            style: TextStyle(fontSize: 11, color: Colors.blue.shade800),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PAGE NAVIGATION
+  // ─────────────────────────────────────────────────────────────────────────────
+
   Widget _buildPageNavigation() {
+    final mistakesOnPage = widget.existingMistakes
+        .where((m) => m.pageNumber == currentPage)
+        .length;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -431,31 +655,55 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Previous page (→ in RTL = previous)
           IconButton(
             icon: const Icon(Icons.arrow_forward),
-            onPressed: currentPage > 1 ? () => _changePage(currentPage - 1) : null,
+            onPressed: currentPage > 1
+                ? () => _changePage(currentPage - 1)
+                : null,
             tooltip: 'الصفحة السابقة',
           ),
+
+          // Page info + mistake count badge
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'صفحة $currentPage',
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                    fontSize: 18, fontWeight: FontWeight.bold),
               ),
               if (pageInfo != null)
                 Text(
                   'الجزء ${pageInfo!['juz']}',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
+                      fontSize: 12, color: Colors.grey.shade600),
+                ),
+              if (mistakesOnPage > 0) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                    border:
+                        Border.all(color: Colors.orange.shade300),
+                  ),
+                  child: Text(
+                    '$mistakesOnPage ${mistakesOnPage == 1 ? 'ملاحظة' : 'ملاحظات'}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+              ],
             ],
           ),
+
+          // Next page (← in RTL = next)
           IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: currentPage < QuranService.totalPages
@@ -468,7 +716,36 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     );
   }
 
-  // Helper methods
+  // ─────────────────────────────────────────────────────────────────────────────
+  // DIALOG DETAIL ROW HELPER
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade600),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: TextStyle(
+                fontSize: 13, color: Colors.grey.shade600),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MISTAKE TYPE HELPERS
+  // ─────────────────────────────────────────────────────────────────────────────
+
   String _getMistakeTypeLabel(MistakeType type) {
     switch (type) {
       case MistakeType.tajweed:

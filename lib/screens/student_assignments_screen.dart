@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
@@ -52,6 +53,13 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  Future<void> _refreshAssignments() async {
+    ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
+    await ref
+        .read(studentSessionsFirstPageProvider(widget.studentId).future)
+        .catchError((_) => <Map<String, dynamic>>[]);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +87,20 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
               expandedHeight: 130,
               floating: true,
               pinned: true,
+              leading: context.canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_ios),
+                      onPressed: () => context.pop(),
+                      tooltip: 'رجوع',
+                    )
+                  : null,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'تحديث',
+                  onPressed: _refreshAssignments,
+                ),
+              ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -161,24 +183,26 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                   // Active Assignments
                   sessionsAsync.when(
                     data: (sessions) {
-                    final now = DateTime.now();
+                      final now = DateTime.now();
 
-                    // "قيد الإنجاز" - الجلسات القادمة المقبولة فقط
-                    final activeSessions = sessions
-                      .where((s) {
+                      // "قيد الإنجاز" - الجلسات القادمة المقبولة فقط
+                      final activeSessions = sessions.where((s) {
                         final status = s['status'] as String?;
                         if (status != 'accepted') return false;
 
                         final sessionDate = s['sessionDate'] as DateTime?;
                         if (sessionDate == null) return false;
 
-                        final timeSlot = s['preferredTimeSlot'] as String? ?? '08:00';
-                        
+                        final timeSlot =
+                            s['preferredTimeSlot'] as String? ?? '08:00';
+
                         try {
                           // Parse time from slot (e.g., "08:00-09:00")
                           final timeParts = timeSlot.split('-')[0].split(':');
                           final hour = int.parse(timeParts[0]);
-                          final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
+                          final minute = timeParts.length > 1
+                              ? int.parse(timeParts[1])
+                              : 0;
 
                           final sessionDateTime = DateTime(
                             sessionDate.year,
@@ -193,11 +217,11 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                         } catch (_) {
                           // Fallback: at least check date is today or future
                           final today = DateTime(now.year, now.month, now.day);
-                          final dateOnly = DateTime(sessionDate.year, sessionDate.month, sessionDate.day);
+                          final dateOnly = DateTime(sessionDate.year,
+                              sessionDate.month, sessionDate.day);
                           return !dateOnly.isBefore(today);
                         }
-                      })
-                      .toList();
+                      }).toList();
                       if (activeSessions.isEmpty) {
                         return const EmptyState(
                           icon: Icons.assignment_outlined,
@@ -208,10 +232,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                       }
 
                       return RefreshIndicator(
-                        onRefresh: () async {
-                          ref.invalidate(
-                              studentSessionsFirstPageProvider(widget.studentId));
-                        },
+                        onRefresh: _refreshAssignments,
                         child: ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: activeSessions.length,
@@ -453,8 +474,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
     // ✅ NEW: التقييمات
     final previousHifzCompleted = session['previousHifzCompleted'] as bool?;
     final previousHifzRating = session['previousHifzRating'] as int? ?? 0;
-    final previousMurajaCompleted =
-        session['previousMurajaCompleted'] as bool?;
+    final previousMurajaCompleted = session['previousMurajaCompleted'] as bool?;
     final previousMurajaRating = session['previousMurajaRating'] as int? ?? 0;
     final performanceNotes = session['performanceNotes'] as String?;
     final sessionRating = session['sessionRating'] as int? ?? 0;
@@ -564,7 +584,6 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-
               if (previousHifzCompleted != null)
                 _buildPerformanceBadge(
                   'الحفظ',
@@ -572,7 +591,6 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                   previousHifzRating,
                   Colors.green,
                 ),
-
               if (previousMurajaCompleted != null) ...[
                 const SizedBox(height: 8),
                 _buildPerformanceBadge(
@@ -582,7 +600,6 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                   Colors.blue,
                 ),
               ],
-
               if (performanceNotes != null && performanceNotes.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -643,7 +660,6 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-
               if (hifz.isNotEmpty)
                 _CompletedAssignmentItem(
                   icon: Icons.book,

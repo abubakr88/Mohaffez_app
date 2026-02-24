@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
 
@@ -55,9 +56,12 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
   }
 
   Future<void> _loadWallets() async {
-    final wallets = await DirectPaymentService.getMohaffezWalletNumbers(
-        widget.mohaffezId);
-    setState(() { _wallets = wallets; _loading = false; });
+    final wallets =
+        await DirectPaymentService.getMohaffezWalletNumbers(widget.mohaffezId);
+    setState(() {
+      _wallets = wallets;
+      _loading = false;
+    });
   }
 
   List<DirectPaymentMethod> get _availableMethods => DirectPaymentMethod.values
@@ -87,7 +91,8 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
         slotEnd: widget.slotEnd,
         paymentMethod: _selectedMethod!.value,
         studentNote: _noteController.text.trim().isEmpty
-            ? null : _noteController.text.trim(),
+            ? null
+            : _noteController.text.trim(),
         imamAddressText: widget.imamAddressText,
         imamAddressLat: widget.imamAddressLat,
         imamAddressLng: widget.imamAddressLng,
@@ -128,6 +133,13 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('الدفع المباشر'),
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
@@ -180,8 +192,7 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                         final isSelected = _selectedMethod == method;
                         final number = _wallets[method.value] ?? '';
                         return GestureDetector(
-                          onTap: () =>
-                              setState(() => _selectedMethod = method),
+                          onTap: () => setState(() => _selectedMethod = method),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             margin: const EdgeInsets.only(bottom: 10),
@@ -203,9 +214,7 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                                 isSelected
                                     ? Icons.radio_button_checked
                                     : Icons.radio_button_unchecked,
-                                color: isSelected
-                                    ? Colors.green
-                                    : Colors.grey,
+                                color: isSelected ? Colors.green : Colors.grey,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -232,8 +241,8 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                                               ClipboardData(text: number));
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(const SnackBar(
-                                                  content: Text(
-                                                      'تم نسخ الرقم')));
+                                                  content:
+                                                      Text('تم نسخ الرقم')));
                                         },
                                       ),
                                     ]),
@@ -303,7 +312,8 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                     onPressed: _submitting ? null : _confirmPayment,
                     icon: _submitting
                         ? const SizedBox(
-                            width: 20, height: 20,
+                            width: 20,
+                            height: 20,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.check_circle, color: Colors.white),

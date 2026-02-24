@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../shared/constants/app_theme.dart';
@@ -45,47 +46,55 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         body: profileAsync.when(
-          data: (profile) => CustomScrollView(
-            slivers: [
-              _buildAppBar(context, profile),
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildBasicInfo(profile),
-                    const SizedBox(height: 16),
+          data: (profile) => RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
+              await ref
+                  .read(mohaffezProfileProvider(widget.mohaffezId).future)
+                  .catchError((_) => <String, dynamic>{});
+            },
+            child: CustomScrollView(
+              slivers: [
+                _buildAppBar(context, profile),
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildBasicInfo(profile),
+                      const SizedBox(height: 16),
 
-                    // Pricing Preview Banner
-                    _buildPricingPreviewBanner(plansAsync),
-                    const SizedBox(height: 16),
+                      // Pricing Preview Banner
+                      _buildPricingPreviewBanner(plansAsync),
+                      const SizedBox(height: 16),
 
-                    if (profile['bio'] != null &&
-                        (profile['bio'] as String).isNotEmpty)
-                      _buildBioSection(profile['bio'] as String),
-                    const SizedBox(height: 16),
+                      if (profile['bio'] != null &&
+                          (profile['bio'] as String).isNotEmpty)
+                        _buildBioSection(profile['bio'] as String),
+                      const SizedBox(height: 16),
 
-                    _buildCredentialsSection(ref),
-                    const SizedBox(height: 16),
+                      _buildCredentialsSection(ref),
+                      const SizedBox(height: 16),
 
-                    // Trust Badges Section
-                    _buildTrustBadgesSection(),
-                    const SizedBox(height: 16),
+                      // Trust Badges Section
+                      _buildTrustBadgesSection(),
+                      const SizedBox(height: 16),
 
-                    // Session Type Selector
-                    _buildSessionTypeSelector(),
-                    const SizedBox(height: 16),
+                      // Session Type Selector
+                      _buildSessionTypeSelector(),
+                      const SizedBox(height: 16),
 
-                    // Detailed Pricing Plans (Horizontal Scroll)
-                    _buildPricingSection(plansAsync),
-                    const SizedBox(height: 16),
+                      // Detailed Pricing Plans (Horizontal Scroll)
+                      _buildPricingSection(plansAsync),
+                      const SizedBox(height: 16),
 
-                    // Availability Section
-                    _buildAvailabilitySection(ref, profile),
-                    const SizedBox(height: 24),
-                  ],
+                      // Availability Section
+                      _buildAvailabilitySection(ref, profile),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
@@ -230,7 +239,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         // Filter by selected session type
         final relevantPlans = plans.where((plan) {
-          if (selectedSessionType == 'home') return plan.mode == SessionMode.home;
+          if (selectedSessionType == 'home')
+            return plan.mode == SessionMode.home;
           if (selectedSessionType == 'mosque')
             return plan.mode == SessionMode.mosque;
           if (selectedSessionType == 'online')
@@ -407,8 +417,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               children: [
                 _buildPaymentMethodBadge(Icons.credit_card, 'بطاقة'),
                 const SizedBox(width: 12),
-                _buildPaymentMethodBadge(
-                    Icons.account_balance_wallet, 'محفظة'),
+                _buildPaymentMethodBadge(Icons.account_balance_wallet, 'محفظة'),
               ],
             ),
           ],
@@ -476,7 +485,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         // Filter plans by selected session type
         final relevantPlans = plans.where((plan) {
-          if (selectedSessionType == 'home') return plan.mode == SessionMode.home;
+          if (selectedSessionType == 'home')
+            return plan.mode == SessionMode.home;
           if (selectedSessionType == 'mosque')
             return plan.mode == SessionMode.mosque;
           if (selectedSessionType == 'online')
@@ -549,8 +559,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     // ✅ Get mohaffez profile data for location
-                    final profileValue = ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
-                    
+                    final profileValue = ref
+                        .read(mohaffezProfileProvider(widget.mohaffezId))
+                        .value;
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -563,10 +575,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           preselectedDate: selectedDate,
                           // ✅ Pass location data
                           location: profileValue?['addressText'] as String?,
-                          mohaffezAddress: profileValue?['addressText'] as String?,
+                          mohaffezAddress:
+                              profileValue?['addressText'] as String?,
                           mohaffezLat: profileValue?['addressLat'] as double?,
                           mohaffezLng: profileValue?['addressLng'] as double?,
-                          mohaffezPhone: profileValue?['phoneNumber'] as String?,
+                          mohaffezPhone:
+                              profileValue?['phoneNumber'] as String?,
                         ),
                       ),
                     );
@@ -602,12 +616,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // Pricing card (clickable)
   Widget _buildPricingCard(PricingPlanModel plan) {
     final pricePerSession = plan.priceEGP / plan.sessionsCount;
-    
+
     return GestureDetector(
       onTap: () {
         // ✅ Get mohaffez profile data for location
-        final profileValue = ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
-        
+        final profileValue =
+            ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
+
         // Navigate to payment screen when card is tapped
         Navigator.push(
           context,
@@ -697,7 +712,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.event_available, size: 12, color: Colors.white),
+                  const Icon(Icons.event_available,
+                      size: 12, color: Colors.white),
                   const SizedBox(width: 4),
                   Flexible(
                     child: Text(
@@ -772,7 +788,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         widget.mohaffezId,
       );
 
-      if (activeSubscription != null && activeSubscription.remainingSessions > 0) {
+      if (activeSubscription != null &&
+          activeSubscription.remainingSessions > 0) {
         // HAS SUBSCRIPTION: Send request directly (credit on hold)
         await _sendRequestWithSubscription(profile, activeSubscription);
       } else {
@@ -1069,6 +1086,21 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     return SliverAppBar(
       expandedHeight: 140,
       pinned: true,
+      leading: context.canPop()
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              onPressed: () => context.pop(),
+              tooltip: 'رجوع',
+            )
+          : null,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'تحديث',
+          onPressed: () =>
+              ref.invalidate(mohaffezProfileProvider(widget.mohaffezId)),
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -1542,28 +1574,39 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   final timeSlots =
                       List<Map<String, dynamic>>.from(slot['timeSlots'] ?? []);
 
-                  final enabledSlots = timeSlots
-                      .where((ts) =>
-                          ts['enabled'] == true &&
-                          ts['sessionType'] == selectedSessionType)
-                      .toList();
-
-                  if (enabledSlots.isEmpty) return const SizedBox.shrink();
-
                   final now = DateTime.now();
                   final today = DateTime(now.year, now.month, now.day);
                   final currentDayOfWeek = today.weekday;
 
                   int daysUntil = dayOfWeek - currentDayOfWeek;
-                  if (daysUntil <= 0) {
-                    daysUntil += 7;
-                  }
+                  if (daysUntil < 0) daysUntil += 7;
 
                   final targetDate = DateTime(
                     today.year,
                     today.month,
                     today.day + daysUntil,
                   );
+
+                  final isToday = daysUntil == 0;
+
+                  final enabledSlots = timeSlots.where((ts) {
+                    if (ts['enabled'] != true) return false;
+                    if (ts['sessionType'] != selectedSessionType) return false;
+                    if (isToday) {
+                      final parts = (ts['startTime'] as String).split(':');
+                      final slotTime = DateTime(
+                        today.year,
+                        today.month,
+                        today.day,
+                        int.parse(parts[0]),
+                        int.parse(parts[1]),
+                      );
+                      return slotTime.isAfter(now);
+                    }
+                    return true;
+                  }).toList();
+
+                  if (enabledSlots.isEmpty) return const SizedBox.shrink();
 
                   return Padding(
                     padding:

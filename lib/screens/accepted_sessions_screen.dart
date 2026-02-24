@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -20,11 +21,13 @@ class AcceptedSessionsScreen extends ConsumerWidget {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('لم يتم تسجيل الدخول')));
+          return const Scaffold(
+              body: Center(child: Text('Ù„Ù… ÙŠØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„')));
         }
         return _buildContent(context, ref, user.uid);
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
         body: ErrorDisplay.dataLoad(
           onRetry: () => ref.invalidate(currentUserProvider),
@@ -34,40 +37,40 @@ class AcceptedSessionsScreen extends ConsumerWidget {
   }
 
   Widget _buildContent(BuildContext context, WidgetRef ref, String studentId) {
-    final firstPageAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
-    final paginatedState = ref.watch(paginatedStudentSessionsProvider(studentId));
+    final acceptedSessionsAsync =
+        ref.watch(acceptedStudentSessionsProvider(studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('الجلسات المقبولة'),
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'Ø±Ø¬ÙˆØ¹',
+                )
+              : null,
+          title: const Text('Ø§Ù„Ø¬Ù„Ø³Ø§Øª Ø§Ù„Ù…Ù‚Ø¨ÙˆÙ„Ø©'),
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {
-                ref.invalidate(studentSessionsFirstPageProvider(studentId));
+                ref.invalidate(acceptedStudentSessionsProvider(studentId));
               },
-              tooltip: 'تحديث',
+              tooltip: 'ØªØ­Ø¯ÙŠØ«',
             ),
           ],
         ),
-        body: firstPageAsync.when(
-          data: (_) {
-            final sessions = paginatedState.sessions;
-
-            final acceptedSessions = sessions.where((session) {
-              final status = session['status'] as String? ?? '';
-              return status == 'accepted';
-            }).toList();
-
-            if (acceptedSessions.isEmpty && !paginatedState.isLoadingMore) {
+        body: acceptedSessionsAsync.when(
+          data: (acceptedSessions) {
+            if (acceptedSessions.isEmpty) {
               return Container(
                 color: Colors.grey.withValues(alpha: 0.05),
                 child: const EmptyState(
                   icon: Icons.event_busy,
-                  title: 'لا توجد جلسات مقبولة',
-                  message: 'جميع الجلسات المقبولة ستظهر هنا',
+                  title: 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¬Ù„Ø³Ø§Øª Ù…Ù‚Ø¨ÙˆÙ„Ø©',
+                  message: 'Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø¬Ù„Ø³Ø§Øª Ø§Ù„Ù…Ù‚Ø¨ÙˆÙ„Ø© Ø³ØªØ¸Ù‡Ø± Ù‡Ù†Ø§',
                   animated: true,
                 ),
               );
@@ -75,27 +78,28 @@ class AcceptedSessionsScreen extends ConsumerWidget {
 
             return RefreshIndicator(
               onRefresh: () async {
-                ref.invalidate(studentSessionsFirstPageProvider(studentId));
+                ref.invalidate(acceptedStudentSessionsProvider(studentId));
+                await ref
+                    .read(acceptedStudentSessionsProvider(studentId).future)
+                    .catchError((_) => <Map<String, dynamic>>[]);
               },
               child: ListView.builder(
                 padding: const EdgeInsets.all(12),
-                itemCount: acceptedSessions.length + (paginatedState.hasMore ? 1 : 0),
+                itemCount: acceptedSessions.length,
                 itemBuilder: (context, index) {
-                  if (index == acceptedSessions.length) {
-                    return _buildLoadMoreButton(ref, studentId, paginatedState);
-                  }
-
                   final session = acceptedSessions[index];
-                  
+
                   // Create SessionModel properly with null safety
                   final sessionModel = SessionModel(
                     id: session['id'] as String?,
                     mohaffezId: session['mohaffezId'] as String? ?? '',
                     studentId: session['studentId'] as String? ?? '',
-                    mohaffezName: session['mohaffezName'] as String? ?? 'غير معروف',
+                    mohaffezName:
+                        session['mohaffezName'] as String? ?? 'ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ',
                     studentName: session['studentName'] as String? ?? '',
-                    sessionType: session['sessionType'] as String? ?? 'بيت',
-                    preferredTimeSlot: session['preferredTimeSlot'] as String? ?? '08:00',
+                    sessionType: session['sessionType'] as String? ?? 'Ø¨ÙŠØª',
+                    preferredTimeSlot:
+                        session['preferredTimeSlot'] as String? ?? '08:00',
                     location: session['location'] as String? ?? '',
                     sessionDate: session['sessionDate'] as DateTime?,
                     slotStart: session['sessionDate'] as DateTime?,
@@ -116,7 +120,8 @@ class AcceptedSessionsScreen extends ConsumerWidget {
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => ErrorDisplay.dataLoad(
-            onRetry: () => ref.invalidate(studentSessionsFirstPageProvider(studentId)),
+            onRetry: () =>
+                ref.invalidate(acceptedStudentSessionsProvider(studentId)),
           ),
         ),
       ),
@@ -166,54 +171,6 @@ class AcceptedSessionsScreen extends ConsumerWidget {
               ),
             );
           },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadMoreButton(WidgetRef ref, String studentId, StudentSessionsState paginatedState) {
-    if (paginatedState.isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (paginatedState.error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(
-              paginatedState.error!,
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () {
-                ref.read(paginatedStudentSessionsProvider(studentId).notifier).loadMore();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: ElevatedButton.icon(
-          onPressed: () {
-            ref.read(paginatedStudentSessionsProvider(studentId).notifier).loadMore();
-          },
-          icon: const Icon(Icons.expand_more),
-          label: const Text('تحميل المزيد'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-          ),
         ),
       ),
     );

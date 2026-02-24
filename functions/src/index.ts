@@ -17,5 +17,19 @@ export { onPaymentCreated } from './payments/triggers';
 export { releaseExpiredSlotLocks } from './cleanup/releaseExpiredSlotLocks';
 
 export { confirmFreeSession } from './bookings/confirmFreeSession';
+export { createSessionRequest } from './bookings/createSessionRequest';
 export { studentMarkedDirectPayment, mohaffezConfirmDirectPayment, mohaffezRejectDirectPayment } from './payments/directPayment';
 export { processWeeklyCommissions, markCommissionPaid } from './payments/commissions';
+
+// Admin functions
+export {
+  setUserRole,
+  suspendUser,
+  deleteUserAccount,
+  sendBroadcastNotification,
+  triggerCommissionJobManually,
+  triggerCleanupJobManually,
+} from './admin/adminActions';
+export { checkAppVersion } from './admin/appVersionCheck';
+export { checkMaintenanceMode } from './admin/maintenanceCheck';
+export { checkVersion } from './admin/appVersion';

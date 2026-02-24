@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/pricing_plan_model.dart';
 import '../providers/pricing_provider.dart';
@@ -37,9 +38,32 @@ class MohaffezPricingScreen extends ConsumerWidget {
             appBar: AppBar(
               // CHANGED: Clean Arabic UTF-8 text.
               title: const Text('إدارة الأسعار'),
+              leading: context.canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_ios),
+                      onPressed: () => context.pop(),
+                      tooltip: 'رجوع',
+                    )
+                  : null,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'تحديث',
+                  onPressed: () =>
+                      ref.invalidate(pricingPlansProvider(mohaffezId)),
+                ),
+              ],
             ),
             body: plansAsync.when(
-              data: (plans) => _buildPlansList(context, ref, plans, mohaffezId),
+              data: (plans) => RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(pricingPlansProvider(mohaffezId));
+                  await ref
+                      .read(pricingPlansProvider(mohaffezId).future)
+                      .catchError((_) => <PricingPlanModel>[]);
+                },
+                child: _buildPlansList(context, ref, plans, mohaffezId),
+              ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => ErrorDisplay.dataLoad(
                 onRetry: () {
@@ -78,9 +102,11 @@ class MohaffezPricingScreen extends ConsumerWidget {
       );
     }
 
-    final onlinePlans = plans.where((p) => p.mode == SessionMode.online).toList();
+    final onlinePlans =
+        plans.where((p) => p.mode == SessionMode.online).toList();
     final homePlans = plans.where((p) => p.mode == SessionMode.home).toList();
-    final mosquePlans = plans.where((p) => p.mode == SessionMode.mosque).toList();
+    final mosquePlans =
+        plans.where((p) => p.mode == SessionMode.mosque).toList();
 
     return ListView(
       padding: const EdgeInsets.all(16),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/session_provider_paginated.dart';
 
@@ -18,7 +19,7 @@ class RateSessionScreen extends ConsumerStatefulWidget {
 }
 
 class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
-  int rating = 5;  // Default to 5
+  int rating = 5; // Default to 5
   final notesController = TextEditingController();
 
   @override
@@ -62,6 +63,13 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('تقييم المحفظ'),
         ),
         body: SingleChildScrollView(
@@ -78,7 +86,8 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.school, color: AppTheme.accentGreen, size: 32),
+                    const Icon(Icons.school,
+                        color: AppTheme.accentGreen, size: 32),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -151,7 +160,8 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
               // Rating display
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.amber.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),

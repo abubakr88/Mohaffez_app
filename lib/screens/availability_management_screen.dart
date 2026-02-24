@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../shared/constants/app_theme.dart';
@@ -59,9 +60,12 @@ class _AvailabilityManagementScreenState
       if (doc.exists) {
         final data = doc.data()!;
         setState(() {
-          startTime = data['startTime'] as String? ?? ScheduleConstants.defaultStartTime;
-          endTime = data['endTime'] as String? ?? ScheduleConstants.defaultEndTime;
-          sessionDuration = data['sessionDuration'] as int? ?? ScheduleConstants.defaultSessionDurationMinutes;
+          startTime = data['startTime'] as String? ??
+              ScheduleConstants.defaultStartTime;
+          endTime =
+              data['endTime'] as String? ?? ScheduleConstants.defaultEndTime;
+          sessionDuration = data['sessionDuration'] as int? ??
+              ScheduleConstants.defaultSessionDurationMinutes;
         });
       }
     } catch (e) {
@@ -120,12 +124,13 @@ class _AvailabilityManagementScreenState
         schedule[dayOfWeek] = data;
 
         // ✅ FIXED: Count enabled slots per type correctly
-        final timeSlots = List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
+        final timeSlots =
+            List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
         for (var slot in timeSlots) {
           // ✅ Only count if explicitly enabled
           if (slot['enabled'] == true) {
             final sessionType = slot['sessionType'] as String? ?? 'home';
-            
+
             // ✅ Count each type separately (NOT 'both')
             if (sessionType == 'home') {
               home++;
@@ -187,7 +192,8 @@ class _AvailabilityManagementScreenState
 
         if (slotIndex >= 0) {
           // Toggle enabled status
-          timeSlots[slotIndex]['enabled'] = !(timeSlots[slotIndex]['enabled'] ?? false);
+          timeSlots[slotIndex]['enabled'] =
+              !(timeSlots[slotIndex]['enabled'] ?? false);
         } else {
           // Add new slot
           timeSlots.add({
@@ -226,12 +232,11 @@ class _AvailabilityManagementScreenState
     if (!weeklySchedule.containsKey(dayOfWeek)) return false;
 
     final daySchedule = weeklySchedule[dayOfWeek]!;
-    final timeSlots = List<Map<String, dynamic>>.from(daySchedule['timeSlots'] ?? []);
+    final timeSlots =
+        List<Map<String, dynamic>>.from(daySchedule['timeSlots'] ?? []);
 
     final slot = timeSlots.firstWhere(
-      (s) =>
-          s['startTime'] == startTime &&
-          s['sessionType'] == sessionType,
+      (s) => s['startTime'] == startTime && s['sessionType'] == sessionType,
       orElse: () => {},
     );
 
@@ -334,7 +339,8 @@ class _AvailabilityManagementScreenState
                       );
                       if (time != null) {
                         setDialogState(() {
-                          tempStart = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                          tempStart =
+                              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
                         });
                       }
                     },
@@ -354,7 +360,8 @@ class _AvailabilityManagementScreenState
                       );
                       if (time != null) {
                         setDialogState(() {
-                          tempEnd = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                          tempEnd =
+                              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
                         });
                       }
                     },
@@ -443,6 +450,13 @@ class _AvailabilityManagementScreenState
               expandedHeight: 120,
               floating: true,
               pinned: true,
+              leading: context.canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_ios),
+                      onPressed: () => context.pop(),
+                      tooltip: 'رجوع',
+                    )
+                  : null,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -517,8 +531,12 @@ class _AvailabilityManagementScreenState
                     indicatorWeight: 3,
                     tabs: const [
                       Tab(icon: Icon(Icons.home, size: 20), text: 'في المنزل'),
-                      Tab(icon: Icon(Icons.mosque, size: 20), text: 'في المسجد'),
-                      Tab(icon: Icon(Icons.videocam, size: 20), text: 'أونلاين'),
+                      Tab(
+                          icon: Icon(Icons.mosque, size: 20),
+                          text: 'في المسجد'),
+                      Tab(
+                          icon: Icon(Icons.videocam, size: 20),
+                          text: 'أونلاين'),
                     ],
                   ),
                 ),
@@ -749,9 +767,10 @@ class TimeSlotCard extends StatelessWidget {
                 // Dart DateTime.weekday: Monday=1, Tuesday=2, ..., Sunday=7
                 // We want: Monday=1, Tuesday=2, ..., Sunday=7 (same as Dart)
                 final dayOfWeek = index + 1; // Monday=1, Sunday=7
-                
-                final isEnabled = isSlotEnabled(dayOfWeek, startTime, sessionType);
-                
+
+                final isEnabled =
+                    isSlotEnabled(dayOfWeek, startTime, sessionType);
+
                 return DayChip(
                   day: ScheduleConstants.arabicDays[index],
                   isEnabled: isEnabled,

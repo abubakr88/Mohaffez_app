@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -96,6 +97,20 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
               expandedHeight: 120,
               floating: true,
               pinned: true,
+              leading: context.canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_ios),
+                      onPressed: () => context.pop(),
+                      tooltip: 'رجوع',
+                    )
+                  : null,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'تحديث (بيانات مباشرة)',
+                  onPressed: () {},
+                ),
+              ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -253,9 +268,11 @@ class _CredentialCard extends StatelessWidget {
     final title = data['title'] as String? ?? 'بدون عنوان';
     final organization = data['organization'] as String? ?? 'بدون جهة';
     final type = data['type'] as String? ?? 'ijazah';
-    final status = data['status'] as String? ?? 'approved'; // ✅ Default approved
+    final status =
+        data['status'] as String? ?? 'approved'; // ✅ Default approved
     final issueDate = (data['issueDate'] as Timestamp?)?.toDate();
-    final imageUrls = List<String>.from(data['imageUrls'] ?? []); // ✅ Can be empty
+    final imageUrls =
+        List<String>.from(data['imageUrls'] ?? []); // ✅ Can be empty
 
     final statusColor = _getStatusColor(status);
     final statusIcon = _getStatusIcon(status);
@@ -473,7 +490,8 @@ class _CredentialCard extends StatelessWidget {
                 ],
 
                 // Rejection Reason (if any)
-                if (status == 'rejected' && data['rejectionReason'] != null) ...[
+                if (status == 'rejected' &&
+                    data['rejectionReason'] != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     width: double.infinity,
@@ -658,6 +676,13 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
+        leading: context.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios),
+                onPressed: () => context.pop(),
+                tooltip: 'رجوع',
+              )
+            : null,
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
@@ -763,8 +788,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
       // ✅ Upload images only if selected
       List<String> imageUrls = [];
       if (selectedImagePaths.isNotEmpty) {
-        final images =
-            selectedImagePaths.map((path) => XFile(path)).toList();
+        final images = selectedImagePaths.map((path) => XFile(path)).toList();
         imageUrls = await CredentialService.uploadCredentialImages(
           images,
           user.uid,
@@ -808,6 +832,13 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('إضافة شهادة'),
           backgroundColor: Colors.purple,
         ),
@@ -830,7 +861,8 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     ChoiceChip(
                       label: const Text('إجازة'),
                       selected: selectedType == 'ijazah',
-                      onSelected: (_) => setState(() => selectedType = 'ijazah'),
+                      onSelected: (_) =>
+                          setState(() => selectedType = 'ijazah'),
                     ),
                     ChoiceChip(
                       label: const Text('مؤهل تعليمي'),
@@ -841,7 +873,8 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     ChoiceChip(
                       label: const Text('ترخيص'),
                       selected: selectedType == 'license',
-                      onSelected: (_) => setState(() => selectedType = 'license'),
+                      onSelected: (_) =>
+                          setState(() => selectedType = 'license'),
                     ),
                   ],
                 ),
@@ -868,8 +901,9 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     labelText: 'الجهة المانحة',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'يرجى إدخال الجهة المانحة' : null,
+                  validator: (value) => value?.isEmpty ?? true
+                      ? 'يرجى إدخال الجهة المانحة'
+                      : null,
                 ),
 
                 const SizedBox(height: 16),

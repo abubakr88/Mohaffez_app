@@ -58,9 +58,13 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _passwordController.text.trim(),
         );
 
-        final roleString = _selectedRole == UserRole.mohaffez ? 'mohaffez' : 'student';
+        final roleString =
+            _selectedRole == UserRole.mohaffez ? 'mohaffez' : 'student';
 
-        await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(cred.user!.uid)
+            .set({
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'role': roleString,
@@ -79,7 +83,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isLogin ? 'تم تسجيل الدخول بنجاح' : 'تم إنشاء الحساب بنجاح'),
+          content: Text(
+              _isLogin ? 'تم تسجيل الدخول بنجاح' : 'تم إنشاء الحساب بنجاح'),
           backgroundColor: AppTheme.accentGreen,
         ),
       );
@@ -130,7 +135,16 @@ class _AuthScreenState extends State<AuthScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('محفظ - تسجيل الدخول')),
+        appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
+          title: const Text('محفظ - تسجيل الدخول'),
+        ),
         body: Column(
           children: [
             const OfflineBanner(),
@@ -162,7 +176,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             width: 100,
                             height: 100,
                             fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Icon(
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
                               Icons.school,
                               size: 100,
                               color: AppTheme.primaryAmber,
@@ -172,7 +187,10 @@ class _AuthScreenState extends State<AuthScreen> {
                         const SizedBox(height: 24),
                         Text(
                           'محفظ',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
                                 color: AppTheme.primaryAmber,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -182,16 +200,19 @@ class _AuthScreenState extends State<AuthScreen> {
                         if (!_isLogin) ...[
                           TextFormField(
                             controller: _nameController,
-                            decoration: const InputDecoration(labelText: 'الاسم'),
-                            validator: (value) =>
-                                value == null || value.isEmpty ? 'الاسم مطلوب' : null,
+                            decoration:
+                                const InputDecoration(labelText: 'الاسم'),
+                            validator: (value) => value == null || value.isEmpty
+                                ? 'الاسم مطلوب'
+                                : null,
                           ),
                           const SizedBox(height: 12),
                         ],
 
                         TextFormField(
                           controller: _emailController,
-                          decoration: const InputDecoration(labelText: 'البريد الإلكتروني'),
+                          decoration: const InputDecoration(
+                              labelText: 'البريد الإلكتروني'),
                           keyboardType: TextInputType.emailAddress,
                           textDirection: TextDirection.ltr,
                           validator: ValidationUtils.email,
@@ -200,7 +221,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
                         TextFormField(
                           controller: _passwordController,
-                          decoration: const InputDecoration(labelText: 'كلمة المرور'),
+                          decoration:
+                              const InputDecoration(labelText: 'كلمة المرور'),
                           obscureText: true,
                           validator: ValidationUtils.password,
                         ),
@@ -215,15 +237,15 @@ class _AuthScreenState extends State<AuthScreen> {
                               ChoiceChip(
                                 label: const Text('محفظ'),
                                 selected: _selectedRole == UserRole.mohaffez,
-                                onSelected: (_) =>
-                                    setState(() => _selectedRole = UserRole.mohaffez),
+                                onSelected: (_) => setState(
+                                    () => _selectedRole = UserRole.mohaffez),
                               ),
                               const SizedBox(width: 8),
                               ChoiceChip(
                                 label: const Text('طالب'),
                                 selected: _selectedRole == UserRole.student,
-                                onSelected: (_) =>
-                                    setState(() => _selectedRole = UserRole.student),
+                                onSelected: (_) => setState(
+                                    () => _selectedRole = UserRole.student),
                               ),
                             ],
                           ),
@@ -235,7 +257,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         else
                           ElevatedButton(
                             onPressed: _submit,
-                            child: Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'),
+                            child:
+                                Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'),
                           ),
                         const SizedBox(height: 8),
 

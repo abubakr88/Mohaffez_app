@@ -1,6 +1,7 @@
 // FILE: lib/screens/student_sessions_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
@@ -12,11 +13,22 @@ class StudentSessionsScreen extends ConsumerStatefulWidget {
   const StudentSessionsScreen({super.key});
 
   @override
-  ConsumerState<StudentSessionsScreen> createState() => _StudentSessionsScreenState();
+  ConsumerState<StudentSessionsScreen> createState() =>
+      _StudentSessionsScreenState();
 }
 
 class _StudentSessionsScreenState extends ConsumerState<StudentSessionsScreen> {
   String selectedFilter = 'all'; // all, upcoming, completed
+  String? _studentId;
+
+  Future<void> _refreshSessions() async {
+    final studentId = _studentId;
+    if (studentId == null) return;
+    ref.invalidate(studentSessionsFirstPageProvider(studentId));
+    await ref
+        .read(studentSessionsFirstPageProvider(studentId).future)
+        .catchError((_) => <Map<String, dynamic>>[]);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,77 +41,81 @@ class _StudentSessionsScreenState extends ConsumerState<StudentSessionsScreen> {
     }
 
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(user.uid));
+    _studentId = user.uid;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            // App Bar
-            _buildAppBar(),
-            
-            // Filter Chips
-            SliverToBoxAdapter(
-              child: _buildFilterChips(),
-            ),
-            
-            // Sessions List
-            sessionsAsync.when(
-              data: (sessions) {
-                var filteredSessions = sessions.where((s) {
-                  final status = (s['status'] as String?)?.toLowerCase();
-                  return status == 'accepted';
-                }).toList();
+        body: RefreshIndicator(
+          onRefresh: _refreshSessions,
+          child: CustomScrollView(
+            slivers: [
+              // App Bar
+              _buildAppBar(),
 
-                // Apply additional filters
-                if (selectedFilter == 'upcoming') {
-                  final now = DateTime.now();
-                  final todayStart = DateTime(now.year, now.month, now.day);
-                  filteredSessions = filteredSessions.where((s) {
-                    final date = s['sessionDate'] as DateTime?;
-                    return date != null && !date.isBefore(todayStart);
-                  }).toList();
-                } else if (selectedFilter == 'completed') {
-                  final now = DateTime.now();
-                  final todayStart = DateTime(now.year, now.month, now.day);
-                  filteredSessions = filteredSessions.where((s) {
-                    final date = s['sessionDate'] as DateTime?;
-                    return date != null && date.isBefore(todayStart);
-                  }).toList();
-                }
+              // Filter Chips
+              SliverToBoxAdapter(
+                child: _buildFilterChips(),
+              ),
 
-                if (filteredSessions.isEmpty) {
-                  return const SliverFillRemaining(
-                    child: EmptyState(
-                      icon: Icons.event_busy,
-                      title: 'لا توجد جلسات',
-                      message: 'لم يتم حجز أي جلسات بعد',
-                      animated: true,
+              // Sessions List
+              sessionsAsync.when(
+                data: (sessions) {
+                  var filteredSessions = sessions.where((s) {
+                    final status = (s['status'] as String?)?.toLowerCase();
+                    return status == 'accepted';
+                  }).toList();
+
+                  // Apply additional filters
+                  if (selectedFilter == 'upcoming') {
+                    final now = DateTime.now();
+                    final todayStart = DateTime(now.year, now.month, now.day);
+                    filteredSessions = filteredSessions.where((s) {
+                      final date = s['sessionDate'] as DateTime?;
+                      return date != null && !date.isBefore(todayStart);
+                    }).toList();
+                  } else if (selectedFilter == 'completed') {
+                    final now = DateTime.now();
+                    final todayStart = DateTime(now.year, now.month, now.day);
+                    filteredSessions = filteredSessions.where((s) {
+                      final date = s['sessionDate'] as DateTime?;
+                      return date != null && date.isBefore(todayStart);
+                    }).toList();
+                  }
+
+                  if (filteredSessions.isEmpty) {
+                    return const SliverFillRemaining(
+                      child: EmptyState(
+                        icon: Icons.event_busy,
+                        title: 'لا توجد جلسات',
+                        message: 'لم يتم حجز أي جلسات بعد',
+                        animated: true,
+                      ),
+                    );
+                  }
+
+                  return SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final session = filteredSessions[index];
+                          return _SessionCard(session: session);
+                        },
+                        childCount: filteredSessions.length,
+                      ),
                     ),
                   );
-                }
-
-                return SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final session = filteredSessions[index];
-                        return _SessionCard(session: session);
-                      },
-                      childCount: filteredSessions.length,
-                    ),
-                  ),
-                );
-              },
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+                },
+                loading: () => const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => SliverFillRemaining(
+                  child: Center(child: Text('حدث خطأ: $e')),
+                ),
               ),
-              error: (e, _) => SliverFillRemaining(
-                child: Center(child: Text('حدث خطأ: $e')),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -110,6 +126,20 @@ class _StudentSessionsScreenState extends ConsumerState<StudentSessionsScreen> {
       expandedHeight: 100,
       floating: true,
       pinned: true,
+      leading: context.canPop()
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              onPressed: () => context.pop(),
+              tooltip: 'رجوع',
+            )
+          : null,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'تحديث',
+          onPressed: _refreshSessions,
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -297,7 +327,9 @@ class _SessionCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isUpcoming ? AppThemeConstants.accentGreen.withValues(alpha: 0.3) : Colors.grey.shade200,
+          color: isUpcoming
+              ? AppThemeConstants.accentGreen.withValues(alpha: 0.3)
+              : Colors.grey.shade200,
           width: 1.5,
         ),
       ),
@@ -317,7 +349,8 @@ class _SessionCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+                      color:
+                          AppThemeConstants.accentGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -350,9 +383,11 @@ class _SessionCard extends StatelessWidget {
                   ),
                   if (isUpcoming)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+                        color: AppThemeConstants.accentGreen
+                            .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
@@ -366,16 +401,17 @@ class _SessionCard extends StatelessWidget {
                     ),
                 ],
               ),
-              
+
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 12),
-              
+
               // Details
               if (sessionDate != null)
                 _DetailRow(
                   icon: Icons.calendar_today,
-                  text: DateFormat('EEEE، d MMMM yyyy', 'ar').format(sessionDate),
+                  text:
+                      DateFormat('EEEE، d MMMM yyyy', 'ar').format(sessionDate),
                 ),
               if (timeSlot.isNotEmpty)
                 _DetailRow(
@@ -387,16 +423,18 @@ class _SessionCard extends StatelessWidget {
                   icon: Icons.location_on,
                   text: location,
                 ),
-              
+
               // Assignments
               if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Divider(height: 1),
                 const SizedBox(height: 12),
                 if (hifz.isNotEmpty)
-                  _AssignmentChip(label: 'حفظ', text: hifz, color: Colors.green),
+                  _AssignmentChip(
+                      label: 'حفظ', text: hifz, color: Colors.green),
                 if (muraja.isNotEmpty)
-                  _AssignmentChip(label: 'مراجعة', text: muraja, color: Colors.blue),
+                  _AssignmentChip(
+                      label: 'مراجعة', text: muraja, color: Colors.blue),
               ],
             ],
           ),

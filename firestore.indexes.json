@@ -13,6 +13,16 @@
       "collectionGroup": "hafizSessions",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "mohaffezId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "isPaid", "order": "ASCENDING" },
+        { "fieldPath": "sessionDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hafizSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "sessionDate", "order": "DESCENDING" }
       ]
@@ -24,6 +34,15 @@
         { "fieldPath": "mohaffezId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sessionRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "mohaffezId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "slotDate", "order": "ASCENDING" }
       ]
     },
     {

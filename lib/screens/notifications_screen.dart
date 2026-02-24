@@ -46,197 +46,211 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            // Modern App Bar
-            SliverAppBar(
-              expandedHeight: 100,
-              floating: true,
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-                    ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(paginatedNotificationsProvider(user.uid));
+          },
+          child: CustomScrollView(
+            slivers: [
+              // Modern App Bar
+              SliverAppBar(
+                expandedHeight: 100,
+                floating: true,
+                pinned: true,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'تحديث',
+                    onPressed: () => ref
+                        .invalidate(paginatedNotificationsProvider(user.uid)),
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    ArabicLabels.notifications,
-                                    style: const TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  if (unreadCount > 0)
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     Text(
-                                      '$unreadCount غير مقروءة',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white.withOpacity(0.9),
+                                      ArabicLabels.notifications,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                ],
-                              ),
-                              if (paginatedState.items.isNotEmpty)
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.done_all,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      ref
-                                          .read(notificationActionsProvider)
-                                          .markAllAsRead(user.uid);
-                                    },
-                                    tooltip: 'تحديد الكل كمقروء',
-                                  ),
+                                    if (unreadCount > 0)
+                                      Text(
+                                        '$unreadCount غير مقروءة',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withOpacity(0.9),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                            ],
-                          ),
-                        ],
+                                if (paginatedState.items.isNotEmpty)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.done_all,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () {
+                                        ref
+                                            .read(notificationActionsProvider)
+                                            .markAllAsRead(user.uid);
+                                      },
+                                      tooltip: 'تحديد الكل كمقروء',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Filter Chips
-            SliverToBoxAdapter(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: ArabicLabels.all,
-                        count: paginatedState.items.length,
-                        isSelected: selectedFilter == 'all',
-                        onTap: () => setState(() => selectedFilter = 'all'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'الجلسات',
-                        isSelected: selectedFilter == 'session',
-                        onTap: () =>
-                            setState(() => selectedFilter = 'session'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'المدفوعات',
-                        isSelected: selectedFilter == 'payment',
-                        onTap: () =>
-                            setState(() => selectedFilter = 'payment'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'المتابعات',
-                        isSelected: selectedFilter == 'follow',
-                        onTap: () => setState(() => selectedFilter = 'follow'),
-                      ),
-                    ],
+              // Filter Chips
+              SliverToBoxAdapter(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _FilterChip(
+                          label: ArabicLabels.all,
+                          count: paginatedState.items.length,
+                          isSelected: selectedFilter == 'all',
+                          onTap: () => setState(() => selectedFilter = 'all'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'الجلسات',
+                          isSelected: selectedFilter == 'session',
+                          onTap: () =>
+                              setState(() => selectedFilter = 'session'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'المدفوعات',
+                          isSelected: selectedFilter == 'payment',
+                          onTap: () =>
+                              setState(() => selectedFilter = 'payment'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'المتابعات',
+                          isSelected: selectedFilter == 'follow',
+                          onTap: () =>
+                              setState(() => selectedFilter = 'follow'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Notifications List
-            if (paginatedState.items.isEmpty && !paginatedState.isLoadingMore)
-              SliverFillRemaining(
-                child: EmptyState(
-                  icon: Icons.notifications_none,
-                  title: ArabicLabels.noNotifications,
-                  message: 'ستظهر إشعاراتك هنا',
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      if (index >= paginatedState.items.length) {
-                        return paginatedState.isLoadingMore
-                            ? const Padding(
-                                padding: EdgeInsets.all(16),
-                                child:
-                                    Center(child: CircularProgressIndicator()),
-                              )
-                            : const SizedBox.shrink();
-                      }
-
-                      final notification = paginatedState.items[index];
-
-                      // Filter logic
-                      if (selectedFilter != 'all') {
-                        if (selectedFilter == 'session' &&
-                            ![
-                              'session_request',
-                              'session_accepted',
-                              'session_rejected',
-                            ].contains(notification.type)) {
-                          return const SizedBox.shrink();
+              // Notifications List
+              if (paginatedState.items.isEmpty && !paginatedState.isLoadingMore)
+                SliverFillRemaining(
+                  child: EmptyState(
+                    icon: Icons.notifications_none,
+                    title: ArabicLabels.noNotifications,
+                    message: 'ستظهر إشعاراتك هنا',
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index >= paginatedState.items.length) {
+                          return paginatedState.isLoadingMore
+                              ? const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Center(
+                                      child: CircularProgressIndicator()),
+                                )
+                              : const SizedBox.shrink();
                         }
 
-                        if (selectedFilter == 'payment' &&
-                            notification.type != 'payment_required') {
-                          return const SizedBox.shrink();
-                        }
+                        final notification = paginatedState.items[index];
 
-                        if (selectedFilter == 'follow' &&
-                            notification.type != 'follow') {
-                          return const SizedBox.shrink();
-                        }
-                      }
-
-                      return _NotificationCard(
-                        notification: notification,
-                        onTap: () async {
-                          if (!notification.isRead) {
-                            ref
-                                .read(notificationActionsProvider)
-                                .markAsRead(user.uid, notification.id!);
+                        // Filter logic
+                        if (selectedFilter != 'all') {
+                          if (selectedFilter == 'session' &&
+                              ![
+                                'session_request',
+                                'session_accepted',
+                                'session_rejected',
+                              ].contains(notification.type)) {
+                            return const SizedBox.shrink();
                           }
 
-                          await _handleNotificationTap(
-                            context,
-                            notification,
-                          );
-                        },
-                        onDismiss: () {
-                          ref
-                              .read(notificationActionsProvider)
-                              .deleteNotification(user.uid, notification.id!);
-                        },
-                      );
-                    },
-                    childCount: paginatedState.items.length +
-                        (paginatedState.hasMore ? 1 : 0),
+                          if (selectedFilter == 'payment' &&
+                              notification.type != 'payment_required') {
+                            return const SizedBox.shrink();
+                          }
+
+                          if (selectedFilter == 'follow' &&
+                              notification.type != 'follow') {
+                            return const SizedBox.shrink();
+                          }
+                        }
+
+                        return _NotificationCard(
+                          notification: notification,
+                          onTap: () async {
+                            if (!notification.isRead) {
+                              ref
+                                  .read(notificationActionsProvider)
+                                  .markAsRead(user.uid, notification.id!);
+                            }
+
+                            await _handleNotificationTap(
+                              context,
+                              notification,
+                            );
+                          },
+                          onDismiss: () {
+                            ref
+                                .read(notificationActionsProvider)
+                                .deleteNotification(user.uid, notification.id!);
+                          },
+                        );
+                      },
+                      childCount: paginatedState.items.length +
+                          (paginatedState.hasMore ? 1 : 0),
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -249,84 +263,86 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     switch (type) {
       case 'payment_required':
-      case 'paymentrequired': {
-        final Map<String, dynamic> data =
-            notification.data ?? <String, dynamic>{};
+      case 'paymentrequired':
+        {
+          final Map<String, dynamic> data =
+              notification.data ?? <String, dynamic>{};
 
-        final requestId = data['requestId'] as String?;
-        final mohaffezId = data['mohaffezId'] as String?;
-        final mohaffezName = data['mohaffezName'] as String? ??
-            notification.mohaffezName ??
-            '';
+          final requestId = data['requestId'] as String?;
+          final mohaffezId = data['mohaffezId'] as String?;
+          final mohaffezName = data['mohaffezName'] as String? ??
+              notification.mohaffezName ??
+              '';
 
-        if (requestId != null &&
-            mohaffezId != null &&
-            mohaffezName.isNotEmpty) {
-          // ✅ Fetch full request details to lock payment screen
-          try {
-            final requestSnapshot = await FirebaseFirestore.instance
-                .collection('sessionRequests')
-                .doc(requestId)
-                .get();
-            
-            if (requestSnapshot.exists && context.mounted) {
-              context.push(
-                '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
-                extra: {
-                  'requestId': requestId,
-                  'mohaffezId': mohaffezId,
-                  'mohaffezName': mohaffezName,
-                  'lockedRequest': requestSnapshot.data(),
-                },
-              );
-            } else if (context.mounted) {
-              context.push(
-                '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
-                extra: {
-                  'requestId': requestId,
-                  'mohaffezId': mohaffezId,
-                  'mohaffezName': mohaffezName,
-                  'sessionDetails': data,
-                },
-              );
+          if (requestId != null &&
+              mohaffezId != null &&
+              mohaffezName.isNotEmpty) {
+            // ✅ Fetch full request details to lock payment screen
+            try {
+              final requestSnapshot = await FirebaseFirestore.instance
+                  .collection('sessionRequests')
+                  .doc(requestId)
+                  .get();
+
+              if (requestSnapshot.exists && context.mounted) {
+                context.push(
+                  '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
+                  extra: {
+                    'requestId': requestId,
+                    'mohaffezId': mohaffezId,
+                    'mohaffezName': mohaffezName,
+                    'lockedRequest': requestSnapshot.data(),
+                  },
+                );
+              } else if (context.mounted) {
+                context.push(
+                  '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
+                  extra: {
+                    'requestId': requestId,
+                    'mohaffezId': mohaffezId,
+                    'mohaffezName': mohaffezName,
+                    'sessionDetails': data,
+                  },
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                context.push(
+                  '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
+                  extra: {
+                    'requestId': requestId,
+                    'mohaffezId': mohaffezId,
+                    'mohaffezName': mohaffezName,
+                    'sessionDetails': data,
+                  },
+                );
+              }
             }
-          } catch (e) {
-            if (context.mounted) {
-              context.push(
-                '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}&requestId=$requestId',
-                extra: {
-                  'requestId': requestId,
-                  'mohaffezId': mohaffezId,
-                  'mohaffezName': mohaffezName,
-                  'sessionDetails': data,
-                },
-              );
-            }
+          } else if (mohaffezId != null && mohaffezName.isNotEmpty) {
+            // Fallback: generic payment screen
+            final sessionType = data['sessionType'] as String?;
+            final preferredTimeSlot =
+                data['timeSlot'] ?? data['preferredTimeSlot'];
+
+            context.push(
+              '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}'
+              '${sessionType != null ? '&sessionType=$sessionType' : ''}'
+              '${preferredTimeSlot != null ? '&timeSlot=$preferredTimeSlot' : ''}',
+              extra: {
+                'preselectedSessionType': sessionType,
+                'preselectedTimeSlot': preferredTimeSlot != null
+                    ? {
+                        'startTime': preferredTimeSlot,
+                        'endTime': null,
+                      }
+                    : null,
+                'preselectedDate': data['sessionDate'],
+                'autoBookAfterPayment': true,
+              },
+            );
           }
-        } else if (mohaffezId != null && mohaffezName.isNotEmpty) {
-          // Fallback: generic payment screen
-          final sessionType = data['sessionType'] as String?;
-          final preferredTimeSlot = data['timeSlot'] ?? data['preferredTimeSlot'];
-
-          context.push(
-            '/payment/$mohaffezId?name=${Uri.encodeComponent(mohaffezName)}'
-            '${sessionType != null ? '&sessionType=$sessionType' : ''}'
-            '${preferredTimeSlot != null ? '&timeSlot=$preferredTimeSlot' : ''}',
-            extra: {
-              'preselectedSessionType': sessionType,
-              'preselectedTimeSlot': preferredTimeSlot != null
-                  ? {
-                      'startTime': preferredTimeSlot,
-                      'endTime': null,
-                    }
-                  : null,
-              'preselectedDate': data['sessionDate'],
-              'autoBookAfterPayment': true,
-            },
-          );
+          break;
         }
-        break;
-      }
 
       case 'session_accepted':
       case 'sessionaccepted':
@@ -336,23 +352,24 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
       case 'session_rejected':
       case 'sessionrejected':
-      case 'rejected': {
-        final reason = notification.body ?? 'لم يذكر سبب الرفض';
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('تم رفض الطلب'),
-            content: Text(reason),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(ArabicLabels.ok),
-              ),
-            ],
-          ),
-        );
-        break;
-      }
+      case 'rejected':
+        {
+          final reason = notification.body ?? 'لم يذكر سبب الرفض';
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('تم رفض الطلب'),
+              content: Text(reason),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(ArabicLabels.ok),
+                ),
+              ],
+            ),
+          );
+          break;
+        }
 
       case 'session_request':
         // Navigate to pending requests
@@ -395,8 +412,7 @@ class _FilterChip extends StatelessWidget {
           color: isSelected ? AppTheme.primaryAmber : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color:
-                isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
+            color: isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
           ),
           boxShadow: isSelected
               ? [
@@ -415,17 +431,14 @@ class _FilterChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
-                color:
-                    isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
               ),
             ),
             if (count != null) ...[
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Colors.white.withOpacity(0.3)
@@ -437,9 +450,7 @@ class _FilterChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.grey.shade700,
+                    color: isSelected ? Colors.white : Colors.grey.shade700,
                   ),
                 ),
               ),
@@ -492,9 +503,8 @@ class _NotificationCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: notification.isRead
-                  ? Colors.white
-                  : color.withOpacity(0.05),
+              color:
+                  notification.isRead ? Colors.white : color.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: notification.isRead

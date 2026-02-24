@@ -11,6 +11,7 @@ class UserModel with _$UserModel {
     required String name,
     required String email,
     required String role,
+    @Default('active') String status,
     String? photoUrl,
     String? bio,
     String? specialization,

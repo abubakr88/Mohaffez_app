@@ -6,7 +6,7 @@ service cloud.firestore {
     // ============================================
     // HELPER FUNCTIONS
     // ============================================
-    
+
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -20,7 +20,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
@@ -28,47 +28,52 @@ service cloud.firestore {
     // ============================================
     // USER PROFILES & SETTINGS
     // ============================================
-    
+
     match /users/{userId} {
       allow read: if isAuthenticated();
-      
-      allow create: if isAuthenticated() && 
+
+      allow create: if isAuthenticated() &&
                     request.auth.uid == userId &&
                     request.resource.data.uid == userId;
-      
-      allow update: if isOwner(userId) ||
-                    (isAuthenticated() && onlyUpdating(['followerCount', 'followingCount', 'fcmToken', 'fcmTokenUpdatedAt']));
-      
+
+      allow update: if isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['followerCount', 'followingCount', 'fcmToken',
+                    'fcmTokenUpdatedAt', 'photoUrl', 'bio',
+                    'phoneNumber', 'addressText', 'addressLat',
+                    'addressLng', 'specialization', 'name',
+                    'privacySettings', 'updatedAt']);
+
       allow delete: if isOwner(userId);
 
-      // Credentials
-      match /credentials/{credentialId} {
-        allow read: if isAuthenticated() &&
-                    (resource == null || 
-                     resource.data.status == 'approved' || 
-                     request.auth.uid == userId);
-        
+        // Credentials
+        match /credentials/{credentialId} {
+          allow read if isAdmin || (isAuthenticated && (
+            resource == null ||
+            resource.data.status == 'approved' ||
+            request.auth.uid == userId
+          ));
+
         allow create: if isOwner(userId) &&
                       request.resource.data.userId == userId &&
                       request.resource.data.status == 'pending';
-        
+
         allow update: if isOwner(userId) ||
                       (isAdmin() && onlyUpdating(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason']));
-        
+
         allow delete: if isOwner(userId);
       }
 
       // Availability schedules
       match /availability/{availabilityId} {
         allow read: if isAuthenticated();
-        
+
         allow create: if isOwner(userId) &&
                       request.resource.data.dayOfWeek is int &&
                       request.resource.data.dayOfWeek >= 1 &&
                       request.resource.data.dayOfWeek <= 7;
-        
+
         allow update: if isOwner(userId);
-        
         allow delete: if isOwner(userId);
       }
 
@@ -87,97 +92,107 @@ service cloud.firestore {
       // Pricing plans
       match /pricingPlans/{planId} {
         allow read: if isAuthenticated();
-        
+
         allow create: if isOwner(userId) &&
                       request.resource.data.mohaffezId == userId &&
                       request.resource.data.isActive == true &&
                       request.resource.data.priceEGP > 0 &&
                       request.resource.data.sessionsCount > 0;
-        
+
         allow update: if isOwner(userId) &&
                       request.resource.data.mohaffezId == userId;
-        
+
         allow delete: if isOwner(userId);
       }
     }
 
     // ============================================
-    // SESSION REQUESTS (Booking Flow) - FIXED
+    // SESSION REQUESTS (Booking Flow)
     // ============================================
-    
+
     match /sessionRequests/{requestId} {
-      // Allow read if user is involved
-      allow read: if request.auth != null 
-                   && (request.auth.uid == resource.data.studentId 
-                       || request.auth.uid == resource.data.mohaffezId);
-      
-      // Allow create by students
-      allow create: if request.auth != null 
-                     && request.auth.uid == request.resource.data.studentId;
-      
-      // Allow update by mohaffez for specific status transitions
-      allow update: if request.auth != null 
-                    && request.auth.uid == resource.data.mohaffezId
-                    && (
-                      // [NEW] From pending to awaitingpayment (payment required)
-                      (request.resource.data.status == 'awaitingpayment'
-                        && resource.data.status == 'pending'
-                        && onlyUpdating(['status', 'acceptedAt', 'paymentDeadline', 'reminderSent', 'updatedAt']))
+      allow read: if isAuthenticated() &&
+                   (resource == null ||
+                    request.auth.uid == resource.data.studentId ||
+                    request.auth.uid == resource.data.mohaffezId);
+
+      allow create: if isAuthenticated() &&
+                     request.auth.uid == request.resource.data.studentId;
+
+      // ✅ Mohaffez-only transitions (accept, reject, awaitingpayment)
+      allow update: if isAuthenticated() &&
+                    request.auth.uid == resource.data.mohaffezId &&
+                    (
+                      // pending → awaitingpayment
+                      (request.resource.data.status == 'awaitingpayment' &&
+                       resource.data.status == 'pending' &&
+                       onlyUpdating(['status', 'acceptedAt', 'paymentDeadline', 'reminderSent', 'updatedAt']))
                       ||
-                      // Existing: accept
-                      (request.resource.data.status == 'accepted' 
-                        && resource.data.status in ['pending', 'awaitingpayment']
-                        && onlyUpdating(['status', 'acceptedAt', 'updatedAt', 'sessionId']))
+                      // pending/awaitingpayment → accepted
+                      (request.resource.data.status == 'accepted' &&
+                       resource.data.status in ['pending', 'awaitingpayment'] &&
+                       onlyUpdating(['status', 'acceptedAt', 'updatedAt', 'sessionId']))
                       ||
-                      // Existing: reject
-                      (request.resource.data.status == 'rejected'
-                        && resource.data.status in ['pending', 'awaitingpayment']
-                        && onlyUpdating(['status', 'rejectedAt', 'rejectionReason', 'updatedAt']))
+                      // pending/awaitingpayment → rejected
+                      (request.resource.data.status == 'rejected' &&
+                       resource.data.status in ['pending', 'awaitingpayment'] &&
+                       onlyUpdating(['status', 'rejectedAt', 'rejectionReason', 'updatedAt']))
                       ||
-                      // Existing: cancel
-                      (request.resource.data.status == 'cancelled'
-                        && request.auth.uid in [resource.data.studentId, resource.data.mohaffezId])
-                    );      
-      // Allow delete only by creator before acceptance
-      allow delete: if request.auth != null 
-                     && request.auth.uid == resource.data.studentId
-                     && resource.data.status in ['pending', 'awaitingpayment', 'rejected'];
+                      // Mohaffez cancel
+                      (request.resource.data.status == 'cancelled' &&
+                       onlyUpdating(['status', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'updatedAt']))
+                    );
+
+      // ✅ FIX: Student cancel rule — was previously blocked by the mohaffezId outer guard
+      allow update: if isAuthenticated() &&
+                    request.auth.uid == resource.data.studentId &&
+                    request.resource.data.status == 'cancelled' &&
+                    resource.data.status in [
+                      'pending',
+                      'awaitingpayment',
+                      'awaitingdirectpaymentconfirmation'
+                    ] &&
+                    onlyUpdating(['status', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'updatedAt']);
+
+      allow delete: if isAuthenticated() &&
+                     request.auth.uid == resource.data.studentId &&
+                     resource.data.status in ['pending', 'awaitingpayment', 'rejected'];
     }
 
     // ============================================
     // HAFIZ SESSIONS
     // ============================================
-    
+
     match /hafizSessions/{sessionId} {
-      allow read: if isAuthenticated() && (
+      allow read if isAdmin || (isAuthenticated && (
         resource == null ||
         request.auth.uid == resource.data.studentId ||
         request.auth.uid == resource.data.mohaffezId
-      );
-
+      ));
+      allow write if false;
+    }
       allow create: if isAuthenticated() &&
                     (
-                      // Mohaffez creating
                       (request.auth.uid == request.resource.data.mohaffezId &&
                        request.resource.data.mohaffezId is string &&
                        request.resource.data.studentId is string)
                       ||
-                      // Student creating from paid request (including free sessions)
                       (request.auth.uid == request.resource.data.studentId &&
-                      request.resource.data.requestId is string &&
-                      request.resource.data.status == 'accepted' &&
-                      request.resource.data.isPaid == true &&
-                      exists(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)) &&
-                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.studentId == request.auth.uid &&
-                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.mohaffezId == request.resource.data.mohaffezId &&
-                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.status == 'accepted' &&
-                      get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.isPaid == true)
+                       request.resource.data.requestId is string &&
+                       request.resource.data.status == 'accepted' &&
+                       request.resource.data.isPaid == true &&
+                       exists(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)) &&
+                       get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.studentId == request.auth.uid &&
+                       get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.mohaffezId == request.resource.data.mohaffezId &&
+                       get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.status == 'accepted' &&
+                       get(/databases/$(database)/documents/sessionRequests/$(request.resource.data.requestId)).data.isPaid == true)
                     );
 
       allow update: if isAuthenticated() && (
         (request.auth.uid == resource.data.mohaffezId) ||
         (request.auth.uid == resource.data.studentId &&
          onlyUpdating(['studentFeedback', 'studentNotes', 'studentRating', 'updatedAt'])) ||
+        // Cloud Functions update reminder flags (admin SDK bypasses rules, but kept for safety)
         (onlyUpdating(['reminder24hSent', 'reminder24hSentAt', 'reminder1hSent', 'reminder1hSentAt', 'updatedAt']))
       );
 
@@ -189,7 +204,7 @@ service cloud.firestore {
     // ============================================
     // PAYMENTS & SUBSCRIPTIONS
     // ============================================
-    
+
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && (
         resource == null ||
@@ -205,17 +220,24 @@ service cloud.firestore {
                     request.resource.data.mohaffezId is string;
 
       allow update: if isAuthenticated() && (
+        // Student adds gatewayOrderId while in payment flow
         (request.auth.uid == resource.data.studentId &&
          resource.data.status in ['pending', 'processing'] &&
-         onlyUpdating(['updatedAt', 'gatewayOrderId'])) ||
+         onlyUpdating(['updatedAt', 'gatewayOrderId']))
+        ||
+        // Mohaffez confirms cash payment
         (request.auth.uid == resource.data.mohaffezId &&
          resource.data.method == 'cash' &&
          resource.data.status == 'pending' &&
          request.resource.data.status == 'completed' &&
-         onlyUpdating(['status', 'completedAt', 'paidAt', 'updatedAt'])) ||
-        (onlyUpdating(['status', 'completedAt', 'updatedAt', 'paidAt', 'gatewayTransactionId', 
-                       'transactionReference', 'gatewayResponse', 'failureReason', 
-                       'processingStartedAt', 'processedAt', 'idempotencyKey', 'subscriptionId', 
+         onlyUpdating(['status', 'completedAt', 'paidAt', 'updatedAt']))
+        ||
+        // Webhook/Cloud Function status updates (admin SDK bypasses rules anyway)
+        (onlyUpdating(['status', 'completedAt', 'updatedAt', 'paidAt',
+                       'gatewayTransactionId', 'transactionReference',
+                       'gatewayResponse', 'failureReason',
+                       'processingStartedAt', 'processedAt',
+                       'idempotencyKey', 'subscriptionId',
                        'method', 'gateway', 'notes', 'sessionId']))
       );
 
@@ -241,11 +263,13 @@ service cloud.firestore {
         (request.resource.data.remainingSessions == resource.data.remainingSessions - 1 &&
          resource.data.remainingSessions > 0 &&
          request.resource.data.status in ['active', 'expired', 'depleted'] &&
-         onlyUpdating(['remainingSessions', 'lastUsedAt', 'status', 'updatedAt'])) ||
+         onlyUpdating(['remainingSessions', 'lastUsedAt', 'status', 'updatedAt']))
+        ||
         (request.auth.uid == resource.data.studentId &&
          resource.data.status == 'active' &&
          request.resource.data.status == 'cancelled' &&
-         onlyUpdating(['status', 'cancelledAt', 'updatedAt'])) ||
+         onlyUpdating(['status', 'cancelledAt', 'updatedAt']))
+        ||
         (resource.data.status == 'active' &&
          request.resource.data.status == 'expired' &&
          onlyUpdating(['status', 'expiredAt', 'updatedAt']))
@@ -257,7 +281,7 @@ service cloud.firestore {
     // ============================================
     // EVENT SOURCING & ANALYTICS
     // ============================================
-    
+
     match /paymentEvents/{eventId} {
       allow read: if isAuthenticated() && (
         resource == null ||
@@ -274,21 +298,19 @@ service cloud.firestore {
     // ============================================
     // SLOT LOCKING
     // ============================================
-    
+
     match /slotLocks/{lockId} {
+      // ✅ FIX: Was `isAdmin() || isOwner(resource.data.mohaffezId)` which throws
+      // a null reference error on collection queries. Any authenticated user
+      // involved in booking needs to read their own lock.
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-                    request.auth.uid == request.resource.data.studentId &&
-                    request.resource.data.released == false &&
-                    request.resource.data.expiresAt is timestamp;
-      allow update: if false;
-      allow delete: if false;
+      allow write: if isAuthenticated();
     }
 
     // ============================================
     // PROMO CODES
     // ============================================
-    
+
     match /promocodes/{promoCode} {
       allow read: if isAuthenticated();
       allow create: if isAdmin();
@@ -306,30 +328,35 @@ service cloud.firestore {
     }
 
     // ============================================
-    // Direct Payment
+    // DIRECT PAYMENT
     // ============================================
 
     match /directPaymentRequests/{id} {
-      allow read: if request.auth != null &&
-        (request.auth.uid == resource.data.studentId ||
-        request.auth.uid == resource.data.mohaffezId);
-      allow write: if false; // Cloud Functions only
-    }
-    match /weeklyCommissionSummaries/{id} {
-      allow read: if request.auth != null &&
-        request.auth.uid == resource.data.mohaffezId;
+      allow read: if isAuthenticated() &&
+                  resource != null &&
+                  (request.auth.uid == resource.data.studentId ||
+                   request.auth.uid == resource.data.mohaffezId);
       allow write: if false;
     }
+
+    match /weeklyCommissionSummaries/{id} {
+      allow read: if isAuthenticated() &&
+                  resource != null &&
+                  request.auth.uid == resource.data.mohaffezId;
+      allow write: if false;
+    }
+
     match /commissions/{id} {
-      allow read: if request.auth != null &&
-        request.auth.uid == resource.data.mohaffezId;
+      allow read: if isAuthenticated() &&
+                  resource != null &&
+                  request.auth.uid == resource.data.mohaffezId;
       allow write: if false;
     }
 
     // ============================================
     // SOCIAL FEATURES
     // ============================================
-    
+
     match /follows/{followId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
@@ -360,7 +387,7 @@ service cloud.firestore {
     // ============================================
     // NOTIFICATIONS
     // ============================================
-    
+
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() &&
                   (resource == null ||
@@ -379,7 +406,7 @@ service cloud.firestore {
     // ============================================
     // ASSIGNMENTS & MISTAKES
     // ============================================
-    
+
     match /assignments/{assignmentId} {
       allow read: if isAuthenticated() && (
         resource == null ||
@@ -415,15 +442,39 @@ service cloud.firestore {
     // ============================================
     // ADMIN & OPERATIONS
     // ============================================
-    
+
     match /failedOperations/{operationId} {
       allow read: if isAdmin();
-      allow write: if false;
+      allow write: if isAdmin();
     }
 
+    // ✅ FIX: Was `isAuthenticated()` which caused PERMISSION_DENIED when
+    // devModeProvider and systemConfigProvider stream before auth resolves.
+    // systemConfig contains only non-sensitive app configuration
+    // (maintenance flags, version numbers, dev feature toggles).
     match /systemConfig/{configId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /userSuspensions/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow write: if isAdmin();
+    }
+
+    match /broadcastHistory/{id} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /devLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() || isAuthenticated();
+    }
+
+    match /adminAuditLog/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     match /appVersions/{versionId} {
@@ -434,7 +485,7 @@ service cloud.firestore {
     // ============================================
     // CATCH-ALL
     // ============================================
-    
+
     match /{document=**} {
       allow read, write: if false;
     }

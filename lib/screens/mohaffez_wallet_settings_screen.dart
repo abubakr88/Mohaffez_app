@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import '../services/direct_payment_service.dart';
 
 class MohaffezWalletSettingsScreen extends StatefulWidget {
@@ -12,14 +13,14 @@ class MohaffezWalletSettingsScreen extends StatefulWidget {
 
 class _MohaffezWalletSettingsScreenState
     extends State<MohaffezWalletSettingsScreen> {
-  final _instapayCtrl    = TextEditingController();
-  final _vodafoneCtrl    = TextEditingController();
-  final _orangeCtrl      = TextEditingController();
-  final _etisalatCtrl    = TextEditingController();
-  final _wePayCtrl       = TextEditingController();
+  final _instapayCtrl = TextEditingController();
+  final _vodafoneCtrl = TextEditingController();
+  final _orangeCtrl = TextEditingController();
+  final _etisalatCtrl = TextEditingController();
+  final _wePayCtrl = TextEditingController();
 
   bool _loading = true;
-  bool _saving  = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -31,11 +32,11 @@ class _MohaffezWalletSettingsScreenState
     final uid = FirebaseAuth.instance.currentUser!.uid;
     final wallets = await DirectPaymentService.getMohaffezWalletNumbers(uid);
     setState(() {
-      _instapayCtrl.text  = wallets['instapay']     ?? '';
-      _vodafoneCtrl.text  = wallets['vodafonecash']  ?? '';
-      _orangeCtrl.text    = wallets['orangemoney']   ?? '';
-      _etisalatCtrl.text  = wallets['etisalatcash']  ?? '';
-      _wePayCtrl.text     = wallets['wepay']         ?? '';
+      _instapayCtrl.text = wallets['instapay'] ?? '';
+      _vodafoneCtrl.text = wallets['vodafonecash'] ?? '';
+      _orangeCtrl.text = wallets['orangemoney'] ?? '';
+      _etisalatCtrl.text = wallets['etisalatcash'] ?? '';
+      _wePayCtrl.text = wallets['wepay'] ?? '';
       _loading = false;
     });
   }
@@ -45,12 +46,20 @@ class _MohaffezWalletSettingsScreenState
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
       await DirectPaymentService.saveMohaffezWalletNumbers(
-        mohaffezId:     uid,
-        instapayNumber: _instapayCtrl.text.trim().isEmpty  ? null : _instapayCtrl.text.trim(),
-        vodafoneNumber: _vodafoneCtrl.text.trim().isEmpty  ? null : _vodafoneCtrl.text.trim(),
-        orangeNumber:   _orangeCtrl.text.trim().isEmpty    ? null : _orangeCtrl.text.trim(),
-        etisalatNumber: _etisalatCtrl.text.trim().isEmpty  ? null : _etisalatCtrl.text.trim(),
-        wePayNumber:    _wePayCtrl.text.trim().isEmpty     ? null : _wePayCtrl.text.trim(),
+        mohaffezId: uid,
+        instapayNumber: _instapayCtrl.text.trim().isEmpty
+            ? null
+            : _instapayCtrl.text.trim(),
+        vodafoneNumber: _vodafoneCtrl.text.trim().isEmpty
+            ? null
+            : _vodafoneCtrl.text.trim(),
+        orangeNumber:
+            _orangeCtrl.text.trim().isEmpty ? null : _orangeCtrl.text.trim(),
+        etisalatNumber: _etisalatCtrl.text.trim().isEmpty
+            ? null
+            : _etisalatCtrl.text.trim(),
+        wePayNumber:
+            _wePayCtrl.text.trim().isEmpty ? null : _wePayCtrl.text.trim(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -84,9 +93,23 @@ class _MohaffezWalletSettingsScreenState
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('أرقام محافظ الدفع المباشر'),
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'تحديث',
+              onPressed: _loadWallets,
+            ),
+          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -159,9 +182,10 @@ class _MohaffezWalletSettingsScreenState
                       onPressed: _saving ? null : _save,
                       icon: _saving
                           ? const SizedBox(
-                              width: 20, height: 20,
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
+                                  strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.save, color: Colors.white),
                       label: Text(
                         _saving ? 'جاري الحفظ...' : 'حفظ الأرقام',

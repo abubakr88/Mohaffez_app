@@ -1,14 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.releaseExpiredSlotLocks = void 0;
+exports.releaseExpiredSlotLocksNow = releaseExpiredSlotLocksNow;
 const functions = require("firebase-functions");
 const admin_1 = require("../utils/admin");
 function normalizeTimeSlot(raw) {
     return raw.replace(/\s+/g, '');
 }
-exports.releaseExpiredSlotLocks = functions.pubsub
-    .schedule('every 10 minutes')
-    .onRun(async () => {
+async function releaseExpiredSlotLocksNow() {
     const now = admin_1.default.firestore.Timestamp.now();
     const snapshot = await admin_1.db
         .collection('slotLocks')
@@ -16,9 +15,9 @@ exports.releaseExpiredSlotLocks = functions.pubsub
         .where('expiresAt', '<=', now)
         .get();
     if (snapshot.empty) {
-        return null;
+        return 0;
     }
-    for (const lockDoc of snapshot.docs) {
+    async function releaseSingleLock(lockDoc) {
         const lock = lockDoc.data();
         const mohaffezId = typeof lock.mohaffezId === 'string' ? lock.mohaffezId : null;
         const availabilityDocId = typeof lock.availabilityDocId === 'string' ? lock.availabilityDocId : null;
@@ -30,7 +29,7 @@ exports.releaseExpiredSlotLocks = functions.pubsub
                 releasedAt: admin_1.FieldValue.serverTimestamp(),
                 releaseReason: 'invalid_lock_payload',
             });
-            continue;
+            return;
         }
         const availabilityRef = admin_1.db
             .collection('users')
@@ -99,9 +98,21 @@ exports.releaseExpiredSlotLocks = functions.pubsub
             });
         }
     }
+    const chunkSize = 10;
+    const docs = snapshot.docs;
+    for (let i = 0; i < docs.length; i += chunkSize) {
+        const chunk = docs.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(releaseSingleLock));
+    }
     functions.logger.info('Expired slot locks processed', {
         count: snapshot.size,
     });
+    return snapshot.size;
+}
+exports.releaseExpiredSlotLocks = functions.pubsub
+    .schedule('every 10 minutes')
+    .onRun(async () => {
+    await releaseExpiredSlotLocksNow();
     return null;
 });
 //# sourceMappingURL=releaseExpiredSlotLocks.js.map

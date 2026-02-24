@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../models/payment_model.dart';
@@ -78,8 +79,23 @@ class _StudentPaymentConfirmationScreenState
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('تأكيد الحجز بالدفع'),
           backgroundColor: AppThemeConstants.accentGreen,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'تحديث',
+              onPressed: () =>
+                  ref.invalidate(activePricingPlansProvider(widget.mohaffezId)),
+            ),
+          ],
         ),
         body: plansAsync.when(
           data: (plans) {
@@ -98,13 +114,21 @@ class _StudentPaymentConfirmationScreenState
               );
             }
 
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _lockedCard(),
-                const SizedBox(height: 12),
-                ...filteredPlans.map(_planCard),
-              ],
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(activePricingPlansProvider(widget.mohaffezId));
+                await ref
+                    .read(activePricingPlansProvider(widget.mohaffezId).future)
+                    .catchError((_) => <PricingPlanModel>[]);
+              },
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _lockedCard(),
+                  const SizedBox(height: 12),
+                  ...filteredPlans.map(_planCard),
+                ],
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

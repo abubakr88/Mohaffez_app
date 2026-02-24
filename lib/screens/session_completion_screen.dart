@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../shared/constants/app_theme.dart';
 import '../providers/session_provider_paginated.dart';
@@ -139,6 +140,13 @@ class _SessionCompletionScreenState
       MaterialPageRoute(
         builder: (context) => Scaffold(
           appBar: AppBar(
+            leading: context.canPop()
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_ios),
+                    onPressed: () => context.pop(),
+                    tooltip: 'رجوع',
+                  )
+                : null,
             title: const Text('تحديد الأخطاء على المصحف'),
             backgroundColor: AppTheme.accentGreen,
           ),
@@ -175,6 +183,13 @@ class _SessionCompletionScreenState
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: Text(
             widget.isLateCompletion ? 'إكمال جلسة متأخرة' : 'إكمال الجلسة',
           ),

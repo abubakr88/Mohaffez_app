@@ -16,6 +16,7 @@ dependencies:
 
   # Core packages
   url_launcher: ^6.3.1
+  package_info_plus: ^8.1.0
   cupertino_icons: ^1.0.8
   flutter_dotenv: ^5.1.0
 
@@ -99,7 +100,7 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.8.0
 
-  # Riverpod code generation - UPDATED
+  # # Riverpod code generation - UPDATED // COmment out for now to avoid build issues, can re-enable once we have the basics working
   custom_lint: ^0.7.3
   riverpod_generator: ^2.4.3
   riverpod_lint: ^2.6.2
@@ -162,3 +163,6 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/images/icon.png"
   min_sdk_android: 21
   remove_alpha_ios: true
+
+dependency_overrides:
+  analyzer_plugin: ^0.13.0

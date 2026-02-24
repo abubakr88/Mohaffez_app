@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../models/mohaffez_student_summary.dart';
@@ -83,8 +84,7 @@ class _StudentsBody extends ConsumerWidget {
                       child: EmptyState(
                         icon: Icons.people_outline,
                         title: 'لا يوجد طلاب بعد',
-                        message:
-                            'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
+                        message: 'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
                         animated: true,
                       ),
                     );
@@ -147,6 +147,13 @@ class _AppBarSliver extends ConsumerWidget {
       expandedHeight: 120,
       floating: true,
       pinned: true,
+      leading: context.canPop()
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              onPressed: () => context.pop(),
+              tooltip: 'رجوع',
+            )
+          : null,
       actions: [
         IconButton(
           icon: const Icon(Icons.refresh),
@@ -238,8 +245,7 @@ class StudentCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 3,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -444,9 +450,7 @@ class _StatChip extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: color),
+                fontSize: 13, fontWeight: FontWeight.bold, color: color),
           ),
         ],
       ),
@@ -512,8 +516,7 @@ class _SkeletonCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -522,8 +525,8 @@ class _SkeletonCard extends StatelessWidget {
             Row(
               children: [
                 _Shimmer(
-                  child: const CircleAvatar(radius: 28,
-                      backgroundColor: Colors.white),
+                  child: const CircleAvatar(
+                      radius: 28, backgroundColor: Colors.white),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

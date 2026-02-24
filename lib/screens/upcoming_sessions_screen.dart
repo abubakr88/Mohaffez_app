@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
@@ -30,246 +31,269 @@ class UpcomingSessionsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            // App Bar with Filter
-            SliverAppBar(
-              expandedHeight: 130,
-              floating: true,
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(upcomingSessionsProvider(mohaffezId));
+            await ref
+                .read(upcomingSessionsProvider(mohaffezId).future)
+                .catchError((_) => <Map<String, dynamic>>[]);
+          },
+          child: CustomScrollView(
+            slivers: [
+              // App Bar with Filter
+              SliverAppBar(
+                expandedHeight: 130,
+                floating: true,
+                pinned: true,
+                leading: context.canPop()
+                    ? IconButton(
+                        icon: const Icon(Icons.arrow_back_ios),
+                        onPressed: () => context.pop(),
+                        tooltip: 'رجوع',
+                      )
+                    : null,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'تحديث',
+                    onPressed: () =>
+                        ref.invalidate(upcomingSessionsProvider(mohaffezId)),
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.event_available,
-                                  size: 28,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      ArabicLabels.upcomingSessions,
-                                      style: TextStyle(
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'جلساتك المجدولة',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Total Count Badge
-                              sessionsAsync.when(
-                                data: (sessions) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Text(
-                                    sessions.length.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.accentGreen,
-                                    ),
+                                  child: const Icon(
+                                    Icons.event_available,
+                                    size: 28,
+                                    color: Colors.white,
                                   ),
                                 ),
-                                loading: () => const SizedBox.shrink(),
-                                error: (_, __) => const SizedBox.shrink(),
-                              ),
-                            ],
-                          ),
-                        ],
+                                const SizedBox(width: 16),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        ArabicLabels.upcomingSessions,
+                                        style: TextStyle(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'جلساتك المجدولة',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Total Count Badge
+                                sessionsAsync.when(
+                                  data: (sessions) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      sessions.length.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.accentGreen,
+                                      ),
+                                    ),
+                                  ),
+                                  loading: () => const SizedBox.shrink(),
+                                  error: (_, __) => const SizedBox.shrink(),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Filter Chips
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'تصفية حسب:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+              // Filter Chips
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'تصفية حسب:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        FilterChip(
-                          label: const Text('الكل'),
-                          selected: filter == UpcomingFilter.all,
-                          onSelected: (_) {
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          FilterChip(
+                            label: const Text('الكل'),
+                            selected: filter == UpcomingFilter.all,
+                            onSelected: (_) {
+                              ref
+                                  .read(upcomingSessionsFilterProvider.notifier)
+                                  .state = UpcomingFilter.all;
+                            },
+                            selectedColor:
+                                AppTheme.accentGreen.withValues(alpha: 0.2),
+                            checkmarkColor: AppTheme.accentGreen,
+                          ),
+                          FilterChip(
+                            label: const Text('اليوم'),
+                            selected: filter == UpcomingFilter.today,
+                            onSelected: (_) {
+                              ref
+                                  .read(upcomingSessionsFilterProvider.notifier)
+                                  .state = UpcomingFilter.today;
+                            },
+                            selectedColor:
+                                AppTheme.accentGreen.withValues(alpha: 0.2),
+                            checkmarkColor: AppTheme.accentGreen,
+                          ),
+                          FilterChip(
+                            label: const Text('هذا الأسبوع'),
+                            selected: filter == UpcomingFilter.thisWeek,
+                            onSelected: (_) {
+                              ref
+                                  .read(upcomingSessionsFilterProvider.notifier)
+                                  .state = UpcomingFilter.thisWeek;
+                            },
+                            selectedColor:
+                                AppTheme.accentGreen.withValues(alpha: 0.2),
+                            checkmarkColor: AppTheme.accentGreen,
+                          ),
+                          FilterChip(
+                            label: const Text('هذا الشهر'),
+                            selected: filter == UpcomingFilter.thisMonth,
+                            onSelected: (_) {
+                              ref
+                                  .read(upcomingSessionsFilterProvider.notifier)
+                                  .state = UpcomingFilter.thisMonth;
+                            },
+                            selectedColor:
+                                AppTheme.accentGreen.withValues(alpha: 0.2),
+                            checkmarkColor: AppTheme.accentGreen,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Filtered Count
+                      Text(
+                        'عدد الجلسات: ${filteredSessions.length}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Sessions List
+              sessionsAsync.when(
+                data: (allSessions) {
+                  if (allSessions.isEmpty) {
+                    return const SliverFillRemaining(
+                      child: EmptyState(
+                        icon: Icons.event_busy,
+                        title: 'لا توجد جلسات قادمة',
+                        message: 'لم يتم جدولة أي جلسات بعد',
+                        animated: true,
+                      ),
+                    );
+                  }
+
+                  if (filteredSessions.isEmpty) {
+                    return SliverFillRemaining(
+                      child: EmptyState(
+                        icon: Icons.filter_list_off,
+                        title: 'لا توجد نتائج',
+                        message: 'لا توجد جلسات في الفترة المحددة',
+                        animated: true,
+                        action: TextButton.icon(
+                          onPressed: () {
                             ref
                                 .read(upcomingSessionsFilterProvider.notifier)
                                 .state = UpcomingFilter.all;
                           },
-                          selectedColor:
-                              AppTheme.accentGreen.withValues(alpha: 0.2),
-                          checkmarkColor: AppTheme.accentGreen,
+                          icon: const Icon(Icons.clear),
+                          label: const Text('مسح التصفية'),
                         ),
-                        FilterChip(
-                          label: const Text('اليوم'),
-                          selected: filter == UpcomingFilter.today,
-                          onSelected: (_) {
-                            ref
-                                .read(upcomingSessionsFilterProvider.notifier)
-                                .state = UpcomingFilter.today;
-                          },
-                          selectedColor:
-                              AppTheme.accentGreen.withValues(alpha: 0.2),
-                          checkmarkColor: AppTheme.accentGreen,
-                        ),
-                        FilterChip(
-                          label: const Text('هذا الأسبوع'),
-                          selected: filter == UpcomingFilter.thisWeek,
-                          onSelected: (_) {
-                            ref
-                                .read(upcomingSessionsFilterProvider.notifier)
-                                .state = UpcomingFilter.thisWeek;
-                          },
-                          selectedColor:
-                              AppTheme.accentGreen.withValues(alpha: 0.2),
-                          checkmarkColor: AppTheme.accentGreen,
-                        ),
-                        FilterChip(
-                          label: const Text('هذا الشهر'),
-                          selected: filter == UpcomingFilter.thisMonth,
-                          onSelected: (_) {
-                            ref
-                                .read(upcomingSessionsFilterProvider.notifier)
-                                .state = UpcomingFilter.thisMonth;
-                          },
-                          selectedColor:
-                              AppTheme.accentGreen.withValues(alpha: 0.2),
-                          checkmarkColor: AppTheme.accentGreen,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Filtered Count
-                    Text(
-                      'عدد الجلسات: ${filteredSessions.length}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                    );
+                  }
 
-            // Sessions List
-            sessionsAsync.when(
-              data: (allSessions) {
-                if (allSessions.isEmpty) {
-                  return const SliverFillRemaining(
-                    child: EmptyState(
-                      icon: Icons.event_busy,
-                      title: 'لا توجد جلسات قادمة',
-                      message: 'لم يتم جدولة أي جلسات بعد',
-                      animated: true,
-                    ),
-                  );
-                }
-
-                if (filteredSessions.isEmpty) {
-                  return SliverFillRemaining(
-                    child: EmptyState(
-                      icon: Icons.filter_list_off,
-                      title: 'لا توجد نتائج',
-                      message:
-                          'لا توجد جلسات في الفترة المحددة',
-                      animated: true,
-                      action: TextButton.icon(
-                        onPressed: () {
-                          ref
-                              .read(upcomingSessionsFilterProvider.notifier)
-                              .state = UpcomingFilter.all;
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final session = filteredSessions[index];
+                          return SessionCard(
+                            session: session,
+                            mohaffezId: mohaffezId,
+                          );
                         },
-                        icon: const Icon(Icons.clear),
-                        label: const Text('مسح التصفية'),
+                        childCount: filteredSessions.length,
                       ),
                     ),
                   );
-                }
-
-                return SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final session = filteredSessions[index];
-                        return SessionCard(
-                          session: session,
-                          mohaffezId: mohaffezId,
-                        );
-                      },
-                      childCount: filteredSessions.length,
-                    ),
+                },
+                loading: () => const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => SliverFillRemaining(
+                  child: ErrorDisplay.dataLoad(
+                    onRetry: () {
+                      ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                    },
                   ),
-                );
-              },
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => SliverFillRemaining(
-                child: ErrorDisplay.dataLoad(
-                  onRetry: () {
-                    ref.invalidate(upcomingSessionsProvider(mohaffezId));
-                  },
                 ),
               ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            ],
+          ),
         ),
       ),
     );
@@ -521,9 +545,7 @@ class SessionCard extends ConsumerWidget {
             children: [
               const Icon(Icons.error_outline, color: Colors.white),
               const SizedBox(width: 12),
-              Expanded(
-                  child:
-                      Text('فشل إلغاء الجلسة: ${e.toString()}')),
+              Expanded(child: Text('فشل إلغاء الجلسة: ${e.toString()}')),
             ],
           ),
           backgroundColor: Colors.red,
@@ -594,8 +616,7 @@ class SessionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final studentName =
-        session['studentName'] as String? ?? 'غير معروف';
+    final studentName = session['studentName'] as String? ?? 'غير معروف';
     final sessionDate = session['sessionDate'] as DateTime?;
     final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
     final location = session['location'] as String? ?? '';
@@ -898,9 +919,7 @@ class SessionCard extends ConsumerWidget {
                         },
                         icon: const Icon(Icons.check_circle, size: 20),
                         label: Text(
-                          isLate
-                              ? 'إكمال متأخر'
-                              : 'إكمال الجلسة',
+                          isLate ? 'إكمال متأخر' : 'إكمال الجلسة',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -982,8 +1001,7 @@ class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
           controller: reasonController,
           maxLines: 3,
           decoration: const InputDecoration(
-            hintText:
-                'اختياري: يمكنك توضيح سبب عدم حضور الطالب',
+            hintText: 'اختياري: يمكنك توضيح سبب عدم حضور الطالب',
             border: OutlineInputBorder(),
           ),
         ),

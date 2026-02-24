@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../route_guard.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/system_config_provider.dart';
 import '../../providers/user_provider.dart';
 
 /// Redirects authenticated users from splash/login and enforces role-based access.
@@ -25,6 +26,7 @@ class RoleGuard implements RouteGuard {
 
   static const String studentHomePath = '/home';
   static const String mohaffezHomePath = '/mohaffez-home';
+  static const String adminHomePath = '/admin-home';
 
   // Routes accessible to any authenticated user.
   static const List<String> sharedRoutePrefixes = <String>[
@@ -53,10 +55,16 @@ class RoleGuard implements RouteGuard {
     '/mohaffez', // profiles
   ];
 
+  static const List<String> adminRoutePrefixes = <String>[
+    '/admin-home',
+    '/admin',
+  ];
+
   @override
   String? check(Ref ref, GoRouterState state) {
     final authState = ref.read(authStateProvider);
     final AsyncValue<UserModel?> userState = ref.read(currentUserProvider);
+    final config = ref.read(systemConfigProvider).valueOrNull;
     final currentPath = state.uri.path;
 
     // Only process if authenticated (AuthGuard handles unauth).
@@ -72,7 +80,8 @@ class RoleGuard implements RouteGuard {
       // If user doc errored, wait: TimeoutGuard decides what to do.
       if (userState.hasError) {
         if (kDebugMode) {
-          debugPrint('⚠️ RoleGuard: user load error on $currentPath: ${userState.error}');
+          debugPrint(
+              '⚠️ RoleGuard: user load error on $currentPath: ${userState.error}');
         }
         return null;
       }
@@ -97,13 +106,26 @@ class RoleGuard implements RouteGuard {
     final role = user.role.trim();
     if (role.isEmpty) return loginPath;
 
+    if (config != null &&
+        config.maintenanceMode == true &&
+        !config.maintenanceAllowedUids.contains(user.uid) &&
+        currentPath != '/maintenance') {
+      return '/maintenance';
+    }
+
     // Enforce role-based access.
-    if (_startsWithAny(currentPath, mohaffezRoutePrefixes) && role != 'mohaffez') {
+    if (_startsWithAny(currentPath, mohaffezRoutePrefixes) &&
+        role != 'mohaffez') {
       return studentHomePath;
     }
 
-    if (_startsWithAny(currentPath, studentRoutePrefixes) && role == 'mohaffez') {
+    if (_startsWithAny(currentPath, studentRoutePrefixes) &&
+        role == 'mohaffez') {
       return mohaffezHomePath;
+    }
+
+    if (_startsWithAny(currentPath, adminRoutePrefixes) && role != 'admin') {
+      return studentHomePath;
     }
 
     return null;
@@ -115,6 +137,7 @@ class RoleGuard implements RouteGuard {
 
   static String? _homeForRole(String role) {
     final normalized = role.trim().toLowerCase();
+    if (normalized == 'admin') return adminHomePath;
     if (normalized == 'mohaffez') return mohaffezHomePath;
     if (normalized == 'student') return studentHomePath;
     return null;

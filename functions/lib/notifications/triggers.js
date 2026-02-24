@@ -76,6 +76,14 @@ exports.onSessionRequestAccepted = functions.firestore
         // CASE 2: Accepted (with free session detection)
         // ============================================
         if (afterStatus === 'accepted') {
+            // Guard: confirmFreeSession already sent notifications atomically
+            const alreadySent = after['notificationsAlreadySent'];
+            if (alreadySent === true) {
+                functions.logger.info('Skipping duplicate notification: already sent by confirmFreeSession', {
+                    requestId: context.params.requestId,
+                });
+                return;
+            }
             // Determine notification content based on free/paid status
             const notificationTitle = isFreeSession
                 ? '🎉 جلسة مجانية مؤكدة!'

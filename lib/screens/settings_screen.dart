@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
 
@@ -12,6 +13,13 @@ class SettingsScreen extends ConsumerWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('الإعدادات'),
         ),
         body: ListView(
@@ -42,9 +50,9 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            
+
             Spacing.vLg,
-            
+
             // الحساب
             buildSection(
               title: 'الحساب',
@@ -70,9 +78,9 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            
+
             Spacing.vLg,
-            
+
             // معلومات
             buildSection(
               title: 'معلومات',
@@ -161,7 +169,8 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               ListTile(
                 title: const Text('العربية'),
-                trailing: const Icon(Icons.check, color: AppThemeConstants.primaryAmber),
+                trailing: const Icon(Icons.check,
+                    color: AppThemeConstants.primaryAmber),
                 onTap: () => Navigator.pop(ctx),
               ),
               ListTile(
@@ -202,7 +211,9 @@ class SettingsScreen extends ConsumerWidget {
                   border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
+              const SizedBox(
+                  height:
+                      AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
               TextField(
                 controller: newPasswordController,
                 obscureText: true,
@@ -211,7 +222,9 @@ class SettingsScreen extends ConsumerWidget {
                   border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
+              const SizedBox(
+                  height:
+                      AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
               TextField(
                 controller: confirmPasswordController,
                 obscureText: true,
@@ -348,7 +361,16 @@ class _NotificationSettingsScreenState
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('إعدادات الإشعارات')),
+        appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
+          title: const Text('إعدادات الإشعارات'),
+        ),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -395,7 +417,16 @@ class _EmailNotificationsScreenState extends State<EmailNotificationsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('إشعارات البريد الإلكتروني')),
+        appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
+          title: const Text('إشعارات البريد الإلكتروني'),
+        ),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -430,4 +461,3 @@ class _EmailNotificationsScreenState extends State<EmailNotificationsScreen> {
     );
   }
 }
-

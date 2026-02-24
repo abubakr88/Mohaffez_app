@@ -109,75 +109,94 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            _buildAppBar(context),
-            if (isLoadingLocation || locationError != null)
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(nearbyMohaffezProvider(params));
+            await ref
+                .read(nearbyMohaffezProvider(params).future)
+                .catchError((_) => <MohaffezModel>[]);
+          },
+          child: CustomScrollView(
+            slivers: [
+              _buildAppBar(context, ref, params),
+              if (isLoadingLocation || locationError != null)
+                SliverToBoxAdapter(
+                  child: _buildLocationBanner(),
+                ),
               SliverToBoxAdapter(
-                child: _buildLocationBanner(),
+                child: _buildRadiusSlider(),
               ),
-            SliverToBoxAdapter(
-              child: _buildRadiusSlider(),
-            ),
-            SliverToBoxAdapter(
-              child: _buildFilterChips(),
-            ),
-            mohaffezAsync.when(
-              data: (mohaffezList) {
-                if (mohaffezList.isEmpty) {
-                  return SliverFillRemaining(
-                    child: EmptyState(
-                      icon: Icons.search_off,
-                      title: 'لا يوجد محفظون',
-                      message: 'لم نتمكن من العثور على محفظين في منطقتك',
+              SliverToBoxAdapter(
+                child: _buildFilterChips(),
+              ),
+              mohaffezAsync.when(
+                data: (mohaffezList) {
+                  if (mohaffezList.isEmpty) {
+                    return SliverFillRemaining(
+                      child: EmptyState(
+                        icon: Icons.search_off,
+                        title: 'لا يوجد محفظون',
+                        message: 'لم نتمكن من العثور على محفظين في منطقتك',
+                      ),
+                    );
+                  }
+
+                  return SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final mohaffez = mohaffezList[index];
+                          final distance =
+                              mohaffez.getDistanceFrom(userLat, userLng);
+
+                          return MohaffezCard(
+                            mohaffez: mohaffez,
+                            distance: distance,
+                            onTap: () =>
+                                context.go('/mohaffez/${mohaffez.id}', extra: {
+                              'lat': userLat?.toString(),
+                              'lng': userLng?.toString(),
+                            }),
+                          );
+                        },
+                        childCount: mohaffezList.length,
+                      ),
                     ),
                   );
-                }
-
-                return SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final mohaffez = mohaffezList[index];
-                        final distance =
-                            mohaffez.getDistanceFrom(userLat, userLng);
-
-                        return MohaffezCard(
-                          mohaffez: mohaffez,
-                          distance: distance,
-                          onTap: () =>
-                              context.go('/mohaffez/${mohaffez.id}', extra: {
-                            'lat': userLat?.toString(),
-                            'lng': userLng?.toString(),
-                          }),
-                        );
-                      },
-                      childCount: mohaffezList.length,
-                    ),
+                },
+                loading: () => const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (error, stack) => SliverFillRemaining(
+                  child: ErrorDisplay.dataLoad(
+                    onRetry: () => ref.invalidate(nearbyMohaffezProvider),
                   ),
-                );
-              },
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (error, stack) => SliverFillRemaining(
-                child: ErrorDisplay.dataLoad(
-                  onRetry: () => ref.invalidate(nearbyMohaffezProvider),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildAppBar(
+    BuildContext context,
+    WidgetRef ref,
+    NearbyParams params,
+  ) {
     return SliverAppBar(
       expandedHeight: 120,
       floating: true,
       pinned: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'تحديث',
+          onPressed: () => ref.invalidate(nearbyMohaffezProvider(params)),
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(

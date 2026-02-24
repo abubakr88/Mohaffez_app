@@ -9,13 +9,29 @@ import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../utils/arabic_labels.dart';
+import '../services/app_version_service.dart';
 import 'student_assignments_screen.dart';
 
-class StudentHome extends ConsumerWidget {
+class StudentHome extends ConsumerStatefulWidget {
   const StudentHome({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentHome> createState() => _StudentHomeState();
+}
+
+class _StudentHomeState extends ConsumerState<StudentHome> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppVersionService.checkOnStartup(context);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
 
     return userAsync.when(
@@ -55,13 +71,16 @@ class StudentHomeContent extends ConsumerWidget {
             ref.invalidate(currentUserProvider);
             ref.invalidate(studentSessionsFirstPageProvider(studentId));
             ref.invalidate(studentRequestsFirstPageProvider(studentId));
+            await ref
+                .read(studentSessionsFirstPageProvider(studentId).future)
+                .catchError((_) => <Map<String, dynamic>>[]);
           },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // Modern App Bar
               _buildAppBar(context, ref),
-              
+
               // Content
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -70,20 +89,20 @@ class StudentHomeContent extends ConsumerWidget {
                     // Welcome Message Card
                     _buildWelcomeCard(ref),
                     const SizedBox(height: 20),
-                    
+
                     // Quick Stats
                     QuickStatsSection(studentId: studentId),
-                    
+
                     Spacing.vLg,
-                    
+
                     // Quick Actions - UPDATED WITH CLEAR SEPARATION
                     QuickActionsSection(studentId: studentId),
-                    
+
                     Spacing.vLg,
-                    
+
                     // Recent Assignments Preview
                     RecentAssignmentsSection(studentId: studentId),
-                    
+
                     const SizedBox(height: 32),
                   ]),
                 ),
@@ -102,6 +121,17 @@ class StudentHomeContent extends ConsumerWidget {
       pinned: true,
       elevation: 0,
       backgroundColor: AppThemeConstants.primaryAmber,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'تحديث',
+          onPressed: () {
+            ref.invalidate(currentUserProvider);
+            ref.invalidate(studentSessionsFirstPageProvider(studentId));
+            ref.invalidate(studentRequestsFirstPageProvider(studentId));
+          },
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -126,7 +156,8 @@ class StudentHomeContent extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.2),
+                          color: AppThemeConstants.surfaceWhite
+                              .withValues(alpha: 0.2),
                           borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
                         child: const Icon(
@@ -162,7 +193,8 @@ class StudentHomeContent extends ConsumerWidget {
                   ),
                   Spacing.vSm,
                   Text(
-                    DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now()),
+                    DateFormat('EEEE، d MMMM yyyy', 'ar')
+                        .format(DateTime.now()),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -258,8 +290,10 @@ class QuickStatsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
-    final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
+    final sessionsAsync =
+        ref.watch(studentSessionsFirstPageProvider(studentId));
+    final requestsAsync =
+        ref.watch(studentRequestsFirstPageProvider(studentId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,7 +337,8 @@ class QuickStatsSection extends ConsumerWidget {
                   data: (requests) => requests
                       .where((r) {
                         final status = (r['status'] as String?)?.toLowerCase();
-                        return status == 'pending' || status == 'awaitingpayment';
+                        return status == 'pending' ||
+                            status == 'awaitingpayment';
                       })
                       .length
                       .toString(),
@@ -577,7 +612,8 @@ class RecentAssignmentsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
+    final sessionsAsync =
+        ref.watch(studentSessionsFirstPageProvider(studentId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,7 +675,8 @@ class RecentAssignmentsSection extends ConsumerWidget {
 
             return Column(
               children: assignments.map((session) {
-                final mohaffezName = (session['mohaffezName'] as String?) ?? 'محفظ';
+                final mohaffezName =
+                    (session['mohaffezName'] as String?) ?? 'محفظ';
                 final hifz = (session['hifzAssignment'] as String?) ?? '';
                 final muraja = (session['murajaAssignment'] as String?) ?? '';
                 final sessionDate = session['sessionDate'] as DateTime?;
@@ -665,7 +702,8 @@ class RecentAssignmentsSection extends ConsumerWidget {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+                                color: AppThemeConstants.accentGreen
+                                    .withValues(alpha: 0.1),
                                 borderRadius: AppThemeConstants.borderRadiusSm,
                               ),
                               child: const Icon(

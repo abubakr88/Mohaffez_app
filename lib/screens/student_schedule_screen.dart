@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../shared/theme/app_theme_constants.dart';
@@ -14,13 +15,24 @@ class StudentScheduleScreen extends ConsumerStatefulWidget {
   const StudentScheduleScreen({super.key});
 
   @override
-  ConsumerState<StudentScheduleScreen> createState() => _StudentScheduleScreenState();
+  ConsumerState<StudentScheduleScreen> createState() =>
+      _StudentScheduleScreenState();
 }
 
 class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   CalendarFormat _calendarFormat = CalendarFormat.month;
+  String? _studentId;
+
+  Future<void> _refreshSchedule() async {
+    final studentId = _studentId;
+    if (studentId == null) return;
+    ref.invalidate(studentSessionsFirstPageProvider(studentId));
+    await ref
+        .read(studentSessionsFirstPageProvider(studentId).future)
+        .catchError((_) => <Map<String, dynamic>>[]);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +45,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
     }
 
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(user.uid));
+    _studentId = user.uid;
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -54,70 +67,76 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
               }
             }
 
-            return CustomScrollView(
-              slivers: [
-                // App Bar
-                _buildAppBar(),
-                
-                // Calendar
-                SliverToBoxAdapter(
-                  child: Card(
-                    margin: const EdgeInsets.all(16),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: TableCalendar(
-                      firstDay: DateTime.utc(2020, 1, 1),
-                      lastDay: DateTime.utc(2030, 12, 31),
-                      focusedDay: _focusedDay,
-                      calendarFormat: _calendarFormat,
-                      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                      onDaySelected: (selectedDay, focusedDay) {
-                        setState(() {
-                          _selectedDay = selectedDay;
+            return RefreshIndicator(
+              onRefresh: _refreshSchedule,
+              child: CustomScrollView(
+                slivers: [
+                  // App Bar
+                  _buildAppBar(),
+
+                  // Calendar
+                  SliverToBoxAdapter(
+                    child: Card(
+                      margin: const EdgeInsets.all(16),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: TableCalendar(
+                        firstDay: DateTime.utc(2020, 1, 1),
+                        lastDay: DateTime.utc(2030, 12, 31),
+                        focusedDay: _focusedDay,
+                        calendarFormat: _calendarFormat,
+                        selectedDayPredicate: (day) =>
+                            isSameDay(_selectedDay, day),
+                        onDaySelected: (selectedDay, focusedDay) {
+                          setState(() {
+                            _selectedDay = selectedDay;
+                            _focusedDay = focusedDay;
+                          });
+                        },
+                        onFormatChanged: (format) {
+                          setState(() {
+                            _calendarFormat = format;
+                          });
+                        },
+                        onPageChanged: (focusedDay) {
                           _focusedDay = focusedDay;
-                        });
-                      },
-                      onFormatChanged: (format) {
-                        setState(() {
-                          _calendarFormat = format;
-                        });
-                      },
-                      onPageChanged: (focusedDay) {
-                        _focusedDay = focusedDay;
-                      },
-                      eventLoader: (day) {
-                        final dateKey = DateTime(day.year, day.month, day.day);
-                        return sessionsByDate[dateKey] ?? [];
-                      },
-                      calendarStyle: CalendarStyle(
-                        todayDecoration: BoxDecoration(
-                          color: AppThemeConstants.primaryAmber.withOpacity(0.5),
-                          shape: BoxShape.circle,
+                        },
+                        eventLoader: (day) {
+                          final dateKey =
+                              DateTime(day.year, day.month, day.day);
+                          return sessionsByDate[dateKey] ?? [];
+                        },
+                        calendarStyle: CalendarStyle(
+                          todayDecoration: BoxDecoration(
+                            color:
+                                AppThemeConstants.primaryAmber.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          selectedDecoration: const BoxDecoration(
+                            color: AppThemeConstants.accentGreen,
+                            shape: BoxShape.circle,
+                          ),
+                          markerDecoration: const BoxDecoration(
+                            color: AppThemeConstants.accentGreen,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                        selectedDecoration: const BoxDecoration(
-                          color: AppThemeConstants.accentGreen,
-                          shape: BoxShape.circle,
+                        headerStyle: const HeaderStyle(
+                          formatButtonVisible: true,
+                          titleCentered: true,
+                          formatButtonShowsNext: false,
                         ),
-                        markerDecoration: const BoxDecoration(
-                          color: AppThemeConstants.accentGreen,
-                          shape: BoxShape.circle,
-                        ),
+                        locale: 'ar',
                       ),
-                      headerStyle: const HeaderStyle(
-                        formatButtonVisible: true,
-                        titleCentered: true,
-                        formatButtonShowsNext: false,
-                      ),
-                      locale: 'ar',
                     ),
                   ),
-                ),
-                
-                // Sessions for selected day
-                _buildSessionsList(sessionsByDate),
-              ],
+
+                  // Sessions for selected day
+                  _buildSessionsList(sessionsByDate),
+                ],
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -132,6 +151,20 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
       expandedHeight: 100,
       floating: true,
       pinned: true,
+      leading: context.canPop()
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              onPressed: () => context.pop(),
+              tooltip: 'رجوع',
+            )
+          : null,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'تحديث',
+          onPressed: _refreshSchedule,
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -198,7 +231,8 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
     );
   }
 
-  Widget _buildSessionsList(Map<DateTime, List<Map<String, dynamic>>> sessionsByDate) {
+  Widget _buildSessionsList(
+      Map<DateTime, List<Map<String, dynamic>>> sessionsByDate) {
     if (_selectedDay == null) {
       return const SliverFillRemaining(
         child: EmptyState(
@@ -210,7 +244,8 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
       );
     }
 
-    final dateKey = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
+    final dateKey =
+        DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
     final sessions = sessionsByDate[dateKey] ?? [];
 
     if (sessions.isEmpty) {
@@ -241,7 +276,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                 ),
               );
             }
-            
+
             final session = sessions[index - 1];
             return _SessionCard(session: session);
           },

@@ -6,6 +6,14 @@ exports.createSubscriptionFromPayment = createSubscriptionFromPayment;
 // src/payments/handlers.ts
 const functions = require("firebase-functions");
 const admin_1 = require("../utils/admin");
+const STATUS = {
+    PENDING: 'pending',
+    AWAITING_PAYMENT: 'awaitingpayment',
+    AWAITING_DIRECT: 'awaitingdirectpaymentconfirmation',
+    ACCEPTED: 'accepted',
+    REJECTED: 'rejected',
+    CANCELLED: 'cancelled',
+};
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const parseNumber = (v, fb) => typeof v === 'number' ? v : fb;
 const parseString = (v, fb) => typeof v === 'string' && v.trim().length > 0 ? v : fb;
@@ -58,11 +66,17 @@ async function readAvailabilityInTransaction(transaction, slotInfo) {
  * Accepts a booking request and creates the hafizSession in a single transaction.
  * ✅ FIX: slot disabling is now atomic — no more race window between booking and removal.
  */
-async function confirmBookingAfterPayment(requestId, sessionDetails, payment, transactionId, slotInfo) {
+async function confirmBookingAfterPayment(requestId, sessionDetails, payment, transactionId, slotInfo, paymentUpdate) {
     return admin_1.db.runTransaction(async (transaction) => {
         // ── READS (must all come before writes) ───────────────────────────────────
         const requestRef = admin_1.db.collection('sessionRequests').doc(requestId);
         const requestSnap = await transaction.get(requestRef);
+        const paymentRef = paymentUpdate
+            ? admin_1.db.collection('payments').doc(paymentUpdate.paymentId)
+            : null;
+        if (paymentRef) {
+            await transaction.get(paymentRef);
+        }
         // Read availability inside the same transaction while still in read phase
         const availUpdate = slotInfo
             ? await readAvailabilityInTransaction(transaction, slotInfo)
@@ -73,13 +87,13 @@ async function confirmBookingAfterPayment(requestId, sessionDetails, payment, tr
         // ── WRITES ────────────────────────────────────────────────────────────────
         const sessionRef = admin_1.db.collection('hafizSessions').doc();
         transaction.update(requestRef, {
-            status: 'accepted',
+            status: STATUS.ACCEPTED,
             isPaid: true,
             paidAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
             paymentTransactionId: transactionId,
             updatedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
         });
-        transaction.set(sessionRef, Object.assign(Object.assign({}, sessionDetails), { requestId, status: 'accepted', isPaid: true, paymentTransactionId: transactionId, createdAt: admin_1.default.firestore.FieldValue.serverTimestamp(), acceptedAt: admin_1.default.firestore.FieldValue.serverTimestamp(), studentId: payment.studentId, mohaffezId: payment.mohaffezId }));
+        transaction.set(sessionRef, Object.assign(Object.assign({}, sessionDetails), { requestId, status: STATUS.ACCEPTED, isPaid: true, paymentTransactionId: transactionId, createdAt: admin_1.default.firestore.FieldValue.serverTimestamp(), acceptedAt: admin_1.default.firestore.FieldValue.serverTimestamp(), studentId: payment.studentId, mohaffezId: payment.mohaffezId }));
         if (availUpdate) {
             transaction.update(availUpdate.doc.ref, {
                 timeSlots: availUpdate.updatedSlots,
@@ -87,6 +101,15 @@ async function confirmBookingAfterPayment(requestId, sessionDetails, payment, tr
             });
             functions.logger.info('Slot disabled atomically with booking', {
                 requestId, sessionId: sessionRef.id, timeSlot: slotInfo === null || slotInfo === void 0 ? void 0 : slotInfo.timeSlot,
+            });
+        }
+        if (paymentUpdate && paymentRef) {
+            transaction.update(paymentRef, {
+                status: 'completed',
+                paidAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+                idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
+                processedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
             });
         }
         functions.logger.info('Booking confirmed in transaction', { requestId, sessionId: sessionRef.id });
@@ -97,11 +120,17 @@ async function confirmBookingAfterPayment(requestId, sessionDetails, payment, tr
  * Consumes one session from a subscription and creates the hafizSession.
  * ✅ FIX: slot disabling is now atomic — same transaction as subscription decrement.
  */
-async function consumeSubscriptionAndCreateSession(subscriptionId, payment, transactionId, metadata, slotInfo) {
+async function consumeSubscriptionAndCreateSession(subscriptionId, payment, transactionId, metadata, slotInfo, paymentUpdate) {
     return admin_1.db.runTransaction(async (transaction) => {
         // ── READS ─────────────────────────────────────────────────────────────────
         const subRef = admin_1.db.collection('subscriptions').doc(subscriptionId);
         const subSnap = await transaction.get(subRef);
+        const paymentRef = paymentUpdate
+            ? admin_1.db.collection('payments').doc(paymentUpdate.paymentId)
+            : null;
+        if (paymentRef) {
+            await transaction.get(paymentRef);
+        }
         let requestRef = null;
         let requestSnap = null;
         if (metadata.requestId && metadata.sessionDetails) {
@@ -134,18 +163,27 @@ async function consumeSubscriptionAndCreateSession(subscriptionId, payment, tran
             const sessionRef = admin_1.db.collection('hafizSessions').doc();
             sessionId = sessionRef.id;
             transaction.update(requestRef, {
-                status: 'accepted',
+                status: STATUS.ACCEPTED,
                 isPaid: true,
                 paidAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
                 paymentTransactionId: transactionId,
                 updatedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
             });
-            transaction.set(sessionRef, Object.assign(Object.assign({}, metadata.sessionDetails), { requestId: metadata.requestId, status: 'accepted', isPaid: true, paymentTransactionId: transactionId, createdAt: admin_1.default.firestore.FieldValue.serverTimestamp(), acceptedAt: admin_1.default.firestore.FieldValue.serverTimestamp(), studentId: payment.studentId, mohaffezId: payment.mohaffezId }));
+            transaction.set(sessionRef, Object.assign(Object.assign({}, metadata.sessionDetails), { requestId: metadata.requestId, status: STATUS.ACCEPTED, isPaid: true, paymentTransactionId: transactionId, createdAt: admin_1.default.firestore.FieldValue.serverTimestamp(), acceptedAt: admin_1.default.firestore.FieldValue.serverTimestamp(), studentId: payment.studentId, mohaffezId: payment.mohaffezId }));
         }
         if (availUpdate) {
             transaction.update(availUpdate.doc.ref, {
                 timeSlots: availUpdate.updatedSlots,
                 updatedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+            });
+        }
+        if (paymentUpdate && paymentRef) {
+            transaction.update(paymentRef, {
+                status: 'completed',
+                paidAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+                idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
+                processedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
             });
         }
         functions.logger.info('Subscription session consumed in transaction', {
@@ -154,7 +192,7 @@ async function consumeSubscriptionAndCreateSession(subscriptionId, payment, tran
         return { remainingSessions: newRemaining, sessionId };
     });
 }
-async function createSubscriptionFromPayment(payment, transactionId) {
+async function createSubscriptionFromPayment(payment, transactionId, paymentUpdate) {
     var _a;
     const metadata = (_a = payment.metadata) !== null && _a !== void 0 ? _a : {};
     const planTitle = parseString(metadata['planTitle'], 'Payment Plan');
@@ -186,6 +224,16 @@ async function createSubscriptionFromPayment(payment, transactionId) {
             createdAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
         });
+        if (paymentUpdate) {
+            const paymentRef = admin_1.db.collection('payments').doc(paymentUpdate.paymentId);
+            transaction.update(paymentRef, {
+                status: 'completed',
+                paidAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+                idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
+                processedAt: admin_1.default.firestore.FieldValue.serverTimestamp(),
+            });
+        }
         functions.logger.info('Subscription created in transaction', { subscriptionId: subscriptionRef.id, sessionsCount });
         return { subscriptionId: subscriptionRef.id };
     });

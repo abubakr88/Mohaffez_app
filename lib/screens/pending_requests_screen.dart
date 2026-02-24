@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 
 import '../shared/constants/app_theme.dart';
@@ -12,6 +11,7 @@ import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
+import '../models/request_status.dart';
 import '../utils/arabic_labels.dart';
 import 'direct_payment_confirmations_screen.dart';
 
@@ -105,6 +105,20 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       expandedHeight: 120,
       floating: true,
       pinned: true,
+      leading: context.canPop()
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              onPressed: () => context.pop(),
+              tooltip: 'رجوع',
+            )
+          : null,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'تحديث',
+          onPressed: () => ref.invalidate(currentUserProvider),
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -159,20 +173,13 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                           ],
                         ),
                       ),
-                      // Counter Badge - Fixed to include awaiting_payment
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('sessionRequests')
-                            .where('mohaffezId', isEqualTo: mohaffezId)
-                            .where('status', whereIn: ['pending', 'awaitingpayment', 'awaiting_direct_payment_confirmation'])
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          final count = snapshot.data?.docs.length ?? 0;
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final count =
+                              ref.watch(pendingRequestsCountProvider(mohaffezId));
                           return Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
+                                horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
@@ -216,15 +223,15 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
             _FilterChip(
               label: 'قيد المراجعة',
               icon: Icons.pending,
-              isSelected: _selectedFilter == 'pending',
-              onTap: () => setState(() => _selectedFilter = 'pending'),
+              isSelected: _selectedFilter == RequestStatus.pending,
+              onTap: () => setState(() => _selectedFilter = RequestStatus.pending),
             ),
             const SizedBox(width: 8),
             _FilterChip(
               label: 'في انتظار الدفع',
               icon: Icons.payment,
-              isSelected: _selectedFilter == 'awaitingpayment',
-              onTap: () => setState(() => _selectedFilter = 'awaitingpayment'),
+              isSelected: _selectedFilter == RequestStatus.awaitingPayment,
+              onTap: () => setState(() => _selectedFilter = RequestStatus.awaitingPayment),
             ),
           ],
         ),
@@ -233,95 +240,51 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
   }
 
   Widget _buildRequestsList(String mohaffezId) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('sessionRequests')
-          .where('mohaffezId', isEqualTo: mohaffezId)
-          .where('status', whereIn: ['pending', 'awaitingpayment', 'awaiting_direct_payment_confirmation'])
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
-          );
+    final requestsAsync = ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
+    return requestsAsync.when(
+      loading: () => const SliverFillRemaining(
+          child: Center(child: CircularProgressIndicator())),
+      error: (e, _) => SliverFillRemaining(
+          child: ErrorDisplay.dataLoad(
+              onRetry: () =>
+                  ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId)))),
+      data: (allRequests) {
+        var filtered = allRequests;
+        // Apply status filter
+        if (_selectedFilter != 'all') {
+          filtered = filtered.where((r) {
+            final status = (r['status'] as String? ?? '').toLowerCase();
+            if (_selectedFilter == RequestStatus.awaitingPayment) {
+              return status == RequestStatus.awaitingPayment ||
+                  status == RequestStatus.awaitingDirectPayment;
+            }
+            return status == _selectedFilter;
+          }).toList();
         }
-
-        if (snapshot.hasError) {
-          return SliverFillRemaining(
-            child: ErrorDisplay.dataLoad(
-              onRetry: () => setState(() {}),
-            ),
-          );
+        // Apply search filter
+        if (_searchQuery.isNotEmpty) {
+          filtered = filtered.where((r) {
+            final name = (r['studentName'] as String? ?? '').toLowerCase();
+            return name.contains(_searchQuery);
+          }).toList();
         }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (filtered.isEmpty) {
           return const SliverFillRemaining(
             child: EmptyState(
               icon: Icons.inbox_outlined,
-              title: 'لا توجد طلبات معلقة',
-              message: 'ستظهر الطلبات الجديدة هنا',
+              title: 'لا توجد طلبات',
+              message: 'لم يصلك أي طلب حتى الآن',
               animated: true,
             ),
           );
         }
-
-        var requests = snapshot.data!.docs;
-
-        // Apply status filter
-        if (_selectedFilter != 'all') {
-          requests = requests.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final status = (data['status'] as String? ?? '').toLowerCase();
-            
-            if (_selectedFilter == 'pending') {
-              return status == 'pending';
-            } else if (_selectedFilter == 'awaitingpayment') {
-              return status == 'awaitingpayment' ||
-                  status == 'awaiting_direct_payment_confirmation';
-            }
-            return true;
-          }).toList();
-        }
-
-        // Apply search filter
-        if (_searchQuery.isNotEmpty) {
-          requests = requests.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final studentName = (data['studentName'] as String? ?? '').toLowerCase();
-            return studentName.contains(_searchQuery);
-          }).toList();
-        }
-
-        if (requests.isEmpty) {
-          return SliverFillRemaining(
-            child: EmptyState(
-              icon: Icons.search_off,
-              title: 'لا توجد نتائج',
-              message: 'جرب تغيير الفلتر أو البحث',
-              animated: true,
-              action: TextButton.icon(
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() {
-                    _searchQuery = '';
-                    _selectedFilter = 'all';
-                  });
-                },
-                icon: const Icon(Icons.clear),
-                label: const Text('مسح الفلاتر'),
-              ),
-            ),
-          );
-        }
-
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                final data = requests[index].data() as Map<String, dynamic>;
-                final requestId = requests[index].id;
+                final data = filtered[index];
+                final requestId = data['id'] as String;
                 return PendingRequestCard(
                   request: data,
                   requestId: requestId,
@@ -329,7 +292,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                   onReject: () => _handleReject(requestId),
                 );
               },
-              childCount: requests.length,
+              childCount: filtered.length,
             ),
           ),
         );
@@ -337,10 +300,11 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
     );
   }
 
-  Future<void> _handleAccept(String requestId, Map<String, dynamic> data) async {
+  Future<void> _handleAccept(
+      String requestId, Map<String, dynamic> data) async {
     final status = (data['status'] as String? ?? '').toLowerCase();
-    
-    if (status == 'awaiting_direct_payment_confirmation') {
+
+    if (status == RequestStatus.awaitingDirectPayment) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -360,7 +324,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
     }
 
     // Check if payment is required
-    if (status == 'awaitingpayment' || status == 'awaitingpayment') {
+    if (status == RequestStatus.awaitingPayment ||
+        status == RequestStatus.awaitingDirectPayment) {
       // Show dialog that payment is pending
       showDialog(
         context: context,
@@ -408,7 +373,9 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
 
     try {
       // ✅ USE PROVIDER: Handles subscription credits, payment deadlines, notifications
-      await ref.read(sessionActionsProvider.notifier).acceptRequestAndCreateSession(requestId);
+      await ref
+          .read(sessionActionsProvider.notifier)
+          .acceptRequestAndCreateSession(requestId);
 
       if (!mounted) return;
 
@@ -476,9 +443,11 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       final reason = reasonController.text.trim().isEmpty
           ? 'لم يذكر سبب'
           : reasonController.text.trim();
-      
+
       // ✅ USE PROVIDER: Handles slot lock release and notifications
-      await ref.read(sessionActionsProvider.notifier).rejectRequest(requestId, reason);
+      await ref
+          .read(sessionActionsProvider.notifier)
+          .rejectRequest(requestId, reason);
 
       if (!mounted) return;
 
@@ -582,19 +551,17 @@ class PendingRequestCard extends StatelessWidget {
     final studentName = request['studentName'] as String? ?? 'غير معروف';
     final sessionType = request['sessionType'] as String? ?? '';
     final location = request['location'] as String? ?? '';
-    
+
     DateTime? sessionDate;
     final dateField = request['sessionDate'] ?? request['slotDate'];
-    if (dateField is Timestamp) {
-      sessionDate = dateField.toDate();
-    } else if (dateField is DateTime) {
-      sessionDate = dateField;
-    }
-    
-    final timeSlot = request['preferredTimeSlot'] as String? ??
-        request['timeSlot'] as String? ?? '';
+    sessionDate = _asDateTime(dateField);
 
-    final isAwaitingPayment = status == 'awaitingpayment' || status == 'awaitingpayment';
+    final timeSlot = request['preferredTimeSlot'] as String? ??
+        request['timeSlot'] as String? ??
+        '';
+
+    final isAwaitingPayment = status == RequestStatus.awaitingPayment ||
+        status == RequestStatus.awaitingDirectPayment;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -602,7 +569,8 @@ class PendingRequestCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isAwaitingPayment ? Colors.orange.shade200 : Colors.grey.shade200,
+          color:
+              isAwaitingPayment ? Colors.orange.shade200 : Colors.grey.shade200,
           width: isAwaitingPayment ? 2 : 1,
         ),
       ),
@@ -625,7 +593,8 @@ class PendingRequestCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isAwaitingPayment
                         ? Colors.orange.withOpacity(0.1)
@@ -649,7 +618,8 @@ class PendingRequestCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isAwaitingPayment ? Colors.orange : Colors.grey,
+                          color:
+                              isAwaitingPayment ? Colors.orange : Colors.grey,
                         ),
                       ),
                     ],
@@ -659,7 +629,7 @@ class PendingRequestCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            if (status == 'awaiting_direct_payment_confirmation') ...[
+            if (status == RequestStatus.awaitingDirectPayment) ...[
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
@@ -690,9 +660,11 @@ class PendingRequestCard extends StatelessWidget {
                       builder: (_) => const DirectPaymentConfirmationsScreen(),
                     ),
                   ),
-                  icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+                  icon: const Icon(Icons.check_circle_outline,
+                      color: Colors.white),
                   label: const Text('تأكيد الدفع المباشر',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade600,
                     shape: RoundedRectangleBorder(
@@ -708,21 +680,21 @@ class PendingRequestCard extends StatelessWidget {
               ArabicLabels.getSessionTypeLabel(sessionType),
             ),
             const SizedBox(height: 8),
-            
+
             if (sessionDate != null)
               _buildDetailRow(
                 ArabicLabels.date,
                 DateFormat('dd/MM/yyyy', 'ar').format(sessionDate),
               ),
             const SizedBox(height: 8),
-            
+
             if (timeSlot.isNotEmpty)
               _buildDetailRow(
                 ArabicLabels.time,
                 timeSlot,
               ),
             const SizedBox(height: 8),
-            
+
             if (location.isNotEmpty)
               _buildDetailRow(
                 ArabicLabels.location,
@@ -801,4 +773,16 @@ class PendingRequestCard extends StatelessWidget {
       ],
     );
   }
+
+  DateTime? _asDateTime(dynamic value) {
+    if (value is DateTime) return value;
+    try {
+      final dynamic dynamicValue = value;
+      final maybeDate = dynamicValue?.toDate();
+      return maybeDate is DateTime ? maybeDate : null;
+    } catch (_) {
+      return null;
+    }
+  }
 }
+

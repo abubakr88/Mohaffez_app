@@ -9,13 +9,30 @@ import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
+import '../models/request_status.dart';
 import '../utils/arabic_labels.dart';
+import '../services/app_version_service.dart';
 
-class MohaffezHome extends ConsumerWidget {
+class MohaffezHome extends ConsumerStatefulWidget {
   const MohaffezHome({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MohaffezHome> createState() => _MohaffezHomeState();
+}
+
+class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppVersionService.checkOnStartup(context);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
 
     return userAsync.when(
@@ -56,6 +73,9 @@ class MohaffezHomeContent extends ConsumerWidget {
             ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
             ref.invalidate(upcomingSessionsProvider(mohaffezId));
             ref.invalidate(acceptedSessionsCountProvider(mohaffezId));
+            await ref
+                .read(upcomingSessionsProvider(mohaffezId).future)
+                .catchError((_) => <Map<String, dynamic>>[]);
           },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -65,6 +85,19 @@ class MohaffezHomeContent extends ConsumerWidget {
                 expandedHeight: 100,
                 floating: false,
                 pinned: true,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'تحديث',
+                    onPressed: () {
+                      ref.invalidate(currentUserProvider);
+                      ref.invalidate(
+                          pendingRequestsFirstPageProvider(mohaffezId));
+                      ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                      ref.invalidate(acceptedSessionsCountProvider(mohaffezId));
+                    },
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -256,9 +289,10 @@ class QuickStatsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    assert(RequestStatus.teacherInbox.isNotEmpty);
     final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
-    final pendingRequests =
-        ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
+    final pendingRequestsCount =
+        ref.watch(pendingRequestsCountProvider(mohaffezId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,14 +330,7 @@ class QuickStatsSection extends ConsumerWidget {
               child: StatCard(
                 icon: Icons.pending_actions,
                 title: ArabicLabels.pendingRequests,
-                value: pendingRequests.when(
-                  data: (requests) => requests
-                      .where((r) => r['status'] == 'pending')
-                      .length
-                      .toString(),
-                  loading: () => '...',
-                  error: (_, __) => '0',
-                ),
+                value: pendingRequestsCount.toString(),
                 color: Colors.orange,
                 onTap: () {
                   context.push('/pending-requests?mohaffezId=$mohaffezId');

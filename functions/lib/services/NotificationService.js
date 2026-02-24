@@ -6,8 +6,7 @@ const payment_types_1 = require("../types/payment.types");
 class NotificationService {
     async send(payload) {
         var _a;
-        const notificationId = `payment_${payload.type}_${payload.recipientId}_${Date.now()}`;
-        await admin_1.db.collection('notifications').doc(notificationId).set({
+        await admin_1.db.collection('notifications').add({
             recipientId: payload.recipientId,
             senderId: payload.senderId,
             type: payload.type,

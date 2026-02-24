@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_google_maps_webservices/places.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this import
@@ -33,7 +34,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
 
   // FIXED: Load API key from environment variable
   late final String _googleApiKey;
-  
+
   String? _selectedPlaceId;
   String? _locationName;
   String? _city;
@@ -42,14 +43,14 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // Load API key from .env file
     _googleApiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
-    
+
     if (_googleApiKey.isEmpty) {
       throw Exception('GOOGLE_MAPS_API_KEY not found in .env file');
     }
-    
+
     _places = GoogleMapsPlaces(apiKey: _googleApiKey);
     _currentCenter = LatLng(
       widget.initialLat ?? 30.0444,
@@ -235,6 +236,13 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('اختيار الموقع'),
         ),
         body: Stack(
@@ -332,8 +340,8 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
                                   '',
                               style: const TextStyle(fontSize: 14),
                             ),
-                            subtitle: prediction.structuredFormatting
-                                        ?.secondaryText !=
+                            subtitle: prediction
+                                        .structuredFormatting?.secondaryText !=
                                     null
                                 ? Text(
                                     prediction

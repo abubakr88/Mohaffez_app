@@ -7,6 +7,7 @@ import '../providers/user_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/notification_provider_paginated.dart';
+import '../providers/system_config_provider.dart';
 import '../utils/arabic_labels.dart';
 import 'direct_payment_confirmations_screen.dart';
 
@@ -23,13 +24,16 @@ class HomeShell extends ConsumerWidget {
 
     final currentIndex = ref.watch(bottomNavIndexProvider);
     final isMohaffez = user.role == 'mohaffez';
+    final isAdmin = user.role == 'admin';
+    final isDevModeActive = ref.watch(isDevModeActiveProvider);
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: _buildAppBar(
-            context, ref, isMohaffez, currentIndex, user.uid, user.name),
-        drawer: _buildDrawer(context, ref, isMohaffez, user),
+        appBar: _buildAppBar(context, ref, isMohaffez, isAdmin, currentIndex,
+            user.uid, user.name),
+        drawer: _buildDrawer(
+            context, ref, isMohaffez, isAdmin, isDevModeActive, user),
         body: Column(
           children: [
             const OfflineBanner(),
@@ -37,7 +41,7 @@ class HomeShell extends ConsumerWidget {
           ],
         ),
         bottomNavigationBar:
-            _buildBottomNavBar(context, ref, isMohaffez, currentIndex),
+            _buildBottomNavBar(context, ref, isMohaffez, isAdmin, currentIndex),
       ),
     );
   }
@@ -46,6 +50,7 @@ class HomeShell extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     bool isMohaffez,
+    bool isAdmin,
     int currentIndex,
     String userId,
     String userName,
@@ -61,6 +66,19 @@ class HomeShell extends ConsumerWidget {
             return ArabicLabels.profile;
           default:
             return 'محفظ';
+        }
+      } else if (isAdmin) {
+        switch (currentIndex) {
+          case 0:
+            return 'لوحة التحكم';
+          case 1:
+            return 'المستخدمون';
+          case 2:
+            return 'المدفوعات';
+          case 3:
+            return 'الإعدادات';
+          default:
+            return 'لوحة التحكم';
         }
       } else {
         switch (currentIndex) {
@@ -131,7 +149,12 @@ class HomeShell extends ConsumerWidget {
             ),
           ),
           actions: [
-            if (currentIndex != (isMohaffez ? 1 : 2))
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'تحديث',
+              onPressed: () => ref.invalidate(currentUserProvider),
+            ),
+            if (!isAdmin && currentIndex != (isMohaffez ? 1 : 2))
               _buildNotificationBadge(context, ref, isMohaffez, userId),
           ],
         ),
@@ -204,6 +227,8 @@ class HomeShell extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     bool isMohaffez,
+    bool isAdmin,
+    bool isDevModeActive,
     dynamic user,
   ) {
     return Drawer(
@@ -268,6 +293,42 @@ class HomeShell extends ConsumerWidget {
               context.go('/profile');
             },
           ),
+
+          // Admin-only sections
+          if (isAdmin) ...[
+            const Divider(),
+            const ListTile(
+              leading: Icon(Icons.admin_panel_settings,
+                  color: AppTheme.primaryAmber),
+              title: Text('مشرف النظام'),
+              subtitle: Text('لوحة تحكم المشرف'),
+            ),
+            _adminTile(context, 'لوحة التحكم', Icons.dashboard, '/admin-home'),
+            _adminTile(
+                context, 'إدارة المستخدمين', Icons.people, '/admin/users'),
+            _adminTile(context, 'مراجعة الشهادات', Icons.verified,
+                '/admin/credentials'),
+            _adminTile(context, 'العمليات الفاشلة', Icons.warning,
+                '/admin/failed-ops'),
+            _adminTile(
+                context, 'أكواد الخصم', Icons.discount, '/admin/promo-codes'),
+            _adminTile(
+                context, 'إعدادات النظام', Icons.settings, '/admin/settings'),
+            _adminTile(context, 'وضع التطوير', Icons.developer_mode,
+                '/admin/dev-mode'),
+            _adminTile(
+                context, 'إشعارات جماعية', Icons.campaign, '/admin/broadcast'),
+            _adminTile(context, 'القفلات النشطة', Icons.lock_clock,
+                '/admin/slot-locks'),
+            _adminTile(
+                context, 'أحداث الدفع', Icons.payment, '/admin/payment-events'),
+            _adminTile(
+                context, 'العمولات', Icons.analytics, '/admin/commissions'),
+            if (isDevModeActive)
+              _adminTile(
+                  context, 'DEV MODE', Icons.bug_report, '/admin/dev-mode',
+                  color: Colors.red),
+          ],
 
           // Mohaffez-only sections
           if (isMohaffez) ...[
@@ -380,9 +441,44 @@ class HomeShell extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     bool isMohaffez,
+    bool isAdmin,
     int currentIndex,
   ) {
-    if (isMohaffez) {
+    if (isAdmin) {
+      return BottomNavigationBar(
+        currentIndex: currentIndex,
+        onTap: (index) {
+          ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+          switch (index) {
+            case 0:
+              context.go('/admin-home');
+              break;
+            case 1:
+              context.go('/admin/users');
+              break;
+            case 2:
+              context.go('/admin/payment-events');
+              break;
+            case 3:
+              context.go('/admin/settings');
+              break;
+          }
+        },
+        selectedItemColor: AppTheme.primaryAmber,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard), label: 'لوحة التحكم'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.people), label: 'المستخدمون'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.payment), label: 'المدفوعات'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.settings), label: 'الإعدادات'),
+        ],
+      );
+    } else if (isMohaffez) {
       return BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) {
@@ -448,5 +544,18 @@ class HomeShell extends ConsumerWidget {
         ],
       );
     }
+  }
+
+  Widget _adminTile(
+      BuildContext context, String title, IconData icon, String route,
+      {Color? color}) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? AppTheme.primaryAmber),
+      title: Text(title, style: TextStyle(color: color)),
+      onTap: () {
+        Navigator.pop(context);
+        context.go(route);
+      },
+    );
   }
 }

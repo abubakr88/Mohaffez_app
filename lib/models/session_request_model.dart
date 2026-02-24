@@ -1,15 +1,11 @@
+// IMPORTANT: After editing this file run:
+// flutter pub run build_runner build --delete-conflicting-outputs
 import 'package:freezed_annotation/freezed_annotation.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_model.dart';
 
 part 'session_request_model.freezed.dart';
 part 'session_request_model.g.dart';
-
-enum SessionRequestStatus {
-  pending,
-  accepted,
-  rejected,
-}
 
 @freezed
 class SessionRequestModel with _$SessionRequestModel {
@@ -21,7 +17,7 @@ class SessionRequestModel with _$SessionRequestModel {
     required String mohaffezName,
     required String sessionType,
     required String preferredTimeSlot,
-    @Default(SessionRequestStatus.pending) SessionRequestStatus status,
+    @Default('pending') String? status,
     String? imamAddressText,
     double? imamAddressLat,
     double? imamAddressLng,

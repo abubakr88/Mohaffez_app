@@ -1,5 +1,4 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -360,61 +359,45 @@ class BookingService {
     bool isPaid = false,
     bool requiresPaymentOnAcceptance = false,
     BookingPaymentMethod? paymentMethod,
+    String? slotLockId,
   }) async {
-    SlotLockResult? lockResult;
+    SlotLockResult? lockResult = slotLockId != null
+        ? SlotLockResult(success: true, lockId: slotLockId)
+        : null;
     try {
       final DateTime actualSlotDate =
           slotDate ?? DateTime(slotStart.year, slotStart.month, slotStart.day);
 
-      final currentUid = FirebaseAuth.instance.currentUser?.uid;
-      final canLockAvailability = currentUid != null && currentUid == mohaffezId;
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'createSessionRequest',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      );
 
-      if (canLockAvailability) {
-        lockResult = await _lockAvailabilitySlot(
-          mohaffezId: mohaffezId,
-          slotDate: actualSlotDate,
-          timeSlot: preferredTimeSlot,
-          sessionType: sessionType,
-        );
-      } else {
-        lockResult = const SlotLockResult(success: true);
-      }
-
-      if (!lockResult.success) {
-        return BookingResult.failure(lockResult.error ?? 'فشل الحجز');
-      }
-
-      final Map<String, dynamic> requestData = {
+      final result = await callable.call({
         'mohaffezId': mohaffezId,
         'studentId': studentId,
         'studentName': studentName,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
         'preferredTimeSlot': preferredTimeSlot,
-        'slotStart': Timestamp.fromDate(slotStart),
-        'slotEnd': Timestamp.fromDate(slotEnd),
-        'slotDate': Timestamp.fromDate(actualSlotDate),
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
+        'slotDate': actualSlotDate.toIso8601String(),
+        'slotStart': slotStart.toIso8601String(),
+        'slotEnd': slotEnd.toIso8601String(),
         'imamAddressText': imamAddressText,
         'imamAddressLat': imamAddressLat,
         'imamAddressLng': imamAddressLng,
         'mohaffezPhone': mohaffezPhone,
-        'isPaid': isPaid,
         'subscriptionId': subscriptionId,
         'requiresPaymentOnAcceptance': requiresPaymentOnAcceptance,
         'selectedPaymentMethod':
             (paymentMethod ?? BookingPaymentMethod.payAfterAcceptance).value,
-        'slotLockId': lockResult.lockId,
-        'slotLockedAt': FieldValue.serverTimestamp(),
-        'paymentDeadline': null,
-        'reminderSent': false,
-      };
+        if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
+      });
 
-      final docRef =
-          await _firestore.collection('sessionRequests').add(requestData);
-
-      return BookingResult.success(docRef.id);
+      if (result.data['success'] == true) {
+        return BookingResult.success(result.data['requestId'] as String);
+      }
+      return BookingResult.failure('Failed to create session request');
     } catch (e) {
       if (lockResult?.success == true) {
         await _releaseSlotLock(lockResult!).catchError((_) {});
@@ -600,9 +583,47 @@ class BookingService {
     return raw.replaceAll(' ', '');
   }
 
+  Future<DocumentReference?> _findAvailabilityRef({
+    required String mohaffezId,
+    required Timestamp slotDate,
+  }) async {
+    final date = slotDate.toDate();
+    final dayOfWeek = date.weekday;
+    final snap = await _firestore
+        .collection('users')
+        .doc(mohaffezId)
+        .collection('availability')
+        .where('dayOfWeek', isEqualTo: dayOfWeek)
+        .limit(1)
+        .get();
+    return snap.docs.isEmpty ? null : snap.docs.first.reference;
+  }
+
+  List<Map<String, dynamic>>? _computeRestoredSlots(
+    Map<String, dynamic> availabilityData,
+    String timeSlot,
+    String sessionType,
+  ) {
+    final timeSlots =
+        List<Map<String, dynamic>>.from(availabilityData['timeSlots'] ?? []);
+    final normalizedSelected = _normalizeTimeSlot(timeSlot);
+    var restored = false;
+    for (final slot in timeSlots) {
+      final slotTime = _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
+      if (slotTime == normalizedSelected && slot['sessionType'] == sessionType) {
+        slot.remove('lockedBy');
+        slot.remove('lockId');
+        slot.remove('lockedAt');
+        slot['enabled'] = true;
+        restored = true;
+        break;
+      }
+    }
+    return restored ? timeSlots : null;
+  }
+
   Future<BookingResult> cancelSessionRequest(String requestId) async {
     try {
-      // Get request data first
       final requestDoc = await _firestore
           .collection('sessionRequests')
           .doc(requestId)
@@ -617,104 +638,71 @@ class BookingService {
       final mohaffezId = requestData['mohaffezId'] as String?;
       final studentId = requestData['studentId'] as String?;
       final studentName = requestData['studentName'] as String?;
+      final slotDate = requestData['slotDate'] as Timestamp?;
+      final timeSlot = requestData['preferredTimeSlot'] as String?;
+      final sessionType = requestData['sessionType'] as String?;
 
-      // Run in transaction for atomicity
+      DocumentReference? availRef;
+      if (mohaffezId != null && slotDate != null) {
+        availRef = await _findAvailabilityRef(
+          mohaffezId: mohaffezId,
+          slotDate: slotDate,
+        );
+      }
+
       await _firestore.runTransaction((transaction) async {
-        // 1. Update request status
+        Map<String, dynamic>? availData;
+        final resolvedAvailRef = availRef;
+        if (resolvedAvailRef != null) {
+          final availSnap = await transaction.get(resolvedAvailRef);
+          availData = availSnap.data() as Map<String, dynamic>?;
+        }
+
         transaction.update(requestDoc.reference, {
           'status': 'cancelled',
           'cancelledAt': FieldValue.serverTimestamp(),
           'cancelledBy': 'student',
         });
 
-        // 2. Delete slot lock if exists
         if (slotLockId != null) {
           final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
           transaction.delete(lockRef);
         }
+
+        if (resolvedAvailRef != null &&
+            availData != null &&
+            timeSlot != null &&
+            sessionType != null) {
+          final updated = _computeRestoredSlots(availData, timeSlot, sessionType);
+          if (updated != null) {
+            transaction.update(resolvedAvailRef, {
+              'timeSlots': updated,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        if (mohaffezId != null) {
+          final notifRef = _firestore.collection('notifications').doc();
+          transaction.set(notifRef, {
+            'userId': mohaffezId,
+            'recipientId': mohaffezId,
+            'senderId': studentId,
+            'title': 'تم إلغاء طلب الحجز',
+            'body': 'قام $studentName بإلغاء طلب الحجز',
+            'type': 'sessionCancelled',
+            'isRead': false,
+            'requestId': requestId,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
       });
-
-      // 3. Restore availability slot (outside transaction due to query)
-      if (mohaffezId != null) {
-        await _restoreAvailabilitySlot(
-          mohaffezId: mohaffezId,
-          slotDate: requestData['slotDate'] as Timestamp,
-          timeSlot: requestData['preferredTimeSlot'] as String,
-          sessionType: requestData['sessionType'] as String,
-        );
-      }
-
-      // 4. Send notification to mohaffez
-      if (mohaffezId != null) {
-        await _firestore.collection('notifications').add({
-          'userId': mohaffezId,
-          'recipientId': mohaffezId,
-          'senderId': studentId,
-          'title': 'تم إلغاء طلب الحجز',
-          'body': 'قام $studentName بإلغاء طلب الحجز',
-          'type': 'session_cancelled',
-          'isRead': false,
-          'requestId': requestId,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
 
       return BookingResult.success(requestId);
     } catch (e, stack) {
-      debugPrint('❌ Error cancelling request: $e');
-      debugPrint('Stack: $stack');
-      return BookingResult.failure('فشل إلغاء الطلب: ${e.toString()}');
-    }
-  }
-
-  Future<void> _restoreAvailabilitySlot({
-    required String mohaffezId,
-    required Timestamp slotDate,
-    required String timeSlot,
-    required String sessionType,
-  }) async {
-    try {
-      final date = slotDate.toDate();
-      final dayOfWeek = date.weekday;
-
-      final availabilitySnapshot = await _firestore
-          .collection('users')
-          .doc(mohaffezId)
-          .collection('availability')
-          .where('dayOfWeek', isEqualTo: dayOfWeek)
-          .limit(1)
-          .get();
-
-      if (availabilitySnapshot.docs.isEmpty) return;
-
-      final availabilityDoc = availabilitySnapshot.docs.first;
-      final data = availabilityDoc.data();
-      final timeSlots = List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
-
-      final normalizedSelected = _normalizeTimeSlot(timeSlot);
-      var restored = false;
-
-      for (var slot in timeSlots) {
-        final slotTime = _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
-        if (slotTime == normalizedSelected && slot['sessionType'] == sessionType) {
-          slot['enabled'] = true;
-          slot.remove('lockedBy');
-          slot.remove('lockId');
-          slot.remove('lockedAt');
-          restored = true;
-          break;
-        }
-      }
-
-      if (restored) {
-        await availabilityDoc.reference.update({
-          'timeSlots': timeSlots,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error restoring availability: $e');
-      // Don't fail the cancellation if this fails
+      debugPrint('Error cancelling request: $e');
+      debugPrintStack(stackTrace: stack);
+      return BookingResult.failure(e.toString());
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/constants/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../repositories/user_repository.dart';
@@ -37,8 +38,22 @@ class _LocationSettingsScreenState
           textDirection: TextDirection.rtl,
           child: Scaffold(
             appBar: AppBar(
+              leading: context.canPop()
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_ios),
+                      onPressed: () => context.pop(),
+                      tooltip: 'رجوع',
+                    )
+                  : null,
               title: const Text('إعدادات الموقع'),
               backgroundColor: AppTheme.primaryAmber,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'تحديث',
+                  onPressed: () => ref.invalidate(currentUserProvider),
+                ),
+              ],
             ),
             body: Padding(
               padding: const EdgeInsets.all(16),
@@ -215,7 +230,8 @@ class _LocationSettingsScreenState
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: isLoading ? null : () => _pickLocation(user.uid),
+                      onPressed:
+                          isLoading ? null : () => _pickLocation(user.uid),
                       icon: isLoading
                           ? const SizedBox(
                               width: 20,
@@ -226,7 +242,9 @@ class _LocationSettingsScreenState
                               ),
                             )
                           : Icon(
-                              hasLocation ? Icons.edit_location : Icons.add_location,
+                              hasLocation
+                                  ? Icons.edit_location
+                                  : Icons.add_location,
                             ),
                       label: Text(
                         hasLocation ? 'تغيير الموقع' : 'إضافة موقع',
@@ -298,7 +316,7 @@ class _LocationSettingsScreenState
   Future<void> _pickLocation(String userId) async {
     try {
       final user = ref.read(currentUserProvider).value;
-      
+
       // Navigate to location picker
       final result = await Navigator.push<Map<String, dynamic>>(
         context,
@@ -319,9 +337,9 @@ class _LocationSettingsScreenState
       await repository.updateUser(userId, {
         'addressLat': result['lat'] as double,
         'addressLng': result['lng'] as double,
-        'addressText': result['locationName'] as String? ?? 
-                      result['city'] as String? ?? 
-                      'موقع محدد',
+        'addressText': result['locationName'] as String? ??
+            result['city'] as String? ??
+            'موقع محدد',
       });
 
       // Refresh user data

@@ -1,11 +1,10 @@
 ﻿/// Arabic labels and localization strings for the Al-Mohaffez app.
-/// 
+///
 /// IMPORTANT: This file must be saved with UTF-8 encoding.
 /// In VS Code: Click bottom-right encoding → Select "UTF-8"
 /// In Android Studio: File → Settings → Editor → File Encodings → UTF-8
 class ArabicLabels {
   ArabicLabels._(); // Private constructor to prevent instantiation
-
 
   // ============================================
   // NAVIGATION & MAIN SCREENS
@@ -18,7 +17,6 @@ class ArabicLabels {
   static const String settings = 'الإعدادات';
   static const String privacy = 'الخصوصية';
 
-
   // ============================================
   // USER TYPES & ROLES
   // ============================================
@@ -27,7 +25,6 @@ class ArabicLabels {
   static const String teacher = 'معلم';
   static const String admin = 'مدير';
 
-
   // ============================================
   // SESSION TYPES
   // ============================================
@@ -35,12 +32,10 @@ class ArabicLabels {
   static const String mosqueSession = 'مسجد';
   static const String onlineSession = 'أونلاين';
 
-
   // Backward compatible session names
   static const String sessionHome = homeSession;
   static const String sessionMosque = mosqueSession;
   static const String sessionOnline = onlineSession;
-
 
   // ============================================
   // SESSION STATUS
@@ -55,7 +50,6 @@ class ArabicLabels {
   static const String inProgress = 'قيد التنفيذ';
   static const String scheduled = 'مجدول';
 
-
   // Backward compatible status names
   static const String statusPending = pending;
   static const String statusAwaitingPayment = awaitingPayment;
@@ -65,7 +59,6 @@ class ArabicLabels {
   static const String statusExpired = expired;
   static const String statusCompleted = completed;
 
-
   // ============================================
   // REQUESTS & SESSIONS
   // ============================================
@@ -73,7 +66,7 @@ class ArabicLabels {
   static const String acceptedRequests = 'مقبول';
   static const String rejectedRequests = 'مرفوض';
   static const String cancelledRequests = 'ملغي';
-  
+
   // Actions
   static const String cancelRequest = 'إلغاء الطلب';
   static const String confirmCancel = 'تأكيد الإلغاء';
@@ -87,7 +80,7 @@ class ArabicLabels {
   static const String sessionHistory = 'سجل الجلسات';
   static const String bookSession = 'حجز جلسة';
   static const String rescheduleSession = 'إعادة جدولة الجلسة';
-  
+
   // NEW: Additional session-related labels
   static const String sessionInfo = 'معلومات الجلسة';
   static const String lockedSessionDetails = 'تفاصيل الجلسة المحجوزة';
@@ -98,7 +91,6 @@ class ArabicLabels {
   static const String sessionType = 'نوع الجلسة';
   static const String mohaffezName = 'اسم المحفظ';
   static const String studentName = 'اسم الطالب';
-
 
   // ============================================
   // PAYMENT & PRICING
@@ -130,7 +122,6 @@ class ArabicLabels {
   static const String paymentFailed = 'فشل الدفع';
   static const String freeSession = 'جلسة مجانية';
 
-
   // ============================================
   // COMMON FORM FIELDS
   // ============================================
@@ -156,7 +147,6 @@ class ArabicLabels {
   static const String notes = 'ملاحظات';
   static const String bio = 'نبذة تعريفية';
   static const String specialization = 'التخصص';
-
 
   // ============================================
   // COMMON ACTIONS
@@ -195,7 +185,6 @@ class ArabicLabels {
   static const String seeMore = 'عرض المزيد';
   static const String seeLess = 'عرض أقل';
 
-
   // ============================================
   // ACTION SPECIFIC TO APP
   // ============================================
@@ -210,7 +199,6 @@ class ArabicLabels {
   static const String writeReview = 'كتابة مراجعة';
   static const String completeSession = 'إكمال الجلسة';
   static const String viewDetails = 'عرض التفاصيل';
-
 
   // ============================================
   // COMMON MESSAGES
@@ -228,7 +216,6 @@ class ArabicLabels {
   static const String info = 'معلومة';
   static const String areYouSure = 'هل أنت متأكد؟';
   static const String confirmAction = 'تأكيد الإجراء';
-
 
   // ============================================
   // ERROR MESSAGES
@@ -258,7 +245,6 @@ class ArabicLabels {
   static const String forbidden = 'محظور';
   static const String notFound = 'غير موجود';
 
-
   // ============================================
   // SUCCESS MESSAGES
   // ============================================
@@ -270,7 +256,6 @@ class ArabicLabels {
   static const String requestSentSuccessfully = 'تم إرسال الطلب بنجاح';
   static const String sessionBookedSuccessfully = 'تم حجز الجلسة بنجاح';
   static const String sessionCancelledSuccessfully = 'تم إلغاء الجلسة بنجاح';
-
 
   // ============================================
   // TIME & DATE
@@ -301,7 +286,6 @@ class ArabicLabels {
   static const String remaining = 'متبقي';
   static const String remainingTime = 'الوقت المتبقي';
 
-
   // Days of the week
   static const String saturday = 'السبت';
   static const String sunday = 'الأحد';
@@ -310,7 +294,6 @@ class ArabicLabels {
   static const String wednesday = 'الأربعاء';
   static const String thursday = 'الخميس';
   static const String friday = 'الجمعة';
-
 
   // ============================================
   // RATINGS & REVIEWS
@@ -322,11 +305,10 @@ class ArabicLabels {
   static const String stars = 'نجوم';
   static const String followers = 'متابعين';
   static const String following = 'متابَعين';
-  
+
   // NEW: Additional rating labels
   static const String sessionRating = 'تقييم الجلسة';
   static const String performanceNotes = 'ملاحظات الأداء';
-
 
   // ============================================
   // SEARCH & FILTERS
@@ -340,13 +322,12 @@ class ArabicLabels {
   static const String nearby = 'قريب منك';
   static const String distance = 'المسافة';
   static const String priceRange = 'نطاق السعر';
-  
+
   // NEW: Additional search labels
   static const String searchRequests = 'ابحث عن طلب...';
   static const String searchStudents = 'ابحث عن طالب...';
   static const String noSearchResults = 'لا توجد نتائج للبحث';
   static const String clearSearch = 'مسح البحث';
-
 
   // ============================================
   // EMPTY STATES
@@ -357,13 +338,12 @@ class ArabicLabels {
   static const String noMessages = 'لا توجد رسائل';
   static const String noAvailableSlots = 'لا توجد مواعيد متاحة';
   static const String emptyList = 'القائمة فارغة';
-  
+
   // NEW: Additional empty state messages
   static const String noRequestsMessage = 'لم تقم بإرسال أي طلبات بعد';
   static const String noSessionsMessage = 'لا توجد جلسات حالياً';
   static const String noCompletedSessions = 'لا توجد جلسات مكتملة';
   static const String noUpcomingSessions = 'لا توجد جلسات قادمة';
-
 
   // ============================================
   // AVAILABILITY & SCHEDULING
@@ -375,7 +355,6 @@ class ArabicLabels {
   static const String selectSlot = 'اختر موعد';
   static const String availableSlots = 'المواعيد المتاحة';
   static const String bookedSlots = 'المواعيد المحجوزة';
-
 
   // ============================================
   // ASSIGNMENTS & QURAN STUDY
@@ -391,7 +370,6 @@ class ArabicLabels {
   static const String previousHifz = 'الحفظ السابق';
   static const String previousMuraja = 'المراجعة السابقة';
 
-
   // ============================================
   // FILTERS & CATEGORIES
   // ============================================
@@ -400,11 +378,175 @@ class ArabicLabels {
   static const String thisMonth = 'هذا الشهر';
   static const String filterBy = 'تصفية حسب';
 
-
   // ============================================
   // HELPER METHODS
   // ============================================
 
+  // ============================================
+  // ADMIN DASHBOARD
+  // ============================================
+  static const String adminDashboard = 'لوحة التحكم';
+  static const String totalUsers = 'إجمالي المستخدمين';
+  static const String totalSessions = 'إجمالي الجلسات';
+  static const String pendingVerification = 'بانتظار التحقق';
+  static const String failedOperationsCount = 'عمليات فاشلة';
+
+  // ============================================
+  // ADMIN NAV TILES
+  // ============================================
+  static const String manageUsers = 'إدارة المستخدمين';
+  static const String teacherCredentials = 'شهادات المعلمين';
+  static const String failedOperations = 'العمليات الفاشلة';
+  static const String promoCodes = 'أكواد الخصم';
+  static const String systemSettings = 'إعدادات النظام';
+  static const String devMode = 'وضع المطور';
+  static const String broadcastNotifications = 'إشعارات جماعية';
+  static const String slotLocksManagement = 'إدارة قفل الفترات';
+  static const String paymentEvents = 'أحداث المدفوعات';
+  static const String commissionsBoard = 'لوحة العمولات';
+
+  // ============================================
+  // ADMIN BROADCAST
+  // ============================================
+  static const String notificationTitle = 'عنوان الإشعار';
+  static const String notificationBody = 'نص الإشعار';
+  static const String students = 'الطلاب';
+  static const String mohaffezin = 'المحفظين';
+  static const String sendHistory = 'سجل الإرسال';
+  static const String unexpectedError = 'حدث خطأ غير متوقع';
+  static const String sentToCount = 'أُرسل إلى';
+  static const String recipients = 'مستلم';
+
+  // ============================================
+  // ADMIN CREDENTIALS
+  // ============================================
+  static const String noCredentialsPending = 'لا توجد شهادات قيد المراجعة';
+  static const String rejectCredential = 'رفض الشهادة';
+  static const String rejectionReason = 'سبب الرفض';
+  static const String approve = 'قبول';
+  static const String submittedAt = 'وقت الرفع';
+  static const String userId = 'معرّف المستخدم';
+
+  // ============================================
+  // ADMIN DEV MODE
+  // ============================================
+  static const String devModeWarning = 'تحذير: هذا الوضع للمطورين فقط';
+  static const String enableDevMode = 'تفعيل وضع التطوير';
+  static const String bypassPayment = 'تجاوز الدفع';
+  static const String bypassPromoValidation = 'تجاوز التحقق من الكوبون';
+  static const String bypassSlotLock = 'تجاوز قفل الفترة';
+  static const String mockNotifications = 'إشعارات وهمية';
+  static const String skipVersionCheck = 'تجاوز التحقق من الإصدار';
+  static const String enableFakeGps = 'تفعيل GPS وهمي';
+  static const String latitude = 'خط العرض';
+  static const String longitude = 'خط الطول';
+  static const String showDebugOverlay = 'إظهار طبقة التصحيح';
+  static const String logFirestoreWrites = 'تسجيل كتابات Firestore';
+  static const String simulateSlowNetwork = 'محاكاة شبكة بطيئة';
+  static const String devModeUsers = 'المستخدمون في وضع التطوير';
+  static const String addUid = 'أضف UID';
+  static const String saveSettings = 'حفظ الإعدادات';
+  static const String settingsSaved = 'تم حفظ الإعدادات';
+
+  // ============================================
+  // ADMIN FAILED OPERATIONS
+  // ============================================
+  static const String runCleanupJob = 'تشغيل مهمة التنظيف';
+  static const String dismiss = 'تجاهل';
+  static const String unknownError = 'خطأ غير معروف';
+  static const String operationAt = 'تاريخ العملية';
+  static const String retryCount = 'عدد المحاولات';
+
+  // ============================================
+  // ADMIN PROMO CODES
+  // ============================================
+  static const String createPromoCode = 'إنشاء كود خصم';
+  static const String promoCodeValue = 'الكود';
+  static const String discountPercent = 'نسبة الخصم';
+  static const String usageLimit = 'حد الاستخدام';
+  static const String expiryDate = 'تاريخ انتهاء الصلاحية';
+  static const String noExpirySet = 'بدون تاريخ انتهاء - اضغط لتحديد';
+  static const String isActive = 'نشط';
+  static const String deleteCode = 'حذف هذا الكود';
+  static const String confirmDelete = 'هل أنت متأكد من الحذف؟';
+  static const String usedCount = 'مرات الاستخدام';
+
+  // ============================================
+  // ADMIN SLOT LOCKS
+  // ============================================
+  static const String releaseExpiredLocks = 'تحرير الأقفال المنتهية';
+  static const String slotOf = 'فترة المحفظ';
+
+  // ============================================
+  // ADMIN SYSTEM SETTINGS
+  // ============================================
+  static const String maintenanceMode = 'وضع الصيانة';
+  static const String maintenanceModeActive =
+      '⚠️ التطبيق في وضع الصيانة حالياً';
+  static const String maintenanceMessage = 'رسالة الصيانة';
+  static const String enableMaintenance = 'تفعيل وضع الصيانة';
+  static const String appVersionSettings = 'إعدادات الإصدار';
+  static const String forceVersion = 'الإصدار الإجباري';
+  static const String recommendedVersion = 'الإصدار الموصى به';
+  static const String sessionSettings = 'إعدادات الجلسات';
+  static const String paymentSettings = 'إعدادات الدفع';
+  static const String commissionRate = 'نسبة العمولة';
+  static const String sessionPrices = 'أسعار الجلسات';
+  static const String paymentDeadlineHours = 'مهلة الدفع (ساعات)';
+  static const String slotLockDurationMinutes = 'مدة قفل الفترة (دقائق)';
+
+  // ============================================
+  // ADMIN USERS
+  // ============================================
+  static const String allUsers = 'جميع المستخدمين';
+  static const String filterByRole = 'تصفية حسب الدور';
+  static const String banUser = 'حظر المستخدم';
+  static const String unbanUser = 'رفع الحظر';
+  static const String userDetails = 'تفاصيل المستخدم';
+  static const String userBanned = 'محظور';
+  static const String userActive = 'نشط';
+  static const String joined = 'تاريخ الانضمام';
+  static const String lastSeen = 'آخر ظهور';
+
+  // ============================================
+  // MAINTENANCE SCREEN
+  // ============================================
+  static const String maintenanceTitle = 'التطبيق تحت الصيانة';
+  static const String maintenanceSubtitle =
+      'نعمل على تحسين خدمتك، يرجى المحاولة لاحقاً';
+  static const String checkAgain = 'تحقق مجدداً';
+
+
+  static const String setBanExpiryOptional  = 'تحديد تاريخ انتهاء الحظر (اختياري)';
+  static const String changeRole            = 'تغيير الدور';
+  static const String resetPassword         = 'إعادة تعيين كلمة المرور';
+  static const String passwordResetSent     = 'تم إرسال رابط إعادة تعيين كلمة المرور';
+  static const String deleteAccount         = 'حذف الحساب';
+  static const String finalConfirmation     = 'تأكيد نهائي';
+  static const String actionIrreversible    = 'هذا الإجراء لا يمكن التراجع عنه';
+  static const String sessions              = 'الجلسات';
+  static const String subscriptions         = 'الاشتراكات';
+  static const String credentials           = 'الشهادات';
+  static const String rejectedByAdmin       = 'تم الرفض من الإدارة';
+  static const String role                  = 'الدور';
+  static const String banUserWarning        = 'هل أنت متأكد من حظر هذا المستخدم؟';
+  static const String unbanUserWarning      = 'هل أنت متأكد من رفع الحظر عن هذا المستخدم؟';
+  static const String deleteUserWarning     = 'هل أنت متأكد من حذف هذا المستخدم؟';
+  static const String changeRoleWarning     = 'هل أنت متأكد من تغيير دور هذا المستخدم؟';
+  static const String resetPasswordWarning  = 'هل أنت متأكد من إعادة تعيين كلمة المرور لهذا المستخدم؟';
+  static const String userDetailsTitle      = 'تفاصيل المستخدم';
+  static const String userDetailsSessions   = 'جلسات المستخدم';
+  static const String userDetailsSubscriptions = 'اشتراكات المستخدم';
+  static const String userDetailsCredentials = 'شهادات المستخدم';
+  static const String noSubscriptions      = 'لا توجد اشتراكات لهذا المستخدم';
+  static const String noCredentials        = 'لا توجد شهادات لهذا المستخدم';
+  static const String bannedUntil           = 'محظور حتى';  
+
+  // ============================================
+  // SHARED ADMIN
+  // ============================================
+  static const String operationSuccess = 'تمت العملية بنجاح';
+  static const String operationFailed = 'فشلت العملية';
 
   /// Get localized status label from status code
   static String getStatusLabel(String status) {
@@ -412,8 +554,6 @@ class ArabicLabels {
       case 'pending':
         return statusPending;
       case 'awaitingpayment':
-      case 'awaitingpayment':
-      case 'awaiting payment':
         return statusAwaitingPayment;
       case 'accepted':
         return statusAccepted;
@@ -436,7 +576,6 @@ class ArabicLabels {
     }
   }
 
-
   /// Get localized session type label from type code
   static String getSessionTypeLabel(String type) {
     switch (type.toLowerCase()) {
@@ -450,7 +589,6 @@ class ArabicLabels {
         return type;
     }
   }
-
 
   /// Get localized day of week
   static String getDayOfWeek(int weekday) {
@@ -474,17 +612,14 @@ class ArabicLabels {
     }
   }
 
-
   /// Format time remaining (e.g., "3 ساعات و 45 دقيقة متبقي")
   static String formatTimeRemaining(Duration duration) {
     if (duration.isNegative) {
       return expired;
     }
 
-
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
-
 
     if (hours > 0 && minutes > 0) {
       return '$hours ${hours > 1 ? hours : hour} و $minutes ${minutes > 1 ? minutes : minute} $remaining';
@@ -497,12 +632,10 @@ class ArabicLabels {
     }
   }
 
-
   /// Format price with currency
   static String formatPrice(double price, {String currency = egp}) {
     return '${price.toStringAsFixed(2)} $currency';
   }
-
 
   /// Format distance
   static String formatDistance(double distanceInKm) {

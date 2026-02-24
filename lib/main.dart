@@ -14,6 +14,8 @@ import 'config/app_router.dart';
 import 'shared/theme/app_theme_constants.dart';
 import 'shared/theme/app_theme_data.dart';
 import 'services/cache_service.dart';
+import 'providers/system_config_provider.dart';
+import 'shared/widgets/dev_mode_overlay.dart';
 
 /// Firebase Cloud Messaging background handler
 /// Must be top-level function for isolate entry point
@@ -27,7 +29,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     // ============================================
     // 1. Load Environment Variables
@@ -58,7 +60,7 @@ void main() async {
     // 4. Setup Firebase Cloud Messaging
     // ============================================
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    
+
     // Request notification permissions (iOS)
     final messaging = FirebaseMessaging.instance;
     final settings = await messaging.requestPermission(
@@ -67,7 +69,8 @@ void main() async {
       sound: true,
       provisional: false,
     );
-    debugPrint('✅ Notification permission status: ${settings.authorizationStatus}');
+    debugPrint(
+        '✅ Notification permission status: ${settings.authorizationStatus}');
 
     // ============================================
     // 5. Initialize Arabic Date Formatting
@@ -84,8 +87,8 @@ void main() async {
     debugPrint('✅ Cache service initialized');
 
     // Check for stale cache data
-    final hasStaleData = CacheService.getUserId() != null && 
-                         FirebaseAuth.instance.currentUser == null;
+    final hasStaleData = CacheService.getUserId() != null &&
+        FirebaseAuth.instance.currentUser == null;
     if (hasStaleData) {
       debugPrint('⚠️ Stale cache detected - clearing...');
       await CacheService.clearAll();
@@ -114,8 +117,7 @@ void main() async {
     // 8. Launch App
     // ============================================
     debugPrint('🚀 Launching Al-Mohaffez app...');
-    runApp(const ProviderScope(child: MyApp()));
-    
+    runApp(const ProviderScope(child: DevModeOverlay(child: MyApp())));
   } catch (e, stackTrace) {
     debugPrint('❌ Initialization error: $e');
     debugPrint('Stack trace: $stackTrace');
@@ -161,7 +163,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     ),
                   ),
                   const SizedBox(height: AppThemeConstants.spaceLg),
-                  
+
                   // Error Title
                   const Text(
                     'حدث خطأ في التطبيق',
@@ -173,7 +175,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppThemeConstants.spaceMd),
-                  
+
                   // Error Message
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -192,7 +194,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     ),
                   ),
                   const SizedBox(height: AppThemeConstants.spaceLg),
-                  
+
                   // Restart Button
                   SizedBox(
                     width: double.infinity,
@@ -220,7 +222,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     ),
                   ),
                   const SizedBox(height: AppThemeConstants.spaceSm),
-                  
+
                   // Close Button
                   TextButton(
                     onPressed: () {
@@ -252,6 +254,10 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // keep config streams warm for synchronous guards
+    ref.watch(systemConfigProvider);
+    ref.watch(devModeProvider);
+
     final router = ref.watch(goRouterProvider);
 
     return MaterialApp.router(
@@ -260,31 +266,31 @@ class MyApp extends ConsumerWidget {
       // ============================================
       title: 'المحفظ',
       debugShowCheckedModeBanner: false,
-      
+
       // ============================================
       // Theme Configuration
       // ============================================
       themeMode: ThemeMode.light,
       theme: AppThemeData.lightTheme,
-      
+
       // ============================================
       // ✅ CRITICAL: Arabic Localization
       // ============================================
       locale: const Locale('ar', 'EG'), // Egyptian Arabic (default)
-      
+
       supportedLocales: const [
         Locale('ar', 'EG'), // Egyptian Arabic
         Locale('ar', 'SA'), // Saudi Arabic
-        Locale('ar'),       // Generic Arabic
+        Locale('ar'), // Generic Arabic
         Locale('en', 'US'), // English (fallback)
       ],
-      
+
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      
+
       // Locale resolution strategy
       localeResolutionCallback: (locale, supportedLocales) {
         // Check if the current device locale is supported
@@ -298,12 +304,12 @@ class MyApp extends ConsumerWidget {
         // Default to Egyptian Arabic
         return const Locale('ar', 'EG');
       },
-      
+
       // ============================================
       // Router Configuration
       // ============================================
       routerConfig: router,
-      
+
       // ============================================
       // ✅ CRITICAL: Force RTL globally
       // ============================================

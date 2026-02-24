@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../providers/booking_provider.dart';
 
@@ -47,6 +48,13 @@ class _PaymentMethodSelectorScreenState
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('اختر طريقة الدفع'),
         ),
         body: RadioGroup<BookingPaymentMethod>(

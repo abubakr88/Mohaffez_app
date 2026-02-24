@@ -5,6 +5,14 @@ exports.confirmFreeSession = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
+const STATUS = {
+    PENDING: 'pending',
+    AWAITING_PAYMENT: 'awaitingpayment',
+    AWAITING_DIRECT: 'awaitingdirectpaymentconfirmation',
+    ACCEPTED: 'accepted',
+    REJECTED: 'rejected',
+    CANCELLED: 'cancelled',
+};
 exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
     functions.logger.info("🎫 confirmFreeSession v6.0 (17/2/2026) - Enhanced Logging");
     // 1. Verify authentication
@@ -147,7 +155,7 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             .where("mohaffezId", "==", mohaffezId)
             .where("sessionDate", "==", slotDateTimestamp)
             .where("preferredTimeSlot", "==", preferredTimeSlot)
-            .where("status", "in", ["accepted", "pending"]);
+            .where("status", "in", [STATUS.ACCEPTED, STATUS.PENDING]);
         const existingSessionsOnSlot = await transaction.get(existingSessionOnSlotQuery);
         if (!existingSessionsOnSlot.empty) {
             functions.logger.error("❌ Slot already booked", {
@@ -223,7 +231,7 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             }
             const requestData = existingRequest.data();
             // ✅ CHECK: If already accepted
-            if (requestData && requestData.status === 'accepted') {
+            if (requestData && requestData.status === STATUS.ACCEPTED) {
                 const sessionId = requestData.sessionId;
                 if (sessionId) {
                     functions.logger.warn("⚠️ Request already accepted!", {
@@ -261,11 +269,12 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
         // ✅ STEP 5: WRITE PHASE
         // ============================================
         const requestUpdateData = {
-            status: "accepted",
+            status: STATUS.ACCEPTED,
             isPaid: true,
             paymentAmount: 0.0,
             promoCode,
             promoDiscount: 100,
+            notificationsAlreadySent: true,
             sessionId: sessionRef.id,
             acceptedAt: admin_1.FieldValue.serverTimestamp(),
             paidAt: admin_1.FieldValue.serverTimestamp(),
@@ -310,7 +319,7 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             sessionDate: slotDateTimestamp,
             slotStart: slotStartTimestamp,
             slotEnd: slotEndTimestamp,
-            status: "accepted",
+            status: STATUS.ACCEPTED,
             isPaid: true,
             sessionPrice: 0.0,
             promoCode,

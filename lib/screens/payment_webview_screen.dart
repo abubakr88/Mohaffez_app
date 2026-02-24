@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../models/payment_model.dart';
@@ -232,7 +233,16 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('إتمام الدفع')),
+        appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
+          title: const Text('إتمام الدفع'),
+        ),
         body: Stack(
           children: [
             WebViewWidget(controller: controller),

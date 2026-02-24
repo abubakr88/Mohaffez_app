@@ -1,6 +1,7 @@
 // screens/completed_sessions_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
@@ -34,212 +35,238 @@ class _CompletedSessionsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final sessionsAsync = ref.watch(completedSessionsProvider(widget.mohaffezId));
+    final sessionsAsync =
+        ref.watch(completedSessionsProvider(widget.mohaffezId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            // App Bar
-            SliverAppBar(
-              expandedHeight: 130,
-              floating: true,
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.purple, Color(0xFFAB47BC)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(completedSessionsProvider(widget.mohaffezId));
+            await ref
+                .read(completedSessionsProvider(widget.mohaffezId).future)
+                .catchError((_) => <Map<String, dynamic>>[]);
+          },
+          child: CustomScrollView(
+            slivers: [
+              // App Bar
+              SliverAppBar(
+                expandedHeight: 130,
+                floating: true,
+                pinned: true,
+                leading: context.canPop()
+                    ? IconButton(
+                        icon: const Icon(Icons.arrow_back_ios),
+                        onPressed: () => context.pop(),
+                        tooltip: 'رجوع',
+                      )
+                    : null,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'تحديث',
+                    onPressed: () => ref.invalidate(
+                        completedSessionsProvider(widget.mohaffezId)),
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.done_all,
-                                  size: 28,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      ArabicLabels.completedSessions,
-                                      style: const TextStyle(
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      ArabicLabels.sessionHistory,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Total Count
-                              sessionsAsync.when(
-                                data: (sessions) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.purple, Color(0xFFAB47BC)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Text(
-                                    sessions.length.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.purple,
-                                    ),
+                                  child: const Icon(
+                                    Icons.done_all,
+                                    size: 28,
+                                    color: Colors.white,
                                   ),
                                 ),
-                                loading: () => const SizedBox.shrink(),
-                                error: (_, __) => const SizedBox.shrink(),
-                              ),
-                            ],
-                          ),
-                        ],
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        ArabicLabels.completedSessions,
+                                        style: const TextStyle(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        ArabicLabels.sessionHistory,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Total Count
+                                sessionsAsync.when(
+                                  data: (sessions) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      sessions.length.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.purple,
+                                      ),
+                                    ),
+                                  ),
+                                  loading: () => const SizedBox.shrink(),
+                                  error: (_, __) => const SizedBox.shrink(),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Search Bar
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: searchController,
-                  onChanged: (value) {
-                    setState(() {
-                      searchQuery = value.toLowerCase().trim();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: ArabicLabels.searchStudents,
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              searchController.clear();
-                              setState(() {
-                                searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+              // Search Bar
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        searchQuery = value.toLowerCase().trim();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: ArabicLabels.searchStudents,
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                searchController.clear();
+                                setState(() {
+                                  searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
                     ),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
                   ),
                 ),
               ),
-            ),
 
-            // Sessions List
-            sessionsAsync.when(
-              data: (allSessions) {
-                if (allSessions.isEmpty) {
-                  return SliverFillRemaining(
-                    child: EmptyState(
-                      icon: Icons.history,
-                      title: ArabicLabels.noCompletedSessions,
-                      message: ArabicLabels.noSessionsMessage,
-                      animated: true,
-                    ),
-                  );
-                }
+              // Sessions List
+              sessionsAsync.when(
+                data: (allSessions) {
+                  if (allSessions.isEmpty) {
+                    return SliverFillRemaining(
+                      child: EmptyState(
+                        icon: Icons.history,
+                        title: ArabicLabels.noCompletedSessions,
+                        message: ArabicLabels.noSessionsMessage,
+                        animated: true,
+                      ),
+                    );
+                  }
 
-                // Apply search filter
-                final filteredSessions = searchQuery.isEmpty
-                    ? allSessions
-                    : allSessions.where((session) {
-                        final studentName =
-                            (session['studentName'] as String? ?? '')
-                                .toLowerCase();
-                        return studentName.contains(searchQuery);
-                      }).toList();
+                  // Apply search filter
+                  final filteredSessions = searchQuery.isEmpty
+                      ? allSessions
+                      : allSessions.where((session) {
+                          final studentName =
+                              (session['studentName'] as String? ?? '')
+                                  .toLowerCase();
+                          return studentName.contains(searchQuery);
+                        }).toList();
 
-                if (filteredSessions.isEmpty) {
-                  return SliverFillRemaining(
-                    child: EmptyState(
-                      icon: Icons.search_off,
-                      title: ArabicLabels.noSearchResults,
-                      message: ArabicLabels.noSessionsMessage,
-                      animated: true,
-                      action: TextButton.icon(
-                        onPressed: () {
-                          searchController.clear();
-                          setState(() {
-                            searchQuery = '';
-                          });
+                  if (filteredSessions.isEmpty) {
+                    return SliverFillRemaining(
+                      child: EmptyState(
+                        icon: Icons.search_off,
+                        title: ArabicLabels.noSearchResults,
+                        message: ArabicLabels.noSessionsMessage,
+                        animated: true,
+                        action: TextButton.icon(
+                          onPressed: () {
+                            searchController.clear();
+                            setState(() {
+                              searchQuery = '';
+                            });
+                          },
+                          icon: const Icon(Icons.clear),
+                          label: Text(ArabicLabels.clearSearch),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final session = filteredSessions[index];
+                          return CompletedSessionCard(session: session);
                         },
-                        icon: const Icon(Icons.clear),
-                        label: Text(ArabicLabels.clearSearch),
+                        childCount: filteredSessions.length,
                       ),
                     ),
                   );
-                }
-
-                return SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final session = filteredSessions[index];
-                        return CompletedSessionCard(session: session);
-                      },
-                      childCount: filteredSessions.length,
-                    ),
+                },
+                loading: () => const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => SliverFillRemaining(
+                  child: ErrorDisplay.dataLoad(
+                    onRetry: () {
+                      ref.invalidate(
+                          completedSessionsProvider(widget.mohaffezId));
+                    },
                   ),
-                );
-              },
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => SliverFillRemaining(
-                child: ErrorDisplay.dataLoad(
-                  onRetry: () {
-                    ref.invalidate(completedSessionsProvider(widget.mohaffezId));
-                  },
                 ),
               ),
-            ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            ],
+          ),
         ),
       ),
     );
@@ -256,7 +283,8 @@ class CompletedSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final studentName = session['studentName'] as String? ?? ArabicLabels.notSpecified;
+    final studentName =
+        session['studentName'] as String? ?? ArabicLabels.notSpecified;
     final completedAt = session['completedAt'] as DateTime?;
     final sessionDate = session['sessionDate'] as DateTime?;
     final location = session['location'] as String? ?? '';
@@ -310,7 +338,8 @@ class CompletedSessionCard extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 12, color: Colors.grey.shade600),
+                Icon(Icons.calendar_today,
+                    size: 12, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
                 Text(
                   completedAt != null
@@ -351,14 +380,14 @@ class CompletedSessionCard extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Previous assignment evaluation
-          if (previousHifzCompleted != null || previousMurajaCompleted != null) ...[
+          if (previousHifzCompleted != null ||
+              previousMurajaCompleted != null) ...[
             _buildSectionHeader(
               icon: Icons.assignment_turned_in,
               title: ArabicLabels.previousAssignments,
               color: Colors.blue,
             ),
             const SizedBox(height: 12),
-
             if (previousHifzCompleted != null)
               _buildAssignmentEvaluation(
                 label: ArabicLabels.hifz,
@@ -366,7 +395,6 @@ class CompletedSessionCard extends StatelessWidget {
                 rating: previousHifzRating,
                 color: Colors.green,
               ),
-
             if (previousMurajaCompleted != null) ...[
               const SizedBox(height: 8),
               _buildAssignmentEvaluation(
@@ -376,7 +404,6 @@ class CompletedSessionCard extends StatelessWidget {
                 color: Colors.blue,
               ),
             ],
-
             if (performanceNotes != null && performanceNotes.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
@@ -422,14 +449,12 @@ class CompletedSessionCard extends StatelessWidget {
               color: AppTheme.primaryAmber,
             ),
             const SizedBox(height: 12),
-
             if (hifzAssignment != null && hifzAssignment.isNotEmpty)
               _buildAssignmentDisplay(
                 label: ArabicLabels.hifz,
                 content: hifzAssignment,
                 color: Colors.green,
               ),
-
             if (murajaAssignment != null && murajaAssignment.isNotEmpty) ...[
               const SizedBox(height: 8),
               _buildAssignmentDisplay(
@@ -590,7 +615,9 @@ class CompletedSessionCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                label == ArabicLabels.hifz ? Icons.menu_book : Icons.history_edu,
+                label == ArabicLabels.hifz
+                    ? Icons.menu_book
+                    : Icons.history_edu,
                 size: 16,
                 color: color,
               ),

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class AdminPaymentEventsScreen extends StatelessWidget {
   const AdminPaymentEventsScreen({super.key});
@@ -8,7 +9,21 @@ class AdminPaymentEventsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: context.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios),
+                onPressed: () => context.pop(),
+                tooltip: 'رجوع',
+              )
+            : null,
         title: const Text('Payment Events'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'تحديث (بيانات مباشرة)',
+            onPressed: () {},
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
@@ -46,7 +61,8 @@ class AdminPaymentEventsScreen extends StatelessWidget {
 
               return ListTile(
                 title: Text(eventType),
-                subtitle: Text('paymentId: $paymentId\ntransactionId: $transactionId'),
+                subtitle: Text(
+                    'paymentId: $paymentId\ntransactionId: $transactionId'),
                 trailing: const Icon(Icons.chevron_right),
               );
             },

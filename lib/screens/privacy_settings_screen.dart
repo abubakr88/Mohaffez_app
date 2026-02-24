@@ -1,6 +1,7 @@
 // screens/privacy_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../shared/constants/app_theme.dart';
@@ -10,7 +11,8 @@ class PrivacySettingsScreen extends ConsumerStatefulWidget {
   const PrivacySettingsScreen({super.key});
 
   @override
-  ConsumerState<PrivacySettingsScreen> createState() => _PrivacySettingsScreenState();
+  ConsumerState<PrivacySettingsScreen> createState() =>
+      _PrivacySettingsScreenState();
 }
 
 class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
@@ -30,7 +32,10 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
     if (user == null) return;
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       final data = doc.data();
       if (data != null && data['privacySettings'] != null) {
         final settings = data['privacySettings'] as Map<String, dynamic>;
@@ -61,7 +66,8 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
     try {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'privacySettings': {
-          'showPhoneNumber': key == 'showPhoneNumber' ? value : _showPhoneNumber,
+          'showPhoneNumber':
+              key == 'showPhoneNumber' ? value : _showPhoneNumber,
           'allowMessages': key == 'allowMessages' ? value : _allowMessages,
           'showLocation': key == 'showLocation' ? value : _showLocation,
         }
@@ -69,7 +75,7 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
     } catch (e) {
       if (mounted) ErrorHandler.showError(context, "فشل حفظ الإعدادات");
       // إعادة التعيين في حال الفشل
-      _loadSettings(); 
+      _loadSettings();
     }
   }
 
@@ -78,7 +84,23 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text("إعدادات الخصوصية")),
+        appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
+          title: const Text("إعدادات الخصوصية"),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'تحديث',
+              onPressed: _loadSettings,
+            ),
+          ],
+        ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : ListView(
@@ -127,7 +149,8 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(right: 32.0, top: 4),
-        child: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        child: Text(subtitle,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
       ),
       activeColor: AppTheme.accentGreen,
     );

@@ -5,6 +5,9 @@
 // - Added null checks in AsyncValue.guard to prevent silent failures
 // - Added exponential backoff for FCM token save
 // - Fixed invalidation order (auth invalidated AFTER operations complete)
+// - [FIX] Added 'uid' field to signUp Firestore write (required by security rule)
+// - [FIX] Added 'status' field to match UserModel defaults
+// - [FIX] Delete orphan Auth account if Firestore write fails in signUp
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -49,7 +52,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
         throw Exception('حساب غير مكتمل. تواصل مع الدعم');
       }
 
-      final data = userDoc.data() as Map<String, dynamic>;;
+      final data = userDoc.data() as Map<String, dynamic>;
       await CacheService.saveUserId(userId);
       await CacheService.saveUserRole(data['role'] as String);
       await CacheService.saveUserName(data['name'] as String);
@@ -76,15 +79,34 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
 
       final userId = cred.user!.uid;
 
-      await FirebaseFirestore.instance.collection('users').doc(userId).set({
-        'name': name,
-        'email': email,
-        'role': role,
-        'photoUrl': null,
-        'followerCount': 0,
-        'followingCount': 0,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      try {
+        // ✅ FIX 1: 'uid' is required by the Firestore security rule:
+        //   request.resource.data.uid == userId
+        // ✅ FIX 2: 'status' matches UserModel @Default('active')
+        await FirebaseFirestore.instance.collection('users').doc(userId).set({
+          'uid': userId,
+          'name': name,
+          'email': email,
+          'role': role,
+          'status': 'active',
+          'photoUrl': null,
+          'followerCount': 0,
+          'followingCount': 0,
+          'rating': 0.0,
+          'reviewCount': 0,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        // ✅ FIX 3: Delete the orphan Firebase Auth account if Firestore
+        // write fails. Without this, the user can never re-register with
+        // the same email because Auth already holds the account.
+        try {
+          await _authService.currentUser?.delete();
+        } catch (_) {
+          // Best-effort cleanup — ignore secondary error
+        }
+        rethrow;
+      }
 
       await CacheService.saveUserId(userId);
       await CacheService.saveUserRole(role);
@@ -116,9 +138,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<DocumentSnapshot> _waitForUserDoc(String userId, {int maxRetries = 3}) async {
+  Future<DocumentSnapshot> _waitForUserDoc(
+    String userId, {
+    int maxRetries = 3,
+  }) async {
     for (var attempt = 1; attempt <= maxRetries; attempt++) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
 
       if (doc.exists) return doc;
 
@@ -143,12 +171,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
   }
 }
 
-final authNotifierProvider = StateNotifierProvider<AuthNotifier, AsyncValue<void>>((ref) {
+final authNotifierProvider =
+    StateNotifierProvider<AuthNotifier, AsyncValue<void>>((ref) {
   return AuthNotifier(ref.watch(authServiceProvider), ref);
 });
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  FirebaseAuth get auth => _auth;
+
+  User? get currentUser => _auth.currentUser;
 
   Future<void> logout() => _auth.signOut();
 
@@ -166,8 +199,6 @@ class AuthService {
 
   Future<void> sendPasswordResetEmail(String email) =>
       _auth.sendPasswordResetEmail(email: email);
-
-  User? get currentUser => _auth.currentUser;
 }
 
 final isAuthenticatedProvider = Provider<bool>((ref) {

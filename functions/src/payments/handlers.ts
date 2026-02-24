@@ -3,6 +3,15 @@ import * as functions from 'firebase-functions';
 import admin, { db } from '../utils/admin';
 import { PaymentDocument, PaymentMetadata } from '../types/payment.types';
 
+const STATUS = {
+  PENDING: 'pending',
+  AWAITING_PAYMENT: 'awaitingpayment',
+  AWAITING_DIRECT: 'awaitingdirectpaymentconfirmation',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  CANCELLED: 'cancelled',
+} as const;
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface BookingConfirmationResult  { sessionId: string; }
@@ -15,6 +24,11 @@ export interface SlotInfo {
   slotDate: unknown;       // FirebaseFirestore.Timestamp from sessionDetails
   timeSlot: string;        // "HH:mm-HH:mm"
   sessionType: string;
+}
+
+export interface PaymentStatusUpdate {
+  paymentId: string;
+  transactionId: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,11 +107,18 @@ export async function confirmBookingAfterPayment(
   payment: PaymentDocument,
   transactionId: string,
   slotInfo?: SlotInfo,
+  paymentUpdate?: PaymentStatusUpdate,
 ): Promise<BookingConfirmationResult> {
   return db.runTransaction(async (transaction) => {
     // ── READS (must all come before writes) ───────────────────────────────────
     const requestRef  = db.collection('sessionRequests').doc(requestId);
     const requestSnap = await transaction.get(requestRef);
+    const paymentRef = paymentUpdate
+      ? db.collection('payments').doc(paymentUpdate.paymentId)
+      : null;
+    if (paymentRef) {
+      await transaction.get(paymentRef);
+    }
 
     // Read availability inside the same transaction while still in read phase
     const availUpdate = slotInfo
@@ -111,7 +132,7 @@ export async function confirmBookingAfterPayment(
     const sessionRef = db.collection('hafizSessions').doc();
 
     transaction.update(requestRef, {
-      status: 'accepted',
+      status: STATUS.ACCEPTED,
       isPaid: true,
       paidAt:               admin.firestore.FieldValue.serverTimestamp(),
       paymentTransactionId: transactionId,
@@ -121,7 +142,7 @@ export async function confirmBookingAfterPayment(
     transaction.set(sessionRef, {
       ...sessionDetails,
       requestId,
-      status:               'accepted',
+      status:               STATUS.ACCEPTED,
       isPaid:               true,
       paymentTransactionId: transactionId,
       createdAt:            admin.firestore.FieldValue.serverTimestamp(),
@@ -140,6 +161,16 @@ export async function confirmBookingAfterPayment(
       });
     }
 
+    if (paymentUpdate && paymentRef) {
+      transaction.update(paymentRef, {
+        status: 'completed',
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
     functions.logger.info('Booking confirmed in transaction', { requestId, sessionId: sessionRef.id });
     return { sessionId: sessionRef.id };
   });
@@ -155,11 +186,18 @@ export async function consumeSubscriptionAndCreateSession(
   transactionId: string,
   metadata: PaymentMetadata,
   slotInfo?: SlotInfo,
+  paymentUpdate?: PaymentStatusUpdate,
 ): Promise<SubscriptionConsumptionResult> {
   return db.runTransaction(async (transaction) => {
     // ── READS ─────────────────────────────────────────────────────────────────
     const subRef  = db.collection('subscriptions').doc(subscriptionId);
     const subSnap = await transaction.get(subRef);
+    const paymentRef = paymentUpdate
+      ? db.collection('payments').doc(paymentUpdate.paymentId)
+      : null;
+    if (paymentRef) {
+      await transaction.get(paymentRef);
+    }
 
     let requestRef:  FirebaseFirestore.DocumentReference | null = null;
     let requestSnap: FirebaseFirestore.DocumentSnapshot  | null = null;
@@ -200,7 +238,7 @@ export async function consumeSubscriptionAndCreateSession(
       sessionId = sessionRef.id;
 
       transaction.update(requestRef, {
-        status:               'accepted',
+        status:               STATUS.ACCEPTED,
         isPaid:               true,
         paidAt:               admin.firestore.FieldValue.serverTimestamp(),
         paymentTransactionId: transactionId,
@@ -210,7 +248,7 @@ export async function consumeSubscriptionAndCreateSession(
       transaction.set(sessionRef, {
         ...metadata.sessionDetails,
         requestId:            metadata.requestId,
-        status:               'accepted',
+        status:               STATUS.ACCEPTED,
         isPaid:               true,
         paymentTransactionId: transactionId,
         createdAt:            admin.firestore.FieldValue.serverTimestamp(),
@@ -227,6 +265,16 @@ export async function consumeSubscriptionAndCreateSession(
       });
     }
 
+    if (paymentUpdate && paymentRef) {
+      transaction.update(paymentRef, {
+        status: 'completed',
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
     functions.logger.info('Subscription session consumed in transaction', {
       subscriptionId, remainingSessions: newRemaining, sessionId,
     });
@@ -237,6 +285,7 @@ export async function consumeSubscriptionAndCreateSession(
 export async function createSubscriptionFromPayment(
   payment: PaymentDocument,
   transactionId: string,
+  paymentUpdate?: PaymentStatusUpdate,
 ): Promise<SubscriptionCreationResult> {
   const metadata     = payment.metadata ?? {};
   const planTitle    = parseString(metadata['planTitle'],    'Payment Plan');
@@ -271,6 +320,17 @@ export async function createSubscriptionFromPayment(
       createdAt:           admin.firestore.FieldValue.serverTimestamp(),
       updatedAt:           admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    if (paymentUpdate) {
+      const paymentRef = db.collection('payments').doc(paymentUpdate.paymentId);
+      transaction.update(paymentRef, {
+        status: 'completed',
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
 
     functions.logger.info('Subscription created in transaction',
       { subscriptionId: subscriptionRef.id, sessionsCount });

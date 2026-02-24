@@ -51,14 +51,6 @@ export class PaymentOrchestrationService {
         result = await this.handleSubscriptionCreation(context);
       }
 
-      await db.collection('payments').doc(context.paymentId).update({
-        status:         'completed',
-        paidAt:         serverTimestamp(),
-        updatedAt:      serverTimestamp(),
-        idempotencyKey: `${context.paymentId}_${context.transactionId}`,
-        processedAt:    serverTimestamp(),
-      });
-
       await this.eventStore.appendPaymentEvent({
         eventType: PaymentEventType.PAYMENT_COMPLETED,
         paymentId: context.paymentId,
@@ -142,6 +134,10 @@ export class PaymentOrchestrationService {
       context.payment,
       context.transactionId,
       slotInfo,
+      {
+        paymentId: context.paymentId,
+        transactionId: context.transactionId,
+      },
     );
 
     await this.notificationService.send({
@@ -180,6 +176,10 @@ export class PaymentOrchestrationService {
     const subscriptionResult = await createSubscriptionFromPayment(
       context.payment,
       context.transactionId,
+      {
+        paymentId: context.paymentId,
+        transactionId: context.transactionId,
+      },
     );
 
     await db.collection('payments').doc(context.paymentId).update({
@@ -239,6 +239,10 @@ export class PaymentOrchestrationService {
       context.transactionId,
       context.metadata,
       slotInfo,
+      {
+        paymentId: context.paymentId,
+        transactionId: context.transactionId,
+      },
     );
 
     await this.notificationService.send({

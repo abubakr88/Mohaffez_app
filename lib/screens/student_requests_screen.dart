@@ -19,15 +19,16 @@ import 'student_payment_screen.dart';
 // FILTER ENUM AND PROVIDER
 // ============================================================================
 enum RequestFilter {
-  all,           // الكل
-  pending,       // قيد الانتظار
-  accepted,      // مقبول
-  rejected,      // مرفوض
-  cancelled,     // ملغي
+  all, // الكل
+  pending, // قيد الانتظار
+  accepted, // مقبول
+  rejected, // مرفوض
+  cancelled, // ملغي
   awaitingPayment, // في انتظار الدفع
 }
 
-final requestFilterProvider = StateProvider<RequestFilter>((ref) => RequestFilter.all);
+final requestFilterProvider =
+    StateProvider<RequestFilter>((ref) => RequestFilter.all);
 
 // ============================================================================
 // MAIN SCREEN
@@ -36,12 +37,20 @@ class StudentRequestsScreen extends ConsumerStatefulWidget {
   const StudentRequestsScreen({super.key});
 
   @override
-  ConsumerState<StudentRequestsScreen> createState() => _StudentRequestsScreenState();
+  ConsumerState<StudentRequestsScreen> createState() =>
+      _StudentRequestsScreenState();
 }
 
 class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   final searchController = TextEditingController();
   String searchQuery = '';
+
+  Future<void> _refreshRequests(String studentId) async {
+    ref.invalidate(studentRequestsFirstPageProvider(studentId));
+    await ref
+        .read(studentRequestsFirstPageProvider(studentId).future)
+        .catchError((_) => <Map<String, dynamic>>[]);
+  }
 
   @override
   void dispose() {
@@ -80,27 +89,32 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
     String studentId,
     RequestFilter filter,
   ) {
-    final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
+    final requestsAsync =
+        ref.watch(studentRequestsFirstPageProvider(studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            // App Bar with Filter
-            _buildAppBar(context, ref, filter),
-            
-            // Search Bar
-            _buildSearchBar(),
-            
-            // Filter Chips
-            _buildFilterChips(ref, filter),
-            
-            // Requests List
-            _buildRequestsList(context, ref, studentId, requestsAsync, filter),
-            
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
+        body: RefreshIndicator(
+          onRefresh: () => _refreshRequests(studentId),
+          child: CustomScrollView(
+            slivers: [
+              // App Bar with Filter
+              _buildAppBar(context, ref, filter, studentId),
+
+              // Search Bar
+              _buildSearchBar(),
+
+              // Filter Chips
+              _buildFilterChips(ref, filter),
+
+              // Requests List
+              _buildRequestsList(
+                  context, ref, studentId, requestsAsync, filter),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            ],
+          ),
         ),
       ),
     );
@@ -109,11 +123,23 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   // ==========================================================================
   // APP BAR
   // ==========================================================================
-  Widget _buildAppBar(BuildContext context, WidgetRef ref, RequestFilter filter) {
+  Widget _buildAppBar(
+    BuildContext context,
+    WidgetRef ref,
+    RequestFilter filter,
+    String studentId,
+  ) {
     return SliverAppBar(
       expandedHeight: 120,
       floating: true,
       pinned: true,
+      leading: context.canPop()
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              onPressed: () => context.pop(),
+              tooltip: 'رجوع',
+            )
+          : null,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -179,12 +205,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       actions: [
         IconButton(
           icon: const Icon(Icons.refresh),
-          onPressed: () {
-            final user = ref.read(currentUserProvider).value;
-            if (user != null) {
-              ref.invalidate(studentRequestsFirstPageProvider(user.uid));
-            }
-          },
+          onPressed: () => _refreshRequests(studentId),
           tooltip: 'تحديث',
         ),
       ],
@@ -254,7 +275,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           itemBuilder: (context, index) {
             final (filter, label, icon) = filters[index];
             final isSelected = selectedFilter == filter;
-            
+
             return ChoiceChip(
               avatar: Icon(
                 icon,
@@ -292,14 +313,16 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       data: (allRequests) {
         // Apply filters
         var filteredRequests = _applyFilters(allRequests, filter);
-        
+
         // Apply search
         if (searchQuery.isNotEmpty) {
           filteredRequests = filteredRequests.where((req) {
-            final mohaffezName = (req['mohaffezName'] as String? ?? '').toLowerCase();
-            final sessionType = (req['sessionType'] as String? ?? '').toLowerCase();
-            return mohaffezName.contains(searchQuery) || 
-                   sessionType.contains(searchQuery);
+            final mohaffezName =
+                (req['mohaffezName'] as String? ?? '').toLowerCase();
+            final sessionType =
+                (req['sessionType'] as String? ?? '').toLowerCase();
+            return mohaffezName.contains(searchQuery) ||
+                sessionType.contains(searchQuery);
           }).toList();
         }
 
@@ -335,7 +358,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       ),
       error: (e, _) => SliverFillRemaining(
         child: ErrorDisplay.dataLoad(
-          onRetry: () => ref.invalidate(studentRequestsFirstPageProvider(studentId)),
+          onRetry: () =>
+              ref.invalidate(studentRequestsFirstPageProvider(studentId)),
         ),
       ),
     );
@@ -360,7 +384,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         return requests.where((r) {
           final s = r['status'] as String? ?? '';
           return s == 'awaitingpayment' ||
-                s == 'awaiting_direct_payment_confirmation';
+              s == 'awaiting_direct_payment_confirmation';
         }).toList();
     }
   }
@@ -392,11 +416,12 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   ) async {
     final requestId = request['id'] as String?;
     final status = request['status'] as String? ?? 'pending';
-    
+
     if (requestId == null) return;
 
     // Only allow cancel for certain statuses
-    final canCancel = ['pending', 'awaitingpayment', 'accepted'].contains(status);
+    final canCancel =
+        ['pending', 'awaitingpayment', 'accepted'].contains(status);
     if (!canCancel) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -499,7 +524,8 @@ class _RequestCard extends StatelessWidget {
     final (statusText, statusColor, statusIcon) = _getStatusInfo(status);
 
     // Only allow cancel for statuses where it still makes sense
-    final canCancel = ['pending', 'awaitingpayment', 'accepted'].contains(status);
+    final canCancel =
+        ['pending', 'awaitingpayment', 'accepted'].contains(status);
 
     // Rejected requests get their own dedicated card
     if (status == 'rejected') {
@@ -579,8 +605,7 @@ class _RequestCard extends StatelessWidget {
             // ── Session type + time chips ───────────────────────────────────
             Row(
               children: [
-                _buildDetailChip(
-                    Icons.schedule, preferredTimeSlot),
+                _buildDetailChip(Icons.schedule, preferredTimeSlot),
                 const SizedBox(width: 8),
                 _buildDetailChip(
                     Icons.location_on, _getSessionTypeLabel(sessionType)),
@@ -651,8 +676,7 @@ class _RequestCard extends StatelessWidget {
                   icon: const Icon(Icons.payment, size: 20),
                   label: const Text(
                     'ادفع الآن',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
@@ -815,7 +839,6 @@ class _RequestCard extends StatelessWidget {
       // Both spellings — with and without space — handled
       case 'awaitingpayment':
       case 'awaiting_payment':
-      case 'awaiting payment':
         return ('في انتظار الدفع', Colors.orange.shade700, Icons.payment);
 
       case 'awaiting_direct_payment_confirmation':
@@ -860,7 +883,6 @@ class _RequestCard extends StatelessWidget {
   }
 }
 
-
 // ============================================================================
 // REJECTED REQUEST CARD WIDGET
 // ============================================================================
@@ -902,7 +924,8 @@ class _RejectedRequestCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.red.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -932,7 +955,7 @@ class _RejectedRequestCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Mohaffez Name
             Text(
               mohaffezName,
@@ -942,21 +965,23 @@ class _RejectedRequestCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            
+
             // Session Details
             Row(
               children: [
                 _buildDetailChip(Icons.schedule, preferredTimeSlot),
                 const SizedBox(width: 8),
-                _buildDetailChip(Icons.location_on, _getSessionTypeLabel(sessionType)),
+                _buildDetailChip(
+                    Icons.location_on, _getSessionTypeLabel(sessionType)),
               ],
             ),
             const SizedBox(height: 12),
-            
+
             // Date Info
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+                Icon(Icons.calendar_today,
+                    size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 6),
                 Text(
                   slotDate != null
@@ -979,7 +1004,7 @@ class _RejectedRequestCard extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             // Rejection Reason
             if (rejectionReason != null && rejectionReason!.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -992,7 +1017,8 @@ class _RejectedRequestCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange.shade900, size: 20),
+                    Icon(Icons.info_outline,
+                        color: Colors.orange.shade900, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

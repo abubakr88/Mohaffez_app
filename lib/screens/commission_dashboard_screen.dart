@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
@@ -15,9 +16,23 @@ class CommissionDashboardScreen extends StatelessWidget {
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text('عمولات التطبيق (5%)'),
           backgroundColor: const Color(0xFFF59E0B),
           foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'تحديث (بيانات مباشرة)',
+              onPressed: () {},
+            ),
+          ],
         ),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchCommissions(uid),
@@ -50,9 +65,7 @@ class CommissionDashboardScreen extends StatelessWidget {
                 ),
                 child: Column(children: [
                   Text(
-                    totalPending > 0
-                        ? 'مستحق عليك دفعه'
-                        : 'لا يوجد مستحقات 🎉',
+                    totalPending > 0 ? 'مستحق عليك دفعه' : 'لا يوجد مستحقات 🎉',
                     style: const TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 6),
@@ -72,11 +85,9 @@ class CommissionDashboardScreen extends StatelessWidget {
               // List
               Expanded(
                 child: ListView.builder(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: list.length,
-                  itemBuilder: (_, i) =>
-                      _WeekSummaryCard(summary: list[i]),
+                  itemBuilder: (_, i) => _WeekSummaryCard(summary: list[i]),
                 ),
               ),
             ]);
@@ -92,16 +103,16 @@ class _WeekSummaryCard extends StatelessWidget {
   const _WeekSummaryCard({required this.summary});
 
   Color get _statusColor => switch (summary.status) {
-    'paid' => Colors.green,
-    'overdue' => Colors.red,
-    _ => Colors.orange,
-  };
+        'paid' => Colors.green,
+        'overdue' => Colors.red,
+        _ => Colors.orange,
+      };
 
   String get _statusLabel => switch (summary.status) {
-    'paid' => '✅ مدفوع',
-    'overdue' => '⚠️ متأخر',
-    _ => '⏳ مستحق',
-  };
+        'paid' => '✅ مدفوع',
+        'overdue' => '⚠️ متأخر',
+        _ => '⏳ مستحق',
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -115,11 +126,9 @@ class _WeekSummaryCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Text(weekLabel,
             style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Column(

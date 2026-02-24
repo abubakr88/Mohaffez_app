@@ -37,13 +37,6 @@ class PaymentOrchestrationService {
             else {
                 result = await this.handleSubscriptionCreation(context);
             }
-            await admin_1.db.collection('payments').doc(context.paymentId).update({
-                status: 'completed',
-                paidAt: (0, payment_types_1.serverTimestamp)(),
-                updatedAt: (0, payment_types_1.serverTimestamp)(),
-                idempotencyKey: `${context.paymentId}_${context.transactionId}`,
-                processedAt: (0, payment_types_1.serverTimestamp)(),
-            });
             await this.eventStore.appendPaymentEvent({
                 eventType: events_types_1.PaymentEventType.PAYMENT_COMPLETED,
                 paymentId: context.paymentId,
@@ -102,7 +95,10 @@ class PaymentOrchestrationService {
         // as the booking write — eliminates the double-booking race window entirely.
         const slotInfo = this.buildSlotInfo(context.payment.mohaffezId, sessionDetails['slotDate'], sessionDetails['preferredTimeSlot'], sessionDetails['sessionType']);
         // ✅ FIX: slotInfo is passed in; slot removal is now atomic with the booking.
-        const bookingResult = await (0, handlers_1.confirmBookingAfterPayment)(requestId, sessionDetails, context.payment, context.transactionId, slotInfo);
+        const bookingResult = await (0, handlers_1.confirmBookingAfterPayment)(requestId, sessionDetails, context.payment, context.transactionId, slotInfo, {
+            paymentId: context.paymentId,
+            transactionId: context.transactionId,
+        });
         await this.notificationService.send({
             recipientId: context.payment.studentId,
             senderId: context.payment.mohaffezId,
@@ -131,7 +127,10 @@ class PaymentOrchestrationService {
         return { success: true, sessionId: bookingResult.sessionId };
     }
     async handleSubscriptionCreation(context) {
-        const subscriptionResult = await (0, handlers_1.createSubscriptionFromPayment)(context.payment, context.transactionId);
+        const subscriptionResult = await (0, handlers_1.createSubscriptionFromPayment)(context.payment, context.transactionId, {
+            paymentId: context.paymentId,
+            transactionId: context.transactionId,
+        });
         await admin_1.db.collection('payments').doc(context.paymentId).update({
             subscriptionId: subscriptionResult.subscriptionId,
             updatedAt: (0, payment_types_1.serverTimestamp)(),
@@ -169,7 +168,10 @@ class PaymentOrchestrationService {
         // as the subscription decrement — no separate call needed after.
         const slotInfo = this.buildSlotInfo(context.payment.mohaffezId, sd === null || sd === void 0 ? void 0 : sd['slotDate'], sd === null || sd === void 0 ? void 0 : sd['preferredTimeSlot'], sd === null || sd === void 0 ? void 0 : sd['sessionType']);
         // ✅ FIX: slotInfo passed in; slot removal is now atomic with session creation.
-        const consumptionResult = await (0, handlers_1.consumeSubscriptionAndCreateSession)(subscriptionId, context.payment, context.transactionId, context.metadata, slotInfo);
+        const consumptionResult = await (0, handlers_1.consumeSubscriptionAndCreateSession)(subscriptionId, context.payment, context.transactionId, context.metadata, slotInfo, {
+            paymentId: context.paymentId,
+            transactionId: context.transactionId,
+        });
         await this.notificationService.send({
             recipientId: context.payment.studentId,
             senderId: context.payment.mohaffezId,

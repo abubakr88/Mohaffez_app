@@ -5,6 +5,14 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
 const COMMISSION_RATE = 0.05;
+const STATUS = {
+    PENDING: 'pending',
+    AWAITING_PAYMENT: 'awaitingpayment',
+    AWAITING_DIRECT: 'awaitingdirectpaymentconfirmation',
+    ACCEPTED: 'accepted',
+    REJECTED: 'rejected',
+    CANCELLED: 'cancelled',
+};
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getWeekNumber(date) {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -46,9 +54,9 @@ exports.studentMarkedDirectPayment = functions.https.onCall(async (data, context
         if (!reqSnap.exists)
             throw new functions.https.HttpsError("not-found", "الطلب غير موجود");
         const reqData = reqSnap.data();
-        if (reqData.status === "accepted")
+        if (reqData.status === STATUS.ACCEPTED)
             throw new functions.https.HttpsError("already-exists", JSON.stringify({ success: true, message: "الجلسة مقبولة بالفعل" }));
-        if (reqData.status === "awaiting_direct_payment_confirmation")
+        if (reqData.status === STATUS.AWAITING_DIRECT)
             throw new functions.https.HttpsError("already-exists", JSON.stringify({ success: true, message: "تم إرسال إشعار الدفع بالفعل، انتظر تأكيد المحفظ" }));
         const dpRef = admin_1.db.collection("directPaymentRequests").doc();
         tx.set(dpRef, {
@@ -76,7 +84,7 @@ exports.studentMarkedDirectPayment = functions.https.onCall(async (data, context
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });
         tx.update(reqRef, {
-            status: "awaiting_direct_payment_confirmation",
+            status: STATUS.AWAITING_DIRECT,
             directPaymentRequestId: dpRef.id,
             directPaymentMethod: paymentMethod,
             directPaymentAmount: amount,
@@ -145,7 +153,7 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
             sessionDate: dp.sessionDate,
             slotStart: dp.slotStart,
             slotEnd: dp.slotEnd,
-            status: "accepted",
+            status: STATUS.ACCEPTED,
             isPaid: true,
             sessionPrice: dp.amount,
             paymentMethod: dp.paymentMethod,
@@ -156,7 +164,7 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
         });
         // Update request
         tx.update(reqRef, {
-            status: "accepted", isPaid: true,
+            status: STATUS.ACCEPTED, isPaid: true,
             paidAt: admin_1.FieldValue.serverTimestamp(),
             sessionId: sessionRef.id,
             directPaymentConfirmedAt: admin_1.FieldValue.serverTimestamp(),
@@ -180,7 +188,7 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
             directPaymentRequestId, sessionRequestId: dp.sessionRequestId,
             amount: dp.amount, commissionAmount: dp.commissionAmount,
             commissionRate: COMMISSION_RATE, paymentMethod: dp.paymentMethod,
-            status: "pending", weekNumber, year: now.getFullYear(),
+            status: STATUS.PENDING, weekNumber, year: now.getFullYear(),
             weekStart: admin.firestore.Timestamp.fromDate(weekStart),
             weekEnd: admin.firestore.Timestamp.fromDate(weekEnd),
             createdAt: admin_1.FieldValue.serverTimestamp(), paidAt: null,
@@ -196,7 +204,7 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
             totalSessions: admin_1.FieldValue.increment(1),
             totalRevenue: admin_1.FieldValue.increment(dp.amount),
             commissionAmount: admin_1.FieldValue.increment(dp.commissionAmount),
-            commissionRate: COMMISSION_RATE, status: "pending",
+            commissionRate: COMMISSION_RATE, status: STATUS.PENDING,
             dueDate: admin.firestore.Timestamp.fromDate(getNextMonday(weekEnd)),
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         }, { merge: true });
@@ -249,7 +257,7 @@ exports.mohaffezRejectDirectPayment = functions.https.onCall(async (data, contex
             // Cannot reject an already-confirmed payment
             throw new functions.https.HttpsError('failed-precondition', 'تم تأكيد الدفع بالفعل ولا يمكن رفضه');
         }
-        if (dp.status === 'rejected') {
+        if (dp.status === STATUS.REJECTED) {
             // Idempotent early return
             throw new functions.https.HttpsError('already-exists', JSON.stringify({ success: true, message: 'تم الرفض مسبقاً' }));
         }
@@ -262,13 +270,13 @@ exports.mohaffezRejectDirectPayment = functions.https.onCall(async (data, contex
         // ── WRITES ────────────────────────────────────────────────────────────
         const notifRef = admin_1.db.collection('notifications').doc();
         tx.update(dpRef, {
-            status: 'rejected',
+            status: STATUS.REJECTED,
             rejectionReason: rejectionReason || '',
             mohaffezConfirmedAt: admin_1.FieldValue.serverTimestamp(),
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });
         tx.update(reqRef, {
-            status: 'awaitingpayment',
+            status: STATUS.AWAITING_PAYMENT,
             directPaymentRejectedAt: admin_1.FieldValue.serverTimestamp(),
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });

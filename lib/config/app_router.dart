@@ -36,6 +36,19 @@ import '../screens/mohaffez_pricing_screen.dart';
 import '../screens/student_sessions_screen.dart';
 import '../screens/student_schedule_screen.dart';
 import '../screens/mohaffez_wallet_settings_screen.dart';
+import '../screens/admin_home_screen.dart';
+import '../screens/admin_users_screen.dart';
+import '../screens/admin_user_detail_screen.dart';
+import '../screens/admin_credentials_screen.dart';
+import '../screens/admin_failed_operations_screen.dart';
+import '../screens/admin_promo_codes_screen.dart';
+import '../screens/admin_system_settings_screen.dart';
+import '../screens/admin_dev_mode_screen.dart';
+import '../screens/admin_broadcast_screen.dart';
+import '../screens/admin_slot_locks_screen.dart';
+import '../screens/admin_payment_events_screen.dart';
+import '../screens/commission_dashboard_screen.dart';
+import '../screens/maintenance_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -80,6 +93,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/maintenance',
+        name: 'maintenance',
+        builder: (context, state) => const MaintenanceScreen(),
       ),
 
       // ============================================
@@ -173,15 +191,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'privacy-settings',
             builder: (context, state) => const PrivacySettingsScreen(),
           ),
-          
+
           // ============================================
           // ✅ UPDATED: PAYMENT ROUTE WITH SLOT DATA
           // ============================================
-            GoRoute(
+          GoRoute(
             path: '/wallet-settings',
             name: 'wallet-settings',
-            builder: (context, state) =>
-                const MohaffezWalletSettingsScreen(),
+            builder: (context, state) => const MohaffezWalletSettingsScreen(),
           ),
           GoRoute(
             path: '/payment/:mohaffezId',
@@ -190,11 +207,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               final mohaffezId = state.pathParameters['mohaffezId']!;
               final mohaffezName = state.uri.queryParameters['name'] ?? '';
               final requestId = state.uri.queryParameters['requestId'];
-              
+
               // ✅ FIX: Extract lockedRequest from extra
               final extra = state.extra as Map<String, dynamic>?;
-              final lockedRequest = extra?['lockedRequest'] as Map<String, dynamic>?;
-              
+              final lockedRequest =
+                  extra?['lockedRequest'] as Map<String, dynamic>?;
+
               // Parse query parameters (for backward compatibility)
               final sessionType = state.uri.queryParameters['sessionType'];
               final timeSlot = state.uri.queryParameters['timeSlot'];
@@ -203,7 +221,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               final latStr = state.uri.queryParameters['lat'];
               final lngStr = state.uri.queryParameters['lng'];
               final phone = state.uri.queryParameters['phone'];
-              
+
               // Parse timeSlot format "08:00-08:45"
               Map<String, dynamic>? preselectedTimeSlot;
               if (timeSlot != null && timeSlot.contains('-')) {
@@ -215,13 +233,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                   };
                 }
               }
-              
+
               // Parse session date
               DateTime? preselectedDate;
               if (sessionDateStr != null && sessionDateStr.isNotEmpty) {
                 preselectedDate = DateTime.tryParse(sessionDateStr);
               }
-              
+
               // Parse coordinates
               double? lat;
               double? lng;
@@ -231,7 +249,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               if (lngStr != null && lngStr.isNotEmpty) {
                 lng = double.tryParse(lngStr);
               }
-              
+
               return StudentPaymentScreen(
                 mohaffezId: mohaffezId,
                 mohaffezName: mohaffezName,
@@ -248,7 +266,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               );
             },
           ),
-          
+
           // ============================================
           // MOHAFFEZ ROUTES
           // ============================================
@@ -328,6 +346,69 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'pricing-management',
             builder: (context, state) => const MohaffezPricingScreen(),
           ),
+          GoRoute(
+            path: '/admin-home',
+            name: 'admin-home',
+            builder: (context, state) => const AdminHomeScreen(),
+          ),
+          GoRoute(
+            path: '/admin/users',
+            name: 'admin-users',
+            builder: (context, state) => const AdminUsersScreen(),
+          ),
+          GoRoute(
+            path: '/admin/user-detail',
+            name: 'admin-user-detail',
+            builder: (context, state) {
+              final user = state.extra as Map<String, dynamic>;
+              return AdminUserDetailScreen(user: user);
+            },
+          ),
+          GoRoute(
+            path: '/admin/credentials',
+            name: 'admin-credentials',
+            builder: (context, state) => const AdminCredentialsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/failed-ops',
+            name: 'admin-failed-ops',
+            builder: (context, state) => const AdminFailedOperationsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/promo-codes',
+            name: 'admin-promo-codes',
+            builder: (context, state) => const AdminPromoCodesScreen(),
+          ),
+          GoRoute(
+            path: '/admin/settings',
+            name: 'admin-settings',
+            builder: (context, state) => const AdminSystemSettingsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/dev-mode',
+            name: 'admin-dev-mode',
+            builder: (context, state) => const AdminDevModeScreen(),
+          ),
+          GoRoute(
+            path: '/admin/broadcast',
+            name: 'admin-broadcast',
+            builder: (context, state) => const AdminBroadcastScreen(),
+          ),
+          GoRoute(
+            path: '/admin/slot-locks',
+            name: 'admin-slot-locks',
+            builder: (context, state) => const AdminSlotLocksScreen(),
+          ),
+          GoRoute(
+            path: '/admin/payment-events',
+            name: 'admin-payment-events',
+            builder: (context, state) => const AdminPaymentEventsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/commissions',
+            name: 'admin-commissions',
+            builder: (context, state) => const CommissionDashboardScreen(),
+          ),
         ],
       ),
     ],
@@ -396,7 +477,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppThemeConstants.primaryAmber, AppThemeConstants.primaryAmberLight],
+            colors: [
+              AppThemeConstants.primaryAmber,
+              AppThemeConstants.primaryAmberLight
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -450,7 +534,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               const SizedBox(height: AppThemeConstants.space2xl),
               // Loading Indicator
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppThemeConstants.surfaceWhite),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    AppThemeConstants.surfaceWhite),
                 strokeWidth: 3,
               ),
               Spacing.vMd,
@@ -474,7 +559,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppThemeConstants.primaryAmber, AppThemeConstants.primaryAmberLight],
+            colors: [
+              AppThemeConstants.primaryAmber,
+              AppThemeConstants.primaryAmberLight
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -520,11 +608,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 Text(
                   errorMessage ?? 'حدث خطأ في الاتصال',
                   style: context.textTheme.bodyLarge?.copyWith(
-                    color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
+                    color:
+                        AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: AppThemeConstants.spaceXl + AppThemeConstants.spaceSm),
+                const SizedBox(
+                    height:
+                        AppThemeConstants.spaceXl + AppThemeConstants.spaceSm),
                 // Action Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -554,7 +645,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                       label: const Text('تسجيل الدخول'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppThemeConstants.surfaceWhite,
-                        side: const BorderSide(color: AppThemeConstants.surfaceWhite, width: 2),
+                        side: const BorderSide(
+                            color: AppThemeConstants.surfaceWhite, width: 2),
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppThemeConstants.spaceLg,
                           vertical: AppThemeConstants.spaceMd,
@@ -614,7 +706,8 @@ class ErrorScreen extends StatelessWidget {
                 Spacing.vMd,
                 Text(
                   'حدث خطأ',
-                  style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: context.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 Spacing.vSm,
                 Text(

@@ -1,4 +1,4 @@
-﻿// lib/screens/student_payment_screen.dart
+// lib/screens/student_payment_screen.dart
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -98,28 +98,23 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       return widget.timeSlot!;
     }
     if (widget.preselectedTimeSlot != null) {
-      final start =
-          widget.preselectedTimeSlot!['startTime']?.toString() ?? '';
+      final start = widget.preselectedTimeSlot!['startTime']?.toString() ?? '';
       final end = widget.preselectedTimeSlot!['endTime']?.toString();
       if (end != null && end.isNotEmpty) return '$start-$end';
       return start;
     }
-    if (lockedRequestTimeSlot != null &&
-        lockedRequestTimeSlot!.isNotEmpty) {
+    if (lockedRequestTimeSlot != null && lockedRequestTimeSlot!.isNotEmpty) {
       return lockedRequestTimeSlot!;
     }
     return '';
   }
 
-  bool get hasSelectedSlot =>
-      lockedTimeSlot.isNotEmpty && lockedDate != null;
+  bool get hasSelectedSlot => lockedTimeSlot.isNotEmpty && lockedDate != null;
 
   bool get isLockedRequest => widget.lockedRequest != null;
 
   String? get lockedRequestSessionType =>
-      isLockedRequest
-          ? widget.lockedRequest!['sessionType'] as String?
-          : null;
+      isLockedRequest ? widget.lockedRequest!['sessionType'] as String? : null;
 
   DateTime? get lockedRequestSlotDate {
     if (!isLockedRequest) return null;
@@ -129,15 +124,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     return null;
   }
 
-  String? get lockedRequestTimeSlot =>
-      isLockedRequest
-          ? widget.lockedRequest!['preferredTimeSlot'] as String?
-          : null;
+  String? get lockedRequestTimeSlot => isLockedRequest
+      ? widget.lockedRequest!['preferredTimeSlot'] as String?
+      : null;
 
-  String? get lockedRequestLocation =>
-      isLockedRequest
-          ? widget.lockedRequest!['imamAddressText'] as String?
-          : null;
+  String? get lockedRequestLocation => isLockedRequest
+      ? widget.lockedRequest!['imamAddressText'] as String?
+      : null;
 
   @override
   void initState() {
@@ -151,8 +144,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       return;
     }
     try {
-      final wallets =
-          await DirectPaymentService.getMohaffezWalletNumbers(widget.mohaffezId);
+      final wallets = await DirectPaymentService.getMohaffezWalletNumbers(
+          widget.mohaffezId);
       final hasAny =
           wallets.values.any((v) => v != null && v.trim().isNotEmpty);
       if (mounted) {
@@ -198,16 +191,30 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final plansAsync =
-        ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    final plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
     final pricing = resolvePricing();
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
+          leading: context.canPop()
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => context.pop(),
+                  tooltip: 'رجوع',
+                )
+              : null,
           title: const Text(ArabicLabels.payment),
           backgroundColor: AppTheme.accentGreen,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'تحديث',
+              onPressed: () =>
+                  ref.invalidate(activePricingPlansProvider(widget.mohaffezId)),
+            ),
+          ],
         ),
         body: plansAsync.when(
           data: (plans) {
@@ -235,27 +242,34 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               );
             }
 
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                buildLockedSessionDetailsCard,
-                if (widget.sessionDetails != null || hasSelectedSlot)
-                  const SizedBox(height: 14),
-                ...filteredPlans.map(buildPlanCard),
-                if (selectedPlan != null) ...[
-                  const SizedBox(height: 14),
-                  buildPromoCodeSection,
-                  const SizedBox(height: 12),
-                  buildPriceSummary,
-                  _buildPaymentMethodToggle(resolvePricing()),
-                  const SizedBox(height: 100),
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(activePricingPlansProvider(widget.mohaffezId));
+                await ref
+                    .read(activePricingPlansProvider(widget.mohaffezId).future)
+                    .catchError((_) => <PricingPlanModel>[]);
+              },
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  buildLockedSessionDetailsCard,
+                  if (widget.sessionDetails != null || hasSelectedSlot)
+                    const SizedBox(height: 14),
+                  ...filteredPlans.map(buildPlanCard),
+                  if (selectedPlan != null) ...[
+                    const SizedBox(height: 14),
+                    buildPromoCodeSection,
+                    const SizedBox(height: 12),
+                    buildPriceSummary,
+                    _buildPaymentMethodToggle(resolvePricing()),
+                    const SizedBox(height: 100),
+                  ],
                 ],
-              ],
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) =>
-              Center(child: Text('${ArabicLabels.error}: $e')),
+          error: (e, _) => Center(child: Text('${ArabicLabels.error}: $e')),
         ),
         bottomNavigationBar: selectedPlan == null
             ? null
@@ -272,7 +286,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   Widget _buildPaymentMethodToggle(PricingResult pricing) {
     // Don't show for free sessions
     if (pricing.finalPrice <= 0.01) return const SizedBox.shrink();
-    
+
     // Only show when arrived from a real booking request
     if (widget.requestId == null || widget.requestId!.isEmpty) {
       return const SizedBox.shrink();
@@ -304,7 +318,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () => setState(() => _selectedDPMethod = _DPMethod.online),
+                  onTap: () =>
+                      setState(() => _selectedDPMethod = _DPMethod.online),
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
@@ -339,7 +354,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: InkWell(
-                  onTap: () => setState(() => _selectedDPMethod = _DPMethod.direct),
+                  onTap: () =>
+                      setState(() => _selectedDPMethod = _DPMethod.direct),
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
@@ -385,8 +401,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     // ── FREE SESSION (existing) ────────────────────────────────────────────
     if (isFreeSession && appliedPromoCode != null) {
       final requiresSlot = isFreeSession && widget.requestId == null;
-      final canPay =
-          !isProcessingPayment && (!requiresSlot || hasSelectedSlot);
+      final canPay = !isProcessingPayment && (!requiresSlot || hasSelectedSlot);
 
       if (requiresSlot && !hasSelectedSlot) {
         return Column(
@@ -404,9 +419,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 SizedBox(width: 8),
                 Expanded(
                     child: Text('يرجى العودة لاختيار الموعد أولاً',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.deepOrange))),
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.deepOrange))),
               ]),
             ),
             const SizedBox(height: 12),
@@ -417,8 +431,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 icon: const Icon(Icons.arrow_back),
                 label: const Text('العودة لاختيار الموعد'),
                 style: OutlinedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     side: BorderSide(color: Colors.orange.shade300)),
               ),
             ),
@@ -430,8 +443,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         width: double.infinity,
         height: 54,
         child: ElevatedButton.icon(
-          onPressed:
-              canPay ? () => proceedToPayment(context, ref) : null,
+          onPressed: canPay ? () => proceedToPayment(context, ref) : null,
           icon: isProcessingPayment
               ? const SizedBox(
                   width: 20,
@@ -444,15 +456,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 ? 'جاري التأكيد...'
                 : 'تأكيد الجلسة المجانية 🎁',
             style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16),
+                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 4,
             disabledBackgroundColor: Colors.grey.shade300,
             disabledForegroundColor: Colors.grey.shade600,
@@ -463,8 +473,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
     // ── EXISTING: Card / Paymob payment ──────────────────────────────────
     final requiresSlot = isFreeSession && widget.requestId == null;
-    final canPay =
-        !isProcessingPayment && (!requiresSlot || hasSelectedSlot);
+    final canPay = !isProcessingPayment && (!requiresSlot || hasSelectedSlot);
 
     return SizedBox(
       width: double.infinity,
@@ -486,16 +495,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   ? 'تأكيد الجلسة المجانية 🎁'
                   : '${pricing.finalPrice.toStringAsFixed(0)} ${ArabicLabels.egp} - ${ArabicLabels.payNow}',
           style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16),
+              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isFreeSession ? Colors.green : AppTheme.accentGreen,
+          backgroundColor: isFreeSession ? Colors.green : AppTheme.accentGreen,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: isFreeSession ? 4 : 2,
           disabledBackgroundColor: Colors.grey.shade300,
           disabledForegroundColor: Colors.grey.shade600,
@@ -505,13 +511,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   }
 
   // ── MODIFIED: proceedToPayment — 3 branches now ───────────────────────────
-  Future<void> proceedToPayment(
-      BuildContext context, WidgetRef ref) async {
+  Future<void> proceedToPayment(BuildContext context, WidgetRef ref) async {
     if (selectedPlan == null) return;
     final user = ref.read(currentUserProvider).value;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('يرجى تسجيل الدخول')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('يرجى تسجيل الدخول')));
       return;
     }
 
@@ -591,8 +596,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     } else if (hasSelectedSlot) {
       details = {
         'sessionType': lockedSessionType,
-        'slotDate':
-            lockedDate != null ? Timestamp.fromDate(lockedDate!) : null,
+        'slotDate': lockedDate != null ? Timestamp.fromDate(lockedDate!) : null,
         'preferredTimeSlot': lockedTimeSlot,
         'location': widget.location ?? widget.mohaffezAddress,
       };
@@ -603,8 +607,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     final slotDate = details['slotDate'] as Timestamp?;
     final timeSlot = details['timeSlot'] as String? ??
         details['preferredTimeSlot'] as String?;
-    final location = details['location'] as String? ??
-        details['imamAddressText'] as String?;
+    final location =
+        details['location'] as String? ?? details['imamAddressText'] as String?;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -621,9 +625,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                isLockedRequest
-                    ? 'طلب محجوز — أكمل الدفع'
-                    : 'تفاصيل الجلسة',
+                isLockedRequest ? 'طلب محجوز — أكمل الدفع' : 'تفاصيل الجلسة',
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -633,8 +635,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           ]),
           Divider(height: 24, color: Colors.blue.shade300),
           lockedDetailRow('المحفظ:', widget.mohaffezName),
-          lockedDetailRow(ArabicLabels.type,
-              getSessionTypeArabic(sessionType)),
+          lockedDetailRow(ArabicLabels.type, getSessionTypeArabic(sessionType)),
           if (slotDate != null)
             lockedDetailRow(
                 ArabicLabels.date,
@@ -652,16 +653,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(children: [
-              Icon(Icons.info_outline,
-                  size: 20, color: Colors.amber.shade900),
+              Icon(Icons.info_outline, size: 20, color: Colors.amber.shade900),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   isLockedRequest
                       ? 'اختر خطة الدفع واستكمل العملية.'
                       : 'اختر الخطة المناسبة لإتمام الحجز.',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.amber.shade900),
+                  style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
                 ),
               ),
             ]),
@@ -678,12 +677,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             width: 80,
             child: Text(label,
                 style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade800)),
+                    fontWeight: FontWeight.w600, color: Colors.blue.shade800)),
           ),
-          Expanded(
-              child: Text(value,
-                  style: const TextStyle(fontSize: 14))),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ]),
       );
 
@@ -701,13 +697,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                selected ? AppTheme.accentGreen : Colors.grey.shade300,
+            color: selected ? AppTheme.accentGreen : Colors.grey.shade300,
             width: selected ? 2.5 : 1,
           ),
-          color: selected
-              ? AppTheme.accentGreen.withOpacity(0.05)
-              : null,
+          color: selected ? AppTheme.accentGreen.withOpacity(0.05) : null,
         ),
         child: Row(children: [
           Icon(
@@ -728,16 +721,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   plan.sessionsCount > 1
                       ? '${plan.sessionsCount} جلسات'
                       : 'جلسة واحدة',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                 ),
               ],
             ),
           ),
           Text(
             '${plan.priceEGP.toStringAsFixed(0)} ${ArabicLabels.egp}',
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 16),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ]),
       ),
@@ -748,10 +739,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   Widget get buildPromoCodeSection {
     final promoState = ref.watch(promoCodeProvider);
     final isValidatingPromo = promoState.isLoading;
-    final promoError =
-        promoState.hasError ? promoState.error.toString() : null;
-    final promoCodeValid =
-        appliedPromoCode != null && promoState.hasValue;
+    final promoError = promoState.hasError ? promoState.error.toString() : null;
+    final promoCodeValid = appliedPromoCode != null && promoState.hasValue;
     final discount = appliedPromoCode?.discount ?? 0;
     final pricing = resolvePricing();
     final isFreeSession = pricing.finalPrice < 0.01;
@@ -798,8 +787,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                             fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     const Text('100% خصم مطبق',
-                        style: TextStyle(
-                            color: Colors.white70, fontSize: 14)),
+                        style: TextStyle(color: Colors.white70, fontSize: 14)),
                   ],
                 ),
               ),
@@ -825,8 +813,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                     height: 20,
                     child: Padding(
                         padding: EdgeInsets.all(12),
-                        child:
-                            CircularProgressIndicator(strokeWidth: 2)))
+                        child: CircularProgressIndicator(strokeWidth: 2)))
                 : promoCodeValid
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : null,
@@ -842,8 +829,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   await ref
                       .read(promoCodeProvider.notifier)
                       .validateCode(promoCodeController.text.trim());
-                  final latest =
-                      ref.read(promoCodeProvider).valueOrNull;
+                  final latest = ref.read(promoCodeProvider).valueOrNull;
                   if (latest != null && mounted) {
                     setState(() {
                       appliedPromoCode = latest;
@@ -868,8 +854,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               const SizedBox(width: 6),
               Expanded(
                   child: Text(promoError,
-                      style: const TextStyle(
-                          color: Colors.red, fontSize: 12))),
+                      style: const TextStyle(color: Colors.red, fontSize: 12))),
             ]),
           ),
         if (promoCodeValid && discount > 0 && !isFreeSession)
@@ -898,8 +883,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                             ? '${ArabicLabels.discount} ${discount.toStringAsFixed(0)}%'
                             : '${ArabicLabels.discount} ${discount.toStringAsFixed(0)} ${ArabicLabels.currency}',
                         style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green.shade700),
+                            fontSize: 12, color: Colors.green.shade700),
                       ),
                     ],
                   ),
@@ -931,39 +915,32 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       ),
       child: Column(children: [
         if (pricing.originalPrice > 0)
-          Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('سعر الخطة'),
-                Text(
-                  '${pricing.originalPrice.toStringAsFixed(2)} ${ArabicLabels.currency}',
-                  style: TextStyle(
-                    decoration: pricing.discount > 0
-                        ? TextDecoration.lineThrough
-                        : null,
-                    color: Colors.grey,
-                  ),
-                ),
-              ]),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text('سعر الخطة'),
+            Text(
+              '${pricing.originalPrice.toStringAsFixed(2)} ${ArabicLabels.currency}',
+              style: TextStyle(
+                decoration:
+                    pricing.discount > 0 ? TextDecoration.lineThrough : null,
+                color: Colors.grey,
+              ),
+            ),
+          ]),
         if (pricing.discount > 0) ...[
           const SizedBox(height: 8),
-          Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(ArabicLabels.discount),
-                Text(
-                  '- ${pricing.discount.toStringAsFixed(2)} ${ArabicLabels.currency}',
-                  style: const TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold),
-                ),
-              ]),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text(ArabicLabels.discount),
+            Text(
+              '- ${pricing.discount.toStringAsFixed(2)} ${ArabicLabels.currency}',
+              style: const TextStyle(
+                  color: Colors.green, fontWeight: FontWeight.bold),
+            ),
+          ]),
         ],
         const Divider(height: 16),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text(ArabicLabels.total,
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 18)),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           Text(
             isFreeSession
                 ? 'مجاني 🎁'
@@ -971,9 +948,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
-                color: isFreeSession
-                    ? Colors.green
-                    : AppTheme.primaryAmber),
+                color: isFreeSession ? Colors.green : AppTheme.primaryAmber),
           ),
         ]),
       ]),
@@ -1016,26 +991,22 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         phone = data['mohaffezPhone'] as String?;
       } else {
         if (!hasSelectedSlot) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('يرجى اختيار الموعد أولاً'),
-                  backgroundColor: Colors.red));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('يرجى اختيار الموعد أولاً'),
+              backgroundColor: Colors.red));
           return;
         }
         slotDate = lockedDate;
         timeSlot = lockedTimeSlot;
         sessionType = lockedSessionType;
-        location = widget.mohaffezAddress ??
-            widget.location ??
-            lockedRequestLocation;
+        location =
+            widget.mohaffezAddress ?? widget.location ?? lockedRequestLocation;
         lat = widget.mohaffezLat;
         lng = widget.mohaffezLng;
         phone = widget.mohaffezPhone;
       }
 
-      if (slotDate == null ||
-          timeSlot == null ||
-          sessionType == null) {
+      if (slotDate == null || timeSlot == null || sessionType == null) {
         throw Exception('بيانات الموعد غير مكتملة');
       }
 
@@ -1046,12 +1017,16 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           : startParts;
 
       slotStart = DateTime(
-        slotDate.year, slotDate.month, slotDate.day,
+        slotDate.year,
+        slotDate.month,
+        slotDate.day,
         int.tryParse(startParts[0]) ?? 0,
         int.tryParse(startParts.length > 1 ? startParts[1] : '0') ?? 0,
       );
       slotEnd = DateTime(
-        slotDate.year, slotDate.month, slotDate.day,
+        slotDate.year,
+        slotDate.month,
+        slotDate.day,
         int.tryParse(endParts[0]) ?? 0,
         int.tryParse(endParts.length > 1 ? endParts[1] : '0') ?? 0,
       );
@@ -1096,26 +1071,25 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           );
       if (paymentResult == null) throw Exception('فشل إنشاء سجل الدفع');
 
-      final result = await ref
-          .read(bookingFlowProvider.notifier)
-          .createFreeSession(
-            mohaffezId: widget.mohaffezId,
-            mohaffezName: widget.mohaffezName,
-            studentId: user.uid,
-            studentName: user.name,
-            sessionType: sessionType,
-            preferredTimeSlot: timeSlot,
-            slotDate: slotDate,
-            slotStart: slotStart,
-            slotEnd: slotEnd,
-            imamAddressText: location,
-            imamAddressLat: lat,
-            imamAddressLng: lng,
-            mohaffezPhone: phone,
-            promoCode: appliedPromoCode!.code,
-            requestId: widget.requestId,
-            paymentId: paymentResult.paymentId,
-          );
+      final result =
+          await ref.read(bookingFlowProvider.notifier).createFreeSession(
+                mohaffezId: widget.mohaffezId,
+                mohaffezName: widget.mohaffezName,
+                studentId: user.uid,
+                studentName: user.name,
+                sessionType: sessionType,
+                preferredTimeSlot: timeSlot,
+                slotDate: slotDate,
+                slotStart: slotStart,
+                slotEnd: slotEnd,
+                imamAddressText: location,
+                imamAddressLat: lat,
+                imamAddressLng: lng,
+                mohaffezPhone: phone,
+                promoCode: appliedPromoCode!.code,
+                requestId: widget.requestId,
+                paymentId: paymentResult.paymentId,
+              );
 
       if (!mounted) return;
       if (result.isSuccess) {
@@ -1179,9 +1153,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         if (widget.requestId != null)
           'sessionDetails': {
             'sessionType': lockedSessionType,
-            'slotDate': lockedDate != null
-                ? Timestamp.fromDate(lockedDate!)
-                : null,
+            'slotDate':
+                lockedDate != null ? Timestamp.fromDate(lockedDate!) : null,
             'preferredTimeSlot': lockedTimeSlot,
             'location': widget.location,
           },
@@ -1208,8 +1181,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       if (result.paymentUrl.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('تم الدفع بنجاح!'),
-              backgroundColor: Colors.green),
+              content: Text('تم الدفع بنجاح!'), backgroundColor: Colors.green),
         );
         context.go('/home');
         return;
@@ -1229,8 +1201,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       if (success == true && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('تم الدفع بنجاح!'),
-              backgroundColor: Colors.green),
+              content: Text('تم الدفع بنجاح!'), backgroundColor: Colors.green),
         );
         Navigator.pop(context, true);
       }
@@ -1257,4 +1228,3 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     }
   }
 }
-
