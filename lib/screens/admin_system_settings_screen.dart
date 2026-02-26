@@ -22,6 +22,7 @@ class _AdminSystemSettingsScreenState
   final maintenanceMessageCtrl = TextEditingController();
   final forceVersionCtrl = TextEditingController();
   final recVersionCtrl = TextEditingController();
+  bool _isLoadingSave = false;
 
   @override
   void initState() {
@@ -39,20 +40,25 @@ class _AdminSystemSettingsScreenState
   }
 
   Future<void> _save() async {
-    await ref
-        .read(systemConfigNotifierProvider.notifier)
-        .updateGlobalConfig(updates);
-    final st = ref.read(systemConfigNotifierProvider);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor:
-            st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
-        content: Text(
-            st.hasError ? st.error.toString() : ArabicLabels.settingsSaved),
-      ),
-    );
-    if (!st.hasError) updates.clear();
+    setState(() => _isLoadingSave = true);
+    try {
+      await ref
+          .read(systemConfigNotifierProvider.notifier)
+          .updateGlobalConfig(updates);
+      final st = ref.read(systemConfigNotifierProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor:
+              st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
+          content: Text(
+              st.hasError ? st.error.toString() : ArabicLabels.settingsSaved),
+        ),
+      );
+      if (!st.hasError) updates.clear();
+    } finally {
+      if (mounted) setState(() => _isLoadingSave = false);
+    }
   }
 
   @override
@@ -249,8 +255,14 @@ class _AdminSystemSettingsScreenState
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
           backgroundColor: AppThemeConstants.primaryAmber),
-      onPressed: _save,
-      child: const Text(ArabicLabels.saveSettings),
+      onPressed: _isLoadingSave ? null : _save,
+      child: _isLoadingSave
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Text(ArabicLabels.saveSettings),
     );
   }
 }

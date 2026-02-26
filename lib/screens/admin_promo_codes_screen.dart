@@ -6,16 +6,25 @@ import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../utils/arabic_labels.dart';
 
-class AdminPromoCodesScreen extends ConsumerWidget {
+class AdminPromoCodesScreen extends ConsumerStatefulWidget {
   const AdminPromoCodesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminPromoCodesScreen> createState() =>
+      _AdminPromoCodesScreenState();
+}
+
+class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
+  final Set<String> _loadingDeletes = {};
+  final Set<String> _loadingToggles = {};
+  bool _isLoadingCreate = false;
+
+  @override
+  Widget build(BuildContext context) {
     final codes = ref.watch(allPromoCodesProvider);
     final actions = ref.read(adminActionsProvider.notifier);
 
     Future<void> run(Future<void> Function() op) async {
-      await op();
       final st = ref.read(adminActionsProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -45,44 +54,79 @@ class AdminPromoCodesScreen extends ConsumerWidget {
             itemCount: list.length,
             itemBuilder: (_, i) {
               final p = list[i];
+              final promoId = p['id'].toString();
               final active = p['isActive'] == true;
               final expiry = p['expiryDate'];
               final expiryText = expiry is Timestamp
                   ? expiry.toDate().toString().split(' ').first
                   : '-';
-              return GestureDetector(
-                onLongPress: () async {
-                  final ok = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text(ArabicLabels.deleteCode),
-                      content: const Text(ArabicLabels.confirmDelete),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text(ArabicLabels.cancel)),
-                        ElevatedButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text(ArabicLabels.delete)),
-                      ],
-                    ),
-                  );
-                  if (ok == true) {
-                    await run(
-                        () => actions.deletePromoCode(p['id'].toString()));
-                  }
-                },
-                child: Card(
-                  margin: const EdgeInsets.all(AppThemeConstants.spaceSm),
-                  child: ListTile(
-                    title: Text(p['code']?.toString() ?? '-'),
-                    subtitle: Text(
-                        '${ArabicLabels.discountPercent}: ${p['discountPercent'] ?? 0}%\n${ArabicLabels.usedCount}: ${p['usedCount'] ?? 0}/${p['usageLimit'] ?? 0}\n${ArabicLabels.expiryDate}: $expiryText'),
-                    trailing: Switch(
-                      value: active,
-                      onChanged: (v) => run(
-                          () => actions.togglePromoCode(p['id'].toString(), v)),
-                    ),
+              final isDeleting = _loadingDeletes.contains(promoId);
+              final isToggling = _loadingToggles.contains(promoId);
+              final isLoading = isDeleting || isToggling;
+
+              return Card(
+                margin: const EdgeInsets.all(AppThemeConstants.spaceSm),
+                child: ListTile(
+                  title: Text(p['code']?.toString() ?? '-'),
+                  subtitle: Text(
+                      '${ArabicLabels.discountPercent}: ${p['discountPercent'] ?? 0}%\n${ArabicLabels.usedCount}: ${p['usedCount'] ?? 0}/${p['usageLimit'] ?? 0}\n${ArabicLabels.expiryDate}: $expiryText'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isDeleting)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          onPressed: isLoading ? null : () async {
+                            final ok = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                title: const Text(ArabicLabels.deleteCode),
+                                content: const Text(ArabicLabels.confirmDelete),
+                                actions: [
+                                  TextButton(
+                                      onPressed: () => Navigator.pop(dialogContext, false),
+                                      child: const Text(ArabicLabels.cancel)),
+                                  ElevatedButton(
+                                      onPressed: () => Navigator.pop(dialogContext, true),
+                                      child: const Text(ArabicLabels.delete)),
+                                ],
+                              ),
+                            );
+                            if (ok == true) {
+                              setState(() => _loadingDeletes.add(promoId));
+                              try {
+                                await run(() => actions.deletePromoCode(promoId));
+                              } finally {
+                                if (mounted) setState(() => _loadingDeletes.remove(promoId));
+                              }
+                            }
+                          },
+                        ),
+                      if (isToggling)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Switch(
+                          value: active,
+                          onChanged: isLoading ? null : (v) async {
+                            setState(() => _loadingToggles.add(promoId));
+                            try {
+                              await run(() => actions.togglePromoCode(promoId, v));
+                            } finally {
+                              if (mounted) setState(() => _loadingToggles.remove(promoId));
+                            }
+                          },
+                        ),
+                    ],
                   ),
                 ),
               );
@@ -103,12 +147,13 @@ class AdminPromoCodesScreen extends ConsumerWidget {
     double discount = 10;
     bool isActive = true;
     DateTime? expiry;
+    bool isLoading = false;
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (_) => StatefulBuilder(
-        builder: (context, setState) => Directionality(
+        builder: (context, setSheetState) => Directionality(
           textDirection: TextDirection.rtl,
           child: Padding(
             padding: EdgeInsets.only(
@@ -138,7 +183,7 @@ class AdminPromoCodesScreen extends ConsumerWidget {
                       value: discount,
                       min: 0,
                       max: 100,
-                      onChanged: (v) => setState(() => discount = v)),
+                      onChanged: (v) => setSheetState(() => discount = v)),
                   TextField(
                       controller: usageCtrl,
                       keyboardType: TextInputType.number,
@@ -147,7 +192,7 @@ class AdminPromoCodesScreen extends ConsumerWidget {
                   const SizedBox(height: AppThemeConstants.spaceSm),
                   SwitchListTile(
                     value: isActive,
-                    onChanged: (v) => setState(() => isActive = v),
+                    onChanged: (v) => setSheetState(() => isActive = v),
                     title: const Text(ArabicLabels.isActive),
                   ),
                   TextButton(
@@ -157,7 +202,7 @@ class AdminPromoCodesScreen extends ConsumerWidget {
                         firstDate: DateTime.now(),
                         lastDate: DateTime.now().add(const Duration(days: 365)),
                       );
-                      if (selected != null) setState(() => expiry = selected);
+                      if (selected != null) setSheetState(() => expiry = selected);
                     },
                     child: Text(expiry == null
                         ? ArabicLabels.noExpirySet
@@ -165,20 +210,31 @@ class AdminPromoCodesScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppThemeConstants.spaceSm),
                   ElevatedButton(
-                    onPressed: () async {
-                      await run(() => actions.createPromoCode({
-                            'code': codeCtrl.text.trim().toUpperCase(),
-                            'discountPercent': discount,
-                            'usageLimit':
-                                int.tryParse(usageCtrl.text.trim()) ?? 0,
-                            'expiryDate': expiry != null
-                                ? Timestamp.fromDate(expiry!)
-                                : null,
-                            'isActive': isActive,
-                          }));
-                      if (context.mounted) Navigator.pop(context);
+                    onPressed: isLoading ? null : () async {
+                      setSheetState(() => isLoading = true);
+                      try {
+                        await run(() => actions.createPromoCode({
+                              'code': codeCtrl.text.trim().toUpperCase(),
+                              'discountPercent': discount,
+                              'usageLimit':
+                                  int.tryParse(usageCtrl.text.trim()) ?? 0,
+                              'expiryDate': expiry != null
+                                  ? Timestamp.fromDate(expiry!)
+                                  : null,
+                              'isActive': isActive,
+                            }));
+                        if (context.mounted) Navigator.pop(context);
+                      } finally {
+                        if (context.mounted) setSheetState(() => isLoading = false);
+                      }
                     },
-                    child: const Text(ArabicLabels.createPromoCode),
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(ArabicLabels.createPromoCode),
                   ),
                 ],
               ),

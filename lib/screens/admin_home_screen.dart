@@ -170,6 +170,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                         title: ArabicLabels.commissionsBoard,
                         icon: Icons.analytics,
                         routeName: 'admin-commissions'),
+                    _AdminNavTile(
+                        title: ArabicLabels.operationsLog,
+                        icon: Icons.history,
+                        routeName: 'admin-audit-log'),
                   ],
                 ),
               ),

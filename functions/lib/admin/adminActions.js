@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.suspendUser = exports.setUserRole = void 0;
+exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.suspendUser = exports.setUserRole = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
@@ -18,11 +18,11 @@ async function isAdminCaller(context) {
 async function ensureAdmin(context) {
     var _a;
     if (!((_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid)) {
-        throw new functions.https.HttpsError('unauthenticated', '??? ????? ??????');
+        throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
     }
     const ok = await isAdminCaller(context);
     if (!ok) {
-        throw new functions.https.HttpsError('permission-denied', '??? ????');
+        throw new functions.https.HttpsError('permission-denied', 'غير مصرح');
     }
     return context.auth.uid;
 }
@@ -46,7 +46,7 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
     const userId = (_a = data === null || data === void 0 ? void 0 : data.userId) === null || _a === void 0 ? void 0 : _a.trim();
     const newRole = (_b = data === null || data === void 0 ? void 0 : data.newRole) === null || _b === void 0 ? void 0 : _b.trim();
     if (!userId || !newRole) {
-        throw new functions.https.HttpsError('invalid-argument', '?????? ??? ??????');
+        throw new functions.https.HttpsError('invalid-argument', 'يرجى إدخال جميع الحقول المطلوبة');
     }
     await admin_1.auth.getUser(userId);
     await admin_1.db.collection('users').doc(userId).update({
@@ -74,7 +74,7 @@ exports.suspendUser = functions.https.onCall(async (data, context) => {
     const reason = (_c = (_b = data === null || data === void 0 ? void 0 : data.reason) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : '';
     const expiresAtRaw = data === null || data === void 0 ? void 0 : data.expiresAt;
     if (!userId || !reason) {
-        throw new functions.https.HttpsError('invalid-argument', '??? ??????? ?????');
+        throw new functions.https.HttpsError('invalid-argument', 'سبب الإيقاف مطلوب');
     }
     const userRecord = await admin_1.auth.getUser(userId);
     const expiresAt = expiresAtRaw ? admin.firestore.Timestamp.fromDate(new Date(expiresAtRaw)) : null;
@@ -100,7 +100,7 @@ exports.suspendUser = functions.https.onCall(async (data, context) => {
         await admin_1.messaging.send({
             token,
             notification: {
-                title: '?? ????? ??????',
+                title: 'تم إيقاف الحساب',
                 body: reason,
             },
             data: {
@@ -127,21 +127,22 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
     const performedBy = await ensureAdmin(context);
     const userId = (_a = data === null || data === void 0 ? void 0 : data.userId) === null || _a === void 0 ? void 0 : _a.trim();
     if (!userId) {
-        throw new functions.https.HttpsError('invalid-argument', 'userId ?????');
+        throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
     }
     await admin_1.auth.getUser(userId);
-    await admin_1.auth.deleteUser(userId);
-    await admin_1.db.collection('users').doc(userId).delete();
-    const studentPending = await admin_1.db
-        .collection('sessionRequests')
-        .where('studentId', '==', userId)
-        .where('status', '==', 'pending')
-        .get();
-    const mohaffezPending = await admin_1.db
-        .collection('sessionRequests')
-        .where('mohaffezId', '==', userId)
-        .where('status', '==', 'pending')
-        .get();
+    // FIX-5: Commit Firestore batch first, then delete Auth user to avoid orphaned data
+    const [studentPending, mohaffezPending] = await Promise.all([
+        admin_1.db
+            .collection('sessionRequests')
+            .where('studentId', '==', userId)
+            .where('status', '==', 'pending')
+            .get(),
+        admin_1.db
+            .collection('sessionRequests')
+            .where('mohaffezId', '==', userId)
+            .where('status', '==', 'pending')
+            .get(),
+    ]);
     const batch = admin_1.db.batch();
     for (const doc of [...studentPending.docs, ...mohaffezPending.docs]) {
         batch.update(doc.ref, {
@@ -151,7 +152,9 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });
     }
+    batch.delete(admin_1.db.collection('users').doc(userId));
     await batch.commit();
+    await admin_1.auth.deleteUser(userId);
     await writeAuditLog({
         action: 'deleteUserAccount',
         performedBy,
@@ -171,7 +174,7 @@ exports.sendBroadcastNotification = functions.https.onCall(async (data, context)
     const body = (_b = data === null || data === void 0 ? void 0 : data.body) === null || _b === void 0 ? void 0 : _b.trim();
     const targetRole = ((_c = data === null || data === void 0 ? void 0 : data.targetRole) !== null && _c !== void 0 ? _c : 'all');
     if (!title || !body) {
-        throw new functions.https.HttpsError('invalid-argument', '??????? ????? ???????');
+        throw new functions.https.HttpsError('invalid-argument', 'عنوان ونص الإشعار مطلوبان');
     }
     let query = admin_1.db.collection('users');
     if (targetRole !== 'all') {
@@ -242,5 +245,95 @@ exports.triggerCleanupJobManually = functions.https.onCall(async (_, context) =>
     });
     functions.logger.info('Admin triggered cleanup job', { performedBy, released });
     return { released };
+});
+/**
+ * input: { userId: string, credentialId: string }
+ * output: { success: true }
+ */
+exports.approveCredential = functions.https.onCall(async (data, context) => {
+    var _a, _b;
+    const performedBy = await ensureAdmin(context);
+    const userId = (_a = data === null || data === void 0 ? void 0 : data.userId) === null || _a === void 0 ? void 0 : _a.trim();
+    const credentialId = (_b = data === null || data === void 0 ? void 0 : data.credentialId) === null || _b === void 0 ? void 0 : _b.trim();
+    if (!userId || !credentialId) {
+        throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم ومعرف الشهادة مطلوبان');
+    }
+    await admin_1.db.collection('users').doc(userId).collection('credentials').doc(credentialId).update({
+        status: 'approved',
+        reviewedAt: admin_1.FieldValue.serverTimestamp(),
+        reviewedBy: performedBy,
+    });
+    const { createAndSendNotification } = await Promise.resolve().then(() => require('../utils/notificationHelpers'));
+    await createAndSendNotification({
+        userId,
+        title: 'تم اعتماد الشهادة',
+        body: 'تم قبول شهادتك بنجاح ✅',
+        type: 'credential_approved',
+    });
+    await writeAuditLog({
+        action: 'approveCredential',
+        performedBy,
+        targetUserId: userId,
+        data: { credentialId },
+    });
+    functions.logger.info('Admin approved credential', { performedBy, userId, credentialId });
+    return { success: true };
+});
+/**
+ * input: { userId: string, credentialId: string, reason: string }
+ * output: { success: true }
+ */
+exports.rejectCredential = functions.https.onCall(async (data, context) => {
+    var _a, _b, _c;
+    const performedBy = await ensureAdmin(context);
+    const userId = (_a = data === null || data === void 0 ? void 0 : data.userId) === null || _a === void 0 ? void 0 : _a.trim();
+    const credentialId = (_b = data === null || data === void 0 ? void 0 : data.credentialId) === null || _b === void 0 ? void 0 : _b.trim();
+    const reason = (_c = data === null || data === void 0 ? void 0 : data.reason) === null || _c === void 0 ? void 0 : _c.trim();
+    if (!userId || !credentialId || !reason) {
+        throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم ومعرف الشهادة وسبب الرفض مطلوبون');
+    }
+    await admin_1.db.collection('users').doc(userId).collection('credentials').doc(credentialId).update({
+        status: 'rejected',
+        rejectionReason: reason,
+        reviewedAt: admin_1.FieldValue.serverTimestamp(),
+        reviewedBy: performedBy,
+    });
+    const { createAndSendNotification } = await Promise.resolve().then(() => require('../utils/notificationHelpers'));
+    await createAndSendNotification({
+        userId,
+        title: 'تم رفض الشهادة',
+        body: reason,
+        type: 'credential_rejected',
+    });
+    await writeAuditLog({
+        action: 'rejectCredential',
+        performedBy,
+        targetUserId: userId,
+        data: { credentialId, reason },
+    });
+    functions.logger.info('Admin rejected credential', { performedBy, userId, credentialId, reason });
+    return { success: true };
+});
+/**
+ * input: { targetRole: 'all' | 'student' | 'mohaffez' }
+ * output: { count: number }
+ */
+exports.getBroadcastAudienceCount = functions.https.onCall(async (data, context) => {
+    var _a;
+    await ensureAdmin(context);
+    const targetRole = ((_a = data === null || data === void 0 ? void 0 : data.targetRole) !== null && _a !== void 0 ? _a : 'all');
+    let query = admin_1.db.collection('users');
+    if (targetRole !== 'all') {
+        query = query.where('role', '==', targetRole);
+    }
+    const usersSnap = await query.get();
+    let count = 0;
+    for (const doc of usersSnap.docs) {
+        const token = doc.data().fcmToken;
+        if (token != null && token.length > 0)
+            count++;
+    }
+    functions.logger.info('Admin queried broadcast audience count', { targetRole, count });
+    return { count };
 });
 //# sourceMappingURL=adminActions.js.map

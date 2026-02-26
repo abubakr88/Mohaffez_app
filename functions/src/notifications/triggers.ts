@@ -92,7 +92,8 @@ export const onSessionRequestAccepted = functions.firestore
       // ============================================
       if (afterStatus === 'accepted') {
         // Guard: confirmFreeSession already sent notifications atomically
-        const alreadySent = after['notificationsAlreadySent'] as boolean | undefined;
+        // FIX-3: Use runtime-safe boolean coercion for duplicate-notification guard
+        const alreadySent = asBoolean(after['notificationsAlreadySent'], false);
         if (alreadySent === true) {
           functions.logger.info('Skipping duplicate notification: already sent by confirmFreeSession', {
             requestId: context.params.requestId,
@@ -302,4 +303,79 @@ export const onPaymentCompleted = functions.firestore
       subscriptionId: after.subscriptionId,
       sessionId: after.sessionId,
     });
+  });
+
+/**
+ * FIX: BUG #3 - Firestore trigger for assignment update notification
+ * Fires when hifzAssignment is set (non-empty) and status changes to "completed"
+ * Sends notification to student about their new assignment
+ */
+export const onSessionCompleted = functions.firestore
+  .document('hafizSessions/{sessionId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() as RequestDoc;
+    const after = change.after.data() as RequestDoc;
+
+    const beforeStatus = asString(before.status);
+    const afterStatus = asString(after.status);
+    const beforeHifzAssignment = asString(before.hifzAssignment);
+    const afterHifzAssignment = asString(after.hifzAssignment);
+
+    // Only trigger when status changes to 'completed' and hifzAssignment is set
+    if (beforeStatus === afterStatus || afterStatus !== 'completed') {
+      return;
+    }
+
+    // Check if there's an assignment to notify about
+    if (!afterHifzAssignment || afterHifzAssignment.trim().length === 0) {
+      functions.logger.info('Session completed but no assignment to notify', {
+        sessionId: context.params.sessionId,
+      });
+      return;
+    }
+
+    const sessionId = context.params.sessionId;
+    const studentId = asString(after.studentId);
+    const mohaffezId = asString(after.mohaffezId);
+    const mohaffezName = asString(after.mohaffezName, 'المحفظ');
+
+    if (!studentId) {
+      functions.logger.warn('Missing studentId in completed session', {
+        sessionId,
+      });
+      return;
+    }
+
+    try {
+      await createAndSendNotification({
+        userId: studentId,
+        senderId: mohaffezId,
+        title: 'تم إضافة واجبك',
+        body: `${mohaffezName} أضاف واجبك الجديد`,
+        type: 'assignment_updated',
+        isRead: false,
+        data: {
+          sessionId,
+          mohaffezId,
+          mohaffezName,
+          hifzAssignment: afterHifzAssignment,
+          murajaAssignment: asString(after.murajaAssignment),
+          sessionRating: asNumber(after.sessionRating, 0),
+        },
+        highPriority: true,
+      });
+
+      functions.logger.info('Assignment update notification sent', {
+        sessionId,
+        studentId,
+        mohaffezId,
+      });
+    } catch (error) {
+      functions.logger.error('Error sending assignment update notification', {
+        sessionId,
+        studentId,
+        mohaffezId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   });

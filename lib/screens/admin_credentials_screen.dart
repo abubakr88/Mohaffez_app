@@ -6,28 +6,88 @@ import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../utils/arabic_labels.dart';
 
-class AdminCredentialsScreen extends ConsumerWidget {
+class AdminCredentialsScreen extends ConsumerStatefulWidget {
   const AdminCredentialsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pending = ref.watch(pendingCredentialsProvider);
-    final actions = ref.read(adminActionsProvider.notifier);
+  ConsumerState<AdminCredentialsScreen> createState() =>
+      _AdminCredentialsScreenState();
+}
 
-    Future<void> action(Future<void> Function() call) async {
-      await call();
-      final st = ref.read(adminActionsProvider);
-      if (!context.mounted) return;
+class _AdminCredentialsScreenState
+    extends ConsumerState<AdminCredentialsScreen> {
+  final Set<String> _loadingApprove = {};
+  final Set<String> _loadingReject = {};
+
+  String _credentialKey(String userId, String credentialId) =>
+      '$userId:$credentialId';
+
+  Future<void> _approveCredential(String userId, String credentialId) async {
+    final key = _credentialKey(userId, credentialId);
+    setState(() => _loadingApprove.add(key));
+
+    try {
+      await ref.read(adminActionsProvider.notifier).approveCredential(userId, credentialId);
+      
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor:
-              st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
-          content: Text(st.hasError
-              ? st.error.toString()
-              : ArabicLabels.operationSuccess),
+        const SnackBar(
+          backgroundColor: AppThemeConstants.success,
+          content: Text(ArabicLabels.operationSuccess),
         ),
       );
+      ref.invalidate(pendingCredentialsProvider);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text(e.toString()),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingApprove.remove(key));
+      }
     }
+  }
+
+  Future<void> _rejectCredential(
+      String userId, String credentialId, String reason) async {
+    final key = _credentialKey(userId, credentialId);
+    setState(() => _loadingReject.add(key));
+
+    try {
+      await ref
+          .read(adminActionsProvider.notifier)
+          .rejectCredential(userId, credentialId, reason);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.success,
+          content: Text(ArabicLabels.operationSuccess),
+        ),
+      );
+      ref.invalidate(pendingCredentialsProvider);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text(e.toString()),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loadingReject.remove(key));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = ref.watch(pendingCredentialsProvider);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -46,16 +106,24 @@ class AdminCredentialsScreen extends ConsumerWidget {
               itemCount: list.length,
               itemBuilder: (_, i) {
                 final c = list[i];
+                final userId = c['userId']?.toString() ?? '';
+                final credentialId = c['id']?.toString() ?? '';
+                final key = _credentialKey(userId, credentialId);
                 final created = c['createdAt'];
                 final ts = created is Timestamp
                     ? created.toDate().toString().split(' ').first
                     : '-';
+
+                final isApproving = _loadingApprove.contains(key);
+                final isRejecting = _loadingReject.contains(key);
+                final isLoading = isApproving || isRejecting;
+
                 return Card(
                   margin: const EdgeInsets.all(AppThemeConstants.spaceSm),
                   child: ListTile(
                     title: Text(c['title']?.toString() ?? ArabicLabels.noData),
                     subtitle: Text(
-                        '${ArabicLabels.userId}: ${c['userId'] ?? '-'}\n${ArabicLabels.submittedAt}: $ts'),
+                        '${ArabicLabels.userId}: $userId\n${ArabicLabels.submittedAt}: $ts'),
                     leading: c['imageUrl'] != null
                         ? ClipRRect(
                             borderRadius: AppThemeConstants.borderRadiusSm,
@@ -63,50 +131,80 @@ class AdminCredentialsScreen extends ConsumerWidget {
                                 width: 48, height: 48, fit: BoxFit.cover),
                           )
                         : const Icon(Icons.image_not_supported),
-                    trailing: Wrap(
-                      spacing: AppThemeConstants.spaceXs,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          color: AppThemeConstants.success,
-                          icon: const Icon(Icons.check_circle),
-                          onPressed: () => action(() =>
-                              actions.approveCredential(
-                                  c['userId'].toString(), c['id'].toString())),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppThemeConstants.success,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: isApproving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle),
+                          label: const Text('اعتماد ✅'),
+                          onPressed: isLoading
+                              ? null
+                              : () => _approveCredential(userId, credentialId),
                         ),
-                        IconButton(
-                          color: AppThemeConstants.error,
-                          icon: const Icon(Icons.cancel),
-                          onPressed: () async {
-                            final ctrl = TextEditingController();
-                            final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title:
-                                    const Text(ArabicLabels.rejectCredential),
-                                content: TextField(
-                                    controller: ctrl,
-                                    decoration: const InputDecoration(
-                                        labelText:
-                                            ArabicLabels.rejectionReason)),
-                                actions: [
-                                  TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text(ArabicLabels.cancel)),
-                                  ElevatedButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text(ArabicLabels.reject)),
-                                ],
-                              ),
-                            );
-                            if (ok == true && ctrl.text.trim().isNotEmpty) {
-                              await action(() => actions.rejectCredential(
-                                  c['userId'].toString(),
-                                  c['id'].toString(),
-                                  ctrl.text.trim()));
-                            }
-                          },
+                        const SizedBox(width: AppThemeConstants.spaceXs),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppThemeConstants.error,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: isRejecting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.cancel),
+                          label: const Text('رفض ❌'),
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  final ctrl = TextEditingController();
+                                  final ok = await showDialog<bool>(
+                                    context: context,
+                                    builder: (dialogContext) => AlertDialog(
+                                      title: const Text(
+                                          ArabicLabels.rejectCredential),
+                                      content: TextField(
+                                          controller: ctrl,
+                                          decoration: const InputDecoration(
+                                              labelText: ArabicLabels
+                                                  .rejectionReason)),
+                                      actions: [
+                                        TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dialogContext, false),
+                                            child:
+                                                const Text(ArabicLabels.cancel)),
+                                        ElevatedButton(
+                                            onPressed: () =>
+                                                Navigator.pop(dialogContext, true),
+                                            child:
+                                                const Text(ArabicLabels.reject)),
+                                      ],
+                                    ),
+                                  );
+                                  if (ok == true &&
+                                      ctrl.text.trim().isNotEmpty) {
+                                    await _rejectCredential(userId,
+                                        credentialId, ctrl.text.trim());
+                                  }
+                                },
                         ),
                       ],
                     ),

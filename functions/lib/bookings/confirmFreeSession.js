@@ -13,6 +13,14 @@ const STATUS = {
     REJECTED: 'rejected',
     CANCELLED: 'cancelled',
 };
+// FIX-2: Parse Flutter ISO strings without timezone as UTC to prevent server-local shift
+function parseFlutterDate(iso) {
+    // If the string has no timezone info, treat it as UTC
+    if (!iso.endsWith('Z') && !/[+\-]\d{2}:\d{2}$/.test(iso)) {
+        return new Date(iso + 'Z');
+    }
+    return new Date(iso);
+}
 exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
     functions.logger.info("🎫 confirmFreeSession v6.0 (17/2/2026) - Enhanced Logging");
     // 1. Verify authentication
@@ -64,43 +72,42 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             };
         }
     }
-    // 4. Verify promo code
-    const promoSnapshot = await admin_1.db
-        .collection("promoCodes")
-        .where("code", "==", promoCode)
-        .limit(1)
-        .get();
-    if (promoSnapshot.empty) {
-        throw new functions.https.HttpsError("not-found", "كود الخصم غير موجود");
-    }
-    const promoDoc = promoSnapshot.docs[0];
-    const promoData = promoDoc.data();
-    // Validate promo code
-    if (!promoData.isActive) {
-        throw new functions.https.HttpsError("failed-precondition", "كود الخصم غير نشط");
-    }
-    if (promoData.discountPercent !== 100) {
-        throw new functions.https.HttpsError("failed-precondition", "كود الخصم يجب أن يكون 100%");
-    }
-    if (promoData.expiryDate && promoData.expiryDate.toDate() < new Date()) {
-        throw new functions.https.HttpsError("failed-precondition", "كود الخصم منتهي الصلاحية");
-    }
-    if (promoData.usageLimit && promoData.usedCount >= promoData.usageLimit) {
-        throw new functions.https.HttpsError("failed-precondition", "تم استخدام كود الخصم بالكامل");
-    }
-    functions.logger.info("✅ Promo code validated", {
-        promoCode,
-        discountPercent: promoData.discountPercent,
-        usedCount: promoData.usedCount,
-        usageLimit: promoData.usageLimit,
-    });
     // 5. ✅ CRITICAL FIX: Move ALL logic inside transaction
     return admin_1.db.runTransaction(async (transaction) => {
         var _a;
+        // FIX-1: Move promo code read/validation into transaction to avoid TOCTOU race
+        const promoQuery = admin_1.db
+            .collection("promoCodes")
+            .where("code", "==", promoCode)
+            .limit(1);
+        const promoSnapshot = await transaction.get(promoQuery);
+        if (promoSnapshot.empty) {
+            throw new functions.https.HttpsError("not-found", "كود الخصم غير موجود");
+        }
+        const promoDoc = promoSnapshot.docs[0];
+        const promoData = promoDoc.data();
+        if (!promoData.isActive) {
+            throw new functions.https.HttpsError("failed-precondition", "كود الخصم غير نشط");
+        }
+        if (promoData.discountPercent !== 100) {
+            throw new functions.https.HttpsError("failed-precondition", "كود الخصم يجب أن يكون 100%");
+        }
+        if (promoData.expiryDate && promoData.expiryDate.toDate() < new Date()) {
+            throw new functions.https.HttpsError("failed-precondition", "كود الخصم منتهي الصلاحية");
+        }
+        if (promoData.usageLimit && promoData.usedCount >= promoData.usageLimit) {
+            throw new functions.https.HttpsError("failed-precondition", "تم استخدام كود الخصم بالكامل");
+        }
+        functions.logger.info("✅ Promo code validated", {
+            promoCode,
+            discountPercent: promoData.discountPercent,
+            usedCount: promoData.usedCount,
+            usageLimit: promoData.usageLimit,
+        });
         functions.logger.info("🔄 Transaction started");
-        const slotDateTimestamp = admin.firestore.Timestamp.fromDate(new Date(slotDate));
-        const slotStartTimestamp = admin.firestore.Timestamp.fromDate(new Date(slotStart));
-        const slotEndTimestamp = admin.firestore.Timestamp.fromDate(new Date(slotEnd));
+        const slotDateTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotDate));
+        const slotStartTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotStart));
+        const slotEndTimestamp = admin.firestore.Timestamp.fromDate(parseFlutterDate(slotEnd));
         // ============================================
         // ✅ STEP 1: IDEMPOTENCY CHECK INSIDE TRANSACTION
         // ============================================
@@ -169,7 +176,7 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
         // ============================================
         // ✅ STEP 3: READ AVAILABILITY AND VERIFY SLOT IS ENABLED
         // ============================================
-        const slotDateObj = new Date(slotDate);
+        const slotDateObj = parseFlutterDate(slotDate);
         const dayOfWeek = slotDateObj.getDay() === 0 ? 7 : slotDateObj.getDay();
         const availabilityQuery = admin_1.db
             .collection("users")

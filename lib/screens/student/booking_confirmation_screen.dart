@@ -28,6 +28,7 @@ class BookingConfirmationDetails {
   final String? mohaffezPhotoUrl;
   final double rating;
   final int reviewCount;
+  final String? slotLockId;
 
   const BookingConfirmationDetails({
     required this.mohaffezId,
@@ -50,6 +51,7 @@ class BookingConfirmationDetails {
     this.mohaffezPhotoUrl,
     this.rating = 0,
     this.reviewCount = 0,
+    this.slotLockId,
   });
 }
 
@@ -377,12 +379,33 @@ class _BookingConfirmationScreenState
   }
 
   Future<void> _confirmBooking() async {
+    // ── DEBUG START ──────────────────────────────────────────────
+    debugPrint('🟡 [Booking] _confirmBooking() called');
+    debugPrint('🟡 [Booking] agreedToPolicy=$_agreedToPolicy');
+    debugPrint('🟡 [Booking] isSubmitting=$_isSubmitting');
+    debugPrint('🟡 [Booking] isUsingSubscription=$_isUsingSubscription');
+    debugPrint('🟡 [Booking] paymentMethod=${widget.bookingDetails.paymentMethod}');
+    debugPrint('🟡 [Booking] mohaffezId=${widget.bookingDetails.mohaffezId}');
+    debugPrint('🟡 [Booking] studentId=${widget.bookingDetails.studentId}');
+    debugPrint('🟡 [Booking] slotLockId=${widget.bookingDetails.slotLockId}');
+    debugPrint('🟡 [Booking] subscriptionId=${widget.bookingDetails.subscriptionId}');
+    debugPrint('🟡 [Booking] remainingCredits=${widget.bookingDetails.remainingCredits}');
+    debugPrint('🟡 [Booking] cost=${widget.bookingDetails.cost}');
+    debugPrint('🟡 [Booking] sessionType=${widget.bookingDetails.sessionType}');
+    debugPrint('🟡 [Booking] slotDate=${widget.bookingDetails.slotDate}');
+    debugPrint('🟡 [Booking] preferredTimeSlot=${widget.bookingDetails.preferredTimeSlot}');
+    // ── DEBUG END ────────────────────────────────────────────────
+
     final d = widget.bookingDetails;
+
     if (_isUsingSubscription &&
         (d.subscriptionId == null || d.remainingCredits <= 0)) {
+      debugPrint('🔴 [Booking] BLOCKED: insufficient subscription credits');
       _showError('لا يوجد رصيد باقة كافٍ لإتمام الحجز');
       return;
     }
+
+    debugPrint('🟢 [Booking] Subscription check passed — calling createSessionRequest...');
 
     setState(() => _isSubmitting = true);
     try {
@@ -406,7 +429,10 @@ class _BookingConfirmationScreenState
                 requiresPaymentOnAcceptance:
                     d.paymentMethod == BookingPaymentMethod.payAfterAcceptance,
                 paymentMethod: d.paymentMethod,
+                slotLockId: d.slotLockId,
               );
+
+      debugPrint('🟢 [Booking] createSessionRequest returned: isSuccess=${result.isSuccess} error=${result.errorMessage} sessionId=${result.sessionId}');
 
       if (!mounted) return;
       if (result.isSuccess) {
@@ -418,10 +444,13 @@ class _BookingConfirmationScreenState
           ),
         );
       } else {
+        debugPrint('🔴 [Booking] FAILED: ${result.errorMessage}');
         _showError(result.errorMessage ?? 'فشل في إرسال طلب الحجز');
       }
-    } catch (e) {
-      _showError('فشل في إرسال الطلب: $e');
+    } catch (e, stack) {
+      debugPrint('🔴 [Booking] EXCEPTION: $e');
+      debugPrint('🔴 [Booking] STACK: $stack');
+      if (mounted) _showError('فشل في إرسال الطلب: $e');
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);

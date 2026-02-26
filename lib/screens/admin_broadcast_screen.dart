@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,6 +19,8 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
   final titleCtrl = TextEditingController();
   final bodyCtrl = TextEditingController();
   String targetRole = 'all';
+  int? _audienceCount;
+  bool _isLoadingCount = false;
 
   @override
   void dispose() {
@@ -26,7 +29,34 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
     super.dispose();
   }
 
-  Future<void> _send() async {
+  Future<void> _fetchAudienceCount() async {
+    setState(() => _isLoadingCount = true);
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('getBroadcastAudienceCount');
+      final result = await callable.call({'targetRole': targetRole});
+      if (mounted) {
+        setState(() {
+          _audienceCount = result.data['count'] as int;
+          _isLoadingCount = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _audienceCount = null;
+          _isLoadingCount = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppThemeConstants.error,
+            content: Text(e.toString()),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _send(int recipientCount) async {
     await ref
         .read(systemConfigNotifierProvider.notifier)
         .sendBroadcastNotification(
@@ -34,14 +64,95 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
 
     final st = ref.read(systemConfigNotifierProvider);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor:
-            st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
+
+    if (st.hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text(st.error.toString()),
+        ),
+      );
+    } else {
+      // Show success modal bottom sheet
+      await showModalBottomSheet(
+        context: context,
+        isDismissible: false,
+        enableDrag: false,
+        builder: (ctx) => Container(
+          padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.check_circle,
+                color: AppThemeConstants.success,
+                size: 64,
+              ),
+              const SizedBox(height: AppThemeConstants.spaceMd),
+              Text(
+                'تم الإرسال بنجاح إلى $recipientCount مستخدم 🎉',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppThemeConstants.spaceMd),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(ArabicLabels.close),
+              ),
+            ],
+          ),
+        ),
+      );
+      // Clear form after success
+      titleCtrl.clear();
+      bodyCtrl.clear();
+    }
+  }
+
+  Future<void> _showConfirmDialog() async {
+    if (titleCtrl.text.trim().isEmpty || bodyCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('يرجى إدخال عنوان ونص الإشعار'),
+        ),
+      );
+      return;
+    }
+
+    final recipientCount = _audienceCount ?? 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد إرسال الإشعار'),
         content: Text(
-            st.hasError ? st.error.toString() : ArabicLabels.operationSuccess),
+          'سيتم إرسال "${titleCtrl.text.trim()}" إلى $recipientCount مستخدم. هل تريد المتابعة؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(ArabicLabels.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('إرسال الآن'),
+          ),
+        ],
       ),
     );
+
+    if (confirmed == true && mounted) {
+      await _send(recipientCount);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAudienceCount();
   }
 
   @override
@@ -78,11 +189,32 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
                       value: 'mohaffez', label: Text(ArabicLabels.mohaffezin)),
                 ],
                 selected: {targetRole},
-                onSelectionChanged: (v) => setState(() => targetRole = v.first),
+                onSelectionChanged: (v) {
+                  setState(() => targetRole = v.first);
+                  _fetchAudienceCount();
+                },
               ),
               const SizedBox(height: AppThemeConstants.spaceSm),
+              // Audience count preview
+              if (_isLoadingCount)
+                const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else if (_audienceCount != null)
+                Text(
+                  'سيصل الإشعار إلى $_audienceCount مستخدم',
+                  style: const TextStyle(
+                    color: AppThemeConstants.primaryAmber,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              const SizedBox(height: AppThemeConstants.spaceSm),
               ElevatedButton.icon(
-                onPressed: actionState.isLoading ? null : _send,
+                onPressed: actionState.isLoading ? null : _showConfirmDialog,
                 icon: actionState.isLoading
                     ? const SizedBox(
                         width: 16,

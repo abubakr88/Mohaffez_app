@@ -3,7 +3,7 @@
 
 // Notification functions
 export { sendNotification } from './notifications/sendNotification';
-export { onSessionRequestAccepted } from './notifications/triggers';
+export { onSessionRequestAccepted, onSessionCompleted } from './notifications/triggers';
 export { sendPaymentDeadlineReminders } from './notifications/paymentDeadlineReminders';
 export { sendSessionReminders } from './notifications/sessionReminders';
 
@@ -29,6 +29,9 @@ export {
   sendBroadcastNotification,
   triggerCommissionJobManually,
   triggerCleanupJobManually,
+  approveCredential,
+  rejectCredential,
+  getBroadcastAudienceCount,
 } from './admin/adminActions';
 export { checkAppVersion } from './admin/appVersionCheck';
 export { checkMaintenanceMode } from './admin/maintenanceCheck';

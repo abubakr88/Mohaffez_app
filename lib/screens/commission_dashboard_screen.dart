@@ -1,13 +1,73 @@
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/direct_payment_model.dart';
+import '../providers/admin_provider.dart';
 import '../services/direct_payment_service.dart';
+import '../shared/theme/app_theme_constants.dart';
 
-class CommissionDashboardScreen extends StatelessWidget {
+class CommissionDashboardScreen extends ConsumerStatefulWidget {
   const CommissionDashboardScreen({super.key});
+
+  @override
+  ConsumerState<CommissionDashboardScreen> createState() =>
+      _CommissionDashboardScreenState();
+}
+
+class _CommissionDashboardScreenState
+    extends ConsumerState<CommissionDashboardScreen> {
+  bool _isRunningJob = false;
+  final Map<String, bool> _markingPaid = {};
+
+  Future<void> _triggerCommissionJob() async {
+    setState(() => _isRunningJob = true);
+    try {
+      await ref.read(adminActionsProvider.notifier).triggerCommissionJob();
+      final st = ref.read(adminActionsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: st.hasError
+              ? AppThemeConstants.error
+              : AppThemeConstants.success,
+          content: Text(st.hasError
+              ? st.error.toString()
+              : 'تمت معالجة العمولات بنجاح ✓'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isRunningJob = false);
+    }
+  }
+
+  Future<void> _markAsPaid(String commissionId) async {
+    setState(() => _markingPaid[commissionId] = true);
+    try {
+      await ref.read(adminActionsProvider.notifier).markCommissionPaid(commissionId);
+      final st = ref.read(adminActionsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: st.hasError
+              ? AppThemeConstants.error
+              : Colors.green,
+          content: Text(st.hasError
+              ? st.error.toString()
+              : 'تم تسجيل الدفع بنجاح ✓'),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('خطأ: ${e.toString()}'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _markingPaid.remove(commissionId));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,11 +147,30 @@ class CommissionDashboardScreen extends StatelessWidget {
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: list.length,
-                  itemBuilder: (_, i) => _WeekSummaryCard(summary: list[i]),
+                  itemBuilder: (_, i) => _WeekSummaryCard(
+                    summary: list[i],
+                    isMarkingPaid: _markingPaid[list[i].id] == true,
+                    onMarkAsPaid: () => _markAsPaid(list[i].id),
+                  ),
                 ),
               ),
             ]);
           },
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _isRunningJob ? null : _triggerCommissionJob,
+          backgroundColor: _isRunningJob ? Colors.grey : const Color(0xFFF59E0B),
+          icon: _isRunningJob
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.play_arrow),
+          label: Text(_isRunningJob ? 'جاري التشغيل...' : 'تشغيل عملية العمولة'),
         ),
       ),
     );
@@ -100,7 +179,14 @@ class CommissionDashboardScreen extends StatelessWidget {
 
 class _WeekSummaryCard extends StatelessWidget {
   final WeeklyCommissionSummary summary;
-  const _WeekSummaryCard({required this.summary});
+  final bool isMarkingPaid;
+  final VoidCallback onMarkAsPaid;
+
+  const _WeekSummaryCard({
+    required this.summary,
+    required this.isMarkingPaid,
+    required this.onMarkAsPaid,
+  });
 
   Color get _statusColor => switch (summary.status) {
         'paid' => Colors.green,
@@ -158,6 +244,30 @@ class _WeekSummaryCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(_statusLabel,
                 style: TextStyle(fontSize: 11, color: _statusColor)),
+            if (!summary.isPaid) ...[
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 24,
+                child: ElevatedButton(
+                  onPressed: isMarkingPaid ? null : onMarkAsPaid,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: isMarkingPaid
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('تم الدفع', style: TextStyle(fontSize: 10)),
+                ),
+              ),
+            ],
           ],
         ),
       ),

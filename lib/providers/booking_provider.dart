@@ -1,4 +1,6 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+﻿// lib/providers/booking_provider.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,7 +59,8 @@ class BookingState {
     bool? isSubmitting,
     bool? isSuccess,
     String? sessionId,
-    String? error,
+    // FIX: Allow explicitly setting error to null by using a sentinel pattern
+    Object? error = _kSentinel,
   }) {
     return BookingState(
       selectedPaymentMethod: clearSelectedPaymentMethod
@@ -66,10 +69,18 @@ class BookingState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSuccess: isSuccess ?? this.isSuccess,
       sessionId: sessionId ?? this.sessionId,
-      error: error ?? this.error,
+      // FIX: If caller passed error: null explicitly, use null; otherwise keep existing
+      error: error == _kSentinel ? this.error : error as String?,
     );
   }
 }
+
+// Sentinel to distinguish "not passed" from "explicitly null" in copyWith
+const Object _kSentinel = Object();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFIER
+// ─────────────────────────────────────────────────────────────────────────────
 
 class BookingFlowNotifier extends StateNotifier<BookingState> {
   BookingFlowNotifier(this._bookingService) : super(const BookingState());
@@ -83,6 +94,8 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
   void clearSelectedPaymentMethod() {
     state = state.copyWith(clearSelectedPaymentMethod: true);
   }
+
+  // ── Free Session ───────────────────────────────────────────────────────────
 
   Future<BookingResult> createFreeSession({
     required String mohaffezId,
@@ -99,9 +112,10 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
     double? imamAddressLng,
     String? mohaffezPhone,
     required String promoCode,
-    String? requestId, 
-    String? paymentId, // ✅ NEW: Accept payment ID
+    String? requestId,
+    String? paymentId,
   }) async {
+    // Clear previous error on new attempt
     state = state.copyWith(isSubmitting: true, error: null);
 
     try {
@@ -129,6 +143,7 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
           isSubmitting: false,
           isSuccess: true,
           sessionId: result.sessionId,
+          error: null,
         );
       } else {
         state = state.copyWith(
@@ -139,7 +154,9 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
       }
 
       return result;
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ [createFreeSession] Unexpected error: $e');
+      debugPrintStack(stackTrace: stack);
       state = state.copyWith(
         isSubmitting: false,
         isSuccess: false,
@@ -148,6 +165,8 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
       return BookingResult.failure(e.toString());
     }
   }
+
+  // ── Session Request ────────────────────────────────────────────────────────
 
   Future<BookingResult> createSessionRequest({
     required String mohaffezId,
@@ -167,15 +186,18 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
     bool isPaid = false,
     bool requiresPaymentOnAcceptance = false,
     BookingPaymentMethod? paymentMethod,
+    String? slotLockId,
   }) async {
-    state = state.copyWith(isSubmitting: true);
+    // FIX BUG #1 + #2: Clear error on new attempt; do NOT use a bare `finally`
+    // that only resets isSubmitting — it was masking all errors and never
+    // setting isSuccess/error on the state, so the UI had no feedback.
+    state = state.copyWith(isSubmitting: true, error: null);
+
     try {
       final selectedMethod = paymentMethod ?? state.selectedPaymentMethod;
       final method = selectedMethod ?? BookingPaymentMethod.payAfterAcceptance;
-
       final methodRequiresPayment =
           method == BookingPaymentMethod.payAfterAcceptance;
-
       final methodSubscriptionId =
           method == BookingPaymentMethod.subscriptionCredit
               ? subscriptionId
@@ -200,18 +222,50 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
         requiresPaymentOnAcceptance:
             requiresPaymentOnAcceptance || methodRequiresPayment,
         paymentMethod: method,
+        slotLockId: slotLockId,
       );
 
+      // FIX BUG #1: Mirror createFreeSession — always write result into state
       if (result.isSuccess) {
+        state = state.copyWith(
+          isSubmitting: false,
+          isSuccess: true,
+          sessionId: result.sessionId,
+          error: null,
+        );
         clearSelectedPaymentMethod();
+      } else {
+        state = state.copyWith(
+          isSubmitting: false,
+          isSuccess: false,
+          error: result.errorMessage,
+        );
       }
 
       return result;
-    } finally {
-      state = state.copyWith(isSubmitting: false);
+    } catch (e, stack) {
+      // FIX BUG #1 (continued): Exceptions were caught but state was left with
+      // isSubmitting: true because `finally` ran before the catch could set
+      // the error. Now we handle everything in catch explicitly.
+      debugPrint('❌ [createSessionRequest] Unexpected error: $e');
+      debugPrintStack(stackTrace: stack);
+      state = state.copyWith(
+        isSubmitting: false,
+        isSuccess: false,
+        error: e.toString(),
+      );
+      return BookingResult.failure(e.toString());
     }
+    // NOTE: `finally` block intentionally removed. A bare `finally` that only
+    // calls state.copyWith(isSubmitting: false) will execute AFTER the catch
+    // block but BEFORE its state write is observed by the UI on some Flutter
+    // rebuild cycles, resulting in a flash of stale state.
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SLOT LOCK RESULT
+// ─────────────────────────────────────────────────────────────────────────────
 
 class SlotLockResult {
   final bool success;
@@ -227,8 +281,14 @@ class SlotLockResult {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SERVICE
+// ─────────────────────────────────────────────────────────────────────────────
+
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // ── Free Session ───────────────────────────────────────────────────────────
 
   Future<BookingResult> createFreeSession({
     required String mohaffezId,
@@ -254,62 +314,69 @@ class BookingService {
       debugPrint('👤 Student: $studentId');
       debugPrint('👨‍🏫 Mohaffez: $mohaffezId');
       debugPrint('🎟️ Promo: $promoCode');
-      debugPrint('RequestId: $requestId'); 
+      debugPrint('🔑 RequestId: $requestId');
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'confirmFreeSession',
-        options: HttpsCallableOptions(
-          timeout: const Duration(seconds: 30),
-        ),
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
       );
 
       final data = {
+        // FIX-3: Send slot date-times as UTC ISO strings to avoid timezone drift in Cloud Functions
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
         'studentId': studentId,
         'studentName': studentName,
         'sessionType': sessionType,
         'preferredTimeSlot': preferredTimeSlot,
-        'slotDate': slotDate.toIso8601String(),
-        'slotStart': slotStart.toIso8601String(),
-        'slotEnd': slotEnd.toIso8601String(),
+        'slotDate': slotDate.toUtc().toIso8601String(),
+        'slotStart': slotStart.toUtc().toIso8601String(),
+        'slotEnd': slotEnd.toUtc().toIso8601String(),
         'imamAddressText': imamAddressText,
         'imamAddressLat': imamAddressLat,
         'imamAddressLng': imamAddressLng,
         'mohaffezPhone': mohaffezPhone,
         'promoCode': promoCode,
         if (requestId != null) 'requestId': requestId,
-        if (paymentId != null) 'paymentId': paymentId, 
+        if (paymentId != null) 'paymentId': paymentId,
       };
 
-      debugPrint('📦 Payload: ${data.keys.join(", ")}');
+      debugPrint('📦 Payload keys: ${data.keys.join(', ')}');
 
       final result = await callable.call(data);
 
-      debugPrint('✅ [FREE SESSION] Cloud Function response received');
+      debugPrint('✅ [FREE SESSION] Response received');
       debugPrint('📄 Response: ${result.data}');
 
-      if (result.data is Map && result.data['success'] == true) {
-        final sessionId = result.data['sessionId'] as String?;
-        if (sessionId != null) {
-          debugPrint('🎉 Free session created successfully: $sessionId');
-          return BookingResult.success(sessionId);
-        } else {
-          debugPrint('⚠️ Success but no sessionId returned');
-          return BookingResult.failure('تم الحجز ولكن لم يتم إرجاع معرف الجلسة');
-        }
-      } else {
-        final errorMsg = result.data['message'] as String? ?? 'فشل في إنشاء الجلسة';
-        debugPrint('❌ Cloud Function returned failure: $errorMsg');
-        return BookingResult.failure(errorMsg);
+      // FIX: Type-safe response parsing — original code could throw a cast
+      // exception if data was not a Map, silently failing the whole flow.
+      if (result.data is! Map) {
+        return BookingResult.failure('استجابة غير متوقعة من الخادم');
       }
+
+      final responseMap = Map<String, dynamic>.from(result.data as Map);
+
+      if (responseMap['success'] == true) {
+        final sessionId = responseMap['sessionId'] as String?;
+        if (sessionId != null && sessionId.isNotEmpty) {
+          debugPrint('🎉 Free session created: $sessionId');
+          return BookingResult.success(sessionId);
+        }
+        debugPrint('⚠️ Success but no sessionId returned');
+        return BookingResult.failure('تم الحجز ولكن لم يتم إرجاع معرف الجلسة');
+      }
+
+      final errorMsg =
+          responseMap['message'] as String? ?? 'فشل في إنشاء الجلسة';
+      debugPrint('❌ Cloud Function failure: $errorMsg');
+      return BookingResult.failure(errorMsg);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('❌ [FREE SESSION] FirebaseFunctionsException');
       debugPrint('   Code: ${e.code}');
       debugPrint('   Message: ${e.message}');
       debugPrint('   Details: ${e.details}');
 
-      String errorMessage;
+      final String errorMessage;
       switch (e.code) {
         case 'unauthenticated':
           errorMessage = 'يجب تسجيل الدخول أولاً';
@@ -336,10 +403,12 @@ class BookingService {
       return BookingResult.failure(errorMessage);
     } catch (e, stackTrace) {
       debugPrint('❌ [FREE SESSION] Unexpected error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      debugPrintStack(stackTrace: stackTrace);
       return BookingResult.failure('حدث خطأ غير متوقع: ${e.toString()}');
     }
   }
+
+  // ── Session Request ────────────────────────────────────────────────────────
 
   Future<BookingResult> createSessionRequest({
     required String mohaffezId,
@@ -361,12 +430,19 @@ class BookingService {
     BookingPaymentMethod? paymentMethod,
     String? slotLockId,
   }) async {
-    SlotLockResult? lockResult = slotLockId != null
+    // Pre-populate lockResult if slotLockId was already acquired by the caller
+    final SlotLockResult? lockResult = slotLockId != null
         ? SlotLockResult(success: true, lockId: slotLockId)
         : null;
+
     try {
       final DateTime actualSlotDate =
           slotDate ?? DateTime(slotStart.year, slotStart.month, slotStart.day);
+
+      debugPrint('🔄 [SESSION REQUEST] Calling createSessionRequest CF...');
+      debugPrint('   mohaffezId: $mohaffezId');
+      debugPrint('   studentId: $studentId');
+      debugPrint('   slotLockId: $slotLockId');
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'createSessionRequest',
@@ -374,15 +450,16 @@ class BookingService {
       );
 
       final result = await callable.call({
+        // FIX-3: Send slot date-times as UTC ISO strings to avoid timezone drift in Cloud Functions
         'mohaffezId': mohaffezId,
         'studentId': studentId,
         'studentName': studentName,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
         'preferredTimeSlot': preferredTimeSlot,
-        'slotDate': actualSlotDate.toIso8601String(),
-        'slotStart': slotStart.toIso8601String(),
-        'slotEnd': slotEnd.toIso8601String(),
+        'slotDate': actualSlotDate.toUtc().toIso8601String(),
+        'slotStart': slotStart.toUtc().toIso8601String(),
+        'slotEnd': slotEnd.toUtc().toIso8601String(),
         'imamAddressText': imamAddressText,
         'imamAddressLat': imamAddressLat,
         'imamAddressLng': imamAddressLng,
@@ -394,17 +471,91 @@ class BookingService {
         if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
       });
 
-      if (result.data['success'] == true) {
-        return BookingResult.success(result.data['requestId'] as String);
+      debugPrint('✅ [SESSION REQUEST] Response: ${result.data}');
+
+      // FIX BUG #2 (service layer): Guard against non-Map response before
+      // any field access. The original code did result.data['success'] directly,
+      // which throws a NoSuchMethodError if data is null or not a Map — this
+      // exception was silently caught, lock was released, and failure returned
+      // without any useful context.
+      if (result.data is! Map) {
+        debugPrint('❌ [SESSION REQUEST] Unexpected response shape: ${result.data}');
+        return BookingResult.failure('استجابة غير متوقعة من الخادم');
       }
-      return BookingResult.failure('Failed to create session request');
-    } catch (e) {
+
+      final responseMap = Map<String, dynamic>.from(result.data as Map);
+
+      if (responseMap['success'] == true) {
+        // FIX: requestId may be null for some payment flows — don't hard-cast
+        final requestId = responseMap['requestId'] as String?;
+        debugPrint('🎉 Session request created: $requestId');
+        return BookingResult.success(requestId ?? '');
+      }
+
+      final errorMsg = responseMap['message'] as String? ??
+          'فشل في إنشاء طلب الجلسة';
+      debugPrint('❌ [SESSION REQUEST] CF returned failure: $errorMsg');
+      return BookingResult.failure(errorMsg);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('❌ [SESSION REQUEST] FirebaseFunctionsException');
+      debugPrint('   Code: ${e.code}');
+      debugPrint('   Message: ${e.message}');
+
+      // FIX BUG #3: Release the slot lock on CF-level errors so the slot
+      // doesn't stay locked indefinitely. The original catch was generic
+      // and would release, but FirebaseFunctionsException was not caught
+      // separately — it fell into the generic catch which DID call release,
+      // but .catchError((_) {}) swallowed any release failures silently.
       if (lockResult?.success == true) {
-        await _releaseSlotLock(lockResult!).catchError((_) {});
+        await _releaseSlotLock(lockResult!).catchError((e) {
+          debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
+        });
       }
+
+      final String errorMessage;
+      switch (e.code) {
+        case 'unauthenticated':
+          errorMessage = 'يجب تسجيل الدخول أولاً';
+          break;
+        case 'invalid-argument':
+          errorMessage = e.message ?? 'بيانات غير مكتملة';
+          break;
+        case 'not-found':
+          errorMessage = 'الطلب غير موجود';
+          break;
+        case 'failed-precondition':
+          // Covers: slot lock expired, slot already booked, slot disabled
+          errorMessage = e.message ?? 'لا يمكن إتمام الحجز. الرجاء المحاولة مرة أخرى';
+          break;
+        case 'resource-exhausted':
+          errorMessage = 'هذا الموعد محجوز بالفعل. الرجاء اختيار موعد آخر';
+          break;
+        case 'deadline-exceeded':
+          errorMessage = 'انتهت مهلة الطلب. حاول مرة أخرى';
+          break;
+        case 'unavailable':
+          errorMessage = 'الخدمة غير متاحة حالياً. حاول لاحقاً';
+          break;
+        default:
+          errorMessage = e.message ?? 'حدث خطأ في النظام';
+      }
+
+      return BookingResult.failure(errorMessage);
+    } catch (e, stack) {
+      debugPrint('❌ [SESSION REQUEST] Unexpected error: $e');
+      debugPrintStack(stackTrace: stack);
+
+      if (lockResult?.success == true) {
+        await _releaseSlotLock(lockResult!).catchError((releaseErr) {
+          debugPrint('⚠️ [SESSION REQUEST] Lock release also failed: $releaseErr');
+        });
+      }
+
       return BookingResult.failure(e.toString());
     }
   }
+
+  // ── Slot Locking ───────────────────────────────────────────────────────────
 
   Future<SlotLockResult> _lockAvailabilitySlot({
     required String mohaffezId,
@@ -422,10 +573,7 @@ class BookingService {
           .get();
 
       if (availabilityQuery.docs.isEmpty) {
-        return const SlotLockResult(
-          success: false,
-          error: 'الموعد غير متاح',
-        );
+        return const SlotLockResult(success: false, error: 'الموعد غير متاح');
       }
 
       final availabilityDocRef = availabilityQuery.docs.first.reference;
@@ -435,10 +583,7 @@ class BookingService {
         final availabilityDoc = await transaction.get(availabilityDocRef);
         final data = availabilityDoc.data();
         if (data == null) {
-          return const SlotLockResult(
-            success: false,
-            error: 'الموعد غير متاح',
-          );
+          return const SlotLockResult(success: false, error: 'الموعد غير متاح');
         }
 
         final timeSlots =
@@ -452,10 +597,7 @@ class BookingService {
         });
 
         if (slotIndex == -1) {
-          return const SlotLockResult(
-            success: false,
-            error: 'الموعد غير موجود',
-          );
+          return const SlotLockResult(success: false, error: 'الموعد غير موجود');
         }
 
         final slot = timeSlots[slotIndex];
@@ -499,23 +641,25 @@ class BookingService {
           availabilityDocId: availabilityDoc.id,
         );
       });
-    } catch (_) {
-      return const SlotLockResult(
+    // FIX-4: Log lock acquisition failures and return detailed error payload
+    } catch (e, stack) {
+      debugPrint('⚠️ lockAvailabilitySlot failed: $e');
+      debugPrintStack(stackTrace: stack);
+      return SlotLockResult(
         success: false,
-        error: 'فشل في حجز الموعد. حاول مرة أخرى.',
+        lockId: null,
+        availabilityDocId: null,
+        error: e.toString(),
       );
     }
   }
 
   Future<void> _releaseSlotLock(SlotLockResult lockResult) async {
-    if (lockResult.lockId == null) {
-      return;
-    }
+    if (lockResult.lockId == null) return;
+
     final lockRef = _firestore.collection('slotLocks').doc(lockResult.lockId);
     final lockDoc = await lockRef.get();
-    if (!lockDoc.exists) {
-      return;
-    }
+    if (!lockDoc.exists) return;
 
     final lockData = lockDoc.data()!;
     final mohaffezId = lockData['mohaffezId'] as String?;
@@ -574,53 +718,11 @@ class BookingService {
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
-
       transaction.delete(lockRef);
     });
   }
 
-  String _normalizeTimeSlot(String raw) {
-    return raw.replaceAll(' ', '');
-  }
-
-  Future<DocumentReference?> _findAvailabilityRef({
-    required String mohaffezId,
-    required Timestamp slotDate,
-  }) async {
-    final date = slotDate.toDate();
-    final dayOfWeek = date.weekday;
-    final snap = await _firestore
-        .collection('users')
-        .doc(mohaffezId)
-        .collection('availability')
-        .where('dayOfWeek', isEqualTo: dayOfWeek)
-        .limit(1)
-        .get();
-    return snap.docs.isEmpty ? null : snap.docs.first.reference;
-  }
-
-  List<Map<String, dynamic>>? _computeRestoredSlots(
-    Map<String, dynamic> availabilityData,
-    String timeSlot,
-    String sessionType,
-  ) {
-    final timeSlots =
-        List<Map<String, dynamic>>.from(availabilityData['timeSlots'] ?? []);
-    final normalizedSelected = _normalizeTimeSlot(timeSlot);
-    var restored = false;
-    for (final slot in timeSlots) {
-      final slotTime = _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
-      if (slotTime == normalizedSelected && slot['sessionType'] == sessionType) {
-        slot.remove('lockedBy');
-        slot.remove('lockId');
-        slot.remove('lockedAt');
-        slot['enabled'] = true;
-        restored = true;
-        break;
-      }
-    }
-    return restored ? timeSlots : null;
-  }
+  // ── Cancel Session Request ─────────────────────────────────────────────────
 
   Future<BookingResult> cancelSessionRequest(String requestId) async {
     try {
@@ -628,11 +730,11 @@ class BookingService {
           .collection('sessionRequests')
           .doc(requestId)
           .get();
-      
+
       if (!requestDoc.exists) {
         return BookingResult.failure('الطلب غير موجود');
       }
-      
+
       final requestData = requestDoc.data()!;
       final slotLockId = requestData['slotLockId'] as String?;
       final mohaffezId = requestData['mohaffezId'] as String?;
@@ -700,27 +802,70 @@ class BookingService {
 
       return BookingResult.success(requestId);
     } catch (e, stack) {
-      debugPrint('Error cancelling request: $e');
+      debugPrint('❌ [cancelSessionRequest] Error: $e');
       debugPrintStack(stackTrace: stack);
       return BookingResult.failure(e.toString());
     }
   }
 
-  // ✅ CORRECTED: Explicit type casting
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  String _normalizeTimeSlot(String raw) => raw.replaceAll(' ', '');
+
+  Future<DocumentReference?> _findAvailabilityRef({
+    required String mohaffezId,
+    required Timestamp slotDate,
+  }) async {
+    final date = slotDate.toDate();
+    final dayOfWeek = date.weekday;
+    final snap = await _firestore
+        .collection('users')
+        .doc(mohaffezId)
+        .collection('availability')
+        .where('dayOfWeek', isEqualTo: dayOfWeek)
+        .limit(1)
+        .get();
+    return snap.docs.isEmpty ? null : snap.docs.first.reference;
+  }
+
+  List<Map<String, dynamic>>? _computeRestoredSlots(
+    Map<String, dynamic> availabilityData,
+    String timeSlot,
+    String sessionType,
+  ) {
+    final timeSlots =
+        List<Map<String, dynamic>>.from(availabilityData['timeSlots'] ?? []);
+    final normalizedSelected = _normalizeTimeSlot(timeSlot);
+    var restored = false;
+    for (final slot in timeSlots) {
+      final slotTime =
+          _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
+      if (slotTime == normalizedSelected && slot['sessionType'] == sessionType) {
+        slot.remove('lockedBy');
+        slot.remove('lockId');
+        slot.remove('lockedAt');
+        slot['enabled'] = true;
+        restored = true;
+        break;
+      }
+    }
+    return restored ? timeSlots : null;
+  }
+
+  // ── Streams ────────────────────────────────────────────────────────────────
+
   Stream<List<Map<String, dynamic>>> getStudentRequests(String studentId) {
     return _firestore
-      .collection('sessionRequests')
-      .where('studentId', isEqualTo: studentId)
-      .where('status', whereIn: ['pending', 'awaiting_payment', 'rejected', 'cancelled'])
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((snapshot) => snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return <String, dynamic>{
-          ...data,
-          'id': doc.id,
-        };
-      }).toList());
+        .collection('sessionRequests')
+        .where('studentId', isEqualTo: studentId)
+        .where('status',
+            whereIn: ['pending', 'awaiting_payment', 'rejected', 'cancelled'])
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return <String, dynamic>{...data, 'id': doc.id};
+            }).toList());
   }
 
   Stream<List<Map<String, dynamic>>> getMohaffezRequests(String mohaffezId) {
@@ -730,7 +875,8 @@ class BookingService {
         .where('status', whereIn: ['pending', 'awaitingpayment'])
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList());
+        .map((snapshot) => snapshot.docs
+            .map((doc) => <String, dynamic>{...doc.data(), 'id': doc.id})
+            .toList());
   }
 }

@@ -2,12 +2,13 @@
 // functions/src/index.ts
 // Main entry point - only imports and re-exports
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkMaintenanceMode = exports.checkAppVersion = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.suspendUser = exports.setUserRole = exports.markCommissionPaid = exports.processWeeklyCommissions = exports.mohaffezRejectDirectPayment = exports.mohaffezConfirmDirectPayment = exports.studentMarkedDirectPayment = exports.createSessionRequest = exports.confirmFreeSession = exports.releaseExpiredSlotLocks = exports.onPaymentCreated = exports.checkExpiredPayments = exports.projectPaymentAnalytics = exports.paymobWebhook = exports.sendSessionReminders = exports.sendPaymentDeadlineReminders = exports.onSessionRequestAccepted = exports.sendNotification = void 0;
+exports.checkVersion = exports.checkMaintenanceMode = exports.checkAppVersion = exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.suspendUser = exports.setUserRole = exports.markCommissionPaid = exports.processWeeklyCommissions = exports.mohaffezRejectDirectPayment = exports.mohaffezConfirmDirectPayment = exports.studentMarkedDirectPayment = exports.createSessionRequest = exports.confirmFreeSession = exports.releaseExpiredSlotLocks = exports.onPaymentCreated = exports.checkExpiredPayments = exports.projectPaymentAnalytics = exports.paymobWebhook = exports.sendSessionReminders = exports.sendPaymentDeadlineReminders = exports.onSessionCompleted = exports.onSessionRequestAccepted = exports.sendNotification = void 0;
 // Notification functions
 var sendNotification_1 = require("./notifications/sendNotification");
 Object.defineProperty(exports, "sendNotification", { enumerable: true, get: function () { return sendNotification_1.sendNotification; } });
 var triggers_1 = require("./notifications/triggers");
 Object.defineProperty(exports, "onSessionRequestAccepted", { enumerable: true, get: function () { return triggers_1.onSessionRequestAccepted; } });
+Object.defineProperty(exports, "onSessionCompleted", { enumerable: true, get: function () { return triggers_1.onSessionCompleted; } });
 var paymentDeadlineReminders_1 = require("./notifications/paymentDeadlineReminders");
 Object.defineProperty(exports, "sendPaymentDeadlineReminders", { enumerable: true, get: function () { return paymentDeadlineReminders_1.sendPaymentDeadlineReminders; } });
 var sessionReminders_1 = require("./notifications/sessionReminders");
@@ -43,8 +44,13 @@ Object.defineProperty(exports, "deleteUserAccount", { enumerable: true, get: fun
 Object.defineProperty(exports, "sendBroadcastNotification", { enumerable: true, get: function () { return adminActions_1.sendBroadcastNotification; } });
 Object.defineProperty(exports, "triggerCommissionJobManually", { enumerable: true, get: function () { return adminActions_1.triggerCommissionJobManually; } });
 Object.defineProperty(exports, "triggerCleanupJobManually", { enumerable: true, get: function () { return adminActions_1.triggerCleanupJobManually; } });
+Object.defineProperty(exports, "approveCredential", { enumerable: true, get: function () { return adminActions_1.approveCredential; } });
+Object.defineProperty(exports, "rejectCredential", { enumerable: true, get: function () { return adminActions_1.rejectCredential; } });
+Object.defineProperty(exports, "getBroadcastAudienceCount", { enumerable: true, get: function () { return adminActions_1.getBroadcastAudienceCount; } });
 var appVersionCheck_1 = require("./admin/appVersionCheck");
 Object.defineProperty(exports, "checkAppVersion", { enumerable: true, get: function () { return appVersionCheck_1.checkAppVersion; } });
 var maintenanceCheck_1 = require("./admin/maintenanceCheck");
 Object.defineProperty(exports, "checkMaintenanceMode", { enumerable: true, get: function () { return maintenanceCheck_1.checkMaintenanceMode; } });
+var appVersion_1 = require("./admin/appVersion");
+Object.defineProperty(exports, "checkVersion", { enumerable: true, get: function () { return appVersion_1.checkVersion; } });
 //# sourceMappingURL=index.js.map

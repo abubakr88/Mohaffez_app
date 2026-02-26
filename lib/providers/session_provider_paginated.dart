@@ -576,11 +576,12 @@ final studentRequestsFirstPageProvider =
 // ============================================================================
 final sessionActionsProvider =
     StateNotifierProvider<SessionActionsNotifier, AsyncValue<void>>(
-  (ref) => SessionActionsNotifier(),
+  (ref) => SessionActionsNotifier(ref),
 );
 
 class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
-  SessionActionsNotifier() : super(const AsyncValue.data(null));
+  SessionActionsNotifier(this._ref) : super(const AsyncValue.data(null));
+  final Ref _ref;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<DocumentReference?> _findAvailabilityRef({
@@ -631,70 +632,17 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     print('🎯 Accepting request: $requestId');
     state = const AsyncValue.loading();
     try {
+      // FIX: Bug B - Use atomic repository method instead of non-atomic multi-step process
       final requestDoc =
           await _firestore.collection('sessionRequests').doc(requestId).get();
 
       if (!requestDoc.exists) throw Exception('Request not found');
 
       final requestData = requestDoc.data()!;
-      final requiresPayment =
-          requestData['requiresPaymentOnAcceptance'] as bool? ?? false;
-      final subscriptionId = requestData['subscriptionId'] as String?;
-      final studentId = requestData['studentId'] as String;
-      final mohaffezName = requestData['mohaffezName'] as String;
+      final sessionPrice = (requestData['sessionPrice'] as num?)?.toDouble() ?? 0.0;
 
-      if (subscriptionId != null) {
-        print('💳 Path A: Consuming subscription credit');
-        await _consumeSubscriptionCredit(subscriptionId);
-        await _createSessionFromRequest(requestId, requestData);
-        await _firestore.collection('sessionRequests').doc(requestId).update({
-          'status': RequestStatus.accepted,
-          'acceptedAt': FieldValue.serverTimestamp(),
-        });
-        await _releaseSlotLockById(requestData['slotLockId'] as String?);
-        await _removeBookedSlotFromAvailability(
-          mohaffezId: requestData['mohaffezId'] as String,
-          slotDate: requestData['slotDate'] as Timestamp,
-          timeSlot: requestData['preferredTimeSlot'] as String,
-          sessionType: requestData['sessionType'] as String,
-        );
-        print('✅ Session created with subscription payment');
-      } else if (requiresPayment) {
-        print('💰 Path B: Requesting payment from student');
-        final paymentDeadline = Timestamp.fromDate(
-          DateTime.now().add(const Duration(hours: 10)),
-        );
-        await _firestore.collection('sessionRequests').doc(requestId).update({
-          'status': RequestStatus.awaitingPayment,
-          'acceptedAt': FieldValue.serverTimestamp(),
-          'paymentDeadline': paymentDeadline,
-          'reminderSent': false,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        requestData['paymentDeadline'] = paymentDeadline;
-        await _sendPaymentRequestNotification(
-          studentId: studentId,
-          requestId: requestId,
-          mohaffezName: mohaffezName,
-          sessionDetails: requestData,
-        );
-        print('📧 Payment notification sent to student');
-      } else {
-        print('🎁 Path C: Free session');
-        await _createSessionFromRequest(requestId, requestData);
-        await _firestore.collection('sessionRequests').doc(requestId).update({
-          'status': RequestStatus.accepted,
-          'acceptedAt': FieldValue.serverTimestamp(),
-        });
-        await _releaseSlotLockById(requestData['slotLockId'] as String?);
-        await _removeBookedSlotFromAvailability(
-          mohaffezId: requestData['mohaffezId'] as String,
-          slotDate: requestData['slotDate'] as Timestamp,
-          timeSlot: requestData['preferredTimeSlot'] as String,
-          sessionType: requestData['sessionType'] as String,
-        );
-        print('✅ Free session created');
-      }
+      await _ref.read(sessionRepositoryProvider)
+          .acceptRequest(requestId, sessionPrice: sessionPrice);
 
       state = const AsyncValue.data(null);
     } catch (e, stack) {
@@ -704,195 +652,11 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> _removeBookedSlotFromAvailability({
-    required String mohaffezId,
-    required Timestamp slotDate,
-    required String timeSlot,
-    required String sessionType,
-  }) async {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUid != mohaffezId) return;
-
-    try {
-      final date = slotDate.toDate();
-      final dayOfWeek = date.weekday;
-
-      final availabilitySnapshot = await _firestore
-          .collection('users')
-          .doc(mohaffezId)
-          .collection('availability')
-          .where('dayOfWeek', isEqualTo: dayOfWeek)
-          .limit(1)
-          .get();
-
-      if (availabilitySnapshot.docs.isEmpty) {
-        print('⚠️ No availability found for day $dayOfWeek');
-        return;
-      }
-
-      final availabilityDoc = availabilitySnapshot.docs.first;
-      final data = availabilityDoc.data();
-      final timeSlots =
-          List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
-
-      bool updated = false;
-      final selectedSlot = _normalizeTimeSlot(timeSlot);
-      for (var slot in timeSlots) {
-        final slotTime =
-            _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
-        if (slotTime == selectedSlot &&
-            slot['sessionType'] == sessionType &&
-            slot['enabled'] == true) {
-          slot['enabled'] = false;
-          updated = true;
-          break;
-        }
-      }
-
-      if (updated) {
-        await availabilityDoc.reference.update({'timeSlots': timeSlots});
-        print('✅ Slot removed from availability: $timeSlot on day $dayOfWeek');
-      } else {
-        print('⚠️ Slot not found or already disabled: $timeSlot');
-      }
-    } catch (e) {
-      print('❌ Error removing slot from availability: $e');
-    }
-  }
-
-  Future<void> _consumeSubscriptionCredit(String subscriptionId) async {
-    await _firestore.runTransaction((transaction) async {
-      final subRef =
-          _firestore.collection('subscriptions').doc(subscriptionId);
-      final subDoc = await transaction.get(subRef);
-
-      if (!subDoc.exists) throw Exception('Subscription not found');
-
-      final data = subDoc.data()!;
-      final remainingSessions = data['remainingSessions'] as int;
-
-      if (remainingSessions <= 0) {
-        throw Exception('No sessions remaining in subscription');
-      }
-
-      final newRemaining = remainingSessions - 1;
-      final newStatus = newRemaining <= 0 ? 'depleted' : data['status'];
-
-      transaction.update(subRef, {
-        'remainingSessions': newRemaining,
-        'status': newStatus,
-        'lastUsedAt': FieldValue.serverTimestamp(),
-      });
-
-      print(
-          '✅ Subscription credit consumed: $remainingSessions → $newRemaining');
-    });
-  }
-
-  Future<void> _sendPaymentRequestNotification({
-    required String studentId,
-    required String requestId,
-    required String mohaffezName,
-    required Map<String, dynamic> sessionDetails,
-  }) async {
-    try {
-      final notificationRef = _firestore.collection('notifications').doc();
-      await notificationRef.set({
-        'userId': studentId,
-        'recipientId': studentId,
-        'senderId': sessionDetails['mohaffezId'],
-        'title': 'تم قبول طلب الحجز! 🎉',
-        'body': '$mohaffezName قبل طلبك. اضغط للدفع وتأكيد الجلسة.',
-        'type': 'payment_required',
-        'isRead': false,
-        'requestId': requestId,
-        'mohaffezId': sessionDetails['mohaffezId'],
-        'mohaffezName': mohaffezName,
-        'sessionType': sessionDetails['sessionType'],
-        'sessionDate': sessionDetails['slotDate'],
-        'timeSlot': sessionDetails['preferredTimeSlot'],
-        'location':
-            sessionDetails['imamAddressText'] ?? sessionDetails['location'],
-        'paymentDeadline': sessionDetails['paymentDeadline'],
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      print('✅ Payment notification created: ${notificationRef.id}');
-    } catch (e) {
-      print('❌ Error creating payment notification: $e');
-    }
-  }
-
-  Future<void> _createSessionFromRequest(
-    String requestId,
-    Map<String, dynamic> requestData,
-  ) async {
-    try {
-      print('📝 Creating session from request: $requestId');
-      final sessionData = {
-        'mohaffezId': requestData['mohaffezId'],
-        'studentId': requestData['studentId'],
-        'studentName': requestData['studentName'],
-        'mohaffezName': requestData['mohaffezName'],
-        'sessionType': requestData['sessionType'],
-        'sessionDate': requestData['slotDate'],
-        'slotStart': requestData['slotStart'],
-        'slotEnd': requestData['slotEnd'],
-        'timeSlot': requestData['preferredTimeSlot'],
-        'preferredTimeSlot': requestData['preferredTimeSlot'],
-        'status': 'accepted',
-        'isPaid': requestData['subscriptionId'] != null,
-        'subscriptionId': requestData['subscriptionId'],
-        'requestId': requestId,
-        'slotLockId': requestData['slotLockId'],
-        'imamAddressText': requestData['imamAddressText'],
-        'location': requestData['imamAddressText'] ?? requestData['location'],
-        'imamAddressLat': requestData['imamAddressLat'],
-        'imamAddressLng': requestData['imamAddressLng'],
-        'mohaffezPhone': requestData['mohaffezPhone'],
-        'reminder24hSent': false,
-        'reminder1hSent': false,
-        'createdAt': FieldValue.serverTimestamp(),
-        'acceptedAt': FieldValue.serverTimestamp(),
-      };
-
-      final sessionRef =
-          await _firestore.collection('hafizSessions').add(sessionData);
-      print('✅ Session created: ${sessionRef.id}');
-
-      await _sendAcceptanceNotification(
-        studentId: requestData['studentId'],
-        mohaffezName: requestData['mohaffezName'],
-        sessionId: sessionRef.id,
-        sessionDate: (requestData['slotDate'] as Timestamp).toDate(),
-      );
-    } catch (e) {
-      print('❌ Error creating session: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> _sendAcceptanceNotification({
-    required String studentId,
-    required String mohaffezName,
-    required String sessionId,
-    required DateTime sessionDate,
-  }) async {
-    try {
-      await _firestore.collection('notifications').add({
-        'userId': studentId,
-        'title': 'تم قبول طلب الحجز! ✅',
-        'body':
-            '$mohaffezName قبل جلستك في ${DateFormat('dd/MM/yyyy', 'ar').format(sessionDate)}',
-        'type': 'session_accepted',
-        'isRead': false,
-        'sessionId': sessionId,
-        'mohaffezName': mohaffezName,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('❌ Error sending acceptance notification: $e');
-    }
-  }
+  // FIX: Bug C - removed dead code _removeBookedSlotFromAvailability (unused after Bug B fix)
+  // FIX: Bug B - removed dead code _consumeSubscriptionCredit (unused after atomic refactor)
+  // FIX: Bug B - removed dead code _sendPaymentRequestNotification (unused after atomic refactor)
+  // FIX: Bug B - removed dead code _createSessionFromRequest (unused after atomic refactor)
+  // FIX: Bug B - removed dead code _sendAcceptanceNotification (unused after atomic refactor)
 
   Future<void> rejectRequest(String requestId, String? reason) async {
     try {
@@ -1206,7 +970,11 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       }
 
       await lockRef.delete();
-    } catch (_) {}
+    // FIX-6: Log slot lock release failures instead of silently swallowing them
+    } catch (e, stack) {
+      debugPrint('⚠️ Failed to release slot lock $slotLockId: $e');
+      debugPrintStack(stackTrace: stack);
+    }
   }
 
   Future<void> _releaseSlotLockFieldsFromAvailability({
@@ -1216,9 +984,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     required String sessionType,
     required String lockId,
   }) async {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUid != mohaffezId) return;
-
+    // FIX: Bug C - removed UID guard that caused silent exit on admin/system calls
     final availabilityRef = _firestore
         .collection('users')
         .doc(mohaffezId)

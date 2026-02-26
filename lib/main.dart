@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,7 +50,24 @@ void main() async {
     }
 
     // ============================================
-    // 3. Configure Firestore
+    // 3. Initialize Firebase App Check
+    // ============================================
+    // Pin static debug token to avoid re-registering on every emulator boot
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode
+          ? AndroidProvider.debug
+          : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode
+          ? AppleProvider.debug
+          : AppleProvider.deviceCheck,
+    );
+    debugPrint(
+        '✅ Firebase App Check activated (${kDebugMode ? "debug" : "production"} mode)');
+    // final token = await FirebaseAppCheck.instance.getToken(true);
+    // debugPrint('🔑 APP CHECK DEBUG TOKEN: $token');
+
+    // ============================================
+    // 4. Configure Firestore
     // ============================================
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
@@ -57,7 +76,7 @@ void main() async {
     debugPrint('✅ Firestore configured with offline persistence');
 
     // ============================================
-    // 4. Setup Firebase Cloud Messaging
+    // 5. Setup Firebase Cloud Messaging
     // ============================================
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -73,7 +92,7 @@ void main() async {
         '✅ Notification permission status: ${settings.authorizationStatus}');
 
     // ============================================
-    // 5. Initialize Arabic Date Formatting
+    // 6. Initialize Arabic Date Formatting
     // ============================================
     await initializeDateFormatting('ar', null);
     await initializeDateFormatting('ar_SA', null);
@@ -81,7 +100,7 @@ void main() async {
     debugPrint('✅ Arabic date formatting initialized');
 
     // ============================================
-    // 6. Initialize Cache Service
+    // 7. Initialize Cache Service
     // ============================================
     await CacheService.initialize();
     debugPrint('✅ Cache service initialized');
@@ -96,7 +115,7 @@ void main() async {
     }
 
     // ============================================
-    // 7. Configure System UI
+    // 8. Configure System UI
     // ============================================
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -114,7 +133,7 @@ void main() async {
     debugPrint('✅ System UI configured');
 
     // ============================================
-    // 8. Launch App
+    // 9. Launch App
     // ============================================
     debugPrint('🚀 Launching Al-Mohaffez app...');
     runApp(const ProviderScope(child: DevModeOverlay(child: MyApp())));
@@ -149,7 +168,6 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Error Icon
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -163,8 +181,6 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     ),
                   ),
                   const SizedBox(height: AppThemeConstants.spaceLg),
-
-                  // Error Title
                   const Text(
                     'حدث خطأ في التطبيق',
                     style: TextStyle(
@@ -175,8 +191,6 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppThemeConstants.spaceMd),
-
-                  // Error Message
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -194,15 +208,10 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     ),
                   ),
                   const SizedBox(height: AppThemeConstants.spaceLg),
-
-                  // Restart Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Restart the app by popping the navigation stack
-                        SystemNavigator.pop();
-                      },
+                      onPressed: () => SystemNavigator.pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppThemeConstants.primaryAmber,
                         foregroundColor: Colors.white,
@@ -222,12 +231,8 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     ),
                   ),
                   const SizedBox(height: AppThemeConstants.spaceSm),
-
-                  // Close Button
                   TextButton(
-                    onPressed: () {
-                      SystemNavigator.pop();
-                    },
+                    onPressed: () => SystemNavigator.pop(),
                     child: const Text(
                       'إغلاق التطبيق',
                       style: TextStyle(
@@ -254,46 +259,29 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // keep config streams warm for synchronous guards
     ref.watch(systemConfigProvider);
     ref.watch(devModeProvider);
 
     final router = ref.watch(goRouterProvider);
 
     return MaterialApp.router(
-      // ============================================
-      // App Configuration
-      // ============================================
       title: 'المحفظ',
       debugShowCheckedModeBanner: false,
-
-      // ============================================
-      // Theme Configuration
-      // ============================================
       themeMode: ThemeMode.light,
       theme: AppThemeData.lightTheme,
-
-      // ============================================
-      // ✅ CRITICAL: Arabic Localization
-      // ============================================
-      locale: const Locale('ar', 'EG'), // Egyptian Arabic (default)
-
+      locale: const Locale('ar', 'EG'),
       supportedLocales: const [
-        Locale('ar', 'EG'), // Egyptian Arabic
-        Locale('ar', 'SA'), // Saudi Arabic
-        Locale('ar'), // Generic Arabic
-        Locale('en', 'US'), // English (fallback)
+        Locale('ar', 'EG'),
+        Locale('ar', 'SA'),
+        Locale('ar'),
+        Locale('en', 'US'),
       ],
-
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-
-      // Locale resolution strategy
       localeResolutionCallback: (locale, supportedLocales) {
-        // Check if the current device locale is supported
         if (locale != null) {
           for (var supportedLocale in supportedLocales) {
             if (supportedLocale.languageCode == locale.languageCode) {
@@ -301,20 +289,10 @@ class MyApp extends ConsumerWidget {
             }
           }
         }
-        // Default to Egyptian Arabic
         return const Locale('ar', 'EG');
       },
-
-      // ============================================
-      // Router Configuration
-      // ============================================
       routerConfig: router,
-
-      // ============================================
-      // ✅ CRITICAL: Force RTL globally
-      // ============================================
       builder: (context, child) {
-        // Wrap entire app with RTL direction
         return Directionality(
           textDirection: TextDirection.rtl,
           child: child ?? const SizedBox.shrink(),

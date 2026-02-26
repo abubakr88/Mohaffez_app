@@ -147,20 +147,19 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
 
   await auth.getUser(userId);
 
-  await auth.deleteUser(userId);
-  await db.collection('users').doc(userId).delete();
-
-  const studentPending = await db
-    .collection('sessionRequests')
-    .where('studentId', '==', userId)
-    .where('status', '==', 'pending')
-    .get();
-
-  const mohaffezPending = await db
-    .collection('sessionRequests')
-    .where('mohaffezId', '==', userId)
-    .where('status', '==', 'pending')
-    .get();
+  // FIX-5: Commit Firestore batch first, then delete Auth user to avoid orphaned data
+  const [studentPending, mohaffezPending] = await Promise.all([
+    db
+      .collection('sessionRequests')
+      .where('studentId', '==', userId)
+      .where('status', '==', 'pending')
+      .get(),
+    db
+      .collection('sessionRequests')
+      .where('mohaffezId', '==', userId)
+      .where('status', '==', 'pending')
+      .get(),
+  ]);
 
   const batch = db.batch();
   for (const doc of [...studentPending.docs, ...mohaffezPending.docs]) {
@@ -171,7 +170,9 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
       updatedAt: FieldValue.serverTimestamp(),
     });
   }
+  batch.delete(db.collection('users').doc(userId));
   await batch.commit();
+  await auth.deleteUser(userId);
 
   await writeAuditLog({
     action: 'deleteUserAccount',
@@ -277,4 +278,106 @@ export const triggerCleanupJobManually = functions.https.onCall(async (_, contex
 
   functions.logger.info('Admin triggered cleanup job', { performedBy, released });
   return { released };
+});
+
+/**
+ * input: { userId: string, credentialId: string }
+ * output: { success: true }
+ */
+export const approveCredential = functions.https.onCall(async (data, context) => {
+  const performedBy = await ensureAdmin(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+  const credentialId = (data?.credentialId as string | undefined)?.trim();
+
+  if (!userId || !credentialId) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم ومعرف الشهادة مطلوبان');
+  }
+
+  await db.collection('users').doc(userId).collection('credentials').doc(credentialId).update({
+    status: 'approved',
+    reviewedAt: FieldValue.serverTimestamp(),
+    reviewedBy: performedBy,
+  });
+
+  const { createAndSendNotification } = await import('../utils/notificationHelpers');
+  await createAndSendNotification({
+    userId,
+    title: 'تم اعتماد الشهادة',
+    body: 'تم قبول شهادتك بنجاح ✅',
+    type: 'credential_approved',
+  });
+
+  await writeAuditLog({
+    action: 'approveCredential',
+    performedBy,
+    targetUserId: userId,
+    data: { credentialId },
+  });
+
+  functions.logger.info('Admin approved credential', { performedBy, userId, credentialId });
+  return { success: true };
+});
+
+/**
+ * input: { userId: string, credentialId: string, reason: string }
+ * output: { success: true }
+ */
+export const rejectCredential = functions.https.onCall(async (data, context) => {
+  const performedBy = await ensureAdmin(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+  const credentialId = (data?.credentialId as string | undefined)?.trim();
+  const reason = (data?.reason as string | undefined)?.trim();
+
+  if (!userId || !credentialId || !reason) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم ومعرف الشهادة وسبب الرفض مطلوبون');
+  }
+
+  await db.collection('users').doc(userId).collection('credentials').doc(credentialId).update({
+    status: 'rejected',
+    rejectionReason: reason,
+    reviewedAt: FieldValue.serverTimestamp(),
+    reviewedBy: performedBy,
+  });
+
+  const { createAndSendNotification } = await import('../utils/notificationHelpers');
+  await createAndSendNotification({
+    userId,
+    title: 'تم رفض الشهادة',
+    body: reason,
+    type: 'credential_rejected',
+  });
+
+  await writeAuditLog({
+    action: 'rejectCredential',
+    performedBy,
+    targetUserId: userId,
+    data: { credentialId, reason },
+  });
+
+  functions.logger.info('Admin rejected credential', { performedBy, userId, credentialId, reason });
+  return { success: true };
+});
+
+/**
+ * input: { targetRole: 'all' | 'student' | 'mohaffez' }
+ * output: { count: number }
+ */
+export const getBroadcastAudienceCount = functions.https.onCall(async (data, context) => {
+  await ensureAdmin(context);
+  const targetRole = ((data?.targetRole as TargetRole | undefined) ?? 'all');
+
+  let query: FirebaseFirestore.Query = db.collection('users');
+  if (targetRole !== 'all') {
+    query = query.where('role', '==', targetRole);
+  }
+
+  const usersSnap = await query.get();
+  let count = 0;
+  for (const doc of usersSnap.docs) {
+    const token = doc.data().fcmToken as string | undefined;
+    if (token != null && token.length > 0) count++;
+  }
+
+  functions.logger.info('Admin queried broadcast audience count', { targetRole, count });
+  return { count };
 });

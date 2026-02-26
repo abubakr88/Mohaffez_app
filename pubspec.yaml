@@ -100,6 +100,9 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.8.0
 
+
+  firebase_app_check: ^0.3.1+4
+
   # # Riverpod code generation - UPDATED // COmment out for now to avoid build issues, can re-enable once we have the basics working
   custom_lint: ^0.7.3
   riverpod_generator: ^2.4.3

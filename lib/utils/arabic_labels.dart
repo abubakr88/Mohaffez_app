@@ -1,4 +1,4 @@
-﻿/// Arabic labels and localization strings for the Al-Mohaffez app.
+/// Arabic labels and localization strings for the Al-Mohaffez app.
 ///
 /// IMPORTANT: This file must be saved with UTF-8 encoding.
 /// In VS Code: Click bottom-right encoding → Select "UTF-8"
@@ -547,6 +547,17 @@ class ArabicLabels {
   // ============================================
   static const String operationSuccess = 'تمت العملية بنجاح';
   static const String operationFailed = 'فشلت العملية';
+
+  // ============================================
+  // ADMIN AUDIT LOG
+  // ============================================
+  static const String auditLogTitle = 'سجل العمليات الإدارية';
+  static const String noAuditLogs = 'لا توجد عمليات مسجلة';
+  static const String auditAction = 'الإجراء';
+  static const String performedBy = 'المشرف';
+  static const String targetUser = 'المستخدم المستهدف';
+  static const String auditData = 'البيانات';
+  static const String operationsLog = 'سجل العمليات';
 
   /// Get localized status label from status code
   static String getStatusLabel(String status) {

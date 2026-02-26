@@ -440,8 +440,8 @@ class SessionRepository {
   // ============================================================================
 
   /// Accept a session request and create the session atomically.
-
-  Future<void> acceptRequest(String requestId) async {
+  /// FIX: BUG #2 - Added sessionPrice parameter (was hardcoded to 0.0)
+  Future<void> acceptRequest(String requestId, {required double sessionPrice}) async {
     final requestRef = _firestore.collection('sessionRequests').doc(requestId);
     final requestSnap = await requestRef.get();
     if (!requestSnap.exists) {
@@ -545,7 +545,7 @@ class SessionRepository {
       'mohaffezPhone': mohaffezPhone,
       'status': RequestStatus.accepted,
       'isPaid': requiresPaymentOnAcceptance == false,
-      'sessionPrice': 0.0,
+      'sessionPrice': sessionPrice,  // FIX: BUG #2 - Use actual sessionPrice instead of hardcoded 0.0
       'createdAt': FieldValue.serverTimestamp(),
       'acceptedAt': FieldValue.serverTimestamp(),
       'reminder24hSent': false,
@@ -601,10 +601,12 @@ class SessionRepository {
         .collection('hafizSessions')
         .doc(sessionId)
         .update({
-      'hifzAssignment': hifzAssignment,
-      'murajaAssignment': murajaAssignment,
-      'sessionRating': rating,
-      'sessionNotes': notes,
+        'hifzAssignment': hifzAssignment,
+        'murajaAssignment': murajaAssignment,
+        'sessionRating': rating,
+        'sessionNotes': notes,
+        'status': 'completed',  // FIX: BUG #1 - Set status to completed when mohaffez finishes session
+        'completedAt': FieldValue.serverTimestamp(),  // FIX: BUG #1 - Track when session was completed
     });
   }
 

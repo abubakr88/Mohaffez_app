@@ -3,19 +3,6 @@ import * as functions from 'firebase-functions';
 import admin, { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 
-function toTimestampRange(hoursFromNow: number): {
-  start: admin.firestore.Timestamp;
-  end: admin.firestore.Timestamp;
-} {
-  const center = Date.now() + hoursFromNow * 60 * 60 * 1000;
-  const start = new Date(center - 30 * 60 * 1000);
-  const end = new Date(center + 30 * 60 * 1000);
-  return {
-    start: admin.firestore.Timestamp.fromDate(start),
-    end: admin.firestore.Timestamp.fromDate(end),
-  };
-}
-
 async function logFailedOperation(
   sessionId: string,
   operationType: 'session_reminder_24h' | 'session_reminder_1h',
@@ -34,15 +21,25 @@ async function logFailedOperation(
 export const sendSessionReminders = functions.pubsub
   .schedule('every 30 minutes')
   .onRun(async () => {
-    const in24h = toTimestampRange(24);
-    const in1h = toTimestampRange(1);
+    // FIX-8: Switch to flag-based bounded windows to prevent overlap gaps/duplicates across runs
+    const nowMs = Date.now();
+    const in24hLower = admin.firestore.Timestamp.fromDate(
+      new Date(nowMs + 23 * 60 * 60 * 1000)
+    );
+    const in24hUpper = admin.firestore.Timestamp.fromDate(
+      new Date(nowMs + 25 * 60 * 60 * 1000)
+    );
+    const in1hLower = admin.firestore.Timestamp.fromDate(new Date(nowMs));
+    const in1hUpper = admin.firestore.Timestamp.fromDate(
+      new Date(nowMs + 2 * 60 * 60 * 1000)
+    );
 
     const twentyFourHourSnapshot = await db
       .collection('hafizSessions')
       .where('status', '==', 'accepted')
-      .where('sessionDate', '>=', in24h.start)
-      .where('sessionDate', '<=', in24h.end)
       .where('reminder24hSent', '==', false)
+      .where('sessionDate', '<=', in24hUpper)
+      .where('sessionDate', '>=', in24hLower)
       .get();
 
     for (const doc of twentyFourHourSnapshot.docs) {
@@ -91,10 +88,21 @@ export const sendSessionReminders = functions.pubsub
           },
         });
 
-        await doc.ref.update({
-          reminder24hSent: true,
-          reminder24hSentAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
+        await db.runTransaction(async (transaction) => {
+          const fresh = await transaction.get(doc.ref);
+          if (!fresh.exists) {
+            return;
+          }
+          const freshData = fresh.data();
+          if (freshData?.reminder24hSent === true) {
+            return;
+          }
+
+          transaction.update(doc.ref, {
+            reminder24hSent: true,
+            reminder24hSentAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
         });
       } catch (error) {
         functions.logger.error('Failed to process 24h session reminder', {
@@ -109,9 +117,9 @@ export const sendSessionReminders = functions.pubsub
     const oneHourSnapshot = await db
       .collection('hafizSessions')
       .where('status', '==', 'accepted')
-      .where('sessionDate', '>=', in1h.start)
-      .where('sessionDate', '<=', in1h.end)
       .where('reminder1hSent', '==', false)
+      .where('sessionDate', '<=', in1hUpper)
+      .where('sessionDate', '>=', in1hLower)
       .get();
 
     for (const doc of oneHourSnapshot.docs) {
@@ -168,10 +176,21 @@ export const sendSessionReminders = functions.pubsub
           highPriority: true,
         });
 
-        await doc.ref.update({
-          reminder1hSent: true,
-          reminder1hSentAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
+        await db.runTransaction(async (transaction) => {
+          const fresh = await transaction.get(doc.ref);
+          if (!fresh.exists) {
+            return;
+          }
+          const freshData = fresh.data();
+          if (freshData?.reminder1hSent === true) {
+            return;
+          }
+
+          transaction.update(doc.ref, {
+            reminder1hSent: true,
+            reminder1hSentAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
         });
       } catch (error) {
         functions.logger.error('Failed to process 1h session reminder', {

@@ -49,6 +49,7 @@ import '../screens/admin_slot_locks_screen.dart';
 import '../screens/admin_payment_events_screen.dart';
 import '../screens/commission_dashboard_screen.dart';
 import '../screens/maintenance_screen.dart';
+import '../screens/admin_audit_log_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -408,6 +409,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/commissions',
             name: 'admin-commissions',
             builder: (context, state) => const CommissionDashboardScreen(),
+          ),
+          GoRoute(
+            path: '/admin/audit-log',
+            name: 'admin-audit-log',
+            builder: (context, state) => const AdminAuditLogScreen(),
           ),
         ],
       ),

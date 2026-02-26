@@ -435,7 +435,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => Directionality(
+      builder: (dialogContext) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('تأكيد الإلغاء'),
@@ -445,11 +445,11 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('تراجع'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               child: const Text('إلغاء الطلب'),
             ),

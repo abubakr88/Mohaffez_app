@@ -27,9 +27,10 @@ async function createNotification(params) {
 }
 async function sendFcmNotification(params) {
     var _a;
+    // FIX-7: Return explicit FCM send status so callers can detect push delivery failures
     const token = await getUserFcmToken(params.userId);
     if (!token) {
-        return;
+        return { sent: false, error: 'Missing FCM token' };
     }
     const stringData = Object.entries((_a = params.data) !== null && _a !== void 0 ? _a : {}).reduce((acc, [key, value]) => {
         if (value !== undefined && value !== null) {
@@ -49,18 +50,21 @@ async function sendFcmNotification(params) {
                 priority: params.highPriority ? 'high' : 'normal',
             },
         });
+        return { sent: true };
     }
     catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
         functions.logger.error('Failed to send FCM notification', {
             userId: params.userId,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: message,
         });
+        return { sent: false, error: message };
     }
 }
 async function createAndSendNotification(params) {
     const data = sanitizeNotificationData(params.data);
     await createNotification(params);
-    await sendFcmNotification({
+    const result = await sendFcmNotification({
         userId: params.userId,
         title: params.title,
         body: params.body,
@@ -72,5 +76,8 @@ async function createAndSendNotification(params) {
         }, {}),
         highPriority: params.highPriority,
     });
+    if (result.sent === false) {
+        functions.logger.warn('FCM push failed', { userId: params.userId, error: result.error });
+    }
 }
 //# sourceMappingURL=notificationHelpers.js.map

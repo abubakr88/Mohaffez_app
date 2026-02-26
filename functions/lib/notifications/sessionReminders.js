@@ -4,15 +4,6 @@ exports.sendSessionReminders = void 0;
 const functions = require("firebase-functions");
 const admin_1 = require("../utils/admin");
 const notificationHelpers_1 = require("../utils/notificationHelpers");
-function toTimestampRange(hoursFromNow) {
-    const center = Date.now() + hoursFromNow * 60 * 60 * 1000;
-    const start = new Date(center - 30 * 60 * 1000);
-    const end = new Date(center + 30 * 60 * 1000);
-    return {
-        start: admin_1.default.firestore.Timestamp.fromDate(start),
-        end: admin_1.default.firestore.Timestamp.fromDate(end),
-    };
-}
 async function logFailedOperation(sessionId, operationType, error) {
     await admin_1.db.collection('failedOperations').add({
         operationType,
@@ -26,14 +17,18 @@ async function logFailedOperation(sessionId, operationType, error) {
 exports.sendSessionReminders = functions.pubsub
     .schedule('every 30 minutes')
     .onRun(async () => {
-    const in24h = toTimestampRange(24);
-    const in1h = toTimestampRange(1);
+    // FIX-8: Switch to flag-based bounded windows to prevent overlap gaps/duplicates across runs
+    const nowMs = Date.now();
+    const in24hLower = admin_1.default.firestore.Timestamp.fromDate(new Date(nowMs + 23 * 60 * 60 * 1000));
+    const in24hUpper = admin_1.default.firestore.Timestamp.fromDate(new Date(nowMs + 25 * 60 * 60 * 1000));
+    const in1hLower = admin_1.default.firestore.Timestamp.fromDate(new Date(nowMs));
+    const in1hUpper = admin_1.default.firestore.Timestamp.fromDate(new Date(nowMs + 2 * 60 * 60 * 1000));
     const twentyFourHourSnapshot = await admin_1.db
         .collection('hafizSessions')
         .where('status', '==', 'accepted')
-        .where('sessionDate', '>=', in24h.start)
-        .where('sessionDate', '<=', in24h.end)
         .where('reminder24hSent', '==', false)
+        .where('sessionDate', '<=', in24hUpper)
+        .where('sessionDate', '>=', in24hLower)
         .get();
     for (const doc of twentyFourHourSnapshot.docs) {
         try {
@@ -74,10 +69,20 @@ exports.sendSessionReminders = functions.pubsub
                     sessionId: doc.id,
                 },
             });
-            await doc.ref.update({
-                reminder24hSent: true,
-                reminder24hSentAt: admin_1.FieldValue.serverTimestamp(),
-                updatedAt: admin_1.FieldValue.serverTimestamp(),
+            await admin_1.db.runTransaction(async (transaction) => {
+                const fresh = await transaction.get(doc.ref);
+                if (!fresh.exists) {
+                    return;
+                }
+                const freshData = fresh.data();
+                if ((freshData === null || freshData === void 0 ? void 0 : freshData.reminder24hSent) === true) {
+                    return;
+                }
+                transaction.update(doc.ref, {
+                    reminder24hSent: true,
+                    reminder24hSentAt: admin_1.FieldValue.serverTimestamp(),
+                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+                });
             });
         }
         catch (error) {
@@ -91,9 +96,9 @@ exports.sendSessionReminders = functions.pubsub
     const oneHourSnapshot = await admin_1.db
         .collection('hafizSessions')
         .where('status', '==', 'accepted')
-        .where('sessionDate', '>=', in1h.start)
-        .where('sessionDate', '<=', in1h.end)
         .where('reminder1hSent', '==', false)
+        .where('sessionDate', '<=', in1hUpper)
+        .where('sessionDate', '>=', in1hLower)
         .get();
     for (const doc of oneHourSnapshot.docs) {
         try {
@@ -139,10 +144,20 @@ exports.sendSessionReminders = functions.pubsub
                 data: reminderData,
                 highPriority: true,
             });
-            await doc.ref.update({
-                reminder1hSent: true,
-                reminder1hSentAt: admin_1.FieldValue.serverTimestamp(),
-                updatedAt: admin_1.FieldValue.serverTimestamp(),
+            await admin_1.db.runTransaction(async (transaction) => {
+                const fresh = await transaction.get(doc.ref);
+                if (!fresh.exists) {
+                    return;
+                }
+                const freshData = fresh.data();
+                if ((freshData === null || freshData === void 0 ? void 0 : freshData.reminder1hSent) === true) {
+                    return;
+                }
+                transaction.update(doc.ref, {
+                    reminder1hSent: true,
+                    reminder1hSentAt: admin_1.FieldValue.serverTimestamp(),
+                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+                });
             });
         }
         catch (error) {

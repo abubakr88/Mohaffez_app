@@ -22,8 +22,9 @@ export async function processWeeklyCommissionsNow(): Promise<number> {
       await createAndSendNotification({
         userId: d.mohaffezId,
         senderId: 'system',
-        title: '????? ??????',
-        body: `???? ????? ?????? ${d.commissionAmount.toFixed(2)} ?.? ?? ??????? ${d.weekNumber}`,
+        // FIX-4: Restore correct Arabic strings for overdue commission notification
+        title: 'عمولة متأخرة',
+        body: `لديك عمولة متأخرة بقيمة ${d.commissionAmount.toFixed(2)} ج.م عن الأسبوع ${d.weekNumber}`,
         type: 'commission_overdue',
         isRead: false,
         data: {
@@ -91,8 +92,9 @@ export const markCommissionPaid = functions.https.onCall(async (data, context) =
   await createAndSendNotification({
     userId: s.mohaffezId,
     senderId: context.auth.uid,
-    title: '?? ????? ???? ???????',
-    body: `?? ????? ???? ?????? ??????? ${s.weekNumber}: ${s.commissionAmount.toFixed(2)} ?.?`,
+    // FIX-4: Restore correct Arabic strings for commission paid notification
+    title: 'تم تحويل عمولتك',
+    body: `تم تحويل عمولة الأسبوع ${s.weekNumber}: ${s.commissionAmount.toFixed(2)} ج.م`,
     type: 'commission_paid',
     isRead: false,
     data: { weeklyCommissionSummaryId },

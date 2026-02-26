@@ -69,12 +69,34 @@ export const checkExpiredPayments = functions.pubsub
     for (const doc of expiredRequests.docs) {
       try {
         const data = doc.data();
+        // FIX-2: Skip already-expired docs and atomically transition awaitingpayment -> expired
+        if (data.status === 'expired') {
+          continue;
+        }
 
-        await doc.ref.update({
-          status: 'expired',
-          expiredAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
+        const transitioned = await db.runTransaction(async (transaction) => {
+          const fresh = await transaction.get(doc.ref);
+          if (!fresh.exists) {
+            return false;
+          }
+
+          const freshData = fresh.data();
+          if (freshData?.status !== 'awaitingpayment') {
+            return false;
+          }
+
+          transaction.update(doc.ref, {
+            status: 'expired',
+            expiredAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+
+          return true;
         });
+
+        if (!transitioned) {
+          continue;
+        }
 
         await sendExpirationNotifications({
           id: doc.id,
