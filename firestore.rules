@@ -46,7 +46,7 @@ service cloud.firestore {
 
       allow delete: if isOwner(userId);
 
-      // Credentials — single-document reads & writes (per-user scope)
+      // Credentials
       match /credentials/{credentialId} {
         allow read: if isAdmin() || (isAuthenticated() && (
           resource == null ||
@@ -73,7 +73,11 @@ service cloud.firestore {
                       request.resource.data.dayOfWeek >= 1 &&
                       request.resource.data.dayOfWeek <= 7;
 
-        allow update: if isOwner(userId);
+        allow update: if isOwner(userId)   // existing: mohaffez updates own availability
+                      ||
+                      // NEW: student restoring a slot when cancelling their request
+                      (isAuthenticated() &&
+                      onlyUpdating(['timeSlots', 'updatedAt']));
         allow delete: if isOwner(userId);
       }
 
@@ -108,18 +112,14 @@ service cloud.firestore {
 
     // ============================================
     // COLLECTION GROUP: credentials
-    // Required for collectionGroup('credentials') queries
-    // e.g. AdminRepository.watchPendingCredentials()
     // ============================================
 
     match /{path=**}/credentials/{credentialId} {
       allow read: if isAdmin() || (isAuthenticated() && (
         resource == null ||
         resource.data.status == 'approved' ||
-        request.auth.uid == resource.data.userId   // ← uses field, not scope wildcard
+        request.auth.uid == resource.data.userId
       ));
-      // Writes are handled by the nested rule under users/{userId}
-      // No write rule here — collection group write rules are not recommended
     }
 
     // ============================================
@@ -135,27 +135,54 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
                      request.auth.uid == request.resource.data.studentId;
 
-      // Mohaffez-only transitions
+      // ─── Mohaffez-only transitions ───────────────────────────────────────
+
       allow update: if isAuthenticated() &&
                     request.auth.uid == resource.data.mohaffezId &&
                     (
+                      // pending → awaitingpayment
+                      // FIX: Added 'paymentAmount' (Bug 5 — sessionPrice written by acceptRequest)
+                      //      Added 'sessionId'     (hafizSession pre-created in same batch)
                       (request.resource.data.status == 'awaitingpayment' &&
                        resource.data.status == 'pending' &&
-                       onlyUpdating(['status', 'acceptedAt', 'paymentDeadline', 'reminderSent', 'updatedAt']))
+                       onlyUpdating([
+                         'status', 'acceptedAt', 'paymentDeadline',
+                         'reminderSent', 'paymentAmount', 'sessionId',
+                         'updatedAt'
+                       ]))
+
                       ||
+
+                      // pending | awaitingpayment → accepted (free / subscription, client-side)
+                      // Cloud Functions (Admin SDK) bypass this rule; kept for edge-case
+                      // direct acceptance flows.
                       (request.resource.data.status == 'accepted' &&
                        resource.data.status in ['pending', 'awaitingpayment'] &&
-                       onlyUpdating(['status', 'acceptedAt', 'updatedAt', 'sessionId']))
+                       onlyUpdating([
+                         'status', 'acceptedAt', 'updatedAt', 'sessionId'
+                       ]))
+
                       ||
+
+                      // pending | awaitingpayment → rejected
                       (request.resource.data.status == 'rejected' &&
                        resource.data.status in ['pending', 'awaitingpayment'] &&
-                       onlyUpdating(['status', 'rejectedAt', 'rejectionReason', 'updatedAt']))
+                       onlyUpdating([
+                         'status', 'rejectedAt', 'rejectionReason', 'updatedAt'
+                       ]))
+
                       ||
+
+                      // Any status → cancelled (mohaffez-initiated)
                       (request.resource.data.status == 'cancelled' &&
-                       onlyUpdating(['status', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'updatedAt']))
+                       onlyUpdating([
+                         'status', 'cancelledAt', 'cancelledBy',
+                         'cancellationReason', 'updatedAt'
+                       ]))
                     );
 
-      // Student cancel rule
+      // ─── Student cancel rule ─────────────────────────────────────────────
+
       allow update: if isAuthenticated() &&
                     request.auth.uid == resource.data.studentId &&
                     request.resource.data.status == 'cancelled' &&
@@ -164,11 +191,18 @@ service cloud.firestore {
                       'awaitingpayment',
                       'awaitingdirectpaymentconfirmation'
                     ] &&
-                    onlyUpdating(['status', 'cancelledAt', 'cancelledBy', 'cancellationReason', 'updatedAt']);
+                    onlyUpdating([
+                      'status', 'cancelledAt', 'cancelledBy',
+                      'cancellationReason', 'updatedAt'
+                    ]);
 
+      // FIX: Added 'expired' to allow students to dismiss expired requests
+      //      from their UI (cosmetic clean-up, not a state-machine transition).
       allow delete: if isAuthenticated() &&
                      request.auth.uid == resource.data.studentId &&
-                     resource.data.status in ['pending', 'awaitingpayment', 'rejected'];
+                     resource.data.status in [
+                       'pending', 'awaitingpayment', 'rejected', 'expired'
+                     ];
     }
 
     // ============================================
@@ -184,10 +218,12 @@ service cloud.firestore {
 
       allow create: if isAuthenticated() &&
         (
+          // Mohaffez pre-creates the session atomically with the accept
           (request.auth.uid == request.resource.data.mohaffezId &&
            request.resource.data.mohaffezId is string &&
            request.resource.data.studentId is string)
           ||
+          // Student-side creation after verified payment
           (request.auth.uid == request.resource.data.studentId &&
            request.resource.data.requestId is string &&
            request.resource.data.status == 'accepted' &&
@@ -200,10 +236,22 @@ service cloud.firestore {
         );
 
       allow update: if isAuthenticated() && (
-        (request.auth.uid == resource.data.mohaffezId) ||
+        // Mohaffez can update any field on their own sessions
+        (request.auth.uid == resource.data.mohaffezId)
+        ||
+        // Student can only update their own feedback fields
         (request.auth.uid == resource.data.studentId &&
-         onlyUpdating(['studentFeedback', 'studentNotes', 'studentRating', 'updatedAt'])) ||
-        (onlyUpdating(['reminder24hSent', 'reminder24hSentAt', 'reminder1hSent', 'reminder1hSentAt', 'updatedAt']))
+         onlyUpdating(['studentFeedback', 'studentNotes', 'studentRating', 'updatedAt']))
+        ||
+        // NOTE: reminder flags are written by Cloud Functions (Admin SDK) which
+        // bypass rules entirely. This catch-all rule exists only for any future
+        // server-token-authenticated path. Consider removing if unused.
+        (isAuthenticated() &&
+         onlyUpdating([
+           'reminder24hSent', 'reminder24hSentAt',
+           'reminder1hSent',  'reminder1hSentAt',
+           'updatedAt'
+         ]))
       );
 
       allow delete: if isAuthenticated() &&
@@ -230,22 +278,28 @@ service cloud.firestore {
                     request.resource.data.mohaffezId is string;
 
       allow update: if isAuthenticated() && (
+        // Student updates gateway order ID while payment is in-flight
         (request.auth.uid == resource.data.studentId &&
          resource.data.status in ['pending', 'processing'] &&
          onlyUpdating(['updatedAt', 'gatewayOrderId']))
         ||
+        // Mohaffez marks cash payment complete
         (request.auth.uid == resource.data.mohaffezId &&
          resource.data.method == 'cash' &&
          resource.data.status == 'pending' &&
          request.resource.data.status == 'completed' &&
          onlyUpdating(['status', 'completedAt', 'paidAt', 'updatedAt']))
         ||
-        (onlyUpdating(['status', 'completedAt', 'updatedAt', 'paidAt',
-                       'gatewayTransactionId', 'transactionReference',
-                       'gatewayResponse', 'failureReason',
-                       'processingStartedAt', 'processedAt',
-                       'idempotencyKey', 'subscriptionId',
-                       'method', 'gateway', 'notes', 'sessionId']))
+        // Cloud Function / webhook gateway updates (Admin SDK bypasses, but
+        // this covers any server-token-based update path)
+        (onlyUpdating([
+          'status', 'completedAt', 'updatedAt', 'paidAt',
+          'gatewayTransactionId', 'transactionReference',
+          'gatewayResponse', 'failureReason',
+          'processingStartedAt', 'processedAt',
+          'idempotencyKey', 'subscriptionId',
+          'method', 'gateway', 'notes', 'sessionId'
+        ]))
       );
 
       allow delete: if false;
@@ -267,16 +321,19 @@ service cloud.firestore {
                     request.resource.data.mohaffezId is string;
 
       allow update: if isAuthenticated() && (
+        // Consume one session
         (request.resource.data.remainingSessions == resource.data.remainingSessions - 1 &&
          resource.data.remainingSessions > 0 &&
          request.resource.data.status in ['active', 'expired', 'depleted'] &&
          onlyUpdating(['remainingSessions', 'lastUsedAt', 'status', 'updatedAt']))
         ||
+        // Student cancels subscription
         (request.auth.uid == resource.data.studentId &&
          resource.data.status == 'active' &&
          request.resource.data.status == 'cancelled' &&
          onlyUpdating(['status', 'cancelledAt', 'updatedAt']))
         ||
+        // Subscription expiry (scheduler / Cloud Function)
         (resource.data.status == 'active' &&
          request.resource.data.status == 'expired' &&
          onlyUpdating(['status', 'expiredAt', 'updatedAt']))
@@ -293,6 +350,11 @@ service cloud.firestore {
       allow read: if isAdmin() || (isAuthenticated() && (
         resource == null || request.auth.uid == resource.data.userId
       ));
+      allow write: if false;
+    }
+
+    match /sessionEvents/{eventId} {
+      allow read: if isAdmin();
       allow write: if false;
     }
 
@@ -340,7 +402,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.studentId ||
         request.auth.uid == resource.data.mohaffezId
       );
-      allow write: if false;
+      allow write: if false;  // All writes via Cloud Functions (Admin SDK)
     }
 
     match /weeklyCommissionSummaries/{id} {
@@ -421,7 +483,8 @@ service cloud.firestore {
                     request.auth.uid == request.resource.data.mohaffezId &&
                     request.resource.data.studentId is string;
       allow update: if isAuthenticated() && (
-        (request.auth.uid == resource.data.mohaffezId) ||
+        (request.auth.uid == resource.data.mohaffezId)
+        ||
         (request.auth.uid == resource.data.studentId &&
          onlyUpdating(['status', 'completedAt', 'studentNotes', 'updatedAt']))
       );

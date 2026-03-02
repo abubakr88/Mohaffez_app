@@ -3,12 +3,16 @@
 
 // Notification functions
 export { sendNotification } from './notifications/sendNotification';
-export { onSessionRequestAccepted, onSessionCompleted } from './notifications/triggers';
+export { onSessionRequestAccepted } from './notifications/triggers';
+export { onSessionRequestStatusChanged } from './notifications/triggers';
+export { onSessionCreated, onSessionCompleted } from './notifications/triggers';
 export { sendPaymentDeadlineReminders } from './notifications/paymentDeadlineReminders';
 export { sendSessionReminders } from './notifications/sessionReminders';
 
 // Payment functions
+/* WEBHOOK_DISABLED - re-enable when Paymob gateway is activated
 export { paymobWebhook } from './payments/paymobWebhook';
+*/
 export { projectPaymentAnalytics } from './payments/projections';
 export { checkExpiredPayments } from './payments/expiredPayments';
 export { onPaymentCreated } from './payments/triggers';

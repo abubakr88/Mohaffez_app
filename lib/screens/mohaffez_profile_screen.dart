@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -1017,6 +1017,53 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   // Send free request (payment happens AFTER teacher accepts)
   Future<void> _sendFreeRequest(Map<String, dynamic> profile) async {
+    await _showPlanSelectionAndSend(profile);
+  }
+
+  Future<void> _showPlanSelectionAndSend(Map<String, dynamic> profile) async {
+    final plans =
+        await ref.read(activePricingPlansProvider(widget.mohaffezId).future);
+    if (!mounted) return;
+
+    final filtered = plans.where((p) {
+      if (selectedSessionType == 'home') return p.mode == SessionMode.home;
+      if (selectedSessionType == 'mosque') return p.mode == SessionMode.mosque;
+      return p.mode == SessionMode.online;
+    }).toList();
+
+    if (filtered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا توجد خطط تسعير متاحة لإرسال الطلب'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final chosenPlan = await showModalBottomSheet<PricingPlanModel>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _PlanPickerSheet(
+        plans: filtered,
+        sessionType: selectedSessionType,
+        slotDate: selectedDate!,
+        timeSlot: selectedTimeSlot!,
+      ),
+    );
+    if (chosenPlan == null) return;
+
+    if (!mounted) return;
+    await _sendRequest(profile, chosenPlan);
+  }
+
+  Future<void> _sendRequest(
+    Map<String, dynamic> profile,
+    PricingPlanModel plan,
+  ) async {
     final user = ref.read(currentUserProvider).value!;
 
     final startParts = (selectedTimeSlot!['startTime'] as String).split(':');
@@ -1044,6 +1091,18 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       selectedDate!.day,
     );
 
+    final planId = plan.id;
+    final planTitle = plan.title;
+    final paymentAmount = plan.priceEGP;
+    final sessionsCount = plan.sessionsCount;
+    final planType = plan.type.name;
+
+    debugPrint(
+      '🔍 [BookingDebug] planId=$planId | planTitle=$planTitle | paymentAmount=$paymentAmount | sessionsCount=$sessionsCount | planType=$planType',
+    );
+    assert(planId != null,
+        'planId must not be null — student must select a plan before booking');
+
     final result = await ref.read(bookingServiceProvider).createSessionRequest(
           mohaffezId: widget.mohaffezId,
           studentId: user.uid,
@@ -1060,6 +1119,11 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           imamAddressLng: profile['addressLng'],
           mohaffezPhone: profile['phoneNumber'],
           isPaid: false,
+          planId: planId,
+          planTitle: planTitle,
+          paymentAmount: paymentAmount,
+          sessionsCount: sessionsCount,
+          planType: planType,
           requiresPaymentOnAcceptance: true,
         );
 
@@ -1717,6 +1781,204 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _PlanPickerSheet extends StatefulWidget {
+  const _PlanPickerSheet({
+    required this.plans,
+    required this.sessionType,
+    required this.slotDate,
+    required this.timeSlot,
+  });
+
+  final List<PricingPlanModel> plans;
+  final String sessionType;
+  final DateTime slotDate;
+  final Map<String, dynamic> timeSlot;
+
+  @override
+  State<_PlanPickerSheet> createState() => _PlanPickerSheetState();
+}
+
+class _PlanPickerSheetState extends State<_PlanPickerSheet> {
+  PricingPlanModel? selectedPlan;
+
+  String _sessionTypeLabel(String type) {
+    switch (type) {
+      case 'home':
+        return 'بيت الطالب';
+      case 'mosque':
+        return 'المسجد';
+      default:
+        return 'أونلاين';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final timeLabel =
+        '${widget.timeSlot['startTime'] ?? ''} - ${widget.timeSlot['endTime'] ?? ''}';
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'اختر خطة الدفع قبل إرسال الطلب',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'النوع: ${_sessionTypeLabel(widget.sessionType)}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'التاريخ: ${DateFormat('EEEE، dd MMMM yyyy', 'ar').format(widget.slotDate)}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'الوقت: $timeLabel',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: widget.plans.length,
+                  itemBuilder: (context, index) {
+                    final plan = widget.plans[index];
+                    final selected = selectedPlan?.id == plan.id;
+                    return GestureDetector(
+                      onTap: () => setState(() => selectedPlan = plan),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: selected
+                                ? AppTheme.accentGreen
+                                : Colors.grey.shade300,
+                            width: selected ? 2.5 : 1,
+                          ),
+                          color: selected
+                              ? AppTheme.accentGreen.withOpacity(0.05)
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selected
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              color: AppTheme.accentGreen,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    plan.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    plan.sessionsCount > 1
+                                        ? '${plan.sessionsCount} جلسات'
+                                        : 'جلسة واحدة',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '${plan.priceEGP.toStringAsFixed(0)} ج.م',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: selectedPlan == null
+                      ? null
+                      : () => Navigator.pop(context, selectedPlan),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: AppTheme.accentGreen,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledForegroundColor: Colors.grey.shade600,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'إرسال الطلب',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

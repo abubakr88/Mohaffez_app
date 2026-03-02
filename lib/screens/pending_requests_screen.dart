@@ -175,8 +175,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                       ),
                       Consumer(
                         builder: (context, ref, _) {
-                          final count =
-                              ref.watch(pendingRequestsCountProvider(mohaffezId));
+                          final count = ref
+                              .watch(pendingRequestsCountProvider(mohaffezId));
                           return Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
@@ -224,14 +224,16 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
               label: 'قيد المراجعة',
               icon: Icons.pending,
               isSelected: _selectedFilter == RequestStatus.pending,
-              onTap: () => setState(() => _selectedFilter = RequestStatus.pending),
+              onTap: () =>
+                  setState(() => _selectedFilter = RequestStatus.pending),
             ),
             const SizedBox(width: 8),
             _FilterChip(
               label: 'في انتظار الدفع',
               icon: Icons.payment,
               isSelected: _selectedFilter == RequestStatus.awaitingPayment,
-              onTap: () => setState(() => _selectedFilter = RequestStatus.awaitingPayment),
+              onTap: () => setState(
+                  () => _selectedFilter = RequestStatus.awaitingPayment),
             ),
           ],
         ),
@@ -240,14 +242,15 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
   }
 
   Widget _buildRequestsList(String mohaffezId) {
-    final requestsAsync = ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
+    final requestsAsync =
+        ref.watch(pendingRequestsFirstPageProvider(mohaffezId));
     return requestsAsync.when(
       loading: () => const SliverFillRemaining(
           child: Center(child: CircularProgressIndicator())),
       error: (e, _) => SliverFillRemaining(
           child: ErrorDisplay.dataLoad(
-              onRetry: () =>
-                  ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId)))),
+              onRetry: () => ref
+                  .invalidate(pendingRequestsFirstPageProvider(mohaffezId)))),
       data: (allRequests) {
         var filtered = allRequests;
         // Apply status filter
@@ -700,6 +703,23 @@ class PendingRequestCard extends StatelessWidget {
                 ArabicLabels.location,
                 location,
               ),
+            if (request['paymentAmount'] != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.payment, size: 16, color: Colors.green),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${request['planTitle'] ?? 'خطة دفع'} — '
+                    '${(request['paymentAmount'] as num).toStringAsFixed(0)} جنيه',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ],
 
             const SizedBox(height: 16),
 
@@ -785,4 +805,3 @@ class PendingRequestCard extends StatelessWidget {
     }
   }
 }
-

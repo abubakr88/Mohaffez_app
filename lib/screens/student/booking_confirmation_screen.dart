@@ -29,6 +29,11 @@ class BookingConfirmationDetails {
   final double rating;
   final int reviewCount;
   final String? slotLockId;
+  final String? planId;
+  final String? planTitle;
+  final double? paymentAmount;
+  final int? sessionsCount;
+  final String? planType;
 
   const BookingConfirmationDetails({
     required this.mohaffezId,
@@ -52,6 +57,11 @@ class BookingConfirmationDetails {
     this.rating = 0,
     this.reviewCount = 0,
     this.slotLockId,
+    this.planId,
+    this.planTitle,
+    this.paymentAmount,
+    this.sessionsCount,
+    this.planType,
   });
 }
 
@@ -384,16 +394,20 @@ class _BookingConfirmationScreenState
     debugPrint('🟡 [Booking] agreedToPolicy=$_agreedToPolicy');
     debugPrint('🟡 [Booking] isSubmitting=$_isSubmitting');
     debugPrint('🟡 [Booking] isUsingSubscription=$_isUsingSubscription');
-    debugPrint('🟡 [Booking] paymentMethod=${widget.bookingDetails.paymentMethod}');
+    debugPrint(
+        '🟡 [Booking] paymentMethod=${widget.bookingDetails.paymentMethod}');
     debugPrint('🟡 [Booking] mohaffezId=${widget.bookingDetails.mohaffezId}');
     debugPrint('🟡 [Booking] studentId=${widget.bookingDetails.studentId}');
     debugPrint('🟡 [Booking] slotLockId=${widget.bookingDetails.slotLockId}');
-    debugPrint('🟡 [Booking] subscriptionId=${widget.bookingDetails.subscriptionId}');
-    debugPrint('🟡 [Booking] remainingCredits=${widget.bookingDetails.remainingCredits}');
+    debugPrint(
+        '🟡 [Booking] subscriptionId=${widget.bookingDetails.subscriptionId}');
+    debugPrint(
+        '🟡 [Booking] remainingCredits=${widget.bookingDetails.remainingCredits}');
     debugPrint('🟡 [Booking] cost=${widget.bookingDetails.cost}');
     debugPrint('🟡 [Booking] sessionType=${widget.bookingDetails.sessionType}');
     debugPrint('🟡 [Booking] slotDate=${widget.bookingDetails.slotDate}');
-    debugPrint('🟡 [Booking] preferredTimeSlot=${widget.bookingDetails.preferredTimeSlot}');
+    debugPrint(
+        '🟡 [Booking] preferredTimeSlot=${widget.bookingDetails.preferredTimeSlot}');
     // ── DEBUG END ────────────────────────────────────────────────
 
     final d = widget.bookingDetails;
@@ -405,7 +419,8 @@ class _BookingConfirmationScreenState
       return;
     }
 
-    debugPrint('🟢 [Booking] Subscription check passed — calling createSessionRequest...');
+    debugPrint(
+        '🟢 [Booking] Subscription check passed — calling createSessionRequest...');
 
     setState(() => _isSubmitting = true);
     try {
@@ -430,9 +445,15 @@ class _BookingConfirmationScreenState
                     d.paymentMethod == BookingPaymentMethod.payAfterAcceptance,
                 paymentMethod: d.paymentMethod,
                 slotLockId: d.slotLockId,
+                planId: d.planId,
+                planTitle: d.planTitle,
+                paymentAmount: d.paymentAmount ?? d.cost,
+                sessionsCount: d.sessionsCount,
+                planType: d.planType,
               );
 
-      debugPrint('🟢 [Booking] createSessionRequest returned: isSuccess=${result.isSuccess} error=${result.errorMessage} sessionId=${result.sessionId}');
+      debugPrint(
+          '🟢 [Booking] createSessionRequest returned: isSuccess=${result.isSuccess} error=${result.errorMessage} sessionId=${result.sessionId}');
 
       if (!mounted) return;
       if (result.isSuccess) {

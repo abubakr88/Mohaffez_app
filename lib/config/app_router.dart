@@ -10,8 +10,10 @@ import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../screens/availability_management_screen.dart';
 import '../screens/completed_sessions_screen.dart';
+import '../screens/commission_dashboard_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/login_screen.dart';
+import '../screens/mohaffez_commission_screen.dart';
 import '../screens/mohaffez_credentials_screen.dart';
 import '../screens/mohaffez_home.dart';
 import '../screens/mohaffez_profile_screen.dart';
@@ -35,7 +37,6 @@ import '../screens/student_payment_screen.dart';
 import '../screens/mohaffez_pricing_screen.dart';
 import '../screens/student_sessions_screen.dart';
 import '../screens/student_schedule_screen.dart';
-import '../screens/mohaffez_wallet_settings_screen.dart';
 import '../screens/admin_home_screen.dart';
 import '../screens/admin_users_screen.dart';
 import '../screens/admin_user_detail_screen.dart';
@@ -47,7 +48,6 @@ import '../screens/admin_dev_mode_screen.dart';
 import '../screens/admin_broadcast_screen.dart';
 import '../screens/admin_slot_locks_screen.dart';
 import '../screens/admin_payment_events_screen.dart';
-import '../screens/commission_dashboard_screen.dart';
 import '../screens/maintenance_screen.dart';
 import '../screens/admin_audit_log_screen.dart';
 
@@ -199,7 +199,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/wallet-settings',
             name: 'wallet-settings',
-            builder: (context, state) => const MohaffezWalletSettingsScreen(),
+            builder: (context, state) {
+              final role = ref.read(currentUserRoleProvider);
+              final uid = ref.read(currentUserIdProvider) ?? '';
+              return role == 'admin'
+                  ? const CommissionDashboardScreen()
+                  : MohaffezCommissionScreen(mohaffezId: uid);
+            },
           ),
           GoRoute(
             path: '/payment/:mohaffezId',

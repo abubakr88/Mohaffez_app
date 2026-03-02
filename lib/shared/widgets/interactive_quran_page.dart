@@ -31,6 +31,9 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   Map<String, dynamic>? pageInfo;
   bool isLoading = true;
 
+  // GlobalKey for the image container to get accurate dimensions
+  final GlobalKey _imageKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -102,6 +105,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
   Widget _buildQuranPageImage() {
     return Container(
+      key: _imageKey,
       color: const Color(0xFFF5F3E8),
       child: Center(
         child: CachedNetworkImage(
@@ -150,14 +154,15 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   void _handleTapDown(TapDownDetails details) {
-    final RenderBox? box = context.findRenderObject() as RenderBox?;
+    final RenderBox? box =
+        _imageKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
 
     final localPosition = box.globalToLocal(details.globalPosition);
     final size = box.size;
 
-    final xPosition = localPosition.dx / size.width;
-    final yPosition = localPosition.dy / size.height;
+    final xPosition = (localPosition.dx / size.width).clamp(0.0, 1.0);
+    final yPosition = (localPosition.dy / size.height).clamp(0.0, 1.0);
 
     _showMistakeDialog(xPosition, yPosition);
   }
@@ -324,8 +329,10 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   List<Widget> _buildMistakeMarkers() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+    // Use the image container's size instead of screen size
+    final RenderBox? box =
+        _imageKey.currentContext?.findRenderObject() as RenderBox?;
+    final Size size = box?.size ?? MediaQuery.of(context).size;
 
     return widget.existingMistakes
         .where((m) => m.pageNumber == currentPage)
@@ -333,9 +340,16 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       final hasComment = mistake.correctionNote != null &&
           mistake.correctionNote!.isNotEmpty;
 
+      // Clamp coordinates to [0..1] and center marker (32px / 2 = 16)
+      // xPosition/yPosition are non-nullable doubles, clamp returns double
+      final double xPos = mistake.xPosition.clamp(0.0, 1.0);
+      final double yPos = mistake.yPosition.clamp(0.0, 1.0);
+      final x = xPos * size.width - 16;
+      final y = yPos * size.height - 16;
+
       return Positioned(
-        left: (mistake.xPosition ?? 0) * screenWidth,
-        top: (mistake.yPosition ?? 0) * screenHeight,
+        left: x,
+        top: y,
         child: GestureDetector(
           onTap: () => _showMistakeDetails(mistake),
           child: Stack(

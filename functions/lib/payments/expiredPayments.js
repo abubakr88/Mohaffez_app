@@ -15,31 +15,29 @@ async function logFailedOperation(requestId, error) {
     });
 }
 async function sendExpirationNotifications(request) {
-    var _a;
+    var _a, _b;
     if (request.studentId) {
-        await (0, notificationHelpers_1.createNotification)({
+        await (0, notificationHelpers_1.createAndSendNotification)({
             userId: request.studentId,
             senderId: request.mohaffezId,
-            title: 'انتهت مهلة الدفع',
-            body: 'انتهت مهلة الدفع ولم يتم تأكيد طلبك. يمكنك إرسال طلب جديد.',
-            type: 'payment_expired',
+            title: 'انتهت مهلة الدفع ⏰',
+            body: `انتهت مهلة دفع جلستك مع ${(_a = request.mohaffezName) !== null && _a !== void 0 ? _a : ''}. يمكنك طلب موعد جديد.`,
+            type: 'paymentexpired',
             isRead: false,
-            data: {
-                requestId: request.id,
-            },
+            highPriority: true,
+            data: { requestId: request.id },
         });
     }
     if (request.mohaffezId) {
-        await (0, notificationHelpers_1.createNotification)({
+        await (0, notificationHelpers_1.createAndSendNotification)({
             userId: request.mohaffezId,
             senderId: request.studentId,
             title: 'انتهت مهلة دفع الطالب',
-            body: `لم يكتمل دفع الطالب ${(_a = request.studentName) !== null && _a !== void 0 ? _a : ''} خلال المهلة المحددة.`,
-            type: 'payment_expired',
+            body: `${(_b = request.studentName) !== null && _b !== void 0 ? _b : 'الطالب'} لم يدفع في الوقت المحدد. الموعد ملغي.`,
+            type: 'paymentexpired',
             isRead: false,
-            data: {
-                requestId: request.id,
-            },
+            highPriority: false,
+            data: { requestId: request.id },
         });
     }
 }

@@ -7,8 +7,11 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
+import '../shared/widgets/interactive_quran_page.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
+import '../models/quran_mistake_model.dart';
+import '../utils/quran_mistake_utils.dart';
 
 class StudentAssignmentsScreen extends ConsumerWidget {
   const StudentAssignmentsScreen({super.key});
@@ -719,6 +722,9 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                 ),
               ),
             ],
+
+            // ✅ Mistakes Review Card
+            _MistakeReviewCard(session: session),
           ],
         ),
       ),
@@ -912,6 +918,129 @@ class _CompletedAssignmentItem extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// MISTAKE REVIEW CARD - Shows mistakes from the session for student review
+// ============================================================================
+
+class _MistakeReviewCard extends StatelessWidget {
+  final Map<String, dynamic> session;
+
+  const _MistakeReviewCard({required this.session});
+
+  List<QuranMistake> get _mistakes {
+    final mistakesData = session['mistakes'] as List<dynamic>?;
+    if (mistakesData == null || mistakesData.isEmpty) return [];
+    return mistakesData
+        .whereType<Map<String, dynamic>>()
+        .map((m) => QuranMistake.fromMap(m))
+        .toList();
+  }
+
+  void _openMushaf(BuildContext context) {
+    if (_mistakes.isEmpty) return;
+    
+    final startPage = _mistakes.first.pageNumber;
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('مراجعة الأخطاء'),
+              backgroundColor: Colors.orange.shade700,
+            ),
+            body: InteractiveQuranPage(
+              pageNumber: startPage,
+              existingMistakes: _mistakes,
+              onMistakeAdded: (_) {}, // read-only no-op
+              isEditable: false,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_mistakes.isEmpty) return const SizedBox.shrink();
+
+    // Group mistakes by type for the chips
+    final mistakesByType = groupMistakesByType(_mistakes);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(Icons.menu_book, color: Colors.orange.shade700),
+              const SizedBox(width: 8),
+              Text(
+                'أخطاء الجلسة (${_mistakes.length})',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Mistake type chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: mistakesByType.entries.map((entry) {
+              return Chip(
+                avatar: Icon(
+                  getMistakeIcon(entry.key),
+                  size: 14,
+                  color: Colors.white,
+                ),
+                label: Text(
+                  '${entry.key.arabicLabel} (${entry.value})',
+                  style: const TextStyle(fontSize: 12, color: Colors.white),
+                ),
+                backgroundColor: getMistakeColor(entry.key),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          
+          // Review button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _openMushaf(context),
+              icon: const Icon(Icons.auto_stories),
+              label: const Text('مراجعة الأخطاء في المصحف'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
           ),
         ],

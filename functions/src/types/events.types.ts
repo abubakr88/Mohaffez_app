@@ -8,6 +8,33 @@ export enum PaymentEventType {
   BOOKING_CONFIRMED = 'booking_confirmed',
 }
 
+export enum SessionRequestEventType {
+  REQUEST_CREATED = 'request_created',
+  AWAITING_PAYMENT = 'awaiting_payment',
+  AWAITING_DIRECT = 'awaiting_direct_payment',
+  ACCEPTED = 'accepted',
+  REJECTED = 'rejected',
+  CANCELLED = 'cancelled',
+  EXPIRED = 'expired',
+}
+
+export enum SessionEventType {
+  SESSION_CREATED = 'session_created',
+  SESSION_COMPLETED = 'session_completed',
+}
+
+export interface SessionEvent {
+  eventId: string;
+  eventType: SessionRequestEventType | SessionEventType;
+  requestId?: string;
+  sessionId?: string;
+  timestamp: FirebaseFirestore.Timestamp;
+  actorId: string; // who triggered the change (studentId, mohaffezId, 'system')
+  fromStatus?: string;
+  toStatus: string;
+  data: Record<string, unknown>;
+}
+
 export enum BookingEventType {
   BOOKING_CONFIRMED = 'booking_confirmed',
   BOOKING_PAID = 'booking_paid',

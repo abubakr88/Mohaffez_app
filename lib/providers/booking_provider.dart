@@ -1,7 +1,9 @@
-﻿// lib/providers/booking_provider.dart
+// lib/providers/booking_provider.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -187,6 +189,11 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
     bool requiresPaymentOnAcceptance = false,
     BookingPaymentMethod? paymentMethod,
     String? slotLockId,
+    String? planId,
+    String? planTitle,
+    double? paymentAmount,
+    int? sessionsCount,
+    String? planType,
   }) async {
     // FIX BUG #1 + #2: Clear error on new attempt; do NOT use a bare `finally`
     // that only resets isSubmitting — it was masking all errors and never
@@ -223,6 +230,11 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
             requiresPaymentOnAcceptance || methodRequiresPayment,
         paymentMethod: method,
         slotLockId: slotLockId,
+        planId: planId,
+        planTitle: planTitle,
+        paymentAmount: paymentAmount,
+        sessionsCount: sessionsCount,
+        planType: planType,
       );
 
       // FIX BUG #1: Mirror createFreeSession — always write result into state
@@ -288,6 +300,44 @@ class SlotLockResult {
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  Future<String?> _ensureAuthenticatedForCallable(String flowLabel) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      debugPrint('❌ [$flowLabel] No Firebase user is signed in.');
+      return 'يجب تسجيل الدخول أولاً';
+    }
+
+    try {
+      final token = await user.getIdToken(true);
+      if (token == null || token.isEmpty) {
+        debugPrint('❌ [$flowLabel] Refreshed Firebase ID token is empty.');
+        return 'تعذر التحقق من تسجيل الدخول. حاول تسجيل الخروج ثم الدخول مرة أخرى';
+      }
+      debugPrint('✅ [$flowLabel] Auth ready. uid=${user.uid}');
+      return null;
+    } catch (e, stack) {
+      debugPrint('❌ [$flowLabel] Failed to refresh Firebase ID token: $e');
+      debugPrintStack(stackTrace: stack);
+      return 'تعذر التحقق من تسجيل الدخول. تحقق من الاتصال ثم حاول مرة أخرى';
+    }
+  }
+
+  Future<String?> _ensureAppCheckForCallable(String flowLabel) async {
+    try {
+      final token = await FirebaseAppCheck.instance.getToken(true);
+      if (token == null || token.isEmpty) {
+        debugPrint('❌ [$flowLabel] App Check token is null/empty.');
+        return 'تعذر التحقق من App Check. أعد تشغيل التطبيق ثم حاول مرة أخرى';
+      }
+      debugPrint('✅ [$flowLabel] App Check token ready.');
+      return null;
+    } catch (e, stack) {
+      debugPrint('❌ [$flowLabel] Failed to get App Check token: $e');
+      debugPrintStack(stackTrace: stack);
+      return 'فشل التحقق من App Check. تحقق من إعداد Firebase Console';
+    }
+  }
+
   // ── Free Session ───────────────────────────────────────────────────────────
 
   Future<BookingResult> createFreeSession({
@@ -309,6 +359,15 @@ class BookingService {
     String? paymentId,
   }) async {
     try {
+      final authError = await _ensureAuthenticatedForCallable('FREE SESSION');
+      if (authError != null) {
+        return BookingResult.failure(authError);
+      }
+      final appCheckError = await _ensureAppCheckForCallable('FREE SESSION');
+      if (appCheckError != null) {
+        return BookingResult.failure(appCheckError);
+      }
+
       debugPrint('🔄 [FREE SESSION] Starting Cloud Function call...');
       debugPrint('📍 Function: confirmFreeSession');
       debugPrint('👤 Student: $studentId');
@@ -429,6 +488,11 @@ class BookingService {
     bool requiresPaymentOnAcceptance = false,
     BookingPaymentMethod? paymentMethod,
     String? slotLockId,
+    String? planId,
+    String? planTitle,
+    double? paymentAmount,
+    int? sessionsCount,
+    String? planType,
   }) async {
     // Pre-populate lockResult if slotLockId was already acquired by the caller
     final SlotLockResult? lockResult = slotLockId != null
@@ -436,6 +500,26 @@ class BookingService {
         : null;
 
     try {
+      final authError =
+          await _ensureAuthenticatedForCallable('SESSION REQUEST');
+      if (authError != null) {
+        if (lockResult?.success == true) {
+          await _releaseSlotLock(lockResult!).catchError((e) {
+            debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
+          });
+        }
+        return BookingResult.failure(authError);
+      }
+      final appCheckError = await _ensureAppCheckForCallable('SESSION REQUEST');
+      if (appCheckError != null) {
+        if (lockResult?.success == true) {
+          await _releaseSlotLock(lockResult!).catchError((e) {
+            debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
+          });
+        }
+        return BookingResult.failure(appCheckError);
+      }
+
       final DateTime actualSlotDate =
           slotDate ?? DateTime(slotStart.year, slotStart.month, slotStart.day);
 
@@ -443,6 +527,8 @@ class BookingService {
       debugPrint('   mohaffezId: $mohaffezId');
       debugPrint('   studentId: $studentId');
       debugPrint('   slotLockId: $slotLockId');
+      final fallbackIdToken =
+          await FirebaseAuth.instance.currentUser?.getIdToken();
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'createSessionRequest',
@@ -468,6 +554,12 @@ class BookingService {
         'requiresPaymentOnAcceptance': requiresPaymentOnAcceptance,
         'selectedPaymentMethod':
             (paymentMethod ?? BookingPaymentMethod.payAfterAcceptance).value,
+        'planId': planId,
+        'planTitle': planTitle,
+        'paymentAmount': paymentAmount,
+        'sessionsCount': sessionsCount,
+        'planType': planType,
+        if (fallbackIdToken != null) 'idToken': fallbackIdToken,
         if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
       });
 
@@ -479,7 +571,8 @@ class BookingService {
       // exception was silently caught, lock was released, and failure returned
       // without any useful context.
       if (result.data is! Map) {
-        debugPrint('❌ [SESSION REQUEST] Unexpected response shape: ${result.data}');
+        debugPrint(
+            '❌ [SESSION REQUEST] Unexpected response shape: ${result.data}');
         return BookingResult.failure('استجابة غير متوقعة من الخادم');
       }
 
@@ -492,8 +585,8 @@ class BookingService {
         return BookingResult.success(requestId ?? '');
       }
 
-      final errorMsg = responseMap['message'] as String? ??
-          'فشل في إنشاء طلب الجلسة';
+      final errorMsg =
+          responseMap['message'] as String? ?? 'فشل في إنشاء طلب الجلسة';
       debugPrint('❌ [SESSION REQUEST] CF returned failure: $errorMsg');
       return BookingResult.failure(errorMsg);
     } on FirebaseFunctionsException catch (e) {
@@ -525,7 +618,8 @@ class BookingService {
           break;
         case 'failed-precondition':
           // Covers: slot lock expired, slot already booked, slot disabled
-          errorMessage = e.message ?? 'لا يمكن إتمام الحجز. الرجاء المحاولة مرة أخرى';
+          errorMessage =
+              e.message ?? 'لا يمكن إتمام الحجز. الرجاء المحاولة مرة أخرى';
           break;
         case 'resource-exhausted':
           errorMessage = 'هذا الموعد محجوز بالفعل. الرجاء اختيار موعد آخر';
@@ -547,7 +641,8 @@ class BookingService {
 
       if (lockResult?.success == true) {
         await _releaseSlotLock(lockResult!).catchError((releaseErr) {
-          debugPrint('⚠️ [SESSION REQUEST] Lock release also failed: $releaseErr');
+          debugPrint(
+              '⚠️ [SESSION REQUEST] Lock release also failed: $releaseErr');
         });
       }
 
@@ -597,7 +692,8 @@ class BookingService {
         });
 
         if (slotIndex == -1) {
-          return const SlotLockResult(success: false, error: 'الموعد غير موجود');
+          return const SlotLockResult(
+              success: false, error: 'الموعد غير موجود');
         }
 
         final slot = timeSlots[slotIndex];
@@ -641,7 +737,7 @@ class BookingService {
           availabilityDocId: availabilityDoc.id,
         );
       });
-    // FIX-4: Log lock acquisition failures and return detailed error payload
+      // FIX-4: Log lock acquisition failures and return detailed error payload
     } catch (e, stack) {
       debugPrint('⚠️ lockAvailabilitySlot failed: $e');
       debugPrintStack(stackTrace: stack);
@@ -726,10 +822,8 @@ class BookingService {
 
   Future<BookingResult> cancelSessionRequest(String requestId) async {
     try {
-      final requestDoc = await _firestore
-          .collection('sessionRequests')
-          .doc(requestId)
-          .get();
+      final requestDoc =
+          await _firestore.collection('sessionRequests').doc(requestId).get();
 
       if (!requestDoc.exists) {
         return BookingResult.failure('الطلب غير موجود');
@@ -775,7 +869,8 @@ class BookingService {
             availData != null &&
             timeSlot != null &&
             sessionType != null) {
-          final updated = _computeRestoredSlots(availData, timeSlot, sessionType);
+          final updated =
+              _computeRestoredSlots(availData, timeSlot, sessionType);
           if (updated != null) {
             transaction.update(resolvedAvailRef, {
               'timeSlots': updated,
@@ -840,7 +935,8 @@ class BookingService {
     for (final slot in timeSlots) {
       final slotTime =
           _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
-      if (slotTime == normalizedSelected && slot['sessionType'] == sessionType) {
+      if (slotTime == normalizedSelected &&
+          slot['sessionType'] == sessionType) {
         slot.remove('lockedBy');
         slot.remove('lockId');
         slot.remove('lockedAt');

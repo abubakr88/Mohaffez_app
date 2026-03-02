@@ -74,6 +74,13 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         throw new functions.https.HttpsError("already-exists",
           JSON.stringify({ success: true, message: "تم إرسال إشعار الدفع بالفعل، انتظر تأكيد المحفظ" }));
 
+      if (reqData.status !== STATUS.AWAITING_PAYMENT) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Cannot mark payment: request status is '${reqData.status}', expected 'awaitingpayment'.`
+        );
+      }
+
       const dpRef = db.collection("directPaymentRequests").doc();
       tx.set(dpRef, {
         id: dpRef.id,
@@ -197,6 +204,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
         paidAt: FieldValue.serverTimestamp(),
         sessionId: sessionRef.id,
         directPaymentConfirmedAt: FieldValue.serverTimestamp(),
+        notificationsAlreadySent: true,
         updatedAt: FieldValue.serverTimestamp(),
       });
 
@@ -330,7 +338,12 @@ export const mohaffezRejectDirectPayment = functions.https.onCall(
         updatedAt:           FieldValue.serverTimestamp(),
       });
 
+      const retryDeadline = new Date();
+      retryDeadline.setHours(retryDeadline.getHours() + 24);
+
       tx.update(reqRef, {
+        paymentDeadline:           admin.firestore.Timestamp.fromDate(retryDeadline),
+        reminderSent:              false,
         status:                  STATUS.AWAITING_PAYMENT,
         directPaymentRejectedAt:  FieldValue.serverTimestamp(),
         updatedAt:                FieldValue.serverTimestamp(),
@@ -361,4 +374,5 @@ export const mohaffezRejectDirectPayment = functions.https.onCall(
     });
   },
 );
+
 

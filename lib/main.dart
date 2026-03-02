@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -49,22 +49,31 @@ void main() async {
       debugPrint('✅ Firebase initialized');
     }
 
-    // ============================================
+        // ============================================
     // 3. Initialize Firebase App Check
     // ============================================
-    // Pin static debug token to avoid re-registering on every emulator boot
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode
-          ? AndroidProvider.debug
-          : AndroidProvider.playIntegrity,
-      appleProvider: kDebugMode
-          ? AppleProvider.debug
-          : AppleProvider.deviceCheck,
-    );
-    debugPrint(
-        '✅ Firebase App Check activated (${kDebugMode ? "debug" : "production"} mode)');
-    // final token = await FirebaseAppCheck.instance.getToken(true);
-    // debugPrint('🔑 APP CHECK DEBUG TOKEN: $token');
+    if (kReleaseMode) {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.playIntegrity,
+        appleProvider: AppleProvider.deviceCheck,
+      );
+      debugPrint('Firebase App Check activated (production mode)');
+    } else {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.debug,
+        appleProvider: AppleProvider.debug,
+      );
+      debugPrint('Firebase App Check activated (debug mode)');
+    }
+
+    await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+
+    if (kDebugMode) {
+      FirebaseAppCheck.instance.onTokenChange.listen((token) {
+        final hasToken = token != null && token.isNotEmpty;
+        debugPrint('App Check token state: ' + (hasToken ? 'valid' : 'null_or_empty'));
+      });
+    }
 
     // ============================================
     // 4. Configure Firestore
@@ -125,7 +134,6 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ));
 
-    // Lock to portrait orientation
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -140,8 +148,6 @@ void main() async {
   } catch (e, stackTrace) {
     debugPrint('❌ Initialization error: $e');
     debugPrint('Stack trace: $stackTrace');
-
-    // Show error screen with restart option
     runApp(_buildErrorApp(e, stackTrace));
   }
 }
@@ -301,3 +307,4 @@ class MyApp extends ConsumerWidget {
     );
   }
 }
+

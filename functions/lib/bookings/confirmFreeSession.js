@@ -73,7 +73,7 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
         }
     }
     // 5. ✅ CRITICAL FIX: Move ALL logic inside transaction
-    return admin_1.db.runTransaction(async (transaction) => {
+    const result = await admin_1.db.runTransaction(async (transaction) => {
         var _a;
         // FIX-1: Move promo code read/validation into transaction to avoid TOCTOU race
         const promoQuery = admin_1.db
@@ -478,5 +478,27 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
         });
         throw error;
     });
+    const { createAndSendNotification } = await Promise.resolve().then(() => require('../utils/notificationHelpers'));
+    await Promise.all([
+        createAndSendNotification({
+            userId: studentId,
+            senderId: mohaffezId,
+            title: 'تم تأكيد جلستك المجانية ✅',
+            body: `جلستك مع ${mohaffezName} مؤكدة.`,
+            type: 'sessionconfirmed',
+            highPriority: true,
+            data: { sessionId: result.sessionId, requestId: result.requestId },
+        }),
+        createAndSendNotification({
+            userId: mohaffezId,
+            senderId: studentId,
+            title: 'حجز جلسة مجانية جديد',
+            body: `${studentName} حجز جلسة مجانية معك.`,
+            type: 'sessionconfirmed',
+            highPriority: true,
+            data: { sessionId: result.sessionId, requestId: result.requestId },
+        }),
+    ]);
+    return result;
 });
 //# sourceMappingURL=confirmFreeSession.js.map

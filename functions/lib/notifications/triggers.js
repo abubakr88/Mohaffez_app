@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onSessionCompleted = exports.onPaymentCompleted = exports.onSessionCreated = exports.onSessionRequestAccepted = void 0;
+exports.onSessionRequestStatusChanged = exports.onSessionCompleted = exports.onPaymentCompleted = exports.onSessionCreated = exports.onSessionRequestAccepted = void 0;
 const functions = require("firebase-functions");
 const notificationHelpers_1 = require("../utils/notificationHelpers");
+const SessionEventStore_1 = require("../services/SessionEventStore");
+const events_types_1 = require("../types/events.types");
 const asString = (value, fallback = '') => typeof value === 'string' && value.trim().length > 0 ? value : fallback;
 const asNumber = (value, fallback = 0) => typeof value === 'number' ? value : fallback;
 const asBoolean = (value, fallback = false) => typeof value === 'boolean' ? value : fallback;
@@ -220,25 +222,38 @@ exports.onSessionRequestAccepted = functions.firestore
 exports.onSessionCreated = functions.firestore
     .document('hafizSessions/{sessionId}')
     .onCreate(async (snapshot, context) => {
-    const sessionData = snapshot.data();
+    var _a;
+    const data = snapshot.data();
     const sessionId = context.params.sessionId;
-    const studentId = asString(sessionData.studentId);
-    const mohaffezId = asString(sessionData.mohaffezId);
-    const isPaid = asBoolean(sessionData.isPaid, false);
-    const sessionPrice = asNumber(sessionData.sessionPrice, 0);
-    const promoCode = asString(sessionData.promoCode);
-    const isFreeSession = isPaid && sessionPrice === 0 && promoCode.length > 0;
-    functions.logger.info('Session created', {
-        sessionId,
-        studentId,
-        mohaffezId,
-        isFreeSession,
-        promoCode: isFreeSession ? promoCode : undefined,
-        sessionType: sessionData.sessionType,
-        sessionDate: sessionData.sessionDate,
-    });
-    // Optional: Send additional confirmation if needed
-    // (Main notifications are sent by onSessionRequestAccepted)
+    const studentId = asString(data.studentId, '');
+    const mohaffezId = asString(data.mohaffezId, '');
+    // Append creation event
+    try {
+        await sessionEventStore.appendEvent({
+            eventType: events_types_1.SessionEventType.SESSION_CREATED,
+            sessionId,
+            requestId: asString(data.requestId, ''),
+            toStatus: 'accepted',
+            actorId: mohaffezId || 'system',
+            data: {
+                studentId,
+                mohaffezId,
+                sessionType: data.sessionType,
+                preferredTimeSlot: data.preferredTimeSlot,
+                sessionDate: data.sessionDate,
+                isPaid: data.isPaid,
+                sessionPrice: data.sessionPrice,
+                paymentMethod: data.paymentMethod,
+                promoCode: (_a = data.promoCode) !== null && _a !== void 0 ? _a : null,
+            },
+        });
+    }
+    catch (error) {
+        functions.logger.error('Failed to append session created event', {
+            sessionId,
+            error,
+        });
+    }
 });
 /**
  * NEW: Firestore trigger for payment completion
@@ -276,63 +291,148 @@ exports.onPaymentCompleted = functions.firestore
 exports.onSessionCompleted = functions.firestore
     .document('hafizSessions/{sessionId}')
     .onUpdate(async (change, context) => {
+    var _a, _b, _c, _d, _e;
     const before = change.before.data();
     const after = change.after.data();
-    const beforeStatus = asString(before.status);
-    const afterStatus = asString(after.status);
-    const beforeHifzAssignment = asString(before.hifzAssignment);
-    const afterHifzAssignment = asString(after.hifzAssignment);
-    // Only trigger when status changes to 'completed' and hifzAssignment is set
-    if (beforeStatus === afterStatus || afterStatus !== 'completed') {
+    const beforeStatus = asString(before.status, '');
+    const afterStatus = asString(after.status, '');
+    if (beforeStatus === afterStatus)
         return;
-    }
-    // Check if there's an assignment to notify about
-    if (!afterHifzAssignment || afterHifzAssignment.trim().length === 0) {
-        functions.logger.info('Session completed but no assignment to notify', {
-            sessionId: context.params.sessionId,
-        });
-        return;
-    }
     const sessionId = context.params.sessionId;
-    const studentId = asString(after.studentId);
-    const mohaffezId = asString(after.mohaffezId);
-    const mohaffezName = asString(after.mohaffezName, 'المحفظ');
-    if (!studentId) {
-        functions.logger.warn('Missing studentId in completed session', {
+    const studentId = asString(after.studentId, '');
+    const mohaffezId = asString(after.mohaffezId, '');
+    // Always append a session event for ANY status change
+    try {
+        await sessionEventStore.appendEvent({
+            eventType: events_types_1.SessionEventType.SESSION_COMPLETED,
             sessionId,
+            requestId: asString(after.requestId, ''),
+            fromStatus: beforeStatus,
+            toStatus: afterStatus,
+            actorId: mohaffezId || 'system',
+            data: {
+                studentId,
+                mohaffezId,
+                sessionType: after.sessionType,
+                sessionRating: after.sessionRating,
+                hifzAssignment: (_a = after.hifzAssignment) !== null && _a !== void 0 ? _a : null,
+                murajaAssignment: (_b = after.murajaAssignment) !== null && _b !== void 0 ? _b : null,
+                isLateCompletion: (_c = after.isLateCompletion) !== null && _c !== void 0 ? _c : false,
+                tajweedMistakes: (_d = after.tajweedMistakesCount) !== null && _d !== void 0 ? _d : 0,
+                pronunciationMistakes: (_e = after.pronunciationMistakesCount) !== null && _e !== void 0 ? _e : 0,
+            },
         });
+    }
+    catch (error) {
+        functions.logger.error('Failed to append session completed event', {
+            sessionId, error,
+        });
+    }
+    // Only send notifications when status becomes 'completed'
+    if (afterStatus !== 'completed')
+        return;
+    if (!studentId) {
+        functions.logger.warn('Missing studentId in completed session', { sessionId });
         return;
     }
+    const mohaffezName = asString(after.mohaffezName, '');
+    const hifzAssignment = asString(after.hifzAssignment, '');
+    const hasAssignment = hifzAssignment.trim().length > 0;
     try {
+        // Always notify student session was completed
         await (0, notificationHelpers_1.createAndSendNotification)({
             userId: studentId,
             senderId: mohaffezId,
-            title: 'تم إضافة واجبك',
-            body: `${mohaffezName} أضاف واجبك الجديد`,
-            type: 'assignment_updated',
+            title: 'انتهت الجلسة ✅',
+            body: hasAssignment
+                ? `${mohaffezName} أضاف واجبك الجديد.`
+                : `جلستك مع ${mohaffezName} مكتملة.`,
+            type: hasAssignment ? 'assignmentupdated' : 'sessioncompleted',
             isRead: false,
+            highPriority: true,
             data: {
                 sessionId,
                 mohaffezId,
                 mohaffezName,
-                hifzAssignment: afterHifzAssignment,
-                murajaAssignment: asString(after.murajaAssignment),
-                sessionRating: asNumber(after.sessionRating, 0),
+                hifzAssignment: hifzAssignment || undefined,
+                murajaAssignment: asString(after.murajaAssignment, '') || undefined,
+                sessionRating: after.sessionRating,
             },
-            highPriority: true,
         });
-        functions.logger.info('Assignment update notification sent', {
-            sessionId,
-            studentId,
-            mohaffezId,
+        functions.logger.info('Session completed notification sent', {
+            sessionId, studentId, mohaffezId, hasAssignment,
         });
     }
     catch (error) {
-        functions.logger.error('Error sending assignment update notification', {
-            sessionId,
-            studentId,
-            mohaffezId,
-            error: error instanceof Error ? error.message : String(error),
+        functions.logger.error('Error sending session completed notification', {
+            sessionId, studentId, mohaffezId, error,
+        });
+    }
+});
+const sessionEventStore = new SessionEventStore_1.SessionEventStore();
+exports.onSessionRequestStatusChanged = functions.firestore
+    .document('sessionRequests/{requestId}')
+    .onUpdate(async (change, context) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    const before = change.before.data();
+    const after = change.after.data();
+    const fromStatus = (_a = before.status) !== null && _a !== void 0 ? _a : '';
+    const toStatus = (_b = after.status) !== null && _b !== void 0 ? _b : '';
+    // Only run when status actually changed
+    if (fromStatus === toStatus)
+        return;
+    const requestId = context.params.requestId;
+    const studentId = (_c = after.studentId) !== null && _c !== void 0 ? _c : '';
+    const mohaffezId = (_d = after.mohaffezId) !== null && _d !== void 0 ? _d : '';
+    // Map status string -> enum value
+    const eventTypeMap = {
+        awaitingpayment: events_types_1.SessionRequestEventType.AWAITING_PAYMENT,
+        awaitingdirectpaymentconfirmation: events_types_1.SessionRequestEventType.AWAITING_DIRECT,
+        accepted: events_types_1.SessionRequestEventType.ACCEPTED,
+        rejected: events_types_1.SessionRequestEventType.REJECTED,
+        cancelled: events_types_1.SessionRequestEventType.CANCELLED,
+        expired: events_types_1.SessionRequestEventType.EXPIRED,
+    };
+    const eventType = eventTypeMap[toStatus];
+    if (!eventType) {
+        functions.logger.warn('onSessionRequestStatusChanged: unknown toStatus', {
+            requestId, fromStatus, toStatus,
+        });
+        return;
+    }
+    // Determine actorId heuristically:
+    //   accepted/awaitingdirect = mohaffez acted
+    //   cancelled/expired       = could be system or student
+    //   awaitingpayment         = mohaffez accepted initially
+    //   rejected                = mohaffez acted
+    const actorId = ['accepted', 'rejected', 'awaitingdirectpaymentconfirmation'].includes(toStatus)
+        ? mohaffezId
+        : toStatus === 'expired'
+            ? 'system'
+            : studentId;
+    try {
+        await sessionEventStore.appendEvent({
+            eventType,
+            requestId,
+            toStatus,
+            fromStatus,
+            actorId,
+            data: {
+                studentId,
+                mohaffezId,
+                sessionType: after.sessionType,
+                preferredTimeSlot: after.preferredTimeSlot,
+                slotDate: after.slotDate,
+                paymentMethod: after.selectedPaymentMethod,
+                promoCode: (_e = after.promoCode) !== null && _e !== void 0 ? _e : null,
+                cancelledBy: (_f = after.cancelledBy) !== null && _f !== void 0 ? _f : null,
+                rejectionReason: (_g = after.rejectionReason) !== null && _g !== void 0 ? _g : null,
+            },
+        });
+    }
+    catch (error) {
+        functions.logger.error('Failed to append session request event', {
+            requestId, fromStatus, toStatus, error,
         });
     }
 });

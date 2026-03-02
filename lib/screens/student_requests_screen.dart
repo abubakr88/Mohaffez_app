@@ -757,20 +757,37 @@ class _RequestCard extends StatelessWidget {
   }
 
   // ── Navigate to payment screen ──────────────────────────────────────────
-  void _navigateToPayment(BuildContext context) {
+  Future<void> _navigateToPayment(BuildContext context) async {
     final requestId = request['id'] as String?;
     final mohaffezId = request['mohaffezId'] as String?;
     final mohaffezName = request['mohaffezName'] as String? ?? '';
 
     if (requestId == null || mohaffezId == null) return;
 
+    Map<String, dynamic>? lockedRequest;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('sessionRequests')
+          .doc(requestId)
+          .get();
+      lockedRequest = snap.data();
+    } catch (_) {
+      lockedRequest = null;
+    }
+    final resolvedLockedRequest =
+        lockedRequest ?? Map<String, dynamic>.from(request);
+
+    debugPrint(
+      '🔍 [PaymentNav] lockedRequest planId=${resolvedLockedRequest['planId']} paymentAmount=${resolvedLockedRequest['paymentAmount']}',
+    );
+
     DateTime? slotDate;
     DateTime? slotStart;
     DateTime? slotEnd;
 
-    final rawSlotDate = request['slotDate'];
-    final rawSlotStart = request['slotStart'];
-    final rawSlotEnd = request['slotEnd'];
+    final rawSlotDate = resolvedLockedRequest['slotDate'];
+    final rawSlotStart = resolvedLockedRequest['slotStart'];
+    final rawSlotEnd = resolvedLockedRequest['slotEnd'];
 
     if (rawSlotDate is Timestamp) slotDate = rawSlotDate.toDate();
     if (rawSlotDate is DateTime) slotDate = rawSlotDate;
@@ -782,24 +799,27 @@ class _RequestCard extends StatelessWidget {
     slotDate ??= DateTime.now();
     slotStart ??= slotDate;
     slotEnd ??= slotDate.add(const Duration(hours: 1));
+    if (!context.mounted) return;
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => StudentPaymentScreen(
-          mohaffezId: mohaffezId!,
+          mohaffezId: mohaffezId,
           mohaffezName: mohaffezName,
           requestId: requestId,
-          lockedRequest: request,
-          sessionType: request['sessionType'] as String?,
+          lockedRequest: resolvedLockedRequest,
+          sessionType: resolvedLockedRequest['sessionType'] as String?,
           sessionDate: slotDate,
-          timeSlot: request['preferredTimeSlot'] as String? ??
-              request['timeSlot'] as String?,
-          location: request['imamAddressText'] as String?,
-          mohaffezAddress: request['imamAddressText'] as String?,
-          mohaffezLat: request['imamAddressLat'] as double?,
-          mohaffezLng: request['imamAddressLng'] as double?,
-          mohaffezPhone: request['mohaffezPhone'] as String?,
+          timeSlot: resolvedLockedRequest['preferredTimeSlot'] as String? ??
+              resolvedLockedRequest['timeSlot'] as String?,
+          location: resolvedLockedRequest['imamAddressText'] as String?,
+          mohaffezAddress: resolvedLockedRequest['imamAddressText'] as String?,
+          mohaffezLat:
+              (resolvedLockedRequest['imamAddressLat'] as num?)?.toDouble(),
+          mohaffezLng:
+              (resolvedLockedRequest['imamAddressLng'] as num?)?.toDouble(),
+          mohaffezPhone: resolvedLockedRequest['mohaffezPhone'] as String?,
         ),
       ),
     );

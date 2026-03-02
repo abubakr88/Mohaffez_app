@@ -1,5 +1,4 @@
 import 'dart:ui' as ui;
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -71,7 +70,6 @@ class _CommissionDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
@@ -95,7 +93,7 @@ class _CommissionDashboardScreenState
           ],
         ),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
-          stream: DirectPaymentService.watchCommissions(uid),
+          stream: DirectPaymentService.watchAllCommissions(),
           builder: (context, snap) {
             if (!snap.hasData)
               return const Center(child: CircularProgressIndicator());
@@ -181,11 +179,13 @@ class _WeekSummaryCard extends StatelessWidget {
   final WeeklyCommissionSummary summary;
   final bool isMarkingPaid;
   final VoidCallback onMarkAsPaid;
+  final bool showAdminActions;
 
   const _WeekSummaryCard({
     required this.summary,
     required this.isMarkingPaid,
     required this.onMarkAsPaid,
+    this.showAdminActions = true,
   });
 
   Color get _statusColor => switch (summary.status) {
@@ -244,7 +244,7 @@ class _WeekSummaryCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(_statusLabel,
                 style: TextStyle(fontSize: 11, color: _statusColor)),
-            if (!summary.isPaid) ...[
+            if (showAdminActions && !summary.isPaid) ...[
               const SizedBox(height: 4),
               SizedBox(
                 height: 24,

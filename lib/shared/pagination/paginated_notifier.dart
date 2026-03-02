@@ -59,6 +59,7 @@ abstract class PaginatedNotifier<T> extends StateNotifier<PaginationState<T>> {
         isLoadingMore: false,
       );
     } catch (e) {
+      _isLoadingMore = false;
       state = state.copyWith(
         isLoadingMore: false,
         error: e.toString(),

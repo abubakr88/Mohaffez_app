@@ -71,7 +71,9 @@ class QuranMistake with _$QuranMistake {
       wordText: map['wordText'] as String?,
       correctionNote: map['correctionNote'] as String?,
       markedAt: map['markedAt'] != null
-          ? (map['markedAt'] as Timestamp).toDate()
+          ? (map['markedAt'] is Timestamp
+              ? (map['markedAt'] as Timestamp).toDate()
+              : DateTime.tryParse(map['markedAt'].toString()))
           : null,
     );
   }

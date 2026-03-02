@@ -58,6 +58,9 @@ exports.studentMarkedDirectPayment = functions.https.onCall(async (data, context
             throw new functions.https.HttpsError("already-exists", JSON.stringify({ success: true, message: "الجلسة مقبولة بالفعل" }));
         if (reqData.status === STATUS.AWAITING_DIRECT)
             throw new functions.https.HttpsError("already-exists", JSON.stringify({ success: true, message: "تم إرسال إشعار الدفع بالفعل، انتظر تأكيد المحفظ" }));
+        if (reqData.status !== STATUS.AWAITING_PAYMENT) {
+            throw new functions.https.HttpsError('failed-precondition', `Cannot mark payment: request status is '${reqData.status}', expected 'awaitingpayment'.`);
+        }
         const dpRef = admin_1.db.collection("directPaymentRequests").doc();
         tx.set(dpRef, {
             id: dpRef.id,
@@ -168,6 +171,7 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
             paidAt: admin_1.FieldValue.serverTimestamp(),
             sessionId: sessionRef.id,
             directPaymentConfirmedAt: admin_1.FieldValue.serverTimestamp(),
+            notificationsAlreadySent: true,
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });
         // Update direct payment record
@@ -275,7 +279,11 @@ exports.mohaffezRejectDirectPayment = functions.https.onCall(async (data, contex
             mohaffezConfirmedAt: admin_1.FieldValue.serverTimestamp(),
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });
+        const retryDeadline = new Date();
+        retryDeadline.setHours(retryDeadline.getHours() + 24);
         tx.update(reqRef, {
+            paymentDeadline: admin.firestore.Timestamp.fromDate(retryDeadline),
+            reminderSent: false,
             status: STATUS.AWAITING_PAYMENT,
             directPaymentRejectedAt: admin_1.FieldValue.serverTimestamp(),
             updatedAt: admin_1.FieldValue.serverTimestamp(),

@@ -73,6 +73,7 @@ class StudentPaymentScreen extends ConsumerStatefulWidget {
 
 class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   PricingPlanModel? selectedPlan;
+  bool planSelectionFallback = false;
   final promoCodeController = TextEditingController();
   PromoCodeModel? appliedPromoCode;
   PricingResult? pricingResult;
@@ -135,6 +136,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint(
+      '🔍 [PaymentScreen] isLockedRequest=$isLockedRequest planId=${widget.lockedRequest?['planId']} paymentAmount=${widget.lockedRequest?['paymentAmount']}',
+    );
     _loadWalletAvailability();
   }
 
@@ -234,6 +238,43 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   .toList();
             }
 
+            if (isLockedRequest &&
+                selectedPlan == null &&
+                !planSelectionFallback &&
+                filteredPlans.isNotEmpty) {
+              final lockedPlanId = widget.lockedRequest!['planId'] as String?;
+              final lockedAmount =
+                  (widget.lockedRequest!['paymentAmount'] as num? ??
+                          widget.lockedRequest!['sessionPrice'] as num?)
+                      ?.toDouble();
+
+              PricingPlanModel? match;
+
+              if (lockedPlanId != null && lockedPlanId.isNotEmpty) {
+                try {
+                  match = filteredPlans.firstWhere((p) => p.id == lockedPlanId);
+                } catch (_) {}
+              }
+
+              if (match == null && lockedAmount != null && lockedAmount > 0) {
+                for (final plan in filteredPlans) {
+                  if ((plan.priceEGP - lockedAmount).abs() < 0.01) {
+                    match = plan;
+                    break;
+                  }
+                }
+              }
+
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                if (match != null) {
+                  setState(() => selectedPlan = match);
+                } else {
+                  setState(() => planSelectionFallback = true);
+                }
+              });
+            }
+
             if (filteredPlans.isEmpty) {
               return const EmptyState(
                 icon: Icons.payments_outlined,
@@ -255,7 +296,21 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   buildLockedSessionDetailsCard,
                   if (widget.sessionDetails != null || hasSelectedSlot)
                     const SizedBox(height: 14),
-                  ...filteredPlans.map(buildPlanCard),
+                  if (isLockedRequest && !planSelectionFallback)
+                    if (selectedPlan != null)
+                      _buildLockedPlanCard(selectedPlan!)
+                    else
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Text(
+                            'جارٍ تحديد خطة الدفع...',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      )
+                  else
+                    ...filteredPlans.map(buildPlanCard),
                   if (selectedPlan != null) ...[
                     const SizedBox(height: 14),
                     buildPromoCodeSection,
@@ -539,6 +594,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     dynamic user,
     PricingResult pricing,
   ) {
+    final requestId = widget.requestId;
+    if (requestId == null || requestId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('بيانات الطلب غير مكتملة')),
+      );
+      return;
+    }
+
     final slotDate = lockedDate;
     if (slotDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -567,7 +630,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => DirectPaymentScreen(
-          requestId: widget.requestId!,
+          requestId: requestId,
           mohaffezId: widget.mohaffezId,
           mohaffezName: widget.mohaffezName,
           studentName: user.name,
@@ -577,10 +640,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           slotDate: slotDate,
           slotStart: slotStart,
           slotEnd: slotEnd,
-          imamAddressText: widget.location ?? widget.mohaffezAddress,
+          imamAddressText: widget.location ??
+              widget.mohaffezAddress ??
+              lockedRequestLocation,
           imamAddressLat: widget.mohaffezLat,
           imamAddressLng: widget.mohaffezLng,
-          mohaffezPhone: widget.mohaffezPhone,
+          mohaffezPhone:
+              widget.mohaffezPhone ?? widget.lockedRequest?['mohaffezPhone'],
         ),
       ),
     );
@@ -633,6 +699,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               ),
             ),
           ]),
+          if (isLockedRequest) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'راجع تفاصيل جلستك أدناه ثم تابع إلى الدفع',
+              style: TextStyle(fontSize: 13, color: Colors.blue),
+            ),
+          ],
           Divider(height: 24, color: Colors.blue.shade300),
           lockedDetailRow('المحفظ:', widget.mohaffezName),
           lockedDetailRow(ArabicLabels.type, getSessionTypeArabic(sessionType)),
@@ -646,25 +719,28 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           if (location != null && location.isNotEmpty)
             lockedDetailRow(ArabicLabels.location, location),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(children: [
-              Icon(Icons.info_outline, size: 20, color: Colors.amber.shade900),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isLockedRequest
-                      ? 'اختر خطة الدفع واستكمل العملية.'
-                      : 'اختر الخطة المناسبة لإتمام الحجز.',
-                  style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
-                ),
+          if (planSelectionFallback || !isLockedRequest)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade100,
+                borderRadius: BorderRadius.circular(8),
               ),
-            ]),
-          ),
+              child: Row(children: [
+                Icon(Icons.info_outline,
+                    size: 20, color: Colors.amber.shade900),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isLockedRequest
+                        ? 'اختر خطة الدفع واستكمل العملية.'
+                        : 'اختر الخطة المناسبة لإتمام الحجز.',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                  ),
+                ),
+              ]),
+            ),
         ],
       ),
     );
@@ -731,6 +807,46 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ]),
+      ),
+    );
+  }
+
+  Widget _buildLockedPlanCard(PricingPlanModel plan) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.accentGreen, width: 2),
+        color: AppTheme.accentGreen.withOpacity(0.05),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock, color: AppTheme.accentGreen),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(plan.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  '${plan.priceEGP.toStringAsFixed(0)} جنيه',
+                  style: const TextStyle(color: AppTheme.accentGreen),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.accentGreen.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('محدد',
+                style: TextStyle(fontSize: 12, color: AppTheme.accentGreen)),
+          ),
+        ],
       ),
     );
   }
@@ -1179,11 +1295,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       }
 
       if (result.paymentUrl.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('تم الدفع بنجاح!'), backgroundColor: Colors.green),
-        );
-        context.go('/home');
+        _openDirectPaymentScreen(context, user, pricing);
         return;
       }
 

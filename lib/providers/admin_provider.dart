@@ -236,7 +236,7 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
   Future<void> releaseAllExpiredLocks() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('triggerCleanupJobManually');
+      final callable = _functions.httpsCallable('releaseExpiredSlotLocks');
       await callable.call();
     });
   }

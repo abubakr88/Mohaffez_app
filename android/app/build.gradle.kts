@@ -58,6 +58,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     
-    // Firebase AppCheck - Changed to Kotlin DSL syntax with parentheses
+    // Firebase App Check providers
     implementation("com.google.firebase:firebase-appcheck-playintegrity:17.0.1")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug:18.0.0")
 }

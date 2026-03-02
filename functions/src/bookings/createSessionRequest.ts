@@ -4,7 +4,6 @@ import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
 
 const STATUS = {
-  // FIX-1: Align status literals with app-wide no-underscore RequestStatus values
   PENDING: 'pending',
   AWAITING_PAYMENT: 'awaitingpayment',
   AWAITING_DIRECT: 'awaitingdirectpaymentconfirmation',
@@ -17,9 +16,7 @@ function normalizeTimeSlot(raw: string): string {
   return raw.replace(/\s/g, '');
 }
 
-// FIX-2: Parse Flutter ISO strings without timezone as UTC to prevent server-local shift
 function parseFlutterDate(iso: string): Date {
-  // If the string has no timezone info, treat it as UTC
   if (!iso.endsWith('Z') && !/[+\-]\d{2}:\d{2}$/.test(iso)) {
     return new Date(iso + 'Z');
   }
@@ -28,11 +25,38 @@ function parseFlutterDate(iso: string): Date {
 
 export const createSessionRequest = functions.https.onCall(
   async (data, context) => {
+    const fallbackIdToken =
+      typeof data?.idToken === 'string' ? data.idToken : null;
+    let studentId: string | null = context.auth?.uid ?? null;
+
+    // ── 0. DIAGNOSTIC LOG (remove after issue resolved) ───────────────────
+    functions.logger.info('createSessionRequest invoked', {
+      hasAuth: !!context.auth,
+      uid: context.auth?.uid ?? 'NONE',
+      hasAppCheck: !!(context as any).app,
+      rawAuthHeader: !!(context as any).rawRequest?.headers?.authorization,
+      hasFallbackIdToken: !!fallbackIdToken,
+    });
+
     // ── 1. Auth ────────────────────────────────────────────────────────────
-    if (!context.auth) {
+    if (!studentId && fallbackIdToken) {
+      try {
+        const decoded = await admin.auth().verifyIdToken(fallbackIdToken);
+        studentId = decoded.uid;
+        functions.logger.warn('createSessionRequest: using fallback idToken verification', { uid: studentId });
+      } catch (e) {
+        functions.logger.error('createSessionRequest: fallback idToken verification failed', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    if (!studentId) {
+      functions.logger.error('createSessionRequest: UNAUTHENTICATED - no context.auth and no valid fallback token', {
+        headers: JSON.stringify((context as any).rawRequest?.headers ?? {}),
+      });
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
-    const studentId = context.auth.uid;
 
     // ── 2. Destructure ─────────────────────────────────────────────────────
     const {
@@ -80,9 +104,6 @@ export const createSessionRequest = functions.https.onCall(
       );
     }
 
-    // FIX: Validate date strings are parseable before entering the transaction
-    // — a bad ISO string causes new Date() to return Invalid Date silently,
-    //   which Firestore then rejects with an opaque "3 INVALID_ARGUMENT" error.
     const slotDateObj = parseFlutterDate(slotDate);
     const slotStartObj = parseFlutterDate(slotStart);
     const slotEndObj = parseFlutterDate(slotEnd);
@@ -103,8 +124,6 @@ export const createSessionRequest = functions.https.onCall(
       );
     }
 
-    // FIX: Validate studentId from auth matches studentId in payload (if sent)
-    // — prevents a student booking on behalf of another user.
     if (data.studentId && data.studentId !== studentId) {
       throw new functions.https.HttpsError(
         'permission-denied',
@@ -112,7 +131,7 @@ export const createSessionRequest = functions.https.onCall(
       );
     }
 
-    functions.logger.info('createSessionRequest called', {
+    functions.logger.info('createSessionRequest: validation passed', {
       studentId,
       mohaffezId,
       sessionType,
@@ -129,7 +148,7 @@ export const createSessionRequest = functions.https.onCall(
       let availabilityRef: FirebaseFirestore.DocumentReference | null = null;
       let updatedSlots: Record<string, unknown>[] | null = null;
 
-      // ── 4a. Validate slot lock (if provided) ──────────────────────────
+      // ── 4a. Validate slot lock ─────────────────────────────────────────
       if (slotLockId) {
         lockRef = db.collection('slotLocks').doc(slotLockId);
         const lockSnap = await transaction.get(lockRef);
@@ -165,7 +184,6 @@ export const createSessionRequest = functions.https.onCall(
           );
         }
 
-        // Read availability to compute the slot-disable update atomically
         const availabilityDocId =
           typeof lock.availabilityDocId === 'string'
             ? lock.availabilityDocId
@@ -221,22 +239,19 @@ export const createSessionRequest = functions.https.onCall(
         }
       }
 
-      // ── 4b. Check for an already-booked slot (conflict guard) ─────────
-      // FIX: Instead of the 4-field idempotency query (which requires a
-      // composite index and crashes when the index is missing), we use a
-      // simpler 2-field query that is covered by the existing
-      // mohaffezId + status + createdAt DESC index — then filter in memory.
-      // This avoids the "index not found → transaction aborts → nothing written"
-      // bug that was the root cause of empty sessionRequests collection.
+      // ── 4b. Conflict guard ─────────────────────────────────────────────
       const conflictQuery = db
         .collection('sessionRequests')
         .where('mohaffezId', '==', mohaffezId)
         .where('status', '==', STATUS.PENDING)
-        .where('slotDate', '==', admin.firestore.Timestamp.fromDate(slotDateObj));
+        .where(
+          'slotDate',
+          '==',
+          admin.firestore.Timestamp.fromDate(slotDateObj)
+        );
 
       const conflictSnap = await transaction.get(conflictQuery);
 
-      // Filter in memory for the exact time slot (avoids extra index)
       const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
       const duplicate = conflictSnap.docs.find((doc) => {
         const d = doc.data();
@@ -247,16 +262,13 @@ export const createSessionRequest = functions.https.onCall(
       });
 
       if (duplicate) {
-        // Check if it belongs to THIS student → idempotent success
         if (duplicate.data().studentId === studentId) {
-          functions.logger.warn('Duplicate request from same student — returning existing', {
-            existingId: duplicate.id,
-            studentId,
-            mohaffezId,
-          });
+          functions.logger.warn(
+            'Duplicate request from same student — returning existing',
+            { existingId: duplicate.id, studentId, mohaffezId }
+          );
           return { success: true, requestId: duplicate.id, isDuplicate: true };
         }
-        // Different student already has this slot → conflict
         functions.logger.warn('Slot already requested by another student', {
           conflictingRequestId: duplicate.id,
           mohaffezId,
@@ -269,13 +281,9 @@ export const createSessionRequest = functions.https.onCall(
         );
       }
 
-      // ── 4c. WRITE — create the sessionRequest document ────────────────
+      // ── 4c. Write sessionRequest ───────────────────────────────────────
       const requestRef = db.collection('sessionRequests').doc();
 
-      // FIX: Use Firestore Timestamps directly (not JS Date objects) so
-      // ordering/range queries on slotDate work correctly. JS Date objects
-      // are stored as Timestamps by the SDK but using Timestamp.fromDate
-      // makes the intent explicit and avoids timezone edge cases.
       transaction.set(requestRef, {
         studentId,
         mohaffezId,
@@ -291,6 +299,13 @@ export const createSessionRequest = functions.https.onCall(
         imamAddressLng: imamAddressLng ?? null,
         mohaffezPhone: mohaffezPhone ?? null,
         subscriptionId: subscriptionId ?? null,
+        planId: (data.planId as string) ?? null,
+        planTitle: (data.planTitle as string) ?? null,
+        paymentAmount:
+          typeof data.paymentAmount === 'number' ? data.paymentAmount : null,
+        sessionsCount:
+          typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
+        planType: (data.planType as string) ?? null,
         requiresPaymentOnAcceptance: requiresPaymentOnAcceptance ?? false,
         selectedPaymentMethod: selectedPaymentMethod ?? 'pay_after_acceptance',
         slotLockId: slotLockId ?? null,
@@ -307,7 +322,7 @@ export const createSessionRequest = functions.https.onCall(
         });
       }
 
-      // ── 4e. Disable availability slot atomically ───────────────────────
+      // ── 4e. Disable availability slot ─────────────────────────────────
       if (availabilityRef && updatedSlots) {
         transaction.update(availabilityRef, {
           timeSlots: updatedSlots,
@@ -343,8 +358,8 @@ export const createSessionRequest = functions.https.onCall(
         preferredTimeSlot,
       });
 
-      // ── 4g. Return result ──────────────────────────────────────────────
       return { success: true, requestId: requestRef.id };
     });
   }
 );
+

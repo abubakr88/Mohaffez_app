@@ -21,22 +21,22 @@ class FollowService {
         return false; // Already following
       }
 
-      // Create follow relationship
-      await _firestore.collection('follows').add({
+      final batch = _firestore.batch();
+      final followRef = _firestore.collection('follows').doc();
+      batch.set(followRef, {
         'studentId': user.uid,
         'mohaffezId': mohaffezId,
         'followedAt': FieldValue.serverTimestamp(),
       });
-
-      // Increment mohaffez's follower count
-      await _firestore.collection('users').doc(mohaffezId).update({
-        'followerCount': FieldValue.increment(1),
-      });
-
-      // Increment user's following count
-      await _firestore.collection('users').doc(user.uid).update({
-        'followingCount': FieldValue.increment(1),
-      });
+      batch.update(
+        _firestore.collection('users').doc(mohaffezId),
+        {'followerCount': FieldValue.increment(1)},
+      );
+      batch.update(
+        _firestore.collection('users').doc(user.uid),
+        {'followingCount': FieldValue.increment(1)},
+      );
+      await batch.commit();
 
       return true;
     } catch (e) {
@@ -62,20 +62,19 @@ class FollowService {
         return false; // Not following
       }
 
-      // Delete follow relationship
+      final batch = _firestore.batch();
       for (final doc in followSnapshot.docs) {
-        await doc.reference.delete();
+        batch.delete(doc.reference);
       }
-
-      // Decrement mohaffez's follower count
-      await _firestore.collection('users').doc(mohaffezId).update({
-        'followerCount': FieldValue.increment(-1),
-      });
-
-      // Decrement user's following count
-      await _firestore.collection('users').doc(user.uid).update({
-        'followingCount': FieldValue.increment(-1),
-      });
+      batch.update(
+        _firestore.collection('users').doc(mohaffezId),
+        {'followerCount': FieldValue.increment(-1)},
+      );
+      batch.update(
+        _firestore.collection('users').doc(user.uid),
+        {'followingCount': FieldValue.increment(-1)},
+      );
+      await batch.commit();
 
       return true;
     } catch (e) {

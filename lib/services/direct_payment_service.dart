@@ -162,6 +162,18 @@ class DirectPaymentService {
             .toList());
   }
 
+  // ── Stream ALL commission summaries (admin view) ─────────────────────────
+  static Stream<List<WeeklyCommissionSummary>> watchAllCommissions() {
+    return _db
+        .collection('weeklyCommissionSummaries')
+        .orderBy('dueDate', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => WeeklyCommissionSummary.fromFirestore(d))
+            .toList());
+  }
+
   // ── Simple JSON parser for error messages ────────────────────────────────
   static Map<String, dynamic> _parseJson(String s) {
     // Minimal: handles {"success":true,"message":"..."} only

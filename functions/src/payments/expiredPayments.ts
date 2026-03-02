@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
 import admin, { db, FieldValue } from '../utils/admin';
-import { createNotification } from '../utils/notificationHelpers';
+import { createAndSendNotification } from '../utils/notificationHelpers';
 
 interface ExpiredRequest {
   id: string;
@@ -23,34 +23,30 @@ async function logFailedOperation(requestId: string, error: unknown): Promise<vo
 
 async function sendExpirationNotifications(request: ExpiredRequest): Promise<void> {
   if (request.studentId) {
-    await createNotification({
-      userId: request.studentId,
+    await createAndSendNotification({
+      userId:   request.studentId,
       senderId: request.mohaffezId,
-      title: 'انتهت مهلة الدفع',
-      body: 'انتهت مهلة الدفع ولم يتم تأكيد طلبك. يمكنك إرسال طلب جديد.',
-      type: 'payment_expired',
-      isRead: false,
-      data: {
-        requestId: request.id,
-      },
+      title:    'انتهت مهلة الدفع ⏰',
+      body:     `انتهت مهلة دفع جلستك مع ${request.mohaffezName ?? ''}. يمكنك طلب موعد جديد.`,
+      type:     'paymentexpired',
+      isRead:   false,
+      highPriority: true,
+      data: { requestId: request.id },
     });
   }
-
   if (request.mohaffezId) {
-    await createNotification({
-      userId: request.mohaffezId,
+    await createAndSendNotification({
+      userId:   request.mohaffezId,
       senderId: request.studentId,
-      title: 'انتهت مهلة دفع الطالب',
-      body: `لم يكتمل دفع الطالب ${request.studentName ?? ''} خلال المهلة المحددة.`,
-      type: 'payment_expired',
-      isRead: false,
-      data: {
-        requestId: request.id,
-      },
+      title:    'انتهت مهلة دفع الطالب',
+      body:     `${request.studentName ?? 'الطالب'} لم يدفع في الوقت المحدد. الموعد ملغي.`,
+      type:     'paymentexpired',
+      isRead:   false,
+      highPriority: false,
+      data: { requestId: request.id },
     });
   }
 }
-
 export const checkExpiredPayments = functions.pubsub
   .schedule('every 1 hours')
   .onRun(async () => {

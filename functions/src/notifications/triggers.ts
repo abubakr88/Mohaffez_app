@@ -1,5 +1,7 @@
 import * as functions from 'firebase-functions';
 import { createAndSendNotification } from '../utils/notificationHelpers';
+import { SessionEventStore } from '../services/SessionEventStore';
+import { SessionRequestEventType, SessionEventType } from '../types/events.types';
 
 type RequestDoc = Record<string, unknown>;
 
@@ -247,29 +249,37 @@ export const onSessionRequestAccepted = functions.firestore
 export const onSessionCreated = functions.firestore
   .document('hafizSessions/{sessionId}')
   .onCreate(async (snapshot, context) => {
-    const sessionData = snapshot.data() as RequestDoc;
+    const data = snapshot.data() as Record<string, unknown>;
     const sessionId = context.params.sessionId;
+    const studentId = asString(data.studentId, '');
+    const mohaffezId = asString(data.mohaffezId, '');
 
-    const studentId = asString(sessionData.studentId);
-    const mohaffezId = asString(sessionData.mohaffezId);
-    const isPaid = asBoolean(sessionData.isPaid, false);
-    const sessionPrice = asNumber(sessionData.sessionPrice, 0);
-    const promoCode = asString(sessionData.promoCode);
-
-    const isFreeSession = isPaid && sessionPrice === 0 && promoCode.length > 0;
-
-    functions.logger.info('Session created', {
-      sessionId,
-      studentId,
-      mohaffezId,
-      isFreeSession,
-      promoCode: isFreeSession ? promoCode : undefined,
-      sessionType: sessionData.sessionType,
-      sessionDate: sessionData.sessionDate,
-    });
-
-    // Optional: Send additional confirmation if needed
-    // (Main notifications are sent by onSessionRequestAccepted)
+    // Append creation event
+    try {
+      await sessionEventStore.appendEvent({
+        eventType: SessionEventType.SESSION_CREATED,
+        sessionId,
+        requestId: asString(data.requestId, ''),
+        toStatus: 'accepted',
+        actorId: mohaffezId || 'system',
+        data: {
+          studentId,
+          mohaffezId,
+          sessionType: data.sessionType,
+          preferredTimeSlot: data.preferredTimeSlot,
+          sessionDate: data.sessionDate,
+          isPaid: data.isPaid,
+          sessionPrice: data.sessionPrice,
+          paymentMethod: data.paymentMethod,
+          promoCode: data.promoCode ?? null,
+        },
+      });
+    } catch (error) {
+      functions.logger.error('Failed to append session created event', {
+        sessionId,
+        error,
+      });
+    }
   });
 
 /**
@@ -313,69 +323,157 @@ export const onPaymentCompleted = functions.firestore
 export const onSessionCompleted = functions.firestore
   .document('hafizSessions/{sessionId}')
   .onUpdate(async (change, context) => {
-    const before = change.before.data() as RequestDoc;
-    const after = change.after.data() as RequestDoc;
+    const before = change.before.data() as Record<string, unknown>;
+    const after  = change.after.data()  as Record<string, unknown>;
 
-    const beforeStatus = asString(before.status);
-    const afterStatus = asString(after.status);
-    const beforeHifzAssignment = asString(before.hifzAssignment);
-    const afterHifzAssignment = asString(after.hifzAssignment);
+    const beforeStatus = asString(before.status, '');
+    const afterStatus  = asString(after.status,  '');
 
-    // Only trigger when status changes to 'completed' and hifzAssignment is set
-    if (beforeStatus === afterStatus || afterStatus !== 'completed') {
-      return;
-    }
+    if (beforeStatus === afterStatus) return;
 
-    // Check if there's an assignment to notify about
-    if (!afterHifzAssignment || afterHifzAssignment.trim().length === 0) {
-      functions.logger.info('Session completed but no assignment to notify', {
-        sessionId: context.params.sessionId,
-      });
-      return;
-    }
+    const sessionId  = context.params.sessionId;
+    const studentId  = asString(after.studentId, '');
+    const mohaffezId = asString(after.mohaffezId, '');
 
-    const sessionId = context.params.sessionId;
-    const studentId = asString(after.studentId);
-    const mohaffezId = asString(after.mohaffezId);
-    const mohaffezName = asString(after.mohaffezName, 'المحفظ');
-
-    if (!studentId) {
-      functions.logger.warn('Missing studentId in completed session', {
+    // Always append a session event for ANY status change
+    try {
+      await sessionEventStore.appendEvent({
+        eventType:  SessionEventType.SESSION_COMPLETED,
         sessionId,
+        requestId:  asString(after.requestId, ''),
+        fromStatus: beforeStatus,
+        toStatus:   afterStatus,
+        actorId:    mohaffezId || 'system',
+        data: {
+          studentId,
+          mohaffezId,
+          sessionType:           after.sessionType,
+          sessionRating:         after.sessionRating,
+          hifzAssignment:        after.hifzAssignment        ?? null,
+          murajaAssignment:      after.murajaAssignment      ?? null,
+          isLateCompletion:      after.isLateCompletion      ?? false,
+          tajweedMistakes:       after.tajweedMistakesCount  ?? 0,
+          pronunciationMistakes: after.pronunciationMistakesCount ?? 0,
+        },
       });
+    } catch (error) {
+      functions.logger.error('Failed to append session completed event', {
+        sessionId, error,
+      });
+    }
+
+    // Only send notifications when status becomes 'completed'
+    if (afterStatus !== 'completed') return;
+    if (!studentId) {
+      functions.logger.warn('Missing studentId in completed session', { sessionId });
       return;
     }
+
+    const mohaffezName   = asString(after.mohaffezName, '');
+    const hifzAssignment = asString(after.hifzAssignment, '');
+    const hasAssignment  = hifzAssignment.trim().length > 0;
 
     try {
+      // Always notify student session was completed
       await createAndSendNotification({
-        userId: studentId,
+        userId:   studentId,
         senderId: mohaffezId,
-        title: 'تم إضافة واجبك',
-        body: `${mohaffezName} أضاف واجبك الجديد`,
-        type: 'assignment_updated',
-        isRead: false,
+        title:    'انتهت الجلسة ✅',
+        body:     hasAssignment
+          ? `${mohaffezName} أضاف واجبك الجديد.`
+          : `جلستك مع ${mohaffezName} مكتملة.`,
+        type:     hasAssignment ? 'assignmentupdated' : 'sessioncompleted',
+        isRead:   false,
+        highPriority: true,
         data: {
           sessionId,
           mohaffezId,
           mohaffezName,
-          hifzAssignment: afterHifzAssignment,
-          murajaAssignment: asString(after.murajaAssignment),
-          sessionRating: asNumber(after.sessionRating, 0),
+          hifzAssignment:   hifzAssignment || undefined,
+          murajaAssignment: asString(after.murajaAssignment, '') || undefined,
+          sessionRating:    after.sessionRating,
         },
-        highPriority: true,
       });
-
-      functions.logger.info('Assignment update notification sent', {
-        sessionId,
-        studentId,
-        mohaffezId,
+      functions.logger.info('Session completed notification sent', {
+        sessionId, studentId, mohaffezId, hasAssignment,
       });
     } catch (error) {
-      functions.logger.error('Error sending assignment update notification', {
-        sessionId,
-        studentId,
-        mohaffezId,
-        error: error instanceof Error ? error.message : String(error),
+      functions.logger.error('Error sending session completed notification', {
+        sessionId, studentId, mohaffezId, error,
+      });
+    }
+  });
+
+const sessionEventStore = new SessionEventStore();
+
+export const onSessionRequestStatusChanged = functions.firestore
+  .document('sessionRequests/{requestId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() as Record<string, unknown>;
+    const after  = change.after.data()  as Record<string, unknown>;
+
+    const fromStatus = (before.status  as string) ?? '';
+    const toStatus   = (after.status   as string) ?? '';
+
+    // Only run when status actually changed
+    if (fromStatus === toStatus) return;
+
+    const requestId  = context.params.requestId;
+    const studentId  = (after.studentId  as string) ?? '';
+    const mohaffezId = (after.mohaffezId as string) ?? '';
+
+    // Map status string -> enum value
+    const eventTypeMap: Record<string, SessionRequestEventType> = {
+      awaitingpayment:                    SessionRequestEventType.AWAITING_PAYMENT,
+      awaitingdirectpaymentconfirmation:  SessionRequestEventType.AWAITING_DIRECT,
+      accepted:                           SessionRequestEventType.ACCEPTED,
+      rejected:                           SessionRequestEventType.REJECTED,
+      cancelled:                          SessionRequestEventType.CANCELLED,
+      expired:                            SessionRequestEventType.EXPIRED,
+    };
+
+    const eventType = eventTypeMap[toStatus];
+    if (!eventType) {
+      functions.logger.warn('onSessionRequestStatusChanged: unknown toStatus', {
+        requestId, fromStatus, toStatus,
+      });
+      return;
+    }
+
+    // Determine actorId heuristically:
+    //   accepted/awaitingdirect = mohaffez acted
+    //   cancelled/expired       = could be system or student
+    //   awaitingpayment         = mohaffez accepted initially
+    //   rejected                = mohaffez acted
+    const actorId =
+      ['accepted', 'rejected', 'awaitingdirectpaymentconfirmation'].includes(toStatus)
+        ? mohaffezId
+        : toStatus === 'expired'
+          ? 'system'
+          : studentId;
+
+    try {
+      await sessionEventStore.appendEvent({
+        eventType,
+        requestId,
+        toStatus,
+        fromStatus,
+        actorId,
+        data: {
+          studentId,
+          mohaffezId,
+          sessionType:       after.sessionType,
+          preferredTimeSlot: after.preferredTimeSlot,
+          slotDate:          after.slotDate,
+          paymentMethod:     after.selectedPaymentMethod,
+          promoCode:         after.promoCode ?? null,
+          cancelledBy:       after.cancelledBy ?? null,
+          rejectionReason:   after.rejectionReason ?? null,
+        },
+      });
+    } catch (error) {
+      functions.logger.error('Failed to append session request event', {
+        requestId, fromStatus, toStatus, error,
       });
     }
   });

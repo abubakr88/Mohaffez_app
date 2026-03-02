@@ -109,52 +109,68 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
           paymentUrl: '', // Empty URL means use Cloud Function
           sessionId: null, // Will be created by Cloud Function
         );
-      }
-
-
-      // PAID SESSION FLOW (Gateway payment)
-      print('💳 PAID SESSION: Creating Paymob payment');
-      
-      final pendingPayment = basePayment.copyWith(
-        status: PaymentStatus.pending,
-        method: PaymentMethod.card,
-        gateway: PaymentGateway.paymob,
-        metadata: mergedMetadata,
-      );
-
-      final paymentId = await _repository.createPayment(pendingPayment);
-
-      final gatewayResult = await _paymentService.initiatePayment(
-        paymentId: paymentId,
-        amount: pendingPayment.amount,
-        studentEmail: pendingPayment.studentEmail,
-        studentPhone: pendingPayment.studentPhone,
-        studentName: pendingPayment.studentName,
-      );
-
-      if (gatewayResult['success'] != true) {
-        await _repository.updatePaymentStatus(
-          paymentId,
-          PaymentStatus.failed,
-          failureReason: gatewayResult['error']?.toString(),
+      }      /* PAYMOB_DISABLED - gateway path disabled, use direct payment flow
+      else {
+        // PAID SESSION FLOW (Gateway payment)
+        print('💳 PAID SESSION: Creating Paymob payment');
+        
+        final pendingPayment = basePayment.copyWith(
+          status: PaymentStatus.pending,
+          method: PaymentMethod.card,
+          gateway: PaymentGateway.paymob,
+          metadata: mergedMetadata,
         );
-        throw Exception(
-            gatewayResult['error'] ?? 'Failed to create payment URL');
+
+        final paymentId = await _repository.createPayment(pendingPayment);
+
+        final gatewayResult = await _paymentService.initiatePayment(
+          paymentId: paymentId,
+          amount: pendingPayment.amount,
+          studentEmail: pendingPayment.studentEmail,
+          studentPhone: pendingPayment.studentPhone,
+          studentName: pendingPayment.studentName,
+        );
+
+        if (gatewayResult['success'] != true) {
+          await _repository.updatePaymentStatus(
+            paymentId,
+            PaymentStatus.failed,
+            failureReason: gatewayResult['error']?.toString(),
+          );
+          throw Exception(
+              gatewayResult['error'] ?? 'Failed to create payment URL');
+        }
+
+        final paymentUrl = gatewayResult['paymentUrl'] as String;
+        final orderId = gatewayResult['orderId']?.toString();
+        final paymentKey = gatewayResult['paymentKey']?.toString();
+
+        await _repository.updatePaymentGatewayInfo(
+          paymentId,
+          orderId: orderId,
+          paymentKey: paymentKey,
+        );
+
+        state = const AsyncValue.data(null);
+        return PaymentStartResult(paymentId: paymentId, paymentUrl: paymentUrl);
       }
-
-      final paymentUrl = gatewayResult['paymentUrl'] as String;
-      final orderId = gatewayResult['orderId']?.toString();
-      final paymentKey = gatewayResult['paymentKey']?.toString();
-
-      await _repository.updatePaymentGatewayInfo(
-        paymentId,
-        orderId: orderId,
-        paymentKey: paymentKey,
-      );
-
-      state = const AsyncValue.data(null);
-      return PaymentStartResult(paymentId: paymentId, paymentUrl: paymentUrl);
-    } catch (e, stack) {
+      */
+      else {
+        // Direct payment flow � no gateway
+        final directPayment = basePayment.copyWith(
+          status: PaymentStatus.pending,
+          method: PaymentMethod.cash,
+          gateway: PaymentGateway.manual,
+          metadata: mergedMetadata,
+        );
+        final paymentId = await _repository.createPayment(directPayment);
+        state = const AsyncValue.data(null);
+        return PaymentStartResult(
+          paymentId: paymentId,
+          paymentUrl: '',   // empty string = no WebView needed
+          sessionId: null,
+        );
+      }    } catch (e, stack) {
       print('❌ ERROR in startPaymentAndHandleResult: $e');
       print('Stack trace: $stack');
       state = AsyncValue.error(e, stack);
@@ -174,3 +190,4 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 }
+

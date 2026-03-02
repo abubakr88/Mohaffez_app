@@ -104,7 +104,10 @@ final pendingRequestsFirstPageProvider =
 
 final pendingRequestsCountProvider =
     Provider.autoDispose.family<int, String>((ref, mohaffezId) {
-  return ref.watch(pendingRequestsFirstPageProvider(mohaffezId)).value?.length ??
+  return ref
+          .watch(pendingRequestsFirstPageProvider(mohaffezId))
+          .value
+          ?.length ??
       0;
 });
 
@@ -454,6 +457,8 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
           'sessionNotes': data['sessionNotes'] as String?,
           'status': data['status'] as String? ?? 'pending',
           'isLateCompletion': data['isLateCompletion'] as bool? ?? false,
+          'mistakes': data['mistakes'],
+          'mistakesCount': data['mistakesCount'] as int? ?? 0,
         };
       }).toList();
 
@@ -501,8 +506,9 @@ final studentSessionsFirstPageProvider =
         .limit(20)
         .get();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) =>
-        ref.read(paginatedStudentSessionsProvider(studentId).notifier).refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) => ref
+        .read(paginatedStudentSessionsProvider(studentId).notifier)
+        .refresh());
 
     return snapshot.docs.map((doc) {
       final data = doc.data();
@@ -528,6 +534,8 @@ final studentSessionsFirstPageProvider =
         'sessionNotes': data['sessionNotes'] as String?,
         'status': data['status'] as String? ?? 'pending',
         'isLateCompletion': data['isLateCompletion'] as bool? ?? false,
+        'mistakes': data['mistakes'],
+        'mistakesCount': data['mistakesCount'] as int? ?? 0,
       };
     }).toList();
   },
@@ -612,7 +620,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     for (final slot in timeSlots) {
       final slotTime =
           _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
-      if (slotTime == normalizedSelected && slot['sessionType'] == sessionType) {
+      if (slotTime == normalizedSelected &&
+          slot['sessionType'] == sessionType) {
         slot.remove('lockedBy');
         slot.remove('lockId');
         slot.remove('lockedAt');
@@ -632,16 +641,18 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     print('🎯 Accepting request: $requestId');
     state = const AsyncValue.loading();
     try {
-      // FIX: Bug B - Use atomic repository method instead of non-atomic multi-step process
-      final requestDoc =
+      final requestSnap =
           await _firestore.collection('sessionRequests').doc(requestId).get();
+      if (!requestSnap.exists) {
+        throw Exception('Request not found');
+      }
+      final requestData = requestSnap.data() ?? <String, dynamic>{};
+      final sessionPrice = (requestData['paymentAmount'] as num?)?.toDouble() ??
+          (requestData['sessionPrice'] as num?)?.toDouble() ??
+          0.0;
 
-      if (!requestDoc.exists) throw Exception('Request not found');
-
-      final requestData = requestDoc.data()!;
-      final sessionPrice = (requestData['sessionPrice'] as num?)?.toDouble() ?? 0.0;
-
-      await _ref.read(sessionRepositoryProvider)
+      await _ref
+          .read(sessionRepositoryProvider)
           .acceptRequest(requestId, sessionPrice: sessionPrice);
 
       state = const AsyncValue.data(null);
@@ -693,8 +704,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
               : null;
         }
 
-        transaction.update(
-            _firestore.collection('sessionRequests').doc(requestId), {
+        transaction
+            .update(_firestore.collection('sessionRequests').doc(requestId), {
           'status': RequestStatus.rejected,
           'rejectionReason': reason,
           'rejectedAt': FieldValue.serverTimestamp(),
@@ -784,11 +795,11 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       final slotDate = (requestData?['slotDate'] ?? sessionData['sessionDate'])
           as Timestamp?;
       final timeSlot = (requestData?['preferredTimeSlot'] ??
-              requestData?['timeSlot'] ??
-              sessionData['preferredTimeSlot'] ??
-              sessionData['timeSlot']) as String?;
-      final sessionType =
-          (requestData?['sessionType'] ?? sessionData['sessionType']) as String?;
+          requestData?['timeSlot'] ??
+          sessionData['preferredTimeSlot'] ??
+          sessionData['timeSlot']) as String?;
+      final sessionType = (requestData?['sessionType'] ??
+          sessionData['sessionType']) as String?;
       final slotLockId =
           (requestData?['slotLockId'] ?? sessionData['slotLockId']) as String?;
 
@@ -817,8 +828,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         });
 
         if (requestId != null && requestId.trim().isNotEmpty) {
-          transaction.update(
-              _firestore.collection('sessionRequests').doc(requestId), {
+          transaction
+              .update(_firestore.collection('sessionRequests').doc(requestId), {
             'status': RequestStatus.cancelled,
             'cancelledAt': FieldValue.serverTimestamp(),
           });
@@ -899,8 +910,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
               : null;
         }
 
-        transaction.update(
-            _firestore.collection('sessionRequests').doc(requestId), {
+        transaction
+            .update(_firestore.collection('sessionRequests').doc(requestId), {
           'status': RequestStatus.cancelled,
           'cancelledAt': FieldValue.serverTimestamp(),
         });
@@ -970,7 +981,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       }
 
       await lockRef.delete();
-    // FIX-6: Log slot lock release failures instead of silently swallowing them
+      // FIX-6: Log slot lock release failures instead of silently swallowing them
     } catch (e, stack) {
       debugPrint('⚠️ Failed to release slot lock $slotLockId: $e');
       debugPrintStack(stackTrace: stack);
@@ -1135,7 +1146,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         updates['sessionNotes'] = generalNotes;
 
       if (mistakes != null && mistakes.isNotEmpty) {
-        updates['mistakes'] = mistakes.map((m) => m.toJson()).toList();
+        updates['mistakes'] = mistakes.map((m) => m.toMap()).toList();
+        updates['mistakesCount'] = mistakes.length;
         updates['tajweedMistakesCount'] =
             mistakes.where((m) => m.type == MistakeType.tajweed).length;
         updates['pronunciationMistakesCount'] =
@@ -1226,4 +1238,3 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
 final sessionRepositoryProvider = Provider((ref) {
   return SessionRepository(FirebaseFirestore.instance);
 });
-

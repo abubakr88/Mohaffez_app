@@ -519,9 +519,13 @@ class SessionRepository {
     }
 
     final batch = _firestore.batch();
+    final deadline = DateTime.now().add(const Duration(hours: 24));
     batch.update(requestRef, {
-      'status': RequestStatus.accepted,
+      'status': RequestStatus.awaitingPayment,
       'acceptedAt': FieldValue.serverTimestamp(),
+      'paymentDeadline': Timestamp.fromDate(deadline),
+      'reminderSent': false,
+      'paymentAmount': sessionPrice,
       'sessionId': sessionRef.id,
       'updatedAt': FieldValue.serverTimestamp(),
     });

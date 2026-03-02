@@ -1,3 +1,10 @@
+// ============================================================
+// PAYMOB GATEWAY — DISABLED
+// To re-enable:
+//   1. Set PAYMOB_ENABLED = true in this file
+//   2. Uncomment the export in src/index.ts
+//   3. Set PAYMOB_HMAC_SECRET in Firebase environment config
+// ============================================================
 // Required Firestore index: payments collection on (idempotencyKey, status)
 import * as functions from 'firebase-functions';
 import admin, { db } from '../utils/admin';
@@ -5,8 +12,14 @@ import { verifyPaymobHmac } from '../utils/paymobVerification';
 import { PaymentOrchestrationService } from '../services/PaymentOrchestrationService';
 import { EventStore } from '../services/EventStore';
 import { NotificationService } from '../services/NotificationService';
-import { PaymentDocument, PaymentMetadata, serverTimestamp } from '../types/payment.types';
+import {
+  PaymentDocument,
+  PaymentMetadata,
+  serverTimestamp,
+} from '../types/payment.types';
 import { PaymentEventType } from '../types/events.types';
+
+const PAYMOB_ENABLED = false;
 
 interface PaymobObject {
   id: number;
@@ -31,96 +44,78 @@ interface PaymentLockResult {
   payment: PaymentDocument;
 }
 
-const eventStore = new EventStore();
-const notificationService = new NotificationService();
-const orchestrationService = new PaymentOrchestrationService(
-  eventStore,
-  notificationService
-);
+const createEnabledPaymobWebhook = () => {
+  const eventStore = new EventStore();
+  const notificationService = new NotificationService();
+  const orchestrationService = new PaymentOrchestrationService(
+    eventStore,
+    notificationService
+  );
 
-export const paymobWebhook = functions.https.onRequest(async (req, res) => {
-  try {
-    if (req.method !== 'POST') {
-      res.status(405).send('Method not allowed');
-      return;
-    }
+  return functions.https.onRequest(async (req, res) => {
+    try {
+      if (req.method !== 'POST') {
+        res.status(405).send('Method not allowed');
+        return;
+      }
 
-    const callback = req.body as PaymobCallback;
-    if (!callback?.obj || !callback?.hmac) {
-      res.status(400).send('Invalid payload');
-      return;
-    }
+      const callback = req.body as PaymobCallback;
+      if (!callback?.obj || !callback?.hmac) {
+        res.status(400).send('Invalid payload');
+        return;
+      }
 
-    const isValid = verifyPaymobHmac(callback.obj, callback.hmac);
-    if (!isValid) {
-      functions.logger.warn('Invalid HMAC in webhook');
-      res.status(400).send('Invalid HMAC');
-      return;
-    }
+      const isValid = verifyPaymobHmac(callback.obj, callback.hmac);
+      if (!isValid) {
+        functions.logger.warn('Invalid HMAC in webhook');
+        res.status(400).send('Invalid HMAC');
+        return;
+      }
 
-    const paymentId = callback.obj.order.merchant_order_id;
-    const transactionId = callback.obj.id.toString();
-    const amountEGP = callback.obj.amount_cents / 100;
-    const success = callback.obj.success && !callback.obj.error_occured;
+      const paymentId = callback.obj.order.merchant_order_id;
+      const transactionId = callback.obj.id.toString();
+      const amountEGP = callback.obj.amount_cents / 100;
+      const success = callback.obj.success && !callback.obj.error_occured;
 
-    functions.logger.info('Paymob callback received', {
-      paymentId,
-      transactionId,
-      amountEGP,
-      success,
-      eventType: callback.type,
-    });
-
-    const lockResult = await lockPaymentForProcessing(
-      paymentId,
-      transactionId,
-      amountEGP
-    );
-
-    if (lockResult.state === 'already_processed') {
-      functions.logger.info('Payment already processed', { paymentId, transactionId });
-      res.status(200).send('OK - already processed');
-      return;
-    }
-
-    if (lockResult.state === 'amount_mismatch') {
-      functions.logger.error('Amount mismatch', {
+      functions.logger.info('Paymob callback received', {
         paymentId,
-        expectedAmount: lockResult.payment.amount,
-        receivedAmount: amountEGP,
-      });
-      res.status(400).send('Amount mismatch');
-      return;
-    }
-
-    await eventStore.appendPaymentEvent({
-      eventType: PaymentEventType.PAYMENT_PROCESSING,
-      paymentId,
-      userId: lockResult.payment.studentId,
-      data: {
         transactionId,
-      },
-      metadata: {
-        source: 'webhook',
-        transactionId,
-        ipAddress: req.ip,
-      },
-    });
-
-    if (!success) {
-      await db.collection('payments').doc(paymentId).update({
-        status: 'failed',
-        failureReason: 'Payment declined by gateway',
-        gatewayTransactionId: transactionId,
-        updatedAt: serverTimestamp(),
+        amountEGP,
+        success,
+        eventType: callback.type,
       });
+
+      const lockResult = await lockPaymentForProcessing(
+        paymentId,
+        transactionId,
+        amountEGP
+      );
+
+      if (lockResult.state === 'already_processed') {
+        functions.logger.info('Payment already processed', {
+          paymentId,
+          transactionId,
+        });
+        res.status(200).send('OK - already processed');
+        return;
+      }
+
+      if (lockResult.state === 'amount_mismatch') {
+        functions.logger.error('Amount mismatch', {
+          paymentId,
+          expectedAmount: lockResult.payment.amount,
+          receivedAmount: amountEGP,
+        });
+        res.status(400).send('Amount mismatch');
+        return;
+      }
 
       await eventStore.appendPaymentEvent({
-        eventType: PaymentEventType.PAYMENT_FAILED,
+        eventType: PaymentEventType.PAYMENT_PROCESSING,
         paymentId,
         userId: lockResult.payment.studentId,
         data: {
-          reason: 'Payment declined by gateway',
+          transactionId,
         },
         metadata: {
           source: 'webhook',
@@ -129,30 +124,63 @@ export const paymobWebhook = functions.https.onRequest(async (req, res) => {
         },
       });
 
-      res.status(200).send('OK - payment failed');
-      return;
+      if (!success) {
+        await db.collection('payments').doc(paymentId).update({
+          status: 'failed',
+          failureReason: 'Payment declined by gateway',
+          gatewayTransactionId: transactionId,
+          updatedAt: serverTimestamp(),
+        });
+
+        await eventStore.appendPaymentEvent({
+          eventType: PaymentEventType.PAYMENT_FAILED,
+          paymentId,
+          userId: lockResult.payment.studentId,
+          data: {
+            reason: 'Payment declined by gateway',
+          },
+          metadata: {
+            source: 'webhook',
+            transactionId,
+            ipAddress: req.ip,
+          },
+        });
+
+        res.status(200).send('OK - payment failed');
+        return;
+      }
+
+      const result = await orchestrationService.processSuccessfulPayment({
+        paymentId,
+        payment: lockResult.payment,
+        transactionId,
+        metadata: (lockResult.payment.metadata ?? {}) as PaymentMetadata,
+        ipAddress: req.ip,
+      });
+
+      if (!result.success) {
+        res.status(500).send(result.error ?? 'Payment processing failed');
+        return;
+      }
+
+      res.status(200).send('OK - payment processed');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown webhook error';
+      functions.logger.error('Webhook error', { error: message });
+      res.status(500).send('Internal server error');
     }
+  });
+};
 
-    const result = await orchestrationService.processSuccessfulPayment({
-      paymentId,
-      payment: lockResult.payment,
-      transactionId,
-      metadata: (lockResult.payment.metadata ?? {}) as PaymentMetadata,
-      ipAddress: req.ip,
-    });
+const createDisabledPaymobWebhook = () =>
+  functions.https.onRequest((_req, res) => {
+    res.status(503).send('Paymob gateway is disabled');
+  });
 
-    if (!result.success) {
-      res.status(500).send(result.error ?? 'Payment processing failed');
-      return;
-    }
-
-    res.status(200).send('OK - payment processed');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown webhook error';
-    functions.logger.error('Webhook error', { error: message });
-    res.status(500).send('Internal server error');
-  }
-});
+export const paymobWebhook = PAYMOB_ENABLED
+  ? createEnabledPaymobWebhook()
+  : createDisabledPaymobWebhook();
 
 async function lockPaymentForProcessing(
   paymentId: string,
