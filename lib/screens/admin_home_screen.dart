@@ -171,6 +171,14 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                         icon: Icons.analytics,
                         routeName: 'admin-commissions'),
                     _AdminNavTile(
+                        title: 'عمولات المحافظين',
+                        icon: Icons.people_alt,
+                        routeName: 'admin-teacher-commissions'),
+                    _AdminNavTile(
+                        title: 'أرقام محافظ المنصة',
+                        icon: Icons.account_balance_wallet,
+                        routeName: 'admin-wallet-numbers'),
+                    _AdminNavTile(
                         title: ArabicLabels.operationsLog,
                         icon: Icons.history,
                         routeName: 'admin-audit-log'),

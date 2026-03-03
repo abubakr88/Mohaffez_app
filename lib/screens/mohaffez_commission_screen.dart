@@ -1,11 +1,12 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
 
-class MohaffezCommissionScreen extends StatelessWidget {
+class MohaffezCommissionScreen extends StatefulWidget {
   final String mohaffezId;
 
   const MohaffezCommissionScreen({
@@ -14,7 +15,12 @@ class MohaffezCommissionScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  State<MohaffezCommissionScreen> createState() => _MohaffezCommissionScreenState();
+}
+
+class _MohaffezCommissionScreenState extends State<MohaffezCommissionScreen> {
+  @override
+  Widget build(BuildContext context) {  
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
@@ -26,12 +32,12 @@ class MohaffezCommissionScreen extends StatelessWidget {
                   tooltip: 'رجوع',
                 )
               : null,
-          title: const Text('عمولاتي'),
+          title: const Text('مستحقات المنصة'),
           backgroundColor: const Color(0xFFF59E0B),
           foregroundColor: Colors.white,
         ),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
-          stream: DirectPaymentService.watchCommissions(mohaffezId),
+          stream: DirectPaymentService.watchCommissions(widget.mohaffezId),
           builder: (context, snap) {
             if (!snap.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -91,6 +97,8 @@ class MohaffezCommissionScreen extends StatelessWidget {
                   itemCount: list.length,
                   itemBuilder: (_, i) => _MohaffezWeekSummaryCard(
                     summary: list[i],
+                    mohaffezId: widget.mohaffezId,
+                    onPayNow: () => _showPayNowSheet(context, list[i]),
                   ),
                 ),
               ),
@@ -100,24 +108,44 @@ class MohaffezCommissionScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _showPayNowSheet(BuildContext context, WeeklyCommissionSummary summary) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _PayNowSheet(
+        summary: summary,
+        mohaffezId: widget.mohaffezId,
+      ),
+    );
+  }
 }
 
 class _MohaffezWeekSummaryCard extends StatelessWidget {
   final WeeklyCommissionSummary summary;
+  final String mohaffezId;
+  final VoidCallback onPayNow;
 
   const _MohaffezWeekSummaryCard({
     required this.summary,
+    required this.mohaffezId,
+    required this.onPayNow,
   });
 
   Color get _statusColor => switch (summary.status) {
         'paid' => Colors.green,
         'overdue' => Colors.red,
+        'awaiting_confirmation' => Colors.blue,
         _ => Colors.orange,
       };
 
   String get _statusLabel => switch (summary.status) {
         'paid' => 'مدفوع',
         'overdue' => 'متأخر',
+        'awaiting_confirmation' => 'بانتظار التأكيد',
         _ => 'قيد الانتظار',
       };
 
@@ -154,7 +182,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: _statusColor.withOpacity(0.1),
+                    color: _statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: _statusColor),
                   ),
@@ -211,6 +239,46 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (summary.isActionable) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onPayNow,
+                  icon: const Icon(Icons.payment, size: 18),
+                  label: const Text('ادفع الآن'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (summary.isAwaitingConfirmation)
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.hourglass_top, size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      'في انتظار تأكيد الأدمن',
+                      style: TextStyle(fontSize: 13, color: Colors.blue.shade700),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -253,6 +321,277 @@ class _InfoChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PayNowSheet extends StatefulWidget {
+  final WeeklyCommissionSummary summary;
+  final String mohaffezId;
+
+  const _PayNowSheet({
+    required this.summary,
+    required this.mohaffezId,
+  });
+
+  @override
+  State<_PayNowSheet> createState() => _PayNowSheetState();
+}
+
+class _PayNowSheetState extends State<_PayNowSheet> {
+  final _noteController = TextEditingController();
+  bool _isLoading = false;
+  Map<String, String?> _adminWallets = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminWallets();
+  }
+
+  Future<void> _loadAdminWallets() async {
+    try {
+      final wallets = await DirectPaymentService.getAdminWalletNumbers();
+      if (mounted) {
+        setState(() {
+          _adminWallets = wallets;
+        });
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final weekLabel = widget.summary.weekStart != null
+        ? 'الأسبوع ${widget.summary.weekNumber} — ${DateFormat('yyyy', 'ar').format(widget.summary.weekStart!)}'
+        : 'الأسبوع ${widget.summary.weekNumber}';
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Header
+              Text(
+                'تسديد مستحقات المنصة',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$weekLabel — ${widget.summary.commissionAmount.toStringAsFixed(2)} ج.م',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Info container
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'يرجى تحويل المبلغ المستحق إلى حساب المنصة عبر إحدى وسائل الدفع التالية',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.amber.shade800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Admin wallets
+              if (_adminWallets.isNotEmpty) ...[
+                ..._adminWallets.entries
+                    .where((e) => e.value != null && e.value!.isNotEmpty)
+                    .map((entry) => _WalletTile(
+                          method: entry.key,
+                          value: entry.value!,
+                        )),
+                const SizedBox(height: 16),
+              ],
+
+              // Amount chip
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFF59E0B),
+                  ),
+                ),
+                child: Text(
+                  'المبلغ المستحق: ${widget.summary.commissionAmount.toStringAsFixed(2)} ج.م',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFF59E0B),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Note field
+              TextField(
+                controller: _noteController,
+                decoration: InputDecoration(
+                  hintText: 'ملاحظة (اختياري)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Submit button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _submitPayment,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'تأكيد إرسال الدفعة',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitPayment() async {
+    setState(() => _isLoading = true);
+    try {
+      await DirectPaymentService.notifyAdminOfCommissionPayment(
+        mohaffezId: widget.mohaffezId,
+        mohaffezName: '', // TODO: Get from user provider if needed
+        summaryId: widget.summary.id,
+        amount: widget.summary.commissionAmount,
+        note: _noteController.text.isEmpty ? null : _noteController.text,
+      );
+      if (mounted) {
+        Navigator.pop(context); // Close bottom sheet
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.green,
+            content: Text('تم إرسال تأكيد الدفع، سيتم المراجعة قريباً'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red,
+            content: Text('خطأ: ${e.toString()}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+}
+
+class _WalletTile extends StatelessWidget {
+  final String method;
+  final String value;
+
+  const _WalletTile({
+    required this.method,
+    required this.value,
+  });
+
+  IconData get _icon => switch (method) {
+        'instapay' => Icons.send,
+        'vodafonecash' => Icons.phone_android,
+        'orangemoney' => Icons.phone_android,
+        _ => Icons.account_balance,
+      };
+
+  String get _label => switch (method) {
+        'instapay' => 'إنستاباي',
+        'vodafonecash' => 'فودافون كاش',
+        'orangemoney' => 'أورنج موني',
+        _ => method,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(_icon, color: const Color(0xFFF59E0B)),
+        title: Text(_label),
+        subtitle: Text(value),
+        trailing: IconButton(
+          icon: const Icon(Icons.copy, size: 20),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: value));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('تم نسخ $value'),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

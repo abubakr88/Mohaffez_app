@@ -152,8 +152,10 @@ class WeeklyCommissionSummary {
   });
 
   bool get isPending => status == 'pending';
-  bool get isOverdue => status == 'overdue';
-  bool get isPaid    => status == 'paid';
+  bool get isOverdue  => status == 'overdue';
+  bool get isPaid     => status == 'paid';
+  bool get isAwaitingConfirmation => status == 'awaiting_confirmation';
+  bool get isActionable => isPending || isOverdue;
 
   factory WeeklyCommissionSummary.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;

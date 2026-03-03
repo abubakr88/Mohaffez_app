@@ -498,6 +498,20 @@ class QuickActionsSection extends StatelessWidget {
               },
             ),
 
+            // Platform Dues (Commissions)
+            ActionCard(
+              icon: Icons.account_balance_wallet,
+              title: 'مستحقات المنصة',
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () {
+                context.push('/mohaffez-commissions');
+              },
+            ),
+
             // My Students
             ActionCard(
               icon: Icons.groups,

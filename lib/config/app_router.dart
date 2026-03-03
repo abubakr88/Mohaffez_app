@@ -18,6 +18,7 @@ import '../screens/mohaffez_credentials_screen.dart';
 import '../screens/mohaffez_home.dart';
 import '../screens/mohaffez_profile_screen.dart';
 import '../screens/mohaffez_students_screen.dart';
+import '../screens/mohaffez_wallet_settings_screen.dart';
 import '../screens/nearby_mohaffez_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/pending_requests_screen.dart';
@@ -50,6 +51,8 @@ import '../screens/admin_slot_locks_screen.dart';
 import '../screens/admin_payment_events_screen.dart';
 import '../screens/maintenance_screen.dart';
 import '../screens/admin_audit_log_screen.dart';
+import '../screens/admin_wallet_settings_screen.dart';
+import '../screens/admin_teacher_commissions_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -194,17 +197,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
 
           // ============================================
-          // ✅ UPDATED: PAYMENT ROUTE WITH SLOT DATA
+          // ✅ UPDATED: WALLET SETTINGS ROUTE
           // ============================================
           GoRoute(
             path: '/wallet-settings',
             name: 'wallet-settings',
+            builder: (context, state) => const MohaffezWalletSettingsScreen(),
+          ),
+          GoRoute(
+            path: '/mohaffez-commissions',
+            name: 'mohaffez-commissions',
             builder: (context, state) {
-              final role = ref.read(currentUserRoleProvider);
               final uid = ref.read(currentUserIdProvider) ?? '';
-              return role == 'admin'
-                  ? const CommissionDashboardScreen()
-                  : MohaffezCommissionScreen(mohaffezId: uid);
+              return MohaffezCommissionScreen(mohaffezId: uid);
             },
           ),
           GoRoute(
@@ -415,6 +420,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/commissions',
             name: 'admin-commissions',
             builder: (context, state) => const CommissionDashboardScreen(),
+          ),
+          GoRoute(
+            path: '/admin/teacher-commissions',
+            name: 'admin-teacher-commissions',
+            builder: (context, state) => const AdminTeacherCommissionsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/wallet-numbers',
+            name: 'admin-wallet-numbers',
+            builder: (context, state) => const AdminWalletSettingsScreen(),
           ),
           GoRoute(
             path: '/admin/audit-log',

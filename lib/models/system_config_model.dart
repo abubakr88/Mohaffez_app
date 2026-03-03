@@ -34,6 +34,7 @@ class SystemConfigModel {
   final int maxCredentialFiles;
   final DateTime? updatedAt;
   final String updatedBy;
+  final Map<String, String?> adminWallets;
 
   const SystemConfigModel({
     required this.commissionRate,
@@ -69,6 +70,7 @@ class SystemConfigModel {
     required this.maxCredentialFiles,
     required this.updatedAt,
     required this.updatedBy,
+    required this.adminWallets,
   });
 
   factory SystemConfigModel.fromFirestore(DocumentSnapshot doc) {
@@ -147,6 +149,10 @@ class SystemConfigModel {
       updatedAt:
           updatedAt is Timestamp ? updatedAt.toDate() : defaults.updatedAt,
       updatedBy: data['updatedBy'] as String? ?? defaults.updatedBy,
+      adminWallets: Map<String, String?>.from(
+        (data['adminWallets'] as Map<String, dynamic>? ?? {})
+            .map((k, v) => MapEntry(k, v as String?)),
+      ),
     );
   }
 
@@ -185,6 +191,7 @@ class SystemConfigModel {
       maxCredentialFiles: 5,
       updatedAt: null,
       updatedBy: '',
+      adminWallets: const {},
     );
   }
 
@@ -223,6 +230,7 @@ class SystemConfigModel {
       'maxCredentialFiles': maxCredentialFiles,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'updatedBy': updatedBy,
+      'adminWallets': adminWallets,
     };
   }
 }

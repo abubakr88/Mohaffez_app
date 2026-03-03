@@ -174,6 +174,65 @@ class DirectPaymentService {
             .toList());
   }
 
+  // ── Fetch admin wallet numbers ─────────────────────────────────────────────
+  static Future<Map<String, String?>> getAdminWalletNumbers() async {
+    final doc = await _db
+        .collection('systemConfig')
+        .doc('global')
+        .get();
+    final data = doc.data() ?? {};
+    final wallets = data['adminWallets'] as Map<String, dynamic>? ?? {};
+    return {
+      'instapay': wallets['instapay'] as String?,
+      'vodafonecash': wallets['vodafonecash'] as String?,
+      'orangemoney': wallets['orangemoney'] as String?,
+    };
+  }
+
+  // ── Notify admin of commission payment ───────────────────────────────────
+  static Future<void> notifyAdminOfCommissionPayment({
+    required String mohaffezId,
+    required String mohaffezName,
+    required String summaryId,
+    required double amount,
+    String? note,
+  }) async {
+    final batch = FirebaseFirestore.instance.batch();
+
+    // 1. Update summary status → awaiting_confirmation
+    final summaryRef = FirebaseFirestore.instance
+        .collection('weeklyCommissionSummaries')
+        .doc(summaryId);
+    batch.update(summaryRef, {
+      'status': 'awaiting_confirmation',
+      'paymentClaimedAt': FieldValue.serverTimestamp(),
+      'paymentClaimedBy': mohaffezId,
+      'paymentNote': note,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 2. Send notification to admin
+    final notifRef = FirebaseFirestore.instance.collection('notifications').doc();
+    batch.set(notifRef, {
+      'type': 'commission_payment_claimed',
+      'userId': 'admin',
+      'senderId': mohaffezId,
+      'title': 'طلب تأكيد عمولة',
+      'body': '$mohaffezName أرسل دفعة بقيمة ${amount.toStringAsFixed(2)} ج.م',
+      'isRead': false,
+      'highPriority': true,
+      'data': {
+        'weeklyCommissionSummaryId': summaryId,
+        'mohaffezId': mohaffezId,
+        'amount': amount.toString(),
+        'note': note,
+      },
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+  }
+
   // ── Simple JSON parser for error messages ────────────────────────────────
   static Map<String, dynamic> _parseJson(String s) {
     // Minimal: handles {"success":true,"message":"..."} only

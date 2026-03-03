@@ -19,6 +19,7 @@ class _AdminSystemSettingsScreenState
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final Map<String, dynamic> updates = {};
+  final Map<String, TextEditingController> _numCtrlCache = {};
   final maintenanceMessageCtrl = TextEditingController();
   final forceVersionCtrl = TextEditingController();
   final recVersionCtrl = TextEditingController();
@@ -36,26 +37,36 @@ class _AdminSystemSettingsScreenState
     maintenanceMessageCtrl.dispose();
     forceVersionCtrl.dispose();
     recVersionCtrl.dispose();
+    for (final ctrl in _numCtrlCache.values) {
+      ctrl.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _save() async {
+    if (updates.isEmpty) return;
     setState(() => _isLoadingSave = true);
     try {
       await ref
           .read(systemConfigNotifierProvider.notifier)
           .updateGlobalConfig(updates);
-      final st = ref.read(systemConfigNotifierProvider);
+      if (!mounted) return;
+      updates.clear();
+      _numCtrlCache.clear(); // reset controllers so they reflect saved values
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeConstants.success,
+          content: const Text(ArabicLabels.settingsSaved),
+        ),
+      );
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor:
-              st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
-          content: Text(
-              st.hasError ? st.error.toString() : ArabicLabels.settingsSaved),
+          backgroundColor: AppThemeConstants.error,
+          content: Text(e.toString()),
         ),
       );
-      if (!st.hasError) updates.clear();
     } finally {
       if (mounted) setState(() => _isLoadingSave = false);
     }
@@ -206,7 +217,7 @@ class _AdminSystemSettingsScreenState
           value: current,
           onChanged: (v) {
             setState(() => updates[key] = v);
-            this.setState(() {});
+            // No outer setState needed - updates map is mutated by reference
           },
         );
       },
@@ -214,15 +225,19 @@ class _AdminSystemSettingsScreenState
   }
 
   Widget _numberField(String key, String label, Object initial) {
-    final ctrl = TextEditingController(
-        text: updates[key]?.toString() ?? initial.toString());
+    final ctrl = _numCtrlCache.putIfAbsent(
+      key,
+      () => TextEditingController(
+          text: updates[key]?.toString() ?? initial.toString()),
+    );
     return TextField(
       controller: ctrl,
-      keyboardType: TextInputType.number,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: InputDecoration(labelText: label),
       onChanged: (v) {
         final parsed = v.contains('.') ? double.tryParse(v) : int.tryParse(v);
-        updates[key] = parsed;
+        if (parsed != null) updates[key] = parsed;
+        // Do NOT assign null — leave updates[key] unchanged on partial input
       },
     );
   }
@@ -242,7 +257,7 @@ class _AdminSystemSettingsScreenState
               max: max,
               onChanged: (v) {
                 setState(() => updates[key] = v);
-                this.setState(() {});
+                // No outer setState needed - updates map is mutated by reference
               },
             ),
           ],
