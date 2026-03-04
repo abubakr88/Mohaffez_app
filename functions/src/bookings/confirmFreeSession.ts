@@ -22,6 +22,11 @@ function parseFlutterDate(iso: string): Date {
   return new Date(iso);
 }
 
+// FIXED: BUG-5 - strip both hyphens AND en-dashes
+function normalizeTimeSlot(raw: string): string {
+  return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
+}
+
 export const confirmFreeSession = functions.https.onCall(async (data, context) => {
   functions.logger.info("🎫 confirmFreeSession v6.0 (17/2/2026) - Enhanced Logging");
 
@@ -164,12 +169,13 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           requestId,
           sessionId: session.id,
         });
-        throw new functions.https.HttpsError("already-exists", JSON.stringify({
+        return {
+          __idempotent: true,
           success: true,
           sessionId: session.id,
           requestId: requestId,
           message: "الجلسة موجودة بالفعل",
-        }));
+        };
       }
     }
 
@@ -189,12 +195,13 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           paymentId,
           sessionId: session.id,
         });
-        throw new functions.https.HttpsError("already-exists", JSON.stringify({
+        return {
+          __idempotent: true,
           success: true,
           sessionId: session.id,
           requestId: sessionData.requestId || null,
           message: "الجلسة موجودة بالفعل",
-        }));
+        };
       }
     }
 
@@ -246,13 +253,13 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       const availabilityData = availabilityDoc.data();
       if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
         const timeSlots = availabilityData.timeSlots;
-        const normalizedSlot = preferredTimeSlot.replace(/ /g, "");
+        const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
         
         let slotFound = false;
         let slotEnabled = false;
         
         for (const slot of timeSlots) {
-          const slotTime = `${slot.startTime}-${slot.endTime}`.replace(/ /g, "");
+          const slotTime = normalizeTimeSlot(`${slot.startTime}-${slot.endTime}`);
           if (slotTime === normalizedSlot && slot.sessionType === sessionType) {
             slotFound = true;
             slotEnabled = slot.enabled === true;
@@ -311,12 +318,13 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
             sessionId,
             oldStatus: requestData.status,
           });
-          throw new functions.https.HttpsError('already-exists', JSON.stringify({
+          return {
+            __idempotent: true,
             success: true,
             sessionId: sessionId,
             requestId: requestId,
             message: 'الجلسة مؤكدة بالفعل'
-          }));
+          };
         }
       }
       
@@ -475,10 +483,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       const availabilityData = availabilityDoc.data();
       if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
         const timeSlots = availabilityData.timeSlots;
-        const normalizedSlot = preferredTimeSlot.replace(/ /g, "");
+        const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
 
         const updatedSlots = timeSlots.map((slot: any) => {
-          const slotTime = `${slot.startTime}-${slot.endTime}`.replace(/ /g, "");
+          const slotTime = normalizeTimeSlot(`${slot.startTime}-${slot.endTime}`);
           if (slotTime === normalizedSlot && slot.sessionType === sessionType && slot.enabled) {
             return { ...slot, enabled: false };
           }
@@ -561,44 +569,64 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       message: "تم إنشاء الجلسة المجانية بنجاح",
       isUpdatingExisting,  // ✅ Include in response
     };
-  }).catch((error) => {
-    // Handle "already-exists" pseudo-error (used for early return)
-    if (error.code === "already-exists") {
-      const result = JSON.parse(error.message);
-      functions.logger.info("✅ Returning existing session (no duplicate created)", result);
-      return result;
-    }
-    
-    // ✅ LOG ANY OTHER ERRORS
-    functions.logger.error("❌ Transaction failed", {
-      errorCode: error.code,
-      errorMessage: error.message,
-      stack: error.stack,
-    });
-    
-    throw error;
   });
+
+  // FIX-CONFIRM-2: Handle idempotent early-returns cleanly without JSON.parse.
+  if ((result as any).__idempotent === true) {
+    functions.logger.info('confirmFreeSession: returning existing session', result);
+    return {
+      success: result.success,
+      sessionId: result.sessionId,
+      requestId: result.requestId,
+      paymentId: result.paymentId ?? null,
+      message: result.message,
+    };
+  }
+
   const { createAndSendNotification } = await import('../utils/notificationHelpers');
-  await Promise.all([
-    createAndSendNotification({
-      userId: studentId,
-      senderId: mohaffezId,
-      title: 'تم تأكيد جلستك المجانية ✅',
-      body: `جلستك مع ${mohaffezName} مؤكدة.`,
-      type: 'sessionconfirmed',
-      highPriority: true,
-      data: { sessionId: result.sessionId, requestId: result.requestId },
-    }),
-    createAndSendNotification({
-      userId: mohaffezId,
-      senderId: studentId,
-      title: 'حجز جلسة مجانية جديد',
-      body: `${studentName} حجز جلسة مجانية معك.`,
-      type: 'sessionconfirmed',
-      highPriority: true,
-      data: { sessionId: result.sessionId, requestId: result.requestId },
-    }),
-  ]);
+  try {
+    await Promise.all([
+      createAndSendNotification({
+        userId: studentId,
+        senderId: mohaffezId,
+        title: 'تم تأكيد جلستك المجانية ✅',
+        body: `جلستك مع ${mohaffezName} مؤكدة.`,
+        type: 'sessionconfirmed',
+        highPriority: true,
+        data: { sessionId: result.sessionId, requestId: result.requestId },
+      }),
+      createAndSendNotification({
+        userId: mohaffezId,
+        senderId: studentId,
+        title: 'حجز جلسة مجانية جديد',
+        body: `${studentName} حجز جلسة مجانية معك.`,
+        type: 'sessionconfirmed',
+        highPriority: true,
+        data: { sessionId: result.sessionId, requestId: result.requestId },
+      }),
+    ]);
+  } catch (notifError) {
+    // FIX-CONFIRM-1: Log and enqueue for retry — do NOT crash the function.
+    // The session is already confirmed; only the push notification failed.
+    functions.logger.error('confirmFreeSession: post-transaction FCM failed', {
+      sessionId: result.sessionId,
+      requestId: result.requestId,
+      studentId,
+      mohaffezId,
+      error: notifError instanceof Error ? notifError.message : String(notifError),
+    });
+    await db.collection('failedOperations').add({
+      operationType: 'notification-free-session',
+      sessionId: result.sessionId,
+      requestId: result.requestId,
+      studentId,
+      mohaffezId,
+      error: notifError instanceof Error ? notifError.message : 'unknown',
+      timestamp: FieldValue.serverTimestamp(),
+      retryCount: 0,
+      status: 'pending-retry',
+    });
+  }
 
   return result;
 });

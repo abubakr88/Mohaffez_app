@@ -1,10 +1,12 @@
 import 'dart:ui' as ui;
+import 'package:cloud_functions/cloud_functions.dart'; // FIXED: FIX-COMMISSION — added for CF call
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
+
 
 class MohaffezCommissionScreen extends StatefulWidget {
   final String mohaffezId;
@@ -15,12 +17,14 @@ class MohaffezCommissionScreen extends StatefulWidget {
   });
 
   @override
-  State<MohaffezCommissionScreen> createState() => _MohaffezCommissionScreenState();
+  State<MohaffezCommissionScreen> createState() =>
+      _MohaffezCommissionScreenState();
 }
 
-class _MohaffezCommissionScreenState extends State<MohaffezCommissionScreen> {
+class _MohaffezCommissionScreenState
+    extends State<MohaffezCommissionScreen> {
   @override
-  Widget build(BuildContext context) {  
+  Widget build(BuildContext context) {
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
@@ -49,7 +53,6 @@ class _MohaffezCommissionScreenState extends State<MohaffezCommissionScreen> {
               );
             }
 
-            // Stats at top
             final totalPending = list
                 .where((w) => w.isPending || w.isOverdue)
                 .fold(0.0, (s, w) => s + w.commissionAmount);
@@ -69,7 +72,9 @@ class _MohaffezCommissionScreenState extends State<MohaffezCommissionScreen> {
                 ),
                 child: Column(children: [
                   Text(
-                    totalPending > 0 ? 'إجمالي المستحق للمنصة' : 'لا يوجد مستحقات 🎉',
+                    totalPending > 0
+                        ? 'إجمالي المستحق للمنصة'
+                        : 'لا يوجد مستحقات 🎉',
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
@@ -109,7 +114,8 @@ class _MohaffezCommissionScreenState extends State<MohaffezCommissionScreen> {
     );
   }
 
-  void _showPayNowSheet(BuildContext context, WeeklyCommissionSummary summary) {
+  void _showPayNowSheet(
+      BuildContext context, WeeklyCommissionSummary summary) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -123,6 +129,7 @@ class _MohaffezCommissionScreenState extends State<MohaffezCommissionScreen> {
     );
   }
 }
+
 
 class _MohaffezWeekSummaryCard extends StatelessWidget {
   final WeeklyCommissionSummary summary;
@@ -160,7 +167,8 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -210,7 +218,8 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                 Expanded(
                   child: _InfoChip(
                     label: 'الإجمالي',
-                    value: '${summary.totalRevenue.toStringAsFixed(0)} ج.م',
+                    value:
+                        '${summary.totalRevenue.toStringAsFixed(0)} ج.م',
                   ),
                 ),
               ],
@@ -224,7 +233,8 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                     'الاستحقاق: $due',
                     style: TextStyle(
                       fontSize: 12,
-                      color: summary.isOverdue ? Colors.red : Colors.grey,
+                      color:
+                          summary.isOverdue ? Colors.red : Colors.grey,
                     ),
                   )
                 else
@@ -250,7 +260,8 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF59E0B),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -261,7 +272,8 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
             if (summary.isAwaitingConfirmation)
               Container(
                 margin: const EdgeInsets.only(top: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -270,11 +282,14 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.hourglass_top, size: 16, color: Colors.blue.shade700),
+                    Icon(Icons.hourglass_top,
+                        size: 16, color: Colors.blue.shade700),
                     const SizedBox(width: 6),
                     Text(
                       'في انتظار تأكيد الأدمن',
-                      style: TextStyle(fontSize: 13, color: Colors.blue.shade700),
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade700),
                     ),
                   ],
                 ),
@@ -285,6 +300,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
     );
   }
 }
+
 
 class _InfoChip extends StatelessWidget {
   final String label;
@@ -298,7 +314,8 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(8),
@@ -326,6 +343,7 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
+
 class _PayNowSheet extends StatefulWidget {
   final WeeklyCommissionSummary summary;
   final String mohaffezId;
@@ -352,14 +370,13 @@ class _PayNowSheetState extends State<_PayNowSheet> {
 
   Future<void> _loadAdminWallets() async {
     try {
-      final wallets = await DirectPaymentService.getAdminWalletNumbers();
+      final wallets =
+          await DirectPaymentService.getAdminWalletNumbers();
       if (mounted) {
-        setState(() {
-          _adminWallets = wallets;
-        });
+        setState(() => _adminWallets = wallets);
       }
-    } catch (e) {
-      // Handle error silently
+    } catch (_) {
+      // Silently ignore — wallets section just stays empty
     }
   }
 
@@ -386,7 +403,6 @@ class _PayNowSheetState extends State<_PayNowSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Header
               Text(
                 'تسديد مستحقات المنصة',
                 style: TextStyle(
@@ -426,7 +442,8 @@ class _PayNowSheetState extends State<_PayNowSheet> {
               // Admin wallets
               if (_adminWallets.isNotEmpty) ...[
                 ..._adminWallets.entries
-                    .where((e) => e.value != null && e.value!.isNotEmpty)
+                    .where(
+                        (e) => e.value != null && e.value!.isNotEmpty)
                     .map((entry) => _WalletTile(
                           method: entry.key,
                           value: entry.value!,
@@ -443,9 +460,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFF59E0B),
-                  ),
+                  border: Border.all(color: const Color(0xFFF59E0B)),
                 ),
                 child: Text(
                   'المبلغ المستحق: ${widget.summary.commissionAmount.toStringAsFixed(2)} ج.م',
@@ -482,7 +497,8 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF59E0B),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -513,41 +529,65 @@ class _PayNowSheetState extends State<_PayNowSheet> {
     );
   }
 
+  // FIXED: FIX-COMMISSION
+  // ROOT CAUSE: DirectPaymentService.notifyAdminOfCommissionPayment was doing
+  // a client-side batch write that included weeklyCommissionSummaries
+  // (allow write: if false) alongside a notifications write. Firestore
+  // rejected the entire batch and surfaced the error on the notifications path.
+  //
+  // FIX: Call the mohaffezReportCommissionPayment Cloud Function directly.
+  // Admin SDK inside the CF bypasses security rules entirely.
   Future<void> _submitPayment() async {
     setState(() => _isLoading = true);
     try {
-      await DirectPaymentService.notifyAdminOfCommissionPayment(
-        mohaffezId: widget.mohaffezId,
-        mohaffezName: '', // TODO: Get from user provider if needed
-        summaryId: widget.summary.id,
-        amount: widget.summary.commissionAmount,
-        note: _noteController.text.isEmpty ? null : _noteController.text,
+      // FIXED: FIX-COMMISSION — replaced broken client batch with CF call
+      final callable = FirebaseFunctions.instance
+          .httpsCallable('mohaffezReportCommissionPayment');
+
+      await callable.call({
+        'weeklyCommissionSummaryId': widget.summary.id,
+        'note': _noteController.text.trim().isEmpty
+            ? null
+            : _noteController.text.trim(),
+      });
+
+      if (!mounted) return; // FIXED: FIX-1 — mounted guard after await
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.green,
+          content: Text('تم إرسال تأكيد الدفع، سيتم المراجعة قريباً'),
+        ),
       );
-      if (mounted) {
-        Navigator.pop(context); // Close bottom sheet
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.green,
-            content: Text('تم إرسال تأكيد الدفع، سيتم المراجعة قريباً'),
-          ),
-        );
-      }
+    } on FirebaseFunctionsException catch (e) {
+      // FIXED: FIX-COMMISSION — surface CF-specific error codes clearly
+      if (!mounted) return;
+      final message = switch (e.code) {
+        'not-found' => 'لم يتم العثور على سجل العمولة',
+        'permission-denied' => 'غير مصرح لك بهذه العملية',
+        'already-exists' => 'تم إرسال الدفع مسبقاً',
+        _ => 'خطأ: ${e.message ?? e.code}',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text(message),
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.red,
-            content: Text('خطأ: ${e.toString()}'),
-          ),
-        );
-      }
+      if (!mounted) return; // FIXED: FIX-1 — mounted guard in catch
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('خطأ: ${e.toString()}'),
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }
+
 
 class _WalletTile extends StatelessWidget {
   final String method;

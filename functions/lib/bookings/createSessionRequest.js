@@ -103,7 +103,7 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
     });
     // ── 4. Transaction ─────────────────────────────────────────────────────
     return admin_1.db.runTransaction(async (transaction) => {
-        var _a;
+        var _a, _b, _c, _d;
         let lockRef = null;
         let availabilityRef = null;
         let updatedSlots = null;
@@ -161,10 +161,19 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             }
         }
         // ── 4b. Conflict guard ─────────────────────────────────────────────
+        // FIX-BOOKING-1: Guard against all live statuses, not just PENDING.
+        // Required Firestore composite index: (mohaffezId ASC, status ASC, slotDate ASC)
+        // Add this index to firestore.indexes.json if not already present.
+        const LIVE_STATUSES = [
+            STATUS.PENDING,
+            STATUS.AWAITING_PAYMENT,
+            STATUS.AWAITING_DIRECT,
+            STATUS.ACCEPTED,
+        ];
         const conflictQuery = admin_1.db
             .collection('sessionRequests')
             .where('mohaffezId', '==', mohaffezId)
-            .where('status', '==', STATUS.PENDING)
+            .where('status', 'in', [...LIVE_STATUSES])
             .where('slotDate', '==', admin.firestore.Timestamp.fromDate(slotDateObj));
         const conflictSnap = await transaction.get(conflictQuery);
         const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
@@ -204,6 +213,11 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             imamAddressLng: imamAddressLng !== null && imamAddressLng !== void 0 ? imamAddressLng : null,
             mohaffezPhone: mohaffezPhone !== null && mohaffezPhone !== void 0 ? mohaffezPhone : null,
             subscriptionId: subscriptionId !== null && subscriptionId !== void 0 ? subscriptionId : null,
+            planId: (_b = data.planId) !== null && _b !== void 0 ? _b : null,
+            planTitle: (_c = data.planTitle) !== null && _c !== void 0 ? _c : null,
+            paymentAmount: typeof data.paymentAmount === 'number' ? data.paymentAmount : null,
+            sessionsCount: typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
+            planType: (_d = data.planType) !== null && _d !== void 0 ? _d : null,
             requiresPaymentOnAcceptance: requiresPaymentOnAcceptance !== null && requiresPaymentOnAcceptance !== void 0 ? requiresPaymentOnAcceptance : false,
             selectedPaymentMethod: selectedPaymentMethod !== null && selectedPaymentMethod !== void 0 ? selectedPaymentMethod : 'pay_after_acceptance',
             slotLockId: slotLockId !== null && slotLockId !== void 0 ? slotLockId : null,

@@ -657,6 +657,7 @@ class BookingService {
     required DateTime slotDate,
     required String timeSlot,
     required String sessionType,
+    Duration lockDuration = const Duration(hours: 2), // FIXED: BUG-4
   }) async {
     try {
       final availabilityQuery = await _firestore
@@ -705,7 +706,7 @@ class BookingService {
         }
 
         final lockRef = _firestore.collection('slotLocks').doc();
-        final expiresAt = DateTime.now().add(const Duration(hours: 2));
+        final expiresAt = DateTime.now().add(lockDuration); // FIXED: BUG-4
 
         timeSlots[slotIndex] = {
           ...slot,
@@ -822,71 +823,88 @@ class BookingService {
 
   Future<BookingResult> cancelSessionRequest(String requestId) async {
     try {
-      final requestDoc =
-          await _firestore.collection('sessionRequests').doc(requestId).get();
-
-      if (!requestDoc.exists) {
-        return BookingResult.failure('الطلب غير موجود');
-      }
-
-      final requestData = requestDoc.data()!;
-      final slotLockId = requestData['slotLockId'] as String?;
-      final mohaffezId = requestData['mohaffezId'] as String?;
-      final studentId = requestData['studentId'] as String?;
-      final studentName = requestData['studentName'] as String?;
-      final slotDate = requestData['slotDate'] as Timestamp?;
-      final timeSlot = requestData['preferredTimeSlot'] as String?;
-      final sessionType = requestData['sessionType'] as String?;
-
-      DocumentReference? availRef;
-      if (mohaffezId != null && slotDate != null) {
-        availRef = await _findAvailabilityRef(
-          mohaffezId: mohaffezId,
-          slotDate: slotDate,
-        );
-      }
+      String? notifyMohaffezId;
+      String? notifyStudentId;
+      String? notifyStudentName;
 
       await _firestore.runTransaction((transaction) async {
-        Map<String, dynamic>? availData;
-        final resolvedAvailRef = availRef;
-        if (resolvedAvailRef != null) {
-          final availSnap = await transaction.get(resolvedAvailRef);
-          availData = availSnap.data() as Map<String, dynamic>?;
+        // ── READ phase (inside transaction) ──────────────────────────────
+        final requestRef = _firestore.collection('sessionRequests').doc(requestId);
+        final requestSnap = await transaction.get(requestRef);
+
+        if (!requestSnap.exists) {
+          throw Exception('الطلب غير موجود');
         }
 
-        transaction.update(requestDoc.reference, {
+        final requestData = requestSnap.data()!;
+        final status = requestData['status'] as String? ?? 'pending';
+
+        // Idempotency: if already cancelled, return early
+        if (status == 'cancelled') {
+          return;
+        }
+
+        // Guard: cannot cancel a completed session/request
+        if (status == 'completed') {
+          throw Exception('Cannot cancel completed session');
+        }
+
+        notifyStudentId = requestData['studentId'] as String?;
+        notifyMohaffezId = requestData['mohaffezId'] as String?;
+        notifyStudentName = requestData['studentName'] as String?;
+        final slotLockId = requestData['slotLockId'] as String?;
+        final mohaffezId = requestData['mohaffezId'] as String?;
+        final slotDate = requestData['slotDate'] as Timestamp?;
+        final timeSlot = requestData['preferredTimeSlot'] as String?;
+        final sessionType = requestData['sessionType'] as String?;
+
+        // ── WRITE phase ──────────────────────────────────────────────────
+        transaction.update(requestRef, {
           'status': 'cancelled',
           'cancelledAt': FieldValue.serverTimestamp(),
           'cancelledBy': 'student',
         });
 
-        if (slotLockId != null) {
+        // Release slot lock inside same transaction
+        if (slotLockId != null && slotLockId.trim().isNotEmpty) {
           final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
           transaction.delete(lockRef);
         }
 
-        if (resolvedAvailRef != null &&
-            availData != null &&
-            timeSlot != null &&
-            sessionType != null) {
-          final updated =
-              _computeRestoredSlots(availData, timeSlot, sessionType);
-          if (updated != null) {
-            transaction.update(resolvedAvailRef, {
-              'timeSlots': updated,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
+        // Re-enable availability slot if needed
+        if (mohaffezId != null && slotDate != null &&
+            timeSlot != null && sessionType != null) {
+          final availRef = await _findAvailabilityRefTransaction(
+            transaction: transaction,
+            mohaffezId: mohaffezId,
+            slotDate: slotDate,
+          );
+          if (availRef != null) {
+            final availSnap = await transaction.get(availRef);
+            if (availSnap.exists) {
+              final availData = availSnap.data() as Map<String, dynamic>?;
+              if (availData != null) {
+                final updated = _computeRestoredSlots(availData, timeSlot, sessionType);
+                if (updated != null) {
+                  transaction.update(availRef, {
+                    'timeSlots': updated,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                }
+              }
+            }
           }
         }
 
-        if (mohaffezId != null) {
+        // Send notification inside transaction
+        if (mohaffezId != null && notifyStudentId != null) {
           final notifRef = _firestore.collection('notifications').doc();
           transaction.set(notifRef, {
             'userId': mohaffezId,
             'recipientId': mohaffezId,
-            'senderId': studentId,
+            'senderId': notifyStudentId,
             'title': 'تم إلغاء طلب الحجز',
-            'body': 'قام $studentName بإلغاء طلب الحجز',
+            'body': 'قام $notifyStudentName بإلغاء طلب الحجز',
             'type': 'sessionCancelled',
             'isRead': false,
             'requestId': requestId,
@@ -906,6 +924,26 @@ class BookingService {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   String _normalizeTimeSlot(String raw) => raw.replaceAll(' ', '');
+
+  // Helper method for finding availability reference inside transaction
+  Future<DocumentReference?> _findAvailabilityRefTransaction({
+    required Transaction transaction,
+    required String mohaffezId,
+    required Timestamp slotDate,
+  }) async {
+    final slotDateObj = slotDate.toDate();
+    final dayOfWeek = slotDateObj.weekday == 7 ? 7 : slotDateObj.weekday + 1;
+    
+    final availQuery = _firestore
+        .collection('users').doc(mohaffezId)
+        .collection('availability')
+        .where('dayOfWeek', isEqualTo: dayOfWeek)
+        .limit(1);
+    
+    final availSnap = await availQuery.get();
+    if (availSnap.docs.isEmpty) return null;
+    return availSnap.docs.first.reference;
+  }
 
   Future<DocumentReference?> _findAvailabilityRef({
     required String mohaffezId,

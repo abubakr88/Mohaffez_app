@@ -24,8 +24,8 @@ class TimeoutGuard implements RouteGuard {
 
   static const Duration maxWaitDuration = Duration(seconds: 12);
 
-  // Debounce to avoid repeated redirects while router is transitioning.
-  static const Duration _redirectDebounce = Duration(milliseconds: 800);
+  // FIX-TIMEOUT-1: Increase debounce to outlast GoRouter's default transition.
+  static const Duration _redirectDebounce = Duration(milliseconds: 1500);
 
   static DateTime? _startedAt;
   static bool _logoutTriggered = false;

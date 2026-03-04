@@ -71,12 +71,15 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
   String get _selectedNumber => _wallets[_selectedMethod?.value ?? ''] ?? '';
 
   Future<void> _confirmPayment() async {
+    // Early exit — no await here so context is safe
     if (_selectedMethod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('اختر طريقة الدفع أولاً')));
       return;
     }
+
     setState(() => _submitting = true);
+
     try {
       await DirectPaymentService.studentMarkPaid(
         requestId: widget.requestId,
@@ -98,11 +101,13 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
         imamAddressLng: widget.imamAddressLng,
         mohaffezPhone: widget.mohaffezPhone,
       );
-      if (!mounted) return;
+
+      if (!mounted) return; // FIXED: FIX-1 — widget may be disposed after await
+
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => AlertDialog(
+        builder: (dialogContext) => AlertDialog( // ✅ use dialogContext, not outer context
           title: const Text('تم إرسال الإشعار ✅'),
           content: const Text(
             'تم إرسال إشعار الدفع للمحفظ.\n'
@@ -112,7 +117,8 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).popUntil((r) => r.isFirst);
+                // ✅ dialogContext is always valid here — dialog is still mounted
+                Navigator.of(dialogContext).popUntil((r) => r.isFirst);
               },
               child: const Text('حسناً'),
             ),
@@ -120,9 +126,11 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
         ),
       );
     } catch (e) {
+      if (!mounted) return; // FIXED: FIX-1 — guard before ScaffoldMessenger too
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('خطأ: $e')));
     } finally {
+      // ✅ mounted check required — finally always runs, even after early return
       if (mounted) setState(() => _submitting = false);
     }
   }

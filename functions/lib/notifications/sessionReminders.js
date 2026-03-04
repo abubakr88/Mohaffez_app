@@ -45,45 +45,58 @@ exports.sendSessionReminders = functions.pubsub
             if (!studentId || !mohaffezId) {
                 continue;
             }
-            await (0, notificationHelpers_1.createAndSendNotification)({
-                userId: studentId,
-                senderId: mohaffezId,
-                title: '📅 تذكير: جلسة غداً',
-                body: `جلستك مع ${teacherName} غداً ${timeSlot}`,
-                type: 'session_reminder_24h',
-                isRead: false,
-                data: {
-                    type: 'session_reminder_24h',
-                    sessionId: doc.id,
-                },
-            });
-            await (0, notificationHelpers_1.createAndSendNotification)({
-                userId: mohaffezId,
-                senderId: studentId,
-                title: '📅 تذكير: جلسة غداً',
-                body: `جلستك مع ${studentName} غداً ${timeSlot}`,
-                type: 'session_reminder_24h',
-                isRead: false,
-                data: {
-                    type: 'session_reminder_24h',
-                    sessionId: doc.id,
-                },
-            });
-            await admin_1.db.runTransaction(async (transaction) => {
-                const fresh = await transaction.get(doc.ref);
-                if (!fresh.exists) {
-                    return;
-                }
-                const freshData = fresh.data();
-                if ((freshData === null || freshData === void 0 ? void 0 : freshData.reminder24hSent) === true) {
-                    return;
-                }
-                transaction.update(doc.ref, {
-                    reminder24hSent: true,
-                    reminder24hSentAt: admin_1.FieldValue.serverTimestamp(),
-                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+            // FIX-REMINDER-1: Claim the flag atomically BEFORE sending the notification.
+            // This prevents duplicate sends if the transaction succeeds but FCM fails,
+            // or if the cron fires again before the flag write completes.
+            let shouldSend24h = false;
+            try {
+                await admin_1.db.runTransaction(async (transaction) => {
+                    var _a;
+                    const fresh = await transaction.get(doc.ref);
+                    if (!fresh.exists)
+                        return;
+                    if (((_a = fresh.data()) === null || _a === void 0 ? void 0 : _a.reminder24hSent) === true)
+                        return; // already claimed
+                    transaction.update(doc.ref, {
+                        reminder24hSent: true,
+                        reminder24hSentAt: admin_1.FieldValue.serverTimestamp(),
+                        updatedAt: admin_1.FieldValue.serverTimestamp(),
+                    });
+                    shouldSend24h = true;
                 });
-            });
+            }
+            catch (flagError) {
+                functions.logger.error('Failed to claim reminder24h flag', {
+                    docId: doc.id, error: flagError
+                });
+                continue; // skip this doc safely — try again next cron tick
+            }
+            if (shouldSend24h) {
+                await (0, notificationHelpers_1.createAndSendNotification)({
+                    userId: studentId,
+                    senderId: mohaffezId,
+                    title: '📅 تذكير: جلسة غداً',
+                    body: `جلستك مع ${teacherName} غداً ${timeSlot}`,
+                    type: 'session_reminder_24h',
+                    isRead: false,
+                    data: {
+                        type: 'session_reminder_24h',
+                        sessionId: doc.id,
+                    },
+                });
+                await (0, notificationHelpers_1.createAndSendNotification)({
+                    userId: mohaffezId,
+                    senderId: studentId,
+                    title: '📅 تذكير: جلسة غداً',
+                    body: `جلستك مع ${studentName} غداً ${timeSlot}`,
+                    type: 'session_reminder_24h',
+                    isRead: false,
+                    data: {
+                        type: 'session_reminder_24h',
+                        sessionId: doc.id,
+                    },
+                });
+            }
         }
         catch (error) {
             functions.logger.error('Failed to process 24h session reminder', {
@@ -124,41 +137,54 @@ exports.sendSessionReminders = functions.pubsub
                 teacherPhone,
                 location,
             };
-            await (0, notificationHelpers_1.createAndSendNotification)({
-                userId: studentId,
-                senderId: mohaffezId,
-                title: '🔔 جلستك قريباً!',
-                body: studentBody,
-                type: 'session_reminder_1h',
-                isRead: false,
-                data: reminderData,
-                highPriority: true,
-            });
-            await (0, notificationHelpers_1.createAndSendNotification)({
-                userId: mohaffezId,
-                senderId: studentId,
-                title: '🔔 جلستك قريباً!',
-                body: teacherBody,
-                type: 'session_reminder_1h',
-                isRead: false,
-                data: reminderData,
-                highPriority: true,
-            });
-            await admin_1.db.runTransaction(async (transaction) => {
-                const fresh = await transaction.get(doc.ref);
-                if (!fresh.exists) {
-                    return;
-                }
-                const freshData = fresh.data();
-                if ((freshData === null || freshData === void 0 ? void 0 : freshData.reminder1hSent) === true) {
-                    return;
-                }
-                transaction.update(doc.ref, {
-                    reminder1hSent: true,
-                    reminder1hSentAt: admin_1.FieldValue.serverTimestamp(),
-                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+            // FIX-REMINDER-1: Claim the flag atomically BEFORE sending the notification.
+            // This prevents duplicate sends if the transaction succeeds but FCM fails,
+            // or if the cron fires again before the flag write completes.
+            let shouldSend1h = false;
+            try {
+                await admin_1.db.runTransaction(async (transaction) => {
+                    var _a;
+                    const fresh = await transaction.get(doc.ref);
+                    if (!fresh.exists)
+                        return;
+                    if (((_a = fresh.data()) === null || _a === void 0 ? void 0 : _a.reminder1hSent) === true)
+                        return; // already claimed
+                    transaction.update(doc.ref, {
+                        reminder1hSent: true,
+                        reminder1hSentAt: admin_1.FieldValue.serverTimestamp(),
+                        updatedAt: admin_1.FieldValue.serverTimestamp(),
+                    });
+                    shouldSend1h = true;
                 });
-            });
+            }
+            catch (flagError) {
+                functions.logger.error('Failed to claim reminder1h flag', {
+                    docId: doc.id, error: flagError
+                });
+                continue; // skip this doc safely — try again next cron tick
+            }
+            if (shouldSend1h) {
+                await (0, notificationHelpers_1.createAndSendNotification)({
+                    userId: studentId,
+                    senderId: mohaffezId,
+                    title: '🔔 جلستك قريباً!',
+                    body: studentBody,
+                    type: 'session_reminder_1h',
+                    isRead: false,
+                    data: reminderData,
+                    highPriority: true,
+                });
+                await (0, notificationHelpers_1.createAndSendNotification)({
+                    userId: mohaffezId,
+                    senderId: studentId,
+                    title: '🔔 جلستك قريباً!',
+                    body: teacherBody,
+                    type: 'session_reminder_1h',
+                    isRead: false,
+                    data: reminderData,
+                    highPriority: true,
+                });
+            }
         }
         catch (error) {
             functions.logger.error('Failed to process 1h session reminder', {

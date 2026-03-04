@@ -80,14 +80,20 @@ class DirectPaymentModel {
   factory DirectPaymentModel.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
 
-    // TypeScript writes: 'pending_confirmation' | 'confirmed' | 'rejected'
-    DirectPaymentStatus parseStatus(String? s) => switch (s) {
-          'confirmed'           => DirectPaymentStatus.confirmed,
-          'rejected'            => DirectPaymentStatus.rejected,
-          'pending_confirmation' => DirectPaymentStatus.pendingConfirmation,
-          _                     => DirectPaymentStatus.pendingConfirmation,
-        };
-
+    // direct_payment_model.dart — parseStatus()
+    DirectPaymentStatus parseStatus(String? s) {
+      switch (s) {
+        case 'confirmed':   return DirectPaymentStatus.confirmed;
+        case 'rejected':    return DirectPaymentStatus.rejected;
+        case 'pendingconfirmation': return DirectPaymentStatus.pendingConfirmation;
+        // ✅ ADD THIS:
+        case 'awaitingdirectpaymentconfirmation':
+          return DirectPaymentStatus.pendingConfirmation;
+        default:
+          return DirectPaymentStatus.pendingConfirmation;
+      }
+    }
+    
     DateTime? parseTs(dynamic v) {
       if (v is Timestamp) return v.toDate();
       if (v is String) return DateTime.tryParse(v);

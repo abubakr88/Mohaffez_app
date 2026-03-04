@@ -13,7 +13,8 @@ const STATUS = {
 } as const;
 
 function normalizeTimeSlot(raw: string): string {
-  return raw.replace(/\s/g, '');
+  // FIXED: BUG-5 - strip both hyphens AND en-dashes
+  return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
 }
 
 function parseFlutterDate(iso: string): Date {
@@ -234,21 +235,37 @@ export const createSessionRequest = functions.https.onCall(
               return slot;
             });
 
-            if (!changed) updatedSlots = null;
+            // FIXED: BUG-5 - Warn if slot disable was skipped due to mismatch
+            if (!changed) {
+              functions.logger.warn('createSessionRequest: slot disable skipped — no matching slot found', {
+                lockTimeSlot,
+                lockSessionType,
+                availableSlots: slots.map((s: any) =>
+                  `${s.startTime}-${s.endTime}:${s.sessionType}`
+                ),
+              });
+              updatedSlots = null;
+            }
           }
         }
       }
 
       // ── 4b. Conflict guard ─────────────────────────────────────────────
+      // FIX-BOOKING-1: Guard against all live statuses, not just PENDING.
+      // Required Firestore composite index: (mohaffezId ASC, status ASC, slotDate ASC)
+      // Add this index to firestore.indexes.json if not already present.
+      const LIVE_STATUSES = [
+        STATUS.PENDING,
+        STATUS.AWAITING_PAYMENT,
+        STATUS.AWAITING_DIRECT,
+        STATUS.ACCEPTED,
+      ] as const;
+
       const conflictQuery = db
         .collection('sessionRequests')
         .where('mohaffezId', '==', mohaffezId)
-        .where('status', '==', STATUS.PENDING)
-        .where(
-          'slotDate',
-          '==',
-          admin.firestore.Timestamp.fromDate(slotDateObj)
-        );
+        .where('status', 'in', [...LIVE_STATUSES])
+        .where('slotDate', '==', admin.firestore.Timestamp.fromDate(slotDateObj));
 
       const conflictSnap = await transaction.get(conflictQuery);
 

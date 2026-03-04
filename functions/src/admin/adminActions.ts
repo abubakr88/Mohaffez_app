@@ -147,22 +147,29 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
 
   await auth.getUser(userId);
 
-  // FIX-5: Commit Firestore batch first, then delete Auth user to avoid orphaned data
-  const [studentPending, mohaffezPending] = await Promise.all([
+  // FIX-DELETE-1: Cancel all live requests, not just pending.
+  const LIVE_STATUSES_FOR_DELETE = [
+    'pending',
+    'awaitingpayment',
+    'awaitingdirectpaymentconfirmation',
+    'accepted',
+  ];
+
+  const [studentLive, mohaffezLive] = await Promise.all([
     db
       .collection('sessionRequests')
       .where('studentId', '==', userId)
-      .where('status', '==', 'pending')
+      .where('status', 'in', LIVE_STATUSES_FOR_DELETE)
       .get(),
     db
       .collection('sessionRequests')
       .where('mohaffezId', '==', userId)
-      .where('status', '==', 'pending')
+      .where('status', 'in', LIVE_STATUSES_FOR_DELETE)
       .get(),
   ]);
 
   const batch = db.batch();
-  for (const doc of [...studentPending.docs, ...mohaffezPending.docs]) {
+  for (const doc of [...studentLive.docs, ...mohaffezLive.docs]) {
     batch.update(doc.ref, {
       status: 'cancelled',
       cancelledBy: performedBy,
@@ -171,8 +178,15 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
     });
   }
   batch.delete(db.collection('users').doc(userId));
+
+  // FIXED: BUG-2 - Delete Auth FIRST, then Firestore
+  try {
+    await auth.deleteUser(userId);
+  } catch (authErr) {
+    functions.logger.error('deleteUserAccount: Auth delete failed', { userId, authErr });
+    throw new functions.https.HttpsError('internal', 'Failed to delete auth account');
+  }
   await batch.commit();
-  await auth.deleteUser(userId);
 
   await writeAuditLog({
     action: 'deleteUserAccount',
@@ -211,13 +225,16 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
   }
 
   const chunkSize = 500;
+  // FIX-BROADCAST-1: Count actual FCM deliveries, not total tokens.
+  let successCount = 0;
   for (let i = 0; i < tokens.length; i += chunkSize) {
     const chunk = tokens.slice(i, i + chunkSize);
-    await messaging.sendEachForMulticast({
+    const batchResponse = await messaging.sendEachForMulticast({
       tokens: chunk,
       notification: { title, body },
       data: { type: 'broadcast', targetRole },
     });
+    successCount += batchResponse.successCount;
   }
 
   await db.collection('broadcastHistory').add({
@@ -226,22 +243,23 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
     targetRole,
     sentAt: FieldValue.serverTimestamp(),
     sentBy: performedBy,
-    recipientCount: tokens.length,
+    recipientCount: successCount,
+    totalTokens: tokens.length,
   });
 
   await writeAuditLog({
     action: 'sendBroadcastNotification',
     performedBy,
-    data: { title, targetRole, recipientCount: tokens.length },
+    data: { title, targetRole, recipientCount: successCount },
   });
 
   functions.logger.info('Admin sent broadcast notification', {
     performedBy,
     targetRole,
-    recipientCount: tokens.length,
+    recipientCount: successCount,
   });
 
-  return { recipientCount: tokens.length };
+  return { recipientCount: successCount };
 });
 
 /**

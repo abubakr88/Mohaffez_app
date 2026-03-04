@@ -3,7 +3,8 @@ import * as functions from 'firebase-functions';
 import admin, { db, FieldValue } from '../utils/admin';
 
 function normalizeTimeSlot(raw: string): string {
-  return raw.replace(/\s+/g, '');
+  // FIXED: BUG-5 - strip both hyphens AND en-dashes
+  return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
 }
 
 export async function releaseExpiredSlotLocksNow(): Promise<number> {

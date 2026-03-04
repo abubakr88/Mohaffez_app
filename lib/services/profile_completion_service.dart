@@ -109,22 +109,39 @@ class ProfileCompletionService {
       final userDoc = await userRef.get();
       final data = userDoc.data() ?? {};
 
-      final badges = Map<String, bool>.from(data['badges'] as Map? ?? {});
+      final currentBadges = Map<String, bool>.from(data['badges'] as Map? ?? {});
       final rating = (data['rating'] as num?)?.toDouble() ?? 0;
 
-      // Check for Experienced Badge (50+ sessions with 4.5+ rating)
+      // Get session count for this mohaffez
       final completedSessions = await FirebaseFirestore.instance
           .collection('hafizSessions')
           .where('mohaffezId', isEqualTo: userId)
           .get();
 
-      if (completedSessions.docs.length >= 50 && rating >= 4.5) {
-        badges['experienced'] = true;
+      final sessionCount = completedSessions.docs.length;
+
+      // FIX: Use dot-notation field-level updates instead of overwriting entire badges map
+      final Map<String, dynamic> updates = {};
+
+      // Check for First Ten Badge (10+ sessions)
+      if (sessionCount >= 10 && currentBadges['firstTen'] != true) {
+        updates['badges.firstTen'] = true;
       }
 
-      // Update badges if changed
-      if (badges.isNotEmpty) {
-        await userRef.update({'badges': badges});
+      // Check for Experienced Badge (50+ sessions with 4.5+ rating)
+      if (sessionCount >= 50 && rating >= 4.5 && currentBadges['experienced'] != true) {
+        updates['badges.experienced'] = true;
+      }
+
+      // Check for Centurion Badge (100+ sessions)
+      if (sessionCount >= 100 && currentBadges['centurion'] != true) {
+        updates['badges.centurion'] = true;
+      }
+
+      // Apply updates only if there are new badges to award
+      if (updates.isNotEmpty) {
+        updates['updatedAt'] = FieldValue.serverTimestamp();
+        await userRef.update(updates);
       }
     } catch (e) {
       // Handle error silently

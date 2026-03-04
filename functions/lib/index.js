@@ -2,7 +2,7 @@
 // functions/src/index.ts
 // Main entry point - only imports and re-exports
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkVersion = exports.checkMaintenanceMode = exports.checkAppVersion = exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.suspendUser = exports.setUserRole = exports.markCommissionPaid = exports.processWeeklyCommissions = exports.mohaffezRejectDirectPayment = exports.mohaffezConfirmDirectPayment = exports.studentMarkedDirectPayment = exports.createSessionRequest = exports.confirmFreeSession = exports.releaseExpiredSlotLocks = exports.onPaymentCreated = exports.checkExpiredPayments = exports.projectPaymentAnalytics = exports.sendSessionReminders = exports.sendPaymentDeadlineReminders = exports.onSessionCompleted = exports.onSessionCreated = exports.onSessionRequestStatusChanged = exports.onSessionRequestAccepted = exports.sendNotification = void 0;
+exports.mohaffezReportCommissionPayment = exports.markCommissionPaid = exports.processWeeklyCommissions = exports.checkVersion = exports.checkMaintenanceMode = exports.checkAppVersion = exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.suspendUser = exports.setUserRole = exports.mohaffezRejectDirectPayment = exports.mohaffezConfirmDirectPayment = exports.studentMarkedDirectPayment = exports.createSessionRequest = exports.confirmFreeSession = exports.releaseExpiredSlotLocks = exports.onPaymentCreated = exports.checkExpiredPayments = exports.projectPaymentAnalytics = exports.sendSessionReminders = exports.sendPaymentDeadlineReminders = exports.onSessionCompleted = exports.onSessionCreated = exports.onSessionRequestStatusChanged = exports.onSessionRequestAccepted = exports.sendNotification = void 0;
 // Notification functions
 var sendNotification_1 = require("./notifications/sendNotification");
 Object.defineProperty(exports, "sendNotification", { enumerable: true, get: function () { return sendNotification_1.sendNotification; } });
@@ -38,9 +38,6 @@ var directPayment_1 = require("./payments/directPayment");
 Object.defineProperty(exports, "studentMarkedDirectPayment", { enumerable: true, get: function () { return directPayment_1.studentMarkedDirectPayment; } });
 Object.defineProperty(exports, "mohaffezConfirmDirectPayment", { enumerable: true, get: function () { return directPayment_1.mohaffezConfirmDirectPayment; } });
 Object.defineProperty(exports, "mohaffezRejectDirectPayment", { enumerable: true, get: function () { return directPayment_1.mohaffezRejectDirectPayment; } });
-var commissions_1 = require("./payments/commissions");
-Object.defineProperty(exports, "processWeeklyCommissions", { enumerable: true, get: function () { return commissions_1.processWeeklyCommissions; } });
-Object.defineProperty(exports, "markCommissionPaid", { enumerable: true, get: function () { return commissions_1.markCommissionPaid; } });
 // Admin functions
 var adminActions_1 = require("./admin/adminActions");
 Object.defineProperty(exports, "setUserRole", { enumerable: true, get: function () { return adminActions_1.setUserRole; } });
@@ -58,4 +55,8 @@ var maintenanceCheck_1 = require("./admin/maintenanceCheck");
 Object.defineProperty(exports, "checkMaintenanceMode", { enumerable: true, get: function () { return maintenanceCheck_1.checkMaintenanceMode; } });
 var appVersion_1 = require("./admin/appVersion");
 Object.defineProperty(exports, "checkVersion", { enumerable: true, get: function () { return appVersion_1.checkVersion; } });
+var commissions_1 = require("./payments/commissions");
+Object.defineProperty(exports, "processWeeklyCommissions", { enumerable: true, get: function () { return commissions_1.processWeeklyCommissions; } });
+Object.defineProperty(exports, "markCommissionPaid", { enumerable: true, get: function () { return commissions_1.markCommissionPaid; } });
+Object.defineProperty(exports, "mohaffezReportCommissionPayment", { enumerable: true, get: function () { return commissions_1.mohaffezReportCommissionPayment; } });
 //# sourceMappingURL=index.js.map

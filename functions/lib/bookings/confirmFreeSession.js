@@ -22,6 +22,7 @@ function parseFlutterDate(iso) {
     return new Date(iso);
 }
 exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
+    var _a;
     functions.logger.info("🎫 confirmFreeSession v6.0 (17/2/2026) - Enhanced Logging");
     // 1. Verify authentication
     if (!context.auth) {
@@ -124,12 +125,13 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
                     requestId,
                     sessionId: session.id,
                 });
-                throw new functions.https.HttpsError("already-exists", JSON.stringify({
+                return {
+                    __idempotent: true,
                     success: true,
                     sessionId: session.id,
                     requestId: requestId,
                     message: "الجلسة موجودة بالفعل",
-                }));
+                };
             }
         }
         // Check 2: By paymentId
@@ -146,12 +148,13 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
                     paymentId,
                     sessionId: session.id,
                 });
-                throw new functions.https.HttpsError("already-exists", JSON.stringify({
+                return {
+                    __idempotent: true,
                     success: true,
                     sessionId: session.id,
                     requestId: sessionData.requestId || null,
                     message: "الجلسة موجودة بالفعل",
-                }));
+                };
             }
         }
         // ============================================
@@ -246,12 +249,13 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
                         sessionId,
                         oldStatus: requestData.status,
                     });
-                    throw new functions.https.HttpsError('already-exists', JSON.stringify({
+                    return {
+                        __idempotent: true,
                         success: true,
                         sessionId: sessionId,
                         requestId: requestId,
                         message: 'الجلسة مؤكدة بالفعل'
-                    }));
+                    };
                 }
             }
             isUpdatingExisting = true;
@@ -463,42 +467,63 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             message: "تم إنشاء الجلسة المجانية بنجاح",
             isUpdatingExisting, // ✅ Include in response
         };
-    }).catch((error) => {
-        // Handle "already-exists" pseudo-error (used for early return)
-        if (error.code === "already-exists") {
-            const result = JSON.parse(error.message);
-            functions.logger.info("✅ Returning existing session (no duplicate created)", result);
-            return result;
-        }
-        // ✅ LOG ANY OTHER ERRORS
-        functions.logger.error("❌ Transaction failed", {
-            errorCode: error.code,
-            errorMessage: error.message,
-            stack: error.stack,
-        });
-        throw error;
     });
+    // FIX-CONFIRM-2: Handle idempotent early-returns cleanly without JSON.parse.
+    if (result.__idempotent === true) {
+        functions.logger.info('confirmFreeSession: returning existing session', result);
+        return {
+            success: result.success,
+            sessionId: result.sessionId,
+            requestId: result.requestId,
+            paymentId: (_a = result.paymentId) !== null && _a !== void 0 ? _a : null,
+            message: result.message,
+        };
+    }
     const { createAndSendNotification } = await Promise.resolve().then(() => require('../utils/notificationHelpers'));
-    await Promise.all([
-        createAndSendNotification({
-            userId: studentId,
-            senderId: mohaffezId,
-            title: 'تم تأكيد جلستك المجانية ✅',
-            body: `جلستك مع ${mohaffezName} مؤكدة.`,
-            type: 'sessionconfirmed',
-            highPriority: true,
-            data: { sessionId: result.sessionId, requestId: result.requestId },
-        }),
-        createAndSendNotification({
-            userId: mohaffezId,
-            senderId: studentId,
-            title: 'حجز جلسة مجانية جديد',
-            body: `${studentName} حجز جلسة مجانية معك.`,
-            type: 'sessionconfirmed',
-            highPriority: true,
-            data: { sessionId: result.sessionId, requestId: result.requestId },
-        }),
-    ]);
+    try {
+        await Promise.all([
+            createAndSendNotification({
+                userId: studentId,
+                senderId: mohaffezId,
+                title: 'تم تأكيد جلستك المجانية ✅',
+                body: `جلستك مع ${mohaffezName} مؤكدة.`,
+                type: 'sessionconfirmed',
+                highPriority: true,
+                data: { sessionId: result.sessionId, requestId: result.requestId },
+            }),
+            createAndSendNotification({
+                userId: mohaffezId,
+                senderId: studentId,
+                title: 'حجز جلسة مجانية جديد',
+                body: `${studentName} حجز جلسة مجانية معك.`,
+                type: 'sessionconfirmed',
+                highPriority: true,
+                data: { sessionId: result.sessionId, requestId: result.requestId },
+            }),
+        ]);
+    }
+    catch (notifError) {
+        // FIX-CONFIRM-1: Log and enqueue for retry — do NOT crash the function.
+        // The session is already confirmed; only the push notification failed.
+        functions.logger.error('confirmFreeSession: post-transaction FCM failed', {
+            sessionId: result.sessionId,
+            requestId: result.requestId,
+            studentId,
+            mohaffezId,
+            error: notifError instanceof Error ? notifError.message : String(notifError),
+        });
+        await admin_1.db.collection('failedOperations').add({
+            operationType: 'notification-free-session',
+            sessionId: result.sessionId,
+            requestId: result.requestId,
+            studentId,
+            mohaffezId,
+            error: notifError instanceof Error ? notifError.message : 'unknown',
+            timestamp: admin_1.FieldValue.serverTimestamp(),
+            retryCount: 0,
+            status: 'pending-retry',
+        });
+    }
     return result;
 });
 //# sourceMappingURL=confirmFreeSession.js.map

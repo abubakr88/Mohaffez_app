@@ -62,48 +62,56 @@ export const sendSessionReminders = functions.pubsub
           continue;
         }
 
-        await createAndSendNotification({
-          userId: studentId,
-          senderId: mohaffezId,
-          title: '📅 تذكير: جلسة غداً',
-          body: `جلستك مع ${teacherName} غداً ${timeSlot}`,
-          type: 'session_reminder_24h',
-          isRead: false,
-          data: {
-            type: 'session_reminder_24h',
-            sessionId: doc.id,
-          },
-        });
-
-        await createAndSendNotification({
-          userId: mohaffezId,
-          senderId: studentId,
-          title: '📅 تذكير: جلسة غداً',
-          body: `جلستك مع ${studentName} غداً ${timeSlot}`,
-          type: 'session_reminder_24h',
-          isRead: false,
-          data: {
-            type: 'session_reminder_24h',
-            sessionId: doc.id,
-          },
-        });
-
-        await db.runTransaction(async (transaction) => {
-          const fresh = await transaction.get(doc.ref);
-          if (!fresh.exists) {
-            return;
-          }
-          const freshData = fresh.data();
-          if (freshData?.reminder24hSent === true) {
-            return;
-          }
-
-          transaction.update(doc.ref, {
-            reminder24hSent: true,
-            reminder24hSentAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
+        // FIX-REMINDER-1: Claim the flag atomically BEFORE sending the notification.
+        // This prevents duplicate sends if the transaction succeeds but FCM fails,
+        // or if the cron fires again before the flag write completes.
+        let shouldSend24h = false;
+        try {
+          await db.runTransaction(async (transaction) => {
+            const fresh = await transaction.get(doc.ref);
+            if (!fresh.exists) return;
+            if (fresh.data()?.reminder24hSent === true) return; // already claimed
+            transaction.update(doc.ref, {
+              reminder24hSent: true,
+              reminder24hSentAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            shouldSend24h = true;
           });
-        });
+        } catch (flagError) {
+          functions.logger.error('Failed to claim reminder24h flag', {
+            docId: doc.id, error: flagError
+          });
+          continue; // skip this doc safely — try again next cron tick
+        }
+
+        if (shouldSend24h) {
+          await createAndSendNotification({
+            userId: studentId,
+            senderId: mohaffezId,
+            title: '📅 تذكير: جلسة غداً',
+            body: `جلستك مع ${teacherName} غداً ${timeSlot}`,
+            type: 'session_reminder_24h',
+            isRead: false,
+            data: {
+              type: 'session_reminder_24h',
+              sessionId: doc.id,
+            },
+          });
+
+          await createAndSendNotification({
+            userId: mohaffezId,
+            senderId: studentId,
+            title: '📅 تذكير: جلسة غداً',
+            body: `جلستك مع ${studentName} غداً ${timeSlot}`,
+            type: 'session_reminder_24h',
+            isRead: false,
+            data: {
+              type: 'session_reminder_24h',
+              sessionId: doc.id,
+            },
+          });
+        }
       } catch (error) {
         functions.logger.error('Failed to process 24h session reminder', {
           sessionId: doc.id,
@@ -154,44 +162,52 @@ export const sendSessionReminders = functions.pubsub
           location,
         };
 
-        await createAndSendNotification({
-          userId: studentId,
-          senderId: mohaffezId,
-          title: '🔔 جلستك قريباً!',
-          body: studentBody,
-          type: 'session_reminder_1h',
-          isRead: false,
-          data: reminderData,
-          highPriority: true,
-        });
-
-        await createAndSendNotification({
-          userId: mohaffezId,
-          senderId: studentId,
-          title: '🔔 جلستك قريباً!',
-          body: teacherBody,
-          type: 'session_reminder_1h',
-          isRead: false,
-          data: reminderData,
-          highPriority: true,
-        });
-
-        await db.runTransaction(async (transaction) => {
-          const fresh = await transaction.get(doc.ref);
-          if (!fresh.exists) {
-            return;
-          }
-          const freshData = fresh.data();
-          if (freshData?.reminder1hSent === true) {
-            return;
-          }
-
-          transaction.update(doc.ref, {
-            reminder1hSent: true,
-            reminder1hSentAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
+        // FIX-REMINDER-1: Claim the flag atomically BEFORE sending the notification.
+        // This prevents duplicate sends if the transaction succeeds but FCM fails,
+        // or if the cron fires again before the flag write completes.
+        let shouldSend1h = false;
+        try {
+          await db.runTransaction(async (transaction) => {
+            const fresh = await transaction.get(doc.ref);
+            if (!fresh.exists) return;
+            if (fresh.data()?.reminder1hSent === true) return; // already claimed
+            transaction.update(doc.ref, {
+              reminder1hSent: true,
+              reminder1hSentAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            shouldSend1h = true;
           });
-        });
+        } catch (flagError) {
+          functions.logger.error('Failed to claim reminder1h flag', {
+            docId: doc.id, error: flagError
+          });
+          continue; // skip this doc safely — try again next cron tick
+        }
+
+        if (shouldSend1h) {
+          await createAndSendNotification({
+            userId: studentId,
+            senderId: mohaffezId,
+            title: '🔔 جلستك قريباً!',
+            body: studentBody,
+            type: 'session_reminder_1h',
+            isRead: false,
+            data: reminderData,
+            highPriority: true,
+          });
+
+          await createAndSendNotification({
+            userId: mohaffezId,
+            senderId: studentId,
+            title: '🔔 جلستك قريباً!',
+            body: teacherBody,
+            type: 'session_reminder_1h',
+            isRead: false,
+            data: reminderData,
+            highPriority: true,
+          });
+        }
       } catch (error) {
         functions.logger.error('Failed to process 1h session reminder', {
           sessionId: doc.id,

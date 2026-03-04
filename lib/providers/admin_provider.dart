@@ -61,35 +61,37 @@ final userFilterProvider = StateNotifierProvider<UserFilterNotifier, UserFilterS
   (ref) => UserFilterNotifier(),
 );
 
-/// Client-side filtered stream — streams all users then filters in memory
-/// (Firestore doesn't support partial text search)
+/// Server-side filtered stream — applies role/status filters via Firestore .where()
+/// Only text search (name/uid contains) is done client-side since Firestore
+/// doesn't support partial text search
+// FIXED: BUG-6
 final filteredUsersProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
   final filter = ref.watch(userFilterProvider);
-  return FirebaseFirestore.instance
-      .collection('users')
-      .orderBy('name')
-      .snapshots()
-      .map((snap) {
-        var users = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
-        // Apply role filter
-        if (filter.roleFilter != null) {
-          users = users.where((u) => u['role'] == filter.roleFilter).toList();
-        }
-        // Apply status filter
-        if (filter.statusFilter != null) {
-          users = users.where((u) => u['status'] == filter.statusFilter).toList();
-        }
-        // Apply text search on name + uid (case-insensitive)
-        if (filter.searchQuery.isNotEmpty) {
-          final q = filter.searchQuery.toLowerCase();
-          users = users.where((u) {
-            final name = (u['name'] as String? ?? '').toLowerCase();
-            final uid = (u['id'] as String? ?? '').toLowerCase();
-            return name.contains(q) || uid.contains(q);
-          }).toList();
-        }
-        return users;
-      });
+
+  Query<Map<String, dynamic>> query =
+      FirebaseFirestore.instance.collection('users').orderBy('name');
+
+  if (filter.roleFilter != null) {
+    query = query.where('role', isEqualTo: filter.roleFilter);
+  }
+  if (filter.statusFilter != null) {
+    query = query.where('status', isEqualTo: filter.statusFilter);
+  }
+
+  return query.snapshots().map((snap) {
+    var users = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+    // Apply text search on name + uid (case-insensitive) — client-side only
+    // because Firestore doesn't support partial text search
+    if (filter.searchQuery.isNotEmpty) {
+      final q = filter.searchQuery.toLowerCase();
+      users = users.where((u) {
+        final name = (u['name'] as String? ?? '').toLowerCase();
+        final uid = (u['id'] as String? ?? '').toLowerCase();
+        return name.contains(q) || uid.contains(q);
+      }).toList();
+    }
+    return users;
+  });
 });
 
 final pendingCredentialsProvider =
