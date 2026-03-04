@@ -348,9 +348,10 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
         isLoadingMore: false,
         loadedIds: {...state.loadedIds, ...newIds},
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('loadMore failed: $e\n$stack');
       state = state.copyWith(
-        error: 'حدث خطأ في تحميل الجلسات. حاول مرة أخرى.',
+        error: e.toString(),
         isLoadingMore: false,
       );
     }
@@ -476,9 +477,10 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
         isLoadingMore: false,
         loadedIds: {...state.loadedIds, ...newIds},
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('loadMore failed: $e\n$stack');
       state = state.copyWith(
-        error: 'حدث خطأ في تحميل الجلسات. حاول مرة أخرى.',
+        error: e.toString(),
         isLoadingMore: false,
       );
     }
@@ -509,9 +511,14 @@ final studentSessionsFirstPageProvider =
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
-        ref.read(paginatedStudentSessionsProvider(studentId).notifier).refresh();
+        final notifier = ref.read(
+          paginatedStudentSessionsProvider(studentId).notifier,
+        );
+        if (notifier.state.sessions.isEmpty) {
+          notifier.refresh();
+        }
       } catch (_) {
-        // Provider was auto-disposed before the frame callback fired — safe to ignore.
+        // Provider disposed before frame — safe to ignore
       }
     });
 
@@ -679,6 +686,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       print('🚫 Rejecting request: $requestId');
 
+      // Declare notification data variables BEFORE the transaction
+      String? notifyStudentId;
+      String? notifyMohaffezName;
+
       await _firestore.runTransaction((transaction) async {
         // ── READ phase (inside transaction for consistency) ──────────────────────
         final requestRef = _firestore.collection('sessionRequests').doc(requestId);
@@ -704,6 +715,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
             requestData['timeSlot'] as String?;
         final sessionType = requestData['sessionType'] as String?;
         final slotLockId = requestData['slotLockId'] as String?;
+
+        // Capture notification data INSIDE the transaction
+        notifyStudentId = requestData['studentId'] as String?;
+        notifyMohaffezName = requestData['mohaffezName'] as String?;
 
         // ── WRITE phase ───────────────────────────────────────────────────────────
         transaction.update(requestRef, {
@@ -751,15 +766,14 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         }
       });
 
-      // Notification is sent AFTER the transaction completes successfully
-      final requestDoc = await _firestore.collection('sessionRequests').doc(requestId).get();
-      final requestData = requestDoc.data()!;
-
-      await _sendRejectionNotification(
-        studentId: requestData['studentId'],
-        mohaffezName: requestData['mohaffezName'],
-        reason: reason,
-      );
+      // Notification using data captured from transaction (no re-read needed)
+      if (notifyStudentId != null) {
+        await _sendRejectionNotification(
+          studentId: notifyStudentId!,
+          mohaffezName: notifyMohaffezName ?? '',
+          reason: reason,
+        );
+      }
 
       print('✅ Request rejected successfully');
     } catch (e) {
@@ -947,35 +961,33 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
           'cancelledBy': 'student',
         });
 
-        // Release slot lock inside same transaction
+        // Release slot lock and restore slot inside same transaction
         if (slotLockId != null && slotLockId.trim().isNotEmpty) {
           final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
           transaction.delete(lockRef);
-        }
 
-        // Re-enable availability slot if needed
-        if ((status == RequestStatus.awaitingPayment ||
-                status == RequestStatus.accepted) &&
-            mohaffezId != null && slotDate != null &&
-            timeSlot != null && sessionType != null) {
-          final availRef = await _findAvailabilityRefTransaction(
-            transaction: transaction,
-            mohaffezId: mohaffezId,
-            slotDate: slotDate,
-          );
-          if (availRef != null) {
-            final availSnap = await transaction.get(availRef);
-            if (availSnap.exists) {
-              final availData = availSnap.data() as Map<String, dynamic>?;
-              if (availData != null) {
-                final rawSlots = availData['timeSlots'];
-                if (rawSlots is List) {
-                  final updatedSlots = _computeRestoredSlots(availData, timeSlot, sessionType);
-                  if (updatedSlots != null) {
-                    transaction.update(availRef, {
-                      'timeSlots': updatedSlots,
-                      'updatedAt': FieldValue.serverTimestamp(),
-                    });
+          // Always attempt slot restoration when slotLockId exists
+          if (mohaffezId != null && slotDate != null &&
+              timeSlot != null && sessionType != null) {
+            final availRef = await _findAvailabilityRefTransaction(
+              transaction: transaction,
+              mohaffezId: mohaffezId,
+              slotDate: slotDate,
+            );
+            if (availRef != null) {
+              final availSnap = await transaction.get(availRef);
+              if (availSnap.exists) {
+                final availData = availSnap.data() as Map<String, dynamic>?;
+                if (availData != null) {
+                  final rawSlots = availData['timeSlots'];
+                  if (rawSlots is List) {
+                    final updatedSlots = _computeRestoredSlots(availData, timeSlot, sessionType);
+                    if (updatedSlots != null) {
+                      transaction.update(availRef, {
+                        'timeSlots': updatedSlots,
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
+                    }
                   }
                 }
               }
@@ -1007,7 +1019,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     required Timestamp slotDate,
   }) async {
     final slotDateObj = slotDate.toDate();
-    final dayOfWeek = slotDateObj.weekday == 7 ? 7 : slotDateObj.weekday + 1;
+    final dayOfWeek = slotDateObj.weekday;
     
     final availQuery = _firestore
         .collection('users').doc(mohaffezId)

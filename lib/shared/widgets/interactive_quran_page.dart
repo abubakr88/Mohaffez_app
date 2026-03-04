@@ -31,7 +31,6 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   Map<String, dynamic>? pageInfo;
   bool isLoading = true;
 
-  // GlobalKey for the image container to get accurate dimensions
   final GlobalKey _imageKey = GlobalKey();
 
   @override
@@ -50,7 +49,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         isLoading = false;
       });
     } catch (e) {
-      print('Error loading page data: $e');
+      debugPrint('Error loading page data: $e');
       setState(() => isLoading = false);
     }
   }
@@ -60,6 +59,25 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     setState(() => currentPage = newPage);
     widget.onPageChanged?.call(newPage);
     _loadPageData();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // JUMP SHEET
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  void _openJumpSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _JumpToSheet(
+        currentPage: currentPage,
+        onPageSelected: (page) {
+          Navigator.pop(context);
+          _changePage(page);
+        },
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -74,10 +92,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
     return Column(
       children: [
-        // Mistake type selector — teacher only
         if (widget.isEditable) _buildMistakeTypeSelector(),
-
-        // Quran page with tap detection
         Expanded(
           child: GestureDetector(
             onTapDown: widget.isEditable ? _handleTapDown : null,
@@ -89,11 +104,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
             ),
           ),
         ),
-
-        // Comment legend — only when there are mistakes with comments
         if (_hasAnyComments()) _buildCommentLegend(),
-
-        // Page navigation
         _buildPageNavigation(),
       ],
     );
@@ -127,14 +138,12 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 const SizedBox(height: 16),
                 Text(
                   'صفحة $currentPage',
-                  style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'الجزء ${pageInfo?['juz'] ?? ''}',
-                  style:
-                      TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -168,7 +177,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // ADD MISTAKE DIALOG  (teacher)
+  // ADD MISTAKE DIALOG
   // ─────────────────────────────────────────────────────────────────────────────
 
   Future<void> _showMistakeDialog(double x, double y) async {
@@ -195,17 +204,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         builder: (context, setDialogState) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Text('تحديد الخطأ'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Ayah selector
                   DropdownButtonFormField<int>(
-                    decoration:
-                        const InputDecoration(labelText: 'رقم الآية'),
+                    decoration: const InputDecoration(labelText: 'رقم الآية'),
                     value: selectedAyah,
                     items: verses.map((verse) {
                       final ayahNum = verse['verse'] as int;
@@ -218,16 +224,13 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                       if (val != null) {
                         setDialogState(() {
                           selectedAyah = val;
-                          final verse = verses
-                              .firstWhere((v) => v['verse'] == val);
+                          final verse = verses.firstWhere((v) => v['verse'] == val);
                           selectedSurah = verse['surah'] as int;
                         });
                       }
                     },
                   ),
                   const SizedBox(height: 12),
-
-                  // Word text (optional)
                   TextField(
                     controller: wordController,
                     decoration: const InputDecoration(
@@ -236,11 +239,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Mistake type
                   DropdownButtonFormField<MistakeType>(
-                    decoration:
-                        const InputDecoration(labelText: 'نوع الخطأ'),
+                    decoration: const InputDecoration(labelText: 'نوع الخطأ'),
                     value: dialogMistakeType,
                     items: MistakeType.values.map((type) {
                       return DropdownMenuItem(
@@ -248,8 +248,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                         child: Row(
                           children: [
                             Icon(_getMistakeIcon(type),
-                                size: 16,
-                                color: _getMistakeColor(type)),
+                                size: 16, color: _getMistakeColor(type)),
                             const SizedBox(width: 8),
                             Text(_getMistakeTypeLabel(type)),
                           ],
@@ -263,18 +262,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                     },
                   ),
                   const SizedBox(height: 12),
-
-                  // Correction note — hint emphasises it will appear as blue badge
                   TextField(
                     controller: noteController,
                     maxLines: 3,
                     decoration: InputDecoration(
                       labelText: 'تعليق التصحيح',
                       hintText: 'اشرح الخطأ وكيفية التصحيح...',
-                      helperText:
-                          'إضافة تعليق ستظهر علامة زرقاء 🔵 على الآية',
-                      helperStyle:
-                          TextStyle(color: Colors.blue.shade700),
+                      helperText: 'إضافة تعليق ستظهر علامة زرقاء 🔵 على الآية',
+                      helperStyle: TextStyle(color: Colors.blue.shade700),
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.chat_bubble_outline),
                     ),
@@ -290,23 +285,19 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               ElevatedButton(
                 onPressed: () {
                   final mistake = QuranMistake(
-                    id: DateTime.now()
-                        .millisecondsSinceEpoch
-                        .toString(),
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
                     pageNumber: currentPage,
                     surahNumber: selectedSurah,
                     ayahNumber: selectedAyah,
                     type: dialogMistakeType,
                     xPosition: x,
                     yPosition: y,
-                    wordText:
-                        wordController.text.trim().isEmpty
-                            ? null
-                            : wordController.text.trim(),
-                    correctionNote:
-                        noteController.text.trim().isEmpty
-                            ? null
-                            : noteController.text.trim(),
+                    wordText: wordController.text.trim().isEmpty
+                        ? null
+                        : wordController.text.trim(),
+                    correctionNote: noteController.text.trim().isEmpty
+                        ? null
+                        : noteController.text.trim(),
                     markedAt: DateTime.now(),
                   );
                   Navigator.pop(ctx, mistake);
@@ -325,11 +316,10 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // MISTAKE MARKERS  (with comment badge)
+  // MISTAKE MARKERS
   // ─────────────────────────────────────────────────────────────────────────────
 
   List<Widget> _buildMistakeMarkers() {
-    // Use the image container's size instead of screen size
     final RenderBox? box =
         _imageKey.currentContext?.findRenderObject() as RenderBox?;
     final Size size = box?.size ?? MediaQuery.of(context).size;
@@ -337,11 +327,9 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     return widget.existingMistakes
         .where((m) => m.pageNumber == currentPage)
         .map((mistake) {
-      final hasComment = mistake.correctionNote != null &&
-          mistake.correctionNote!.isNotEmpty;
+      final hasComment =
+          mistake.correctionNote != null && mistake.correctionNote!.isNotEmpty;
 
-      // Clamp coordinates to [0..1] and center marker (32px / 2 = 16)
-      // xPosition/yPosition are non-nullable doubles, clamp returns double
       final double xPos = mistake.xPosition.clamp(0.0, 1.0);
       final double yPos = mistake.yPosition.clamp(0.0, 1.0);
       final x = xPos * size.width - 16;
@@ -355,18 +343,15 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // ── Main mistake circle ────────────────────────────────────
               Tooltip(
                 message: _getMistakeTypeLabel(mistake.type),
                 child: Container(
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: _getMistakeColor(mistake.type)
-                        .withOpacity(0.85),
+                    color: _getMistakeColor(mistake.type).withOpacity(0.85),
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: Colors.white, width: 2),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.3),
@@ -382,8 +367,6 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                   ),
                 ),
               ),
-
-              // ── Blue comment badge — only when correctionNote exists ──
               if (hasComment)
                 Positioned(
                   top: -5,
@@ -394,8 +377,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                     decoration: BoxDecoration(
                       color: Colors.blue.shade700,
                       shape: BoxShape.circle,
-                      border:
-                          Border.all(color: Colors.white, width: 1.5),
+                      border: Border.all(color: Colors.white, width: 1.5),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.blue.withOpacity(0.4),
@@ -418,22 +400,19 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // VIEW MISTAKE DETAILS DIALOG  (teacher + student read-only)
+  // VIEW MISTAKE DETAILS DIALOG
   // ─────────────────────────────────────────────────────────────────────────────
 
   void _showMistakeDetails(QuranMistake mistake) {
-    final hasComment = mistake.correctionNote != null &&
-        mistake.correctionNote!.isNotEmpty;
+    final hasComment =
+        mistake.correctionNote != null && mistake.correctionNote!.isNotEmpty;
 
     showDialog(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-
-          // ── Title: type badge ──────────────────────────────────────────
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
               Container(
@@ -461,25 +440,17 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               ),
             ],
           ),
-
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Location row ─────────────────────────────────────────
-              _detailRow(Icons.menu_book, 'الصفحة',
-                  '${mistake.pageNumber}'),
-              _detailRow(Icons.format_list_numbered, 'الآية',
-                  '${mistake.ayahNumber}'),
-
-              // ── Word text ────────────────────────────────────────────
-              if (mistake.wordText != null &&
-                  mistake.wordText!.isNotEmpty) ...[
+              _detailRow(Icons.menu_book, 'الصفحة', '${mistake.pageNumber}'),
+              _detailRow(Icons.format_list_numbered, 'الآية', '${mistake.ayahNumber}'),
+              if (mistake.wordText != null && mistake.wordText!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Text(
                   'الكلمة / الموضع',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 const SizedBox(height: 4),
                 Container(
@@ -492,22 +463,16 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                   ),
                   child: Text(
                     mistake.wordText!,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                 ),
               ],
-
-              // ── Teacher comment ──────────────────────────────────────
               if (hasComment) ...[
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    Icon(Icons.chat_bubble,
-                        size: 16, color: Colors.blue.shade700),
+                    Icon(Icons.chat_bubble, size: 16, color: Colors.blue.shade700),
                     const SizedBox(width: 6),
                     Text(
                       'تعليق المعلم',
@@ -538,8 +503,6 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                   ),
                 ),
               ],
-
-              // ── No comment hint (teacher view only) ──────────────────
               if (!hasComment && widget.isEditable) ...[
                 const SizedBox(height: 12),
                 Row(
@@ -549,15 +512,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                     const SizedBox(width: 6),
                     Text(
                       'لا يوجد تعليق لهذا الخطأ',
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade500),
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade500),
                     ),
                   ],
                 ),
               ],
             ],
           ),
-
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -570,7 +532,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // MISTAKE TYPE SELECTOR  (teacher toolbar)
+  // MISTAKE TYPE SELECTOR
   // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _buildMistakeTypeSelector() {
@@ -592,14 +554,11 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 ),
                 label: Text(_getMistakeTypeLabel(type)),
                 selected: isSelected,
-                onSelected: (_) {
-                  setState(() => selectedMistakeType = type);
-                },
+                onSelected: (_) => setState(() => selectedMistakeType = type),
                 selectedColor: _getMistakeColor(type),
                 labelStyle: TextStyle(
                   color: isSelected ? Colors.white : Colors.black87,
-                  fontWeight:
-                      isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             );
@@ -616,8 +575,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   bool _hasAnyComments() {
     return widget.existingMistakes
         .where((m) => m.pageNumber == currentPage)
-        .any((m) =>
-            m.correctionNote != null && m.correctionNote!.isNotEmpty);
+        .any((m) => m.correctionNote != null && m.correctionNote!.isNotEmpty);
   }
 
   Widget _buildCommentLegend() {
@@ -646,7 +604,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // PAGE NAVIGATION
+  // PAGE NAVIGATION  (with jump button)
   // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _buildPageNavigation() {
@@ -655,7 +613,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         .length;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -669,55 +627,91 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Previous page (→ in RTL = previous)
+          // ── Previous page (→ RTL)
           IconButton(
             icon: const Icon(Icons.arrow_forward),
-            onPressed: currentPage > 1
-                ? () => _changePage(currentPage - 1)
-                : null,
+            onPressed:
+                currentPage > 1 ? () => _changePage(currentPage - 1) : null,
             tooltip: 'الصفحة السابقة',
           ),
 
-          // Page info + mistake count badge
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'صفحة $currentPage',
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold),
+          // ── Center: page info + jump button ──────────────────────────
+          GestureDetector(
+            onTap: _openJumpSheet,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade300),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              if (pageInfo != null)
-                Text(
-                  'الجزء ${pageInfo!['juz']}',
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.grey.shade600),
-                ),
-              if (mistakesOnPage > 0) ...[
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                    border:
-                        Border.all(color: Colors.orange.shade300),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Page number + jump icon
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.menu_book,
+                          size: 14, color: Colors.green.shade700),
+                      const SizedBox(width: 5),
+                      Text(
+                        'صفحة $currentPage',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Icon(Icons.keyboard_arrow_up,
+                          size: 18, color: Colors.grey.shade500),
+                    ],
                   ),
-                  child: Text(
-                    '$mistakesOnPage ${mistakesOnPage == 1 ? 'ملاحظة' : 'ملاحظات'}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.orange.shade800,
-                      fontWeight: FontWeight.w600,
+                  // Juz label
+                  if (pageInfo != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'الجزء ${pageInfo!['juz']}',
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey.shade600),
                     ),
-                  ),
-                ),
-              ],
-            ],
+                  ],
+                  // Mistakes badge
+                  if (mistakesOnPage > 0) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange.shade300),
+                      ),
+                      child: Text(
+                        '$mistakesOnPage '
+                        '${mistakesOnPage == 1 ? 'ملاحظة' : 'ملاحظات'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange.shade800,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
 
-          // Next page (← in RTL = next)
+          // ── Next page (← RTL)
           IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: currentPage < QuranService.totalPages
@@ -731,7 +725,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // DIALOG DETAIL ROW HELPER
+  // DETAIL ROW HELPER
   // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _detailRow(IconData icon, String label, String value) {
@@ -741,16 +735,11 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         children: [
           Icon(icon, size: 14, color: Colors.grey.shade600),
           const SizedBox(width: 6),
-          Text(
-            '$label: ',
-            style: TextStyle(
-                fontSize: 13, color: Colors.grey.shade600),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600),
-          ),
+          Text('$label: ',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -762,58 +751,484 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
   String _getMistakeTypeLabel(MistakeType type) {
     switch (type) {
-      case MistakeType.tajweed:
-        return 'خطأ تجويد';
-      case MistakeType.pronunciation:
-        return 'خطأ نطق';
-      case MistakeType.reading:
-        return 'قراءة خاطئة';
-      case MistakeType.skip:
-        return 'تجاوز';
-      case MistakeType.addition:
-        return 'زيادة';
-      case MistakeType.other:
-        return 'أخرى';
-      default:
-        return 'غير محدد';
+      case MistakeType.tajweed:       return 'خطأ تجويد';
+      case MistakeType.pronunciation: return 'خطأ نطق';
+      case MistakeType.reading:       return 'قراءة خاطئة';
+      case MistakeType.skip:          return 'تجاوز';
+      case MistakeType.addition:      return 'زيادة';
+      case MistakeType.other:         return 'أخرى';
+      default:                        return 'غير محدد';
     }
   }
 
   Color _getMistakeColor(MistakeType type) {
     switch (type) {
-      case MistakeType.tajweed:
-        return Colors.orange;
-      case MistakeType.pronunciation:
-        return Colors.red;
-      case MistakeType.reading:
-        return Colors.purple;
-      case MistakeType.skip:
-        return Colors.blue;
-      case MistakeType.addition:
-        return Colors.green;
-      case MistakeType.other:
-        return Colors.grey;
-      default:
-        return Colors.grey;
+      case MistakeType.tajweed:       return Colors.orange;
+      case MistakeType.pronunciation: return Colors.red;
+      case MistakeType.reading:       return Colors.purple;
+      case MistakeType.skip:          return Colors.blue;
+      case MistakeType.addition:      return Colors.green;
+      case MistakeType.other:         return Colors.grey;
+      default:                        return Colors.grey;
     }
   }
 
   IconData _getMistakeIcon(MistakeType type) {
     switch (type) {
-      case MistakeType.tajweed:
-        return Icons.auto_fix_high;
-      case MistakeType.pronunciation:
-        return Icons.record_voice_over;
-      case MistakeType.reading:
-        return Icons.error_outline;
-      case MistakeType.skip:
-        return Icons.fast_forward;
-      case MistakeType.addition:
-        return Icons.add_circle_outline;
-      case MistakeType.other:
-        return Icons.help_outline;
-      default:
-        return Icons.help_outline;
+      case MistakeType.tajweed:       return Icons.auto_fix_high;
+      case MistakeType.pronunciation: return Icons.record_voice_over;
+      case MistakeType.reading:       return Icons.error_outline;
+      case MistakeType.skip:          return Icons.fast_forward;
+      case MistakeType.addition:      return Icons.add_circle_outline;
+      case MistakeType.other:         return Icons.help_outline;
+      default:                        return Icons.help_outline;
     }
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// JUMP-TO BOTTOM SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _JumpToSheet extends StatefulWidget {
+  final int currentPage;
+  final void Function(int page) onPageSelected;
+
+  const _JumpToSheet({
+    required this.currentPage,
+    required this.onPageSelected,
+  });
+
+  @override
+  State<_JumpToSheet> createState() => _JumpToSheetState();
+}
+
+class _JumpToSheetState extends State<_JumpToSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+    _searchCtrl.addListener(
+      () => setState(() => _query = _searchCtrl.text.trim()),
+    );
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  // Resolve which Surah the current page is inside (for highlight)
+  int _currentSurahNumber() {
+    int surah = 1;
+    for (final entry in QuranService.surahStartPages.entries) {
+      if (entry.value <= widget.currentPage) surah = entry.key;
+    }
+    return surah;
+  }
+
+  // Resolve which Juz the current page is inside (for highlight)
+  int _currentJuzNumber() {
+    int juz = 1;
+    for (final entry in QuranService.juzStartPages.entries) {
+      if (entry.value <= widget.currentPage) juz = entry.key;
+    }
+    return juz;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.45,
+        builder: (_, scrollCtrl) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // ── Handle ────────────────────────────────────────────────
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // ── Title ─────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.menu_book,
+                        color: Colors.green.shade700, size: 22),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'الانتقال إلى',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    // Current position chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Text(
+                        'ص ${widget.currentPage}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green.shade800,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Search (Surah tab only) ────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _searchCtrl,
+                  textDirection: TextDirection.rtl,
+                  decoration: InputDecoration(
+                    hintText: 'ابحث عن سورة...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _query.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // ── Tabs ──────────────────────────────────────────────────
+              TabBar(
+                controller: _tab,
+                labelColor: Colors.green.shade700,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: Colors.green.shade700,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                tabs: const [
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.format_list_numbered, size: 16),
+                        SizedBox(width: 6),
+                        Text('السور'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.book, size: 16),
+                        SizedBox(width: 6),
+                        Text('الأجزاء'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 1),
+
+              // ── Tab content ───────────────────────────────────────────
+              Expanded(
+                child: TabBarView(
+                  controller: _tab,
+                  children: [
+                    _SurahList(
+                      query: _query,
+                      currentSurah: _currentSurahNumber(),
+                      scrollCtrl: scrollCtrl,
+                      onSelected: widget.onPageSelected,
+                    ),
+                    _JuzList(
+                      currentJuz: _currentJuzNumber(),
+                      scrollCtrl: scrollCtrl,
+                      onSelected: widget.onPageSelected,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SURAH LIST TAB
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _SurahList extends StatelessWidget {
+  final String query;
+  final int currentSurah;
+  final ScrollController scrollCtrl;
+  final void Function(int page) onSelected;
+
+  const _SurahList({
+    required this.query,
+    required this.currentSurah,
+    required this.scrollCtrl,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = QuranService.surahNames.entries
+        .where((e) => query.isEmpty || e.value.contains(query))
+        .toList();
+
+    if (entries.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 48, color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+            Text(
+              'لا توجد نتائج لـ "$query"',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      controller: scrollCtrl,
+      itemCount: entries.length,
+      separatorBuilder: (_, __) =>
+          const Divider(height: 1, indent: 60, endIndent: 16),
+      itemBuilder: (_, i) {
+        final surahNum = entries[i].key;
+        final name = entries[i].value;
+        final page = QuranService.surahStartPages[surahNum]!;
+        final isCurrent = surahNum == currentSurah;
+
+        return Material(
+          color: isCurrent ? Colors.green.shade50 : Colors.transparent,
+          child: InkWell(
+            onTap: () => onSelected(page),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  // Surah number circle
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? Colors.green.shade600
+                          : Colors.green.shade50,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isCurrent
+                            ? Colors.green.shade600
+                            : Colors.green.shade200,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '$surahNum',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: isCurrent
+                            ? Colors.white
+                            : Colors.green.shade700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Surah name
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        fontWeight: isCurrent
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        fontSize: 16,
+                        color: isCurrent
+                            ? Colors.green.shade800
+                            : Colors.black87,
+                      ),
+                    ),
+                  ),
+
+                  // Current indicator
+                  if (isCurrent) ...[
+                    Icon(Icons.location_on,
+                        size: 14, color: Colors.green.shade600),
+                    const SizedBox(width: 4),
+                  ],
+
+                  // Page badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? Colors.green.shade100
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'ص $page',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCurrent
+                            ? Colors.green.shade800
+                            : Colors.grey.shade600,
+                        fontWeight: isCurrent
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// JUZ GRID TAB
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _JuzList extends StatelessWidget {
+  final int currentJuz;
+  final ScrollController scrollCtrl;
+  final void Function(int page) onSelected;
+
+  const _JuzList({
+    required this.currentJuz,
+    required this.scrollCtrl,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      controller: scrollCtrl,
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.1,
+      ),
+      itemCount: 30,
+      itemBuilder: (_, i) {
+        final juzNum = i + 1;
+        final page = QuranService.juzStartPages[juzNum]!;
+        final isCurrent = juzNum == currentJuz;
+
+        return GestureDetector(
+          onTap: () => onSelected(page),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              color: isCurrent ? Colors.green.shade600 : Colors.green.shade50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isCurrent
+                    ? Colors.green.shade700
+                    : Colors.green.shade200,
+                width: isCurrent ? 2 : 1,
+              ),
+              boxShadow: isCurrent
+                  ? [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isCurrent ? Icons.location_on : Icons.book_outlined,
+                  color: isCurrent ? Colors.white : Colors.green.shade600,
+                  size: 20,
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'الجزء $juzNum',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isCurrent ? Colors.white : Colors.green.shade800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'ص $page',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isCurrent
+                        ? Colors.green.shade100
+                        : Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
