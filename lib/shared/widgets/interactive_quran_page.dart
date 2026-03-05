@@ -44,12 +44,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     setState(() => isLoading = true);
     try {
       final info = await QuranService().getPageInfo(currentPage);
+      if (!mounted) return;
       setState(() {
         pageInfo = info;
         isLoading = false;
       });
     } catch (e) {
       debugPrint('Error loading page data: $e');
+      if (!mounted) return;
       setState(() => isLoading = false);
     }
   }
@@ -212,7 +214,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 children: [
                   DropdownButtonFormField<int>(
                     decoration: const InputDecoration(labelText: 'رقم الآية'),
-                    value: selectedAyah,
+                    initialValue: selectedAyah,
                     items: verses.map((verse) {
                       final ayahNum = verse['verse'] as int;
                       return DropdownMenuItem(
@@ -241,7 +243,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<MistakeType>(
                     decoration: const InputDecoration(labelText: 'نوع الخطأ'),
-                    value: dialogMistakeType,
+                    initialValue: dialogMistakeType,
                     items: MistakeType.values.map((type) {
                       return DropdownMenuItem(
                         value: type,
@@ -757,7 +759,6 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       case MistakeType.skip:          return 'تجاوز';
       case MistakeType.addition:      return 'زيادة';
       case MistakeType.other:         return 'أخرى';
-      default:                        return 'غير محدد';
     }
   }
 
@@ -769,7 +770,6 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       case MistakeType.skip:          return Colors.blue;
       case MistakeType.addition:      return Colors.green;
       case MistakeType.other:         return Colors.grey;
-      default:                        return Colors.grey;
     }
   }
 
@@ -781,7 +781,6 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       case MistakeType.skip:          return Icons.fast_forward;
       case MistakeType.addition:      return Icons.add_circle_outline;
       case MistakeType.other:         return Icons.help_outline;
-      default:                        return Icons.help_outline;
     }
   }
 }

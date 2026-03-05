@@ -14,7 +14,9 @@ class QuranService {
   bool _usingMockData = false;
 
   // ✅ CDN base URL for Quran images (quran.com CDN)
+  // ignore: unused_field
   static const String _imageCdnBase = 'https://cdn.quran.com/images/w';
+  // ignore: unused_field
   static const int _imageWidth = 1024; // Resolution: 1024px width
 
   /// Get page image URL from CDN (NOT local assets)
@@ -122,7 +124,7 @@ class QuranService {
   }
 
   List<Map<String, dynamic>> _generateMockVersesForPage(int pageNumber) {
-    final versesPerPage = 15;
+    const versesPerPage = 15;
     final startVerse = ((pageNumber - 1) * versesPerPage) + 1;
 
     return List.generate(versesPerPage, (index) {

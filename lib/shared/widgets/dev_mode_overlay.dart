@@ -24,6 +24,7 @@ class _DevModeOverlayState extends ConsumerState<DevModeOverlay> {
     final devMode =
         ref.watch(devModeProvider).valueOrNull ?? DevModeModel.defaults();
     final user = ref.watch(currentUserProvider).valueOrNull;
+    // ignore: unnecessary_null_comparison
     final isDevActive = devMode != null &&
         devMode.devModeEnabled &&
         user != null &&
@@ -163,7 +164,8 @@ class _DevModeOverlayState extends ConsumerState<DevModeOverlay> {
                         batch.delete(d.reference);
                       }
                       await batch.commit();
-                      if (mounted) Navigator.of(context).pop();
+                      if (!mounted) return;
+                      Navigator.of(context).pop();
                     } catch (e) {
                       debugPrint('⚠️ Failed to clear dev logs: $e');
                     }

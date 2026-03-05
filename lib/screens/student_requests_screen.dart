@@ -933,11 +933,11 @@ class _RejectedRequestCard extends StatelessWidget {
                     color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.cancel, size: 16, color: Colors.red),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 6),
                       Text(
                         'مرفوض',
                         style: TextStyle(

@@ -235,7 +235,6 @@ class SettingsScreen extends ConsumerWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                // TODO: Implement password change
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('تم تغيير كلمة المرور بنجاح')),

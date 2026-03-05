@@ -1,7 +1,6 @@
 // screens/privacy_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../shared/constants/app_theme.dart';
@@ -138,7 +137,7 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
         child: Text(subtitle,
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
       ),
-      activeColor: AppTheme.accentGreen,
+      activeThumbColor: AppTheme.accentGreen,
     );
   }
 }

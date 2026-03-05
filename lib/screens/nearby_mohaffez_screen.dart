@@ -132,7 +132,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
               mohaffezAsync.when(
                 data: (mohaffezList) {
                   if (mohaffezList.isEmpty) {
-                    return SliverFillRemaining(
+                    return const SliverFillRemaining(
                       child: EmptyState(
                         icon: Icons.search_off,
                         title: 'لا يوجد محفظون',
@@ -221,22 +221,22 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      Expanded(
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               ArabicLabels.nearby,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: 4),
                             Text(
                               ArabicLabels.searchForMohaffez,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.white70,
                               ),
@@ -271,17 +271,17 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.blue.shade200),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            const SizedBox(
+            SizedBox(
               width: 20,
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Text(
               '${ArabicLabels.loading} ${ArabicLabels.location}...',
-              style: const TextStyle(fontSize: 14, color: Colors.blue),
+              style: TextStyle(fontSize: 14, color: Colors.blue),
             ),
           ],
         ),
@@ -309,7 +309,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
             ),
             TextButton(
               onPressed: _getCurrentLocation,
-              child: Text(ArabicLabels.retry),
+              child: const Text(ArabicLabels.retry),
             ),
           ],
         ),

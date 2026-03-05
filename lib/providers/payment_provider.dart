@@ -57,7 +57,9 @@ final paymentActionsProvider =
 
 class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
   final PaymentRepository _repository;
+  // ignore: unused_field
   final PaymentService _paymentService;
+  // ignore: unused_field
   final FirebaseFirestore _firestore;
 
   PaymentActionsNotifier(
@@ -87,7 +89,7 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
       // ✅ FREE SESSION FLOW (100% promo code)
       if (basePayment.amount <= 0.01) {
-        debugPrint('🎫 FREE SESSION: Creating payment document only');
+        if (kDebugMode) debugPrint('🎫 FREE SESSION: Creating payment document only');
         
         // ✅ Only create payment document - Cloud Function handles everything else
         final freePayment = basePayment.copyWith(
@@ -99,8 +101,8 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
         final paymentId = await _repository.createPayment(freePayment);
         
-        debugPrint('✅ FREE SESSION: Payment document created: $paymentId');
-        debugPrint('🚀 Next: Call Cloud Function to create session');
+        if (kDebugMode) debugPrint('✅ FREE SESSION: Payment document created: $paymentId');
+        if (kDebugMode) debugPrint('🚀 Next: Call Cloud Function to create session');
         
         state = const AsyncValue.data(null);
         
@@ -113,7 +115,7 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
       }      /* PAYMOB_DISABLED - gateway path disabled, use direct payment flow
       else {
         // PAID SESSION FLOW (Gateway payment)
-        debugPrint('💳 PAID SESSION: Creating Paymob payment');
+        if (kDebugMode) debugPrint('💳 PAID SESSION: Creating Paymob payment');
         
         final pendingPayment = basePayment.copyWith(
           status: PaymentStatus.pending,
@@ -172,8 +174,8 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
           sessionId: null,
         );
       }    } catch (e, stack) {
-      debugPrint('❌ ERROR in startPaymentAndHandleResult: $e');
-      debugPrint('Stack trace: $stack');
+      if (kDebugMode) debugPrint('❌ ERROR in startPaymentAndHandleResult: $e');
+      if (kDebugMode) debugPrint('Stack trace: $stack');
       state = AsyncValue.error(e, stack);
       return null;
     }

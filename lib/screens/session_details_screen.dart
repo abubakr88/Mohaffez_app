@@ -595,6 +595,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
                     // Quran Mistakes Section
                     buildQuranMistakesSection(
+                        // ignore: dead_null_aware_expression
                         isMohaffez: isMohaffez ?? false),
 
                     const SizedBox(height: 16),
@@ -614,8 +615,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
           ),
         ),
         bottomNavigationBar: buildBottomNavigationBar(
-          isMohaffez: isMohaffez ?? false,
-          isStudent: isStudent ?? false,
+          isMohaffez: isMohaffez,
+          isStudent: isStudent,
           session: session,
         ),
       ),
@@ -981,10 +982,9 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       );
     }
 
-    // Student: rate a completed but unrated session
     if (isStudent &&
         session.status == 'completed' &&
-        (session.sessionRating == null || session.sessionRating == 0)) {
+        session.sessionRating == 0) {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),

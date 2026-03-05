@@ -52,6 +52,7 @@ class _AdminTeacherCommissionsScreenState
     }
   }
 
+  // ignore: unused_element
   void _refresh() {
     ref.invalidate(adminActionsProvider);
   }
@@ -159,7 +160,7 @@ class _AdminTeacherCommissionsScreenState
                       return Card(
                         margin: const EdgeInsets.only(
                             bottom: AppThemeConstants.spaceSm),
-                        shape: RoundedRectangleBorder(
+                        shape: const RoundedRectangleBorder(
                           borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
                         elevation: 2,

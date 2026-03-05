@@ -35,7 +35,7 @@ class AdminUsersScreen extends ConsumerWidget {
                               .setSearch(''),
                         )
                       : null,
-                  border: OutlineInputBorder(
+                  border: const OutlineInputBorder(
                     borderRadius: AppThemeConstants.borderRadiusSm,
                   ),
                   contentPadding: const EdgeInsets.symmetric(
@@ -90,7 +90,7 @@ class AdminUsersScreen extends ConsumerWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.search_off,
                               size: 64,
                               color: AppThemeConstants.textSecondary,
@@ -108,7 +108,7 @@ class AdminUsersScreen extends ConsumerWidget {
                       );
                     }
                     if (users.isEmpty) {
-                      return Center(
+                      return const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -117,10 +117,10 @@ class AdminUsersScreen extends ConsumerWidget {
                               size: 64,
                               color: AppThemeConstants.textSecondary,
                             ),
-                            const SizedBox(height: AppThemeConstants.spaceMd),
+                            SizedBox(height: AppThemeConstants.spaceMd),
                             Text(
                               'لا يوجد مستخدمون',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppThemeConstants.textSecondary,
                                 fontSize: 16,
                               ),

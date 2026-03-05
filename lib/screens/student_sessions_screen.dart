@@ -1,7 +1,6 @@
 // FILE: lib/screens/student_sessions_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';

@@ -265,7 +265,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   title: const Text('يتضمن جلسة تجريبية مجانية'),
                   subtitle: const Text('سيتمكن الطلاب من تجربة جلسة قبل الدفع'),
                   // FIX: Use activeThumbColor instead of activeColor
-                  activeColor: AppTheme.accentGreen,
+                  activeThumbColor: AppTheme.accentGreen,
                 ),
                 const SizedBox(height: 24),
                 

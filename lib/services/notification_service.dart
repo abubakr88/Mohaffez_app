@@ -9,7 +9,7 @@ import 'package:http/http.dart' as http;
 // Background message handler - must be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('NotificationService: Background message: ${message.messageId}');
+  if (kDebugMode) debugPrint('NotificationService: Background message: ${message.messageId}');
   // Create notification in database when app is in background
   await NotificationService.createDatabaseNotificationFromRemote(message);
 }
@@ -40,9 +40,9 @@ class NotificationService {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        debugPrint('NotificationService: Permission granted');
+        if (kDebugMode) debugPrint('NotificationService: Permission granted');
       } else {
-        debugPrint('NotificationService: Permission denied');
+        if (kDebugMode) debugPrint('NotificationService: Permission denied');
       }
 
       // Initialize local notifications
@@ -60,7 +60,7 @@ class NotificationService {
       await localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (response) {
-          debugPrint('NotificationService: Notification tapped: ${response.payload}');
+          if (kDebugMode) debugPrint('NotificationService: Notification tapped: ${response.payload}');
           handleNotificationTap(response.payload);
         },
       );
@@ -77,10 +77,10 @@ class NotificationService {
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen(handleForegroundMessage);
 
-      debugPrint('NotificationService: Initialized successfully');
+      if (kDebugMode) debugPrint('NotificationService: Initialized successfully');
     } catch (e, stack) {
-      debugPrint('NotificationService: Initialization error: $e');
-      debugPrint('NotificationService: Stack trace: $stack');
+      if (kDebugMode) debugPrint('NotificationService: Initialization error: $e');
+      if (kDebugMode) debugPrint('NotificationService: Stack trace: $stack');
     }
   }
 
@@ -98,25 +98,25 @@ class NotificationService {
     await localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
-    debugPrint('NotificationService: Channel created');
+    if (kDebugMode) debugPrint('NotificationService: Channel created');
   }
 
   /// Save FCM token with retry logic
   static Future<void> saveFCMToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      debugPrint('NotificationService: No authenticated user');
+      if (kDebugMode) debugPrint('NotificationService: No authenticated user');
       return;
     }
 
     try {
       final token = await messaging.getToken();
       if (token == null) {
-        debugPrint('NotificationService: Failed to get FCM token');
+        if (kDebugMode) debugPrint('NotificationService: Failed to get FCM token');
         if (_tokenRetryCount < _maxTokenRetries) {
           _tokenRetryCount++;
           final delay = Duration(seconds: 5 * _tokenRetryCount);
-          debugPrint('NotificationService: Retrying token fetch in ${delay.inSeconds}s');
+          if (kDebugMode) debugPrint('NotificationService: Retrying token fetch in ${delay.inSeconds}s');
           Future.delayed(delay, () => saveFCMToken());
         }
         return;
@@ -127,10 +127,10 @@ class NotificationService {
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      debugPrint('NotificationService: FCM token saved: $token');
+      if (kDebugMode) debugPrint('NotificationService: FCM token saved: $token');
       _tokenRetryCount = 0;
     } catch (e) {
-      debugPrint('NotificationService: Error saving token: $e');
+      if (kDebugMode) debugPrint('NotificationService: Error saving token: $e');
       if (_tokenRetryCount < _maxTokenRetries) {
         _tokenRetryCount++;
         Future.delayed(Duration(seconds: 5 * _tokenRetryCount), () => saveFCMToken());
@@ -148,9 +148,9 @@ class NotificationService {
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      debugPrint('NotificationService: Token updated: $token');
+      if (kDebugMode) debugPrint('NotificationService: Token updated: $token');
     } catch (e) {
-      debugPrint('NotificationService: Error updating token: $e');
+      if (kDebugMode) debugPrint('NotificationService: Error updating token: $e');
     }
   }
 
@@ -167,7 +167,7 @@ class NotificationService {
           notification.hashCode,
           notification.title,
           notification.body,
-          NotificationDetails(
+          const NotificationDetails(
             android: AndroidNotificationDetails(
               channelId,
               channelName,
@@ -178,7 +178,7 @@ class NotificationService {
               playSound: true,
               enableVibration: true,
             ),
-            iOS: const DarwinNotificationDetails(
+            iOS: DarwinNotificationDetails(
               presentAlert: true,
               presentBadge: true,
               presentSound: true,
@@ -186,9 +186,9 @@ class NotificationService {
           ),
           payload: jsonEncode(message.data),
         );
-        debugPrint('NotificationService: Foreground notification shown');
+        if (kDebugMode) debugPrint('NotificationService: Foreground notification shown');
       } catch (e) {
-        debugPrint('NotificationService: Error showing notification: $e');
+        if (kDebugMode) debugPrint('NotificationService: Error showing notification: $e');
       }
     }
   }
@@ -196,7 +196,7 @@ class NotificationService {
   /// Handle notification tap
   static void handleNotificationTap(String? payload) {
     if (payload != null && payload.isNotEmpty) {
-      debugPrint('NotificationService: Payload: $payload');
+      if (kDebugMode) debugPrint('NotificationService: Payload: $payload');
       // The actual navigation will be handled in the UI layer
       // This is just for logging and data extraction
     }
@@ -222,9 +222,9 @@ class NotificationService {
         'data': data,
       });
 
-      debugPrint('NotificationService: Database notification created');
+      if (kDebugMode) debugPrint('NotificationService: Database notification created');
     } catch (e) {
-      debugPrint('NotificationService: Error creating database notification: $e');
+      if (kDebugMode) debugPrint('NotificationService: Error creating database notification: $e');
     }
   }
 
@@ -269,9 +269,9 @@ class NotificationService {
         },
       );
 
-      debugPrint('✅ Payment required notification sent');
+      if (kDebugMode) debugPrint('✅ Payment required notification sent');
     } catch (e) {
-      debugPrint('❌ Error sending payment notification: $e');
+      if (kDebugMode) debugPrint('❌ Error sending payment notification: $e');
     }
   }
 
@@ -306,9 +306,9 @@ class NotificationService {
         },
       );
 
-      debugPrint('✅ Session accepted notification sent');
+      if (kDebugMode) debugPrint('✅ Session accepted notification sent');
     } catch (e) {
-      debugPrint('❌ Error sending session accepted notification: $e');
+      if (kDebugMode) debugPrint('❌ Error sending session accepted notification: $e');
     }
   }
 
@@ -346,9 +346,9 @@ class NotificationService {
         },
       );
 
-      debugPrint('✅ Session rejected notification sent');
+      if (kDebugMode) debugPrint('✅ Session rejected notification sent');
     } catch (e) {
-      debugPrint('❌ Error sending session rejected notification: $e');
+      if (kDebugMode) debugPrint('❌ Error sending session rejected notification: $e');
     }
   }
 
@@ -383,9 +383,9 @@ class NotificationService {
         },
       );
 
-      debugPrint('✅ New request notification sent');
+      if (kDebugMode) debugPrint('✅ New request notification sent');
     } catch (e) {
-      debugPrint('❌ Error sending new request notification: $e');
+      if (kDebugMode) debugPrint('❌ Error sending new request notification: $e');
     }
   }
 
@@ -402,7 +402,7 @@ class NotificationService {
       final fcmToken = userDoc.data()?['fcmToken'] as String?;
 
       if (fcmToken == null || fcmToken.isEmpty) {
-        debugPrint('⚠️ No FCM token found for user: $userId');
+        if (kDebugMode) debugPrint('⚠️ No FCM token found for user: $userId');
         return;
       }
 
@@ -422,25 +422,25 @@ class NotificationService {
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
-        debugPrint('✅ FCM notification sent successfully: ${result['messageId']}');
+        if (kDebugMode) debugPrint('✅ FCM notification sent successfully: ${result['messageId']}');
       } else {
-        debugPrint('❌ FCM send failed (${response.statusCode}): ${response.body}');
+        if (kDebugMode) debugPrint('❌ FCM send failed (${response.statusCode}): ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Error sending FCM: $e');
+      if (kDebugMode) debugPrint('❌ Error sending FCM: $e');
     }
   }
 
   /// Clear all notifications
   static Future<void> clearAllNotifications() async {
     await localNotifications.cancelAll();
-    debugPrint('NotificationService: All notifications cleared');
+    if (kDebugMode) debugPrint('NotificationService: All notifications cleared');
   }
 
   /// Clear specific notification
   static Future<void> clearNotification(int id) async {
     await localNotifications.cancel(id);
-    debugPrint('NotificationService: Notification $id cleared');
+    if (kDebugMode) debugPrint('NotificationService: Notification $id cleared');
   }
 
   /// Get unread notification count
@@ -453,7 +453,7 @@ class NotificationService {
           .get();
       return snapshot.docs.length;
     } catch (e) {
-      debugPrint('Error getting unread count: $e');
+      if (kDebugMode) debugPrint('Error getting unread count: $e');
       return 0;
     }
   }

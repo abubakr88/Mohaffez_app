@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
@@ -304,7 +303,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text(ArabicLabels.ok),
+              child: const Text(ArabicLabels.ok),
             ),
           ],
         ),
@@ -326,7 +325,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text(ArabicLabels.ok),
+              child: const Text(ArabicLabels.ok),
             ),
           ],
         ),
@@ -345,14 +344,14 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(ArabicLabels.cancel),
+            child: const Text(ArabicLabels.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accentGreen,
             ),
-            child: Text(ArabicLabels.accept),
+            child: const Text(ArabicLabels.accept),
           ),
         ],
       ),
@@ -413,14 +412,14 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(ArabicLabels.cancel),
+            child: const Text(ArabicLabels.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
             ),
-            child: Text(ArabicLabels.reject),
+            child: const Text(ArabicLabels.reject),
           ),
         ],
       ),
@@ -716,7 +715,7 @@ class PendingRequestCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onReject,
                     icon: const Icon(Icons.close, size: 18),
-                    label: Text(ArabicLabels.reject),
+                    label: const Text(ArabicLabels.reject),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),

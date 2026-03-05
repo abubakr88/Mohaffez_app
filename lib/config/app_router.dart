@@ -677,7 +677,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                           horizontal: AppThemeConstants.spaceLg,
                           vertical: AppThemeConstants.spaceMd,
                         ),
-                        shape: RoundedRectangleBorder(
+                        shape: const RoundedRectangleBorder(
                           borderRadius:
                               AppThemeConstants.borderRadiusMd,
                         ),
@@ -699,7 +699,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                           horizontal: AppThemeConstants.spaceLg,
                           vertical: AppThemeConstants.spaceMd,
                         ),
-                        shape: RoundedRectangleBorder(
+                        shape: const RoundedRectangleBorder(
                           borderRadius:
                               AppThemeConstants.borderRadiusMd,
                         ),

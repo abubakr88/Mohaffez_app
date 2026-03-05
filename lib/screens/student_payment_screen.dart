@@ -81,6 +81,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
   bool _loadingWallets = true;
   bool _hasDirectPayment = false;
+  // ignore: unused_field
   Map<String, String?> _walletNumbers = {};
   _DPMethod _selectedDPMethod = _DPMethod.online;
 
@@ -469,7 +470,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.orange.shade200),
               ),
-              child: Row(children: const [
+              child: const Row(children: [
                 Icon(Icons.info_outline, color: Colors.orange, size: 20),
                 SizedBox(width: 8),
                 Expanded(
@@ -889,20 +890,20 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                     offset: const Offset(0, 4))
               ],
             ),
-            child: Row(children: [
-              const Icon(Icons.celebration, color: Colors.white, size: 36),
-              const SizedBox(width: 12),
+            child: const Row(children: [
+              Icon(Icons.celebration, color: Colors.white, size: 36),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('جلسة مجانية! 🎁',
+                    Text('جلسة مجانية! 🎁',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    const Text('100% خصم مطبق',
+                    SizedBox(height: 4),
+                    Text('100% خصم مطبق',
                         style: TextStyle(color: Colors.white70, fontSize: 14)),
                   ],
                 ),
@@ -1074,6 +1075,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   // ── Existing: handleFreeSession (unchanged) ───────────────────────────────
   Future<void> handleFreeSession(
       BuildContext context, WidgetRef ref, dynamic user) async {
+    // Guard against using context after async gaps
+    if (!mounted) return;
     setState(() => isProcessingPayment = true);
     try {
       DateTime? slotDate;
@@ -1209,6 +1212,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
       if (!mounted) return;
       if (result.isSuccess) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('🎉 تم تأكيد جلستك المجانية!'),
@@ -1217,14 +1221,15 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           ),
         );
         await Future.delayed(const Duration(milliseconds: 800));
-        if (mounted) context.go('/home');
+        if (!mounted) return;
+        context.go('/home');
       } else {
         throw Exception(result.errorMessage ?? 'فشل تأكيد الجلسة');
       }
     } catch (e, stack) {
       debugPrint('Free session error: $e');
       debugPrintStack(stackTrace: stack);
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e.toString()),
           backgroundColor: Colors.red,

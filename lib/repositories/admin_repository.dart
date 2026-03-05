@@ -98,6 +98,7 @@ class AdminRepository {
     return _firestore
         .collectionGroup('credentials')
         .where('status', isEqualTo: 'pending')
+        .limit(100)
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => <String, dynamic>{
@@ -138,6 +139,7 @@ class AdminRepository {
     return _firestore
         .collection('failedOperations')
         .orderBy('timestamp', descending: true)
+        .limit(100)
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
@@ -152,7 +154,7 @@ class AdminRepository {
   }
 
   Stream<List<Map<String, dynamic>>> watchAllPromoCodes() {
-    return _firestore.collection('promoCodes').snapshots().map((snap) => snap
+    return _firestore.collection('promoCodes').limit(200).snapshots().map((snap) => snap
         .docs
         .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
         .toList());
@@ -189,6 +191,7 @@ class AdminRepository {
     return _firestore
         .collection('slotLocks')
         .where('released', isEqualTo: false)
+        .limit(100)
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => <String, dynamic>{'id': d.id, ...d.data()})

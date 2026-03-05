@@ -185,6 +185,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
             CameraUpdate.newLatLngZoom(newPosition, 16),
           );
 
+          if (!mounted) return;
           FocusScope.of(context).unfocus();
         }
       } else {

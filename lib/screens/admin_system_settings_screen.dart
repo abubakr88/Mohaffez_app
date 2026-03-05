@@ -54,9 +54,9 @@ class _AdminSystemSettingsScreenState
       updates.clear();
       _numCtrlCache.clear(); // reset controllers so they reflect saved values
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           backgroundColor: AppThemeConstants.success,
-          content: const Text(ArabicLabels.settingsSaved),
+          content: Text(ArabicLabels.settingsSaved),
         ),
       );
     } catch (e) {
@@ -120,7 +120,6 @@ class _AdminSystemSettingsScreenState
   }
 
   Widget _financialTab(SystemConfigModel c) {
-    // TODO: اربط هذه الإعدادات مع شاشة السحب عند توفرها.
     return _sectionList([
       _sliderTile('commissionRate', ArabicLabels.commissionRate,
           c.commissionRate, 0, 0.2),
@@ -151,7 +150,6 @@ class _AdminSystemSettingsScreenState
   }
 
   Widget _appTab(SystemConfigModel c) {
-    // TODO: استخدم forceUpdateVersion في فحص الإصدار داخل التطبيق.
     return _sectionList([
       _switchTile(
           'maintenanceMode', ArabicLabels.maintenanceMode, c.maintenanceMode),

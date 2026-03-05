@@ -78,7 +78,7 @@ final filteredUsersProvider = StreamProvider.autoDispose<List<Map<String, dynami
     query = query.where('status', isEqualTo: filter.statusFilter);
   }
 
-  return query.snapshots().map((snap) {
+  return query.limit(200).snapshots().map((snap) {
     var users = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
     // Apply text search on name + uid (case-insensitive) — client-side only
     // because Firestore doesn't support partial text search

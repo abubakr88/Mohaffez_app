@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../shared/constants/app_theme.dart';
@@ -239,12 +238,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         // Filter by selected session type
         final relevantPlans = plans.where((plan) {
-          if (selectedSessionType == 'home')
+          if (selectedSessionType == 'home') {
             return plan.mode == SessionMode.home;
-          if (selectedSessionType == 'mosque')
+          }
+          if (selectedSessionType == 'mosque') {
             return plan.mode == SessionMode.mosque;
-          if (selectedSessionType == 'online')
+          }
+          if (selectedSessionType == 'online') {
             return plan.mode == SessionMode.online;
+          }
           return false;
         }).toList();
 
@@ -485,12 +487,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         // Filter plans by selected session type
         final relevantPlans = plans.where((plan) {
-          if (selectedSessionType == 'home')
+          if (selectedSessionType == 'home') {
             return plan.mode == SessionMode.home;
-          if (selectedSessionType == 'mosque')
+          }
+          if (selectedSessionType == 'mosque') {
             return plan.mode == SessionMode.mosque;
-          if (selectedSessionType == 'online')
+          }
+          if (selectedSessionType == 'online') {
             return plan.mode == SessionMode.online;
+          }
           return false;
         }).toList();
 
@@ -1458,9 +1463,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             children: [
               Expanded(
                 child: ChoiceChip(
-                  label: Row(
+                  label: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Icon(Icons.home, size: 18),
                       SizedBox(width: 6),
                       Flexible(
@@ -1490,9 +1495,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: ChoiceChip(
-                  label: Row(
+                  label: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Icon(Icons.mosque, size: 18),
                       SizedBox(width: 6),
                       Flexible(
@@ -1522,9 +1527,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: ChoiceChip(
-                  label: Row(
+                  label: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Icon(Icons.videocam, size: 18),
                       SizedBox(width: 6),
                       Flexible(
@@ -1749,7 +1754,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       ],
                     ),
                   );
-                }).toList(),
+                }),
               ],
             );
           },

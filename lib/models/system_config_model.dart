@@ -157,7 +157,7 @@ class SystemConfigModel {
   }
 
   factory SystemConfigModel.defaults() {
-    return SystemConfigModel(
+    return const SystemConfigModel(
       commissionRate: 0.05,
       directPaymentCommission: 0.05,
       minimumWithdrawAmount: 100.0,
@@ -172,7 +172,7 @@ class SystemConfigModel {
       maxAdvanceBookingDays: 30,
       maintenanceMode: false,
       maintenanceMessage: '',
-      maintenanceAllowedUids: const [],
+      maintenanceAllowedUids: [],
       forceUpdateVersion: '1.0.0',
       recommendedUpdateVersion: '1.0.0',
       maxImageUploadSizeMB: 5,
@@ -191,7 +191,7 @@ class SystemConfigModel {
       maxCredentialFiles: 5,
       updatedAt: null,
       updatedBy: '',
-      adminWallets: const {},
+      adminWallets: {},
     );
   }
 

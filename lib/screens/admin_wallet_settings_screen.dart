@@ -29,6 +29,7 @@ class _AdminWalletSettingsScreenState
 
   void _loadCurrentValues() {
     final config = ref.read(systemConfigProvider).value;
+    // ignore: unnecessary_null_comparison
     if (config != null && config.adminWallets != null) {
       _instapayController.text = config.adminWallets['instapay'] ?? '';
       _vodafoneController.text = config.adminWallets['vodafonecash'] ?? '';
@@ -135,10 +136,10 @@ class _AdminWalletSettingsScreenState
             TextFormField(
               controller: _instapayController,
               keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'InstaPay',
                 hintText: 'رقم InstaPay',
-                prefixIcon: const Icon(Icons.account_balance),
+                prefixIcon: Icon(Icons.account_balance),
                 border: OutlineInputBorder(
                   borderRadius: AppThemeConstants.borderRadiusMd,
                 ),
@@ -157,7 +158,7 @@ class _AdminWalletSettingsScreenState
                   Icons.phone_android,
                   color: Colors.red.shade700,
                 ),
-                border: OutlineInputBorder(
+                border: const OutlineInputBorder(
                   borderRadius: AppThemeConstants.borderRadiusMd,
                 ),
               ),
@@ -175,7 +176,7 @@ class _AdminWalletSettingsScreenState
                   Icons.phone_android,
                   color: Colors.orange.shade700,
                 ),
-                border: OutlineInputBorder(
+                border: const OutlineInputBorder(
                   borderRadius: AppThemeConstants.borderRadiusMd,
                 ),
               ),

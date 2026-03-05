@@ -17,7 +17,8 @@ class AdminPromoCodesScreen extends ConsumerStatefulWidget {
 class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
   final Set<String> _loadingDeletes = {};
   final Set<String> _loadingToggles = {};
-  bool _isLoadingCreate = false;
+  // ignore: unused_field
+  final bool _isLoadingCreate = false;
 
   @override
   Widget build(BuildContext context) {

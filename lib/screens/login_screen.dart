@@ -187,7 +187,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             _isLogin
                                 ? 'مرحبًا بعودتك!'
                                 : 'انضم إلى مجتمع المحفظين',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
                               color: AppThemeConstants.textSecondary,
                             ),
@@ -213,9 +213,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 if (!_isLogin) ...[
                                   TextFormField(
                                     controller: _nameController,
-                                    decoration: InputDecoration(
+                                    decoration: const InputDecoration(
                                       labelText: 'الاسم الكامل',
-                                      prefixIcon: const Icon(Icons.person_outline),
+                                      prefixIcon: Icon(Icons.person_outline),
                                       border: OutlineInputBorder(
                                         borderRadius: AppThemeConstants.borderRadiusMd,
                                       ),
@@ -242,9 +242,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
                                   textDirection: TextDirection.ltr,
-                                  decoration: InputDecoration(
+                                  decoration: const InputDecoration(
                                     labelText: 'البريد الإلكتروني',
-                                    prefixIcon: const Icon(Icons.email_outlined),
+                                    prefixIcon: Icon(Icons.email_outlined),
                                     border: OutlineInputBorder(
                                       borderRadius: AppThemeConstants.borderRadiusMd,
                                     ),
@@ -286,7 +286,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         });
                                       },
                                     ),
-                                    border: OutlineInputBorder(
+                                    border: const OutlineInputBorder(
                                       borderRadius: AppThemeConstants.borderRadiusMd,
                                     ),
                                     filled: true,
@@ -367,7 +367,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     onPressed: isLoading ? null : _submit,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppThemeConstants.primaryAmber,
-                                      shape: RoundedRectangleBorder(
+                                      shape: const RoundedRectangleBorder(
                                         borderRadius: AppThemeConstants.borderRadiusMd,
                                       ),
                                       elevation: AppThemeConstants.elevationSm,
@@ -499,7 +499,7 @@ class _RoleCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
                 color: AppThemeConstants.textSecondary,
               ),

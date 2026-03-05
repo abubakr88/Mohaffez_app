@@ -1,7 +1,6 @@
 // screens/completed_sessions_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
@@ -86,23 +85,23 @@ class _CompletedSessionsScreenState
                                   ),
                                 ),
                                 const SizedBox(width: 16),
-                                Expanded(
+                                const Expanded(
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         ArabicLabels.completedSessions,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 26,
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: 4),
                                       Text(
                                         ArabicLabels.sessionHistory,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.white70,
                                         ),
@@ -182,7 +181,7 @@ class _CompletedSessionsScreenState
               sessionsAsync.when(
                 data: (allSessions) {
                   if (allSessions.isEmpty) {
-                    return SliverFillRemaining(
+                    return const SliverFillRemaining(
                       child: EmptyState(
                         icon: Icons.history,
                         title: ArabicLabels.noCompletedSessions,
@@ -217,7 +216,7 @@ class _CompletedSessionsScreenState
                             });
                           },
                           icon: const Icon(Icons.clear),
-                          label: Text(ArabicLabels.clearSearch),
+                          label: const Text(ArabicLabels.clearSearch),
                         ),
                       ),
                     );
@@ -401,13 +400,13 @@ class CompletedSessionCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
-                        const Icon(Icons.note, size: 16, color: Colors.orange),
-                        const SizedBox(width: 6),
+                        Icon(Icons.note, size: 16, color: Colors.orange),
+                        SizedBox(width: 6),
                         Text(
                           '${ArabicLabels.performanceNotes}:',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),

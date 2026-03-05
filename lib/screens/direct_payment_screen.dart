@@ -68,6 +68,7 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
       .where((m) => (_wallets[m.value] ?? '').isNotEmpty)
       .toList();
 
+  // ignore: unused_element
   String get _selectedNumber => _wallets[_selectedMethod?.value ?? ''] ?? '';
 
   Future<void> _confirmPayment() async {
@@ -272,9 +273,9 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.amber.shade200),
                         ),
-                        child: Column(
+                        child: const Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Row(children: [
                               Icon(Icons.info_outline,
                                   color: Colors.orange, size: 18),

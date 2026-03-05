@@ -302,7 +302,7 @@ class _AdminUserDetailScreenState
         builder: (_, setDialogState) => AlertDialog(
           title: const Text('تغيير الدور'),
           content: DropdownButtonFormField<String>(
-            value: role,
+            initialValue: role,
             items: const [
               DropdownMenuItem(
                   value: 'student', child: Text(ArabicLabels.student)),
@@ -391,6 +391,7 @@ class _AdminUserDetailScreenState
       ),
     );
 
+    if (!mounted) return;
     if (second == true) {
       setState(() => _isLoadingDelete = true);
       try {
@@ -407,7 +408,7 @@ class _AdminUserDetailScreenState
   Widget _statBox(String title, String value) {
     return Container(
       padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppThemeConstants.surfaceWhite,
         borderRadius: AppThemeConstants.borderRadiusMd,
       ),

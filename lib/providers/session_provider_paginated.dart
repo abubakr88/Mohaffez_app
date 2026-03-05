@@ -1,11 +1,8 @@
 // lib/providers/session_provider_paginated.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 import '../repositories/session_repository.dart';
 import '../models/request_status.dart';
 import '../models/quran_mistake_model.dart';
@@ -28,26 +25,26 @@ final upcomingSessionsFilterProvider = StateProvider((ref) {
 // ============================================================================
 // COUNTERS
 // ============================================================================
-final completedSessionsCountProvider = StreamProvider.family<int, String>(
-  (ref, mohaffezId) {
-    return FirebaseFirestore.instance
+final completedSessionsCountProvider = FutureProvider.family<int, String>(
+  (ref, mohaffezId) async {
+    final query = FirebaseFirestore.instance
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'completed')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .where('status', isEqualTo: 'completed');
+    final snapshot = await query.count().get();
+    return snapshot.count ?? 0;
   },
 );
 
-final acceptedSessionsCountProvider = StreamProvider.family<int, String>(
-  (ref, mohaffezId) {
-    return FirebaseFirestore.instance
+final acceptedSessionsCountProvider = FutureProvider.family<int, String>(
+  (ref, mohaffezId) async {
+    final query = FirebaseFirestore.instance
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', isEqualTo: 'accepted')
-        .where('isPaid', isEqualTo: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .where('isPaid', isEqualTo: true);
+    final snapshot = await query.count().get();
+    return snapshot.count ?? 0;
   },
 );
 
@@ -520,9 +517,7 @@ final studentSessionsFirstPageProvider =
         final notifier = ref.read(
           paginatedStudentSessionsProvider(studentId).notifier,
         );
-        if (notifier.state.sessions.isEmpty) {
-          notifier.refresh();
-        }
+        notifier.refresh();
       } catch (_) {
         // Provider disposed before frame — safe to ignore
       }
@@ -609,22 +604,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   SessionActionsNotifier(this._ref) : super(const AsyncValue.data(null));
   final Ref _ref;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  Future<DocumentReference?> _findAvailabilityRef({
-    required String mohaffezId,
-    required Timestamp slotDate,
-  }) async {
-    final date = slotDate.toDate();
-    final dayOfWeek = date.weekday;
-    final snap = await _firestore
-        .collection('users')
-        .doc(mohaffezId)
-        .collection('availability')
-        .where('dayOfWeek', isEqualTo: dayOfWeek)
-        .limit(1)
-        .get();
-    return snap.docs.isEmpty ? null : snap.docs.first.reference;
-  }
 
   List<Map<String, dynamic>>? _computeRestoredSlots(
     Map<String, dynamic> availabilityData,
@@ -1057,133 +1036,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     return availSnap.docs.first.reference;
   }
 
-  // BUG-FIX-1: Atomic transaction to prevent ghost locks
-  Future<void> _releaseSlotLockById(String? slotLockId) async {
-    if (slotLockId == null || slotLockId.trim().isEmpty) return;
-
-    try {
-      final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
-
-      await _firestore.runTransaction((transaction) async {
-        final lockDoc = await transaction.get(lockRef);
-        if (!lockDoc.exists) return;
-
-        final data = lockDoc.data()!;
-        final mohaffezId = data['mohaffezId'] as String?;
-        final availabilityDocId = data['availabilityDocId'] as String?;
-        final timeSlot = data['timeSlot'] as String?;
-        final sessionType = data['sessionType'] as String?;
-
-        // If missing required data, just delete the lock and return
-        if (mohaffezId == null ||
-            availabilityDocId == null ||
-            timeSlot == null ||
-            sessionType == null) {
-          transaction.delete(lockRef);
-          return;
-        }
-
-        final availabilityRef = _firestore
-            .collection('users')
-            .doc(mohaffezId)
-            .collection('availability')
-            .doc(availabilityDocId);
-
-        final availabilityDoc = await transaction.get(availabilityRef);
-        if (!availabilityDoc.exists) {
-          transaction.delete(lockRef);
-          return;
-        }
-
-        final availData = availabilityDoc.data()!;
-        final timeSlots =
-            List<Map<String, dynamic>>.from(availData['timeSlots'] ?? []);
-
-        final normalizedSelected = _normalizeTimeSlot(timeSlot);
-        var changed = false;
-
-        for (var i = 0; i < timeSlots.length; i++) {
-          final slot = timeSlots[i];
-          final slotTime =
-              _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
-          if (slotTime == normalizedSelected &&
-              slot['sessionType'] == sessionType &&
-              slot['lockId'] == slotLockId) {
-            final updated = Map<String, dynamic>.from(slot)
-              ..remove('lockedBy')
-              ..remove('lockId')
-              ..remove('lockedAt');
-            timeSlots[i] = updated;
-            changed = true;
-            break;
-          }
-        }
-
-        if (changed) {
-          transaction.update(availabilityRef, {
-            'timeSlots': timeSlots,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        // Delete lock INSIDE the same transaction
-        transaction.delete(lockRef);
-      });
-    } catch (e, stack) {
-      debugPrint('⚠️ Failed to release slot lock $slotLockId: $e');
-      debugPrintStack(stackTrace: stack);
-    }
-  }
-
-  Future<void> _releaseSlotLockFieldsFromAvailability({
-    required String mohaffezId,
-    required String availabilityDocId,
-    required String timeSlot,
-    required String sessionType,
-    required String lockId,
-  }) async {
-    // FIX: Bug C - removed UID guard that caused silent exit on admin/system calls
-    final availabilityRef = _firestore
-        .collection('users')
-        .doc(mohaffezId)
-        .collection('availability')
-        .doc(availabilityDocId);
-
-    await _firestore.runTransaction((transaction) async {
-      final availabilityDoc = await transaction.get(availabilityRef);
-      if (!availabilityDoc.exists) return;
-
-      final data = availabilityDoc.data() ?? <String, dynamic>{};
-      final slots = List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
-      var changed = false;
-
-      final normalizedSelected = _normalizeTimeSlot(timeSlot);
-      for (var i = 0; i < slots.length; i++) {
-        final slot = slots[i];
-        final slotTime =
-            _normalizeTimeSlot('${slot['startTime']}-${slot['endTime']}');
-        if (slotTime == normalizedSelected &&
-            slot['sessionType'] == sessionType &&
-            slot['lockId'] == lockId) {
-          final updated = Map<String, dynamic>.from(slot)
-            ..remove('lockedBy')
-            ..remove('lockId')
-            ..remove('lockedAt');
-          slots[i] = updated;
-          changed = true;
-          break;
-        }
-      }
-
-      if (changed) {
-        transaction.update(availabilityRef, {
-          'timeSlots': slots,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
-    });
-  }
-
   String _normalizeTimeSlot(String raw) => raw.replaceAll(' ', '');
 
   Future<void> sendCancellationNotifications({
@@ -1290,22 +1142,30 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'isLateCompletion': isLateCompletion,
       };
 
-      if (previousHifzCompleted != null)
+      if (previousHifzCompleted != null) {
         updates['previousHifzCompleted'] = previousHifzCompleted;
-      if (previousHifzRating != null)
+      }
+      if (previousHifzRating != null) {
         updates['previousHifzRating'] = previousHifzRating;
-      if (previousMurajaCompleted != null)
+      }
+      if (previousMurajaCompleted != null) {
         updates['previousMurajaCompleted'] = previousMurajaCompleted;
-      if (previousMurajaRating != null)
+      }
+      if (previousMurajaRating != null) {
         updates['previousMurajaRating'] = previousMurajaRating;
-      if (performanceNotes != null && performanceNotes.isNotEmpty)
+      }
+      if (performanceNotes != null && performanceNotes.isNotEmpty) {
         updates['performanceNotes'] = performanceNotes;
-      if (newHifzAssignment != null && newHifzAssignment.isNotEmpty)
+      }
+      if (newHifzAssignment != null && newHifzAssignment.isNotEmpty) {
         updates['hifzAssignment'] = newHifzAssignment;
-      if (newMurajaAssignment != null && newMurajaAssignment.isNotEmpty)
+      }
+      if (newMurajaAssignment != null && newMurajaAssignment.isNotEmpty) {
         updates['murajaAssignment'] = newMurajaAssignment;
-      if (generalNotes != null && generalNotes.isNotEmpty)
+      }
+      if (generalNotes != null && generalNotes.isNotEmpty) {
         updates['sessionNotes'] = generalNotes;
+      }
 
       if (mistakes != null && mistakes.isNotEmpty) {
         updates['mistakes'] = mistakes.map((m) => m.toMap()).toList();
@@ -1324,9 +1184,12 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
             mistakes.where((m) => m.type == MistakeType.other).length;
       }
 
-      if (pagesRead != null && pagesRead.isNotEmpty)
+      if (pagesRead != null && pagesRead.isNotEmpty) {
         updates['pagesRead'] = pagesRead;
-      if (currentPage != null) updates['currentPage'] = currentPage;
+      }
+      if (currentPage != null) {
+        updates['currentPage'] = currentPage;
+      }
 
       await _firestore
           .collection('hafizSessions')

@@ -52,27 +52,13 @@ class _AssignmentsContent extends ConsumerStatefulWidget {
       _AssignmentsContentState();
 }
 
-class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
 
   Future<void> _refreshAssignments() async {
     ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
     await ref
         .read(studentSessionsFirstPageProvider(widget.studentId).future)
         .catchError((_) => <Map<String, dynamic>>[]);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
@@ -83,354 +69,101 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            // Modern App Bar with Tabs
-            SliverAppBar(
-              expandedHeight: 130,
-              floating: true,
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+        body: RefreshIndicator(
+          onRefresh: _refreshAssignments,
+          child: CustomScrollView(
+            slivers: [
+              // Modern App Bar with Tabs
+              SliverAppBar(
+                expandedHeight: 130,
+                floating: true,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.accentGreen, const Color(0xFF66BB6A)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                     ),
-                  ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 16, 24, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.assignment,
-                                  size: 28,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              const Expanded(
-                                child: Text(
-                                  'واجباتي',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 16, 24, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.assignment,
+                                    size: 28,
                                     color: Colors.white,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(48),
-                child: Container(
-                  color: Colors.white,
-                  child: TabBar(
-                    controller: _tabController,
-                    labelColor: AppTheme.accentGreen,
-                    unselectedLabelColor: Colors.grey.shade600,
-                    indicatorColor: AppTheme.accentGreen,
-                    indicatorWeight: 3,
-                    tabs: const [
-                      Tab(
-                        icon: Icon(Icons.pending_actions, size: 20),
-                        text: 'قيد الإنجاز',
-                      ),
-                      Tab(
-                        icon: Icon(Icons.check_circle, size: 20),
-                        text: 'مكتملة',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Tab Content
-            SliverFillRemaining(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Active Assignments
-                  sessionsAsync.when(
-                    data: (sessions) {
-                      final now = DateTime.now();
-
-                      // "قيد الإنجاز" - الجلسات القادمة المقبولة فقط
-                      final activeSessions = sessions.where((s) {
-                        final status = s['status'] as String?;
-                        if (status != 'accepted') return false;
-
-                        final sessionDate = s['sessionDate'] as DateTime?;
-                        if (sessionDate == null) return false;
-
-                        final timeSlot =
-                            s['preferredTimeSlot'] as String? ?? '08:00';
-
-                        try {
-                          // Parse time from slot (e.g., "08:00-09:00")
-                          final timeParts = timeSlot.split('-')[0].split(':');
-                          final hour = int.parse(timeParts[0]);
-                          final minute = timeParts.length > 1
-                              ? int.parse(timeParts[1])
-                              : 0;
-
-                          final sessionDateTime = DateTime(
-                            sessionDate.year,
-                            sessionDate.month,
-                            sessionDate.day,
-                            hour,
-                            minute,
-                          );
-
-                          // Only future sessions
-                          return sessionDateTime.isAfter(now);
-                        } catch (_) {
-                          // Fallback: at least check date is today or future
-                          final today = DateTime(now.year, now.month, now.day);
-                          final dateOnly = DateTime(sessionDate.year,
-                              sessionDate.month, sessionDate.day);
-                          return !dateOnly.isBefore(today);
-                        }
-                      }).toList();
-                      if (activeSessions.isEmpty) {
-                        return const EmptyState(
-                          icon: Icons.assignment_outlined,
-                          title: 'لا توجد واجبات حالية',
-                          message: 'ستظهر واجباتك النشطة هنا',
-                          animated: true,
-                        );
-                      }
-
-                      return RefreshIndicator(
-                        onRefresh: _refreshAssignments,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: activeSessions.length,
-                          itemBuilder: (context, index) {
-                            return _ActiveAssignmentCard(
-                              session: activeSessions[index],
-                            );
-                          },
-                        ),
-                      );
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => ErrorDisplay.dataLoad(
-                      onRetry: () => ref.invalidate(
-                        studentSessionsFirstPageProvider(widget.studentId),
-                      ),
-                    ),
-                  ),
-
-                  // Completed Assignments
-                  sessionsAsync.when(
-                    data: (sessions) {
-                      final completedSessions = sessions
-                          .where((s) => (s['status'] as String?) == 'completed')
-                          .toList();
-
-                      if (completedSessions.isEmpty) {
-                        return const EmptyState(
-                          icon: Icons.inventory_2_outlined,
-                          title: 'لا توجد واجبات مكتملة',
-                          message: 'أكمل واجباتك لتظهر هنا',
-                          animated: true,
-                        );
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: completedSessions.length,
-                        itemBuilder: (context, index) {
-                          return _CompletedAssignmentCard(
-                            session: completedSessions[index],
-                            studentId: widget.studentId,
-                          );
-                        },
-                      );
-                    },
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => ErrorDisplay.dataLoad(
-                      onRetry: () => ref.invalidate(
-                        studentSessionsFirstPageProvider(widget.studentId),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// ACTIVE ASSIGNMENT CARD
-// ============================================================================
-
-class _ActiveAssignmentCard extends StatelessWidget {
-  final Map<String, dynamic> session;
-
-  const _ActiveAssignmentCard({required this.session});
-
-  @override
-  Widget build(BuildContext context) {
-    final mohaffezName = session['mohaffezName'] as String? ?? 'محفظ';
-    final hifz = session['hifzAssignment'] as String? ?? '';
-    final muraja = session['murajaAssignment'] as String? ?? '';
-    final sessionDate = session['sessionDate'] as DateTime?;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () {
-          // Navigate to session details if needed
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentGreen.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.school,
-                      color: AppTheme.accentGreen,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mohaffezName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (sessionDate != null) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today,
-                                size: 14,
-                                color: Colors.grey.shade600,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                DateFormat('dd MMM yyyy', 'ar')
-                                    .format(sessionDate),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
+                                const SizedBox(width: 16),
+                                const Expanded(
+                                  child: Text(
+                                    'واجباتي',
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'قيد الإنجاز',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange,
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 20),
 
-              // Assignments
-              if (hifz.isNotEmpty)
-                _AssignmentItem(
-                  icon: Icons.book,
-                  label: 'حفظ',
-                  content: hifz,
-                  color: Colors.green,
-                ),
-              if (hifz.isNotEmpty && muraja.isNotEmpty)
-                const SizedBox(height: 12),
-              if (muraja.isNotEmpty)
-                _AssignmentItem(
-                  icon: Icons.refresh,
-                  label: 'مراجعة',
-                  content: muraja,
-                  color: Colors.blue,
-                ),
-              const SizedBox(height: 16),
+              SliverFillRemaining(
+                child: sessionsAsync.when(
+                  data: (sessions) {
+                    final completedSessions = sessions
+                        .where((s) => (s['status'] as String?) == 'completed')
+                        .toList();
 
-              // Progress Indicator
-              Row(
-                children: [
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: 0.6,
-                      backgroundColor: Colors.grey.shade200,
-                      color: AppTheme.accentGreen,
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(4),
+                    if (completedSessions.isEmpty) {
+                      return const EmptyState(
+                        icon: Icons.inventory_2_outlined,
+                        title: 'لا توجد واجبات مكتملة',
+                        message: 'أكمل واجباتك لتظهر هنا',
+                        animated: true,
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: completedSessions.length,
+                      itemBuilder: (context, index) {
+                        return _CompletedAssignmentCard(
+                          session: completedSessions[index],
+                          studentId: widget.studentId,
+                        );
+                      },
+                    );
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => ErrorDisplay.dataLoad(
+                    onRetry: () => ref.invalidate(
+                      studentSessionsFirstPageProvider(widget.studentId),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '60%',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),

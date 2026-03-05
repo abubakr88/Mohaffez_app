@@ -8,9 +8,7 @@ import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
-import '../utils/arabic_labels.dart';
 import '../services/app_version_service.dart';
-import 'student_assignments_screen.dart';
 
 class StudentHome extends ConsumerStatefulWidget {
   const StudentHome({super.key});
@@ -58,7 +56,7 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
 class StudentHomeContent extends ConsumerWidget {
   final String studentId;
 
-  const StudentHomeContent({required this.studentId});
+  const StudentHomeContent({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -275,7 +273,7 @@ class StudentHomeContent extends ConsumerWidget {
 class QuickStatsSection extends ConsumerWidget {
   final String studentId;
 
-  const QuickStatsSection({required this.studentId});
+  const QuickStatsSection({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -354,7 +352,7 @@ class StatCard extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const StatCard({
+  const StatCard({super.key, 
     required this.icon,
     required this.title,
     required this.value,
@@ -437,7 +435,7 @@ class StatCard extends StatelessWidget {
 class QuickActionsSection extends StatelessWidget {
   final String studentId;
 
-  const QuickActionsSection({required this.studentId});
+  const QuickActionsSection({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context) {
@@ -543,7 +541,7 @@ class ActionCard extends StatelessWidget {
   final Gradient gradient;
   final VoidCallback onTap;
 
-  const ActionCard({
+  const ActionCard({super.key, 
     required this.icon,
     required this.title,
     required this.gradient,
@@ -597,7 +595,7 @@ class ActionCard extends StatelessWidget {
 class RecentAssignmentsSection extends ConsumerWidget {
   final String studentId;
 
-  const RecentAssignmentsSection({required this.studentId});
+  const RecentAssignmentsSection({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -781,7 +779,7 @@ class AssignmentRow extends StatelessWidget {
   final String text;
   final Color color;
 
-  const AssignmentRow({
+  const AssignmentRow({super.key, 
     required this.label,
     required this.text,
     required this.color,

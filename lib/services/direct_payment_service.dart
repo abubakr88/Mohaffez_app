@@ -143,6 +143,7 @@ class DirectPaymentService {
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', isEqualTo: 'pending_confirmation')
         .orderBy('createdAt', descending: true)
+        .limit(50)
         .snapshots()
         .map((s) =>
             s.docs.map((d) => DirectPaymentModel.fromFirestore(d)).toList());
@@ -243,9 +244,13 @@ class DirectPaymentService {
       if (kv.length >= 2) {
         final key = kv[0].trim().replaceAll('"', '');
         final val = kv.sublist(1).join(':').trim().replaceAll('"', '');
-        if (val == 'true') result[key] = true;
-        else if (val == 'false') result[key] = false;
-        else result[key] = val;
+        if (val == 'true') {
+          result[key] = true;
+        } else if (val == 'false') {
+          result[key] = false;
+        } else {
+          result[key] = val;
+        }
       }
     }
     return result;

@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../models/mohaffez_student_summary.dart';
@@ -97,7 +96,6 @@ class _StudentsBody extends ConsumerWidget {
                           final student = students[index];
                           return StudentCard(
                             student: student,
-                            // FIX: real navigation — no more // TODO
                             onTap: () => Navigator.push(
                               ctx,
                               MaterialPageRoute(
@@ -510,8 +508,8 @@ class _SkeletonCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                _Shimmer(
-                  child: const CircleAvatar(
+                const _Shimmer(
+                  child: CircleAvatar(
                       radius: 28, backgroundColor: Colors.white),
                 ),
                 const SizedBox(width: 12),

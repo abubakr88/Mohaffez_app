@@ -4,11 +4,12 @@ import 'package:flutter/semantics.dart';
 class AccessibilityUtils {
   AccessibilityUtils._();
 
-  /// Announce message to screen readers
+ /// Announce message to screen readers
   static void announce(BuildContext context, String message) {
-    SemanticsService.announce(message, TextDirection.rtl);
+    final view = View.of(context);
+    SemanticsService.sendAnnouncement(view, message, TextDirection.rtl);
   }
-
+  
   /// Check if screen reader is enabled
   static bool isScreenReaderEnabled(BuildContext context) {
     return MediaQuery.of(context).accessibleNavigation;

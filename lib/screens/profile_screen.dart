@@ -12,7 +12,6 @@ import '../providers/auth_provider.dart';
 import '../repositories/user_repository.dart';
 import '../utils/arabic_labels.dart';
 import 'location_settings_screen.dart';
-import 'mohaffez_wallet_settings_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -144,8 +143,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(ctx);
                   try {
-                    // TODO: Implement password change logic
-                    // await ref.read(authProvider.notifier).changePassword(...)
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

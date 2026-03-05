@@ -1,7 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/direct_payment_model.dart';
 import '../providers/admin_provider.dart';
@@ -81,13 +80,15 @@ class _CommissionDashboardScreenState
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchAllCommissions(),
           builder: (context, snap) {
-            if (!snap.hasData)
+            if (!snap.hasData) {
               return const Center(child: CircularProgressIndicator());
+            }
             final list = snap.data!;
-            if (list.isEmpty)
+            if (list.isEmpty) {
               return const Center(
                 child: Text('لا توجد عمولات بعد'),
               );
+            }
 
             // Stats at top
             final totalPending = list
@@ -171,6 +172,7 @@ class _WeekSummaryCard extends StatelessWidget {
     required this.summary,
     required this.isMarkingPaid,
     required this.onMarkAsPaid,
+    // ignore: unused_element_parameter
     this.showAdminActions = true,
   });
 

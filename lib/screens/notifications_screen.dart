@@ -77,9 +77,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
+                                    const Text(
                                       ArabicLabels.notifications,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 28,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
@@ -168,7 +168,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
               // Notifications List
               if (paginatedState.items.isEmpty && !paginatedState.isLoadingMore)
-                SliverFillRemaining(
+                const SliverFillRemaining(
                   child: EmptyState(
                     icon: Icons.notifications_none,
                     title: ArabicLabels.noNotifications,
@@ -346,6 +346,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       case 'sessionrejected':
       case 'rejected':
         {
+          // ignore: dead_null_aware_expression
           final reason = notification.body ?? 'لم يذكر سبب الرفض';
           showDialog(
             context: context,
@@ -355,7 +356,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: Text(ArabicLabels.ok),
+                  child: const Text(ArabicLabels.ok),
                 ),
               ],
             ),

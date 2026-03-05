@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../models/pricing_plan_model.dart';
 import '../providers/pricing_provider.dart';
@@ -272,7 +271,7 @@ class PricingPlanCard extends ConsumerWidget {
                 Switch(
                   value: plan.isActive,
                   onChanged: (val) => _togglePlanStatus(context, ref, val),
-                  activeColor: AppTheme.accentGreen,
+                  activeThumbColor: AppTheme.accentGreen,
                 ),
                 const Text('مفعل'),
                 const Spacer(),

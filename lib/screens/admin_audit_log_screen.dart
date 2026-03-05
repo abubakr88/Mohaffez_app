@@ -49,7 +49,7 @@ class AdminAuditLogScreen extends ConsumerWidget {
           ),
           data: (list) {
             if (list.isEmpty) {
-              return Center(
+              return const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -58,10 +58,10 @@ class AdminAuditLogScreen extends ConsumerWidget {
                       size: AppThemeConstants.icon3xl,
                       color: AppThemeConstants.textSecondary,
                     ),
-                    const SizedBox(height: AppThemeConstants.spaceMd),
+                    SizedBox(height: AppThemeConstants.spaceMd),
                     Text(
                       ArabicLabels.noAuditLogs,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppThemeConstants.textSecondary,
                         fontSize: 16,
                       ),
@@ -177,7 +177,7 @@ class AdminAuditLogScreen extends ConsumerWidget {
                                 padding: const EdgeInsets.all(
                                   AppThemeConstants.spaceSm,
                                 ),
-                                decoration: BoxDecoration(
+                                decoration: const BoxDecoration(
                                   color: AppThemeConstants.backgroundLight,
                                   borderRadius:
                                       AppThemeConstants.borderRadiusSm,

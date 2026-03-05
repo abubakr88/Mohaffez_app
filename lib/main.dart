@@ -71,7 +71,7 @@ void main() async {
     if (kDebugMode) {
       FirebaseAppCheck.instance.onTokenChange.listen((token) {
         final hasToken = token != null && token.isNotEmpty;
-        debugPrint('App Check token state: ' + (hasToken ? 'valid' : 'null_or_empty'));
+        debugPrint('App Check token state: ${hasToken ? 'valid' : 'null_or_empty'}');
       });
     }
 
