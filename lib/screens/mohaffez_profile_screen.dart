@@ -333,7 +333,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -657,7 +657,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryAmber.withOpacity(0.3),
+              color: AppTheme.primaryAmber.withValues(alpha: 0.3),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
