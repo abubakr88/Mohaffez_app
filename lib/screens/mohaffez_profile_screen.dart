@@ -116,7 +116,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, -2),
                       ),
@@ -129,10 +129,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppTheme.accentGreen.withOpacity(0.1),
+                          color: AppTheme.accentGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: AppTheme.accentGreen.withOpacity(0.3),
+                            color: AppTheme.accentGreen.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Column(
@@ -273,7 +273,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primaryAmber.withOpacity(0.3),
+                color: AppTheme.primaryAmber.withValues(alpha: 0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -316,7 +316,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -696,7 +696,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     '${pricePerSession.toStringAsFixed(0)} ج/جلسة',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
               ],
@@ -706,7 +706,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -1150,21 +1150,6 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     return SliverAppBar(
       expandedHeight: 140,
       pinned: true,
-      leading: context.canPop()
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
-              onPressed: () => context.pop(),
-              tooltip: 'رجوع',
-            )
-          : null,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'تحديث',
-          onPressed: () =>
-              ref.invalidate(mohaffezProfileProvider(widget.mohaffezId)),
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -1268,9 +1253,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -1366,10 +1351,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         margin: const EdgeInsets.only(left: 12),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.1),
+                          color: Colors.purple.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border:
-                              Border.all(color: Colors.purple.withOpacity(0.3)),
+                              Border.all(color: Colors.purple.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1416,7 +1401,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.1),
+                                color: Colors.green.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
@@ -1494,7 +1479,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       });
                     }
                   },
-                  selectedColor: AppTheme.primaryAmber.withOpacity(0.3),
+                  selectedColor: AppTheme.primaryAmber.withValues(alpha: 0.3),
                   labelStyle: TextStyle(
                     fontWeight: selectedSessionType == 'home'
                         ? FontWeight.bold
@@ -1526,7 +1511,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       });
                     }
                   },
-                  selectedColor: AppTheme.accentGreen.withOpacity(0.3),
+                  selectedColor: AppTheme.accentGreen.withValues(alpha: 0.3),
                   labelStyle: TextStyle(
                     fontWeight: selectedSessionType == 'mosque'
                         ? FontWeight.bold
@@ -1558,7 +1543,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       });
                     }
                   },
-                  selectedColor: Colors.blue.withOpacity(0.3),
+                  selectedColor: Colors.blue.withValues(alpha: 0.3),
                   labelStyle: TextStyle(
                     fontWeight: selectedSessionType == 'online'
                         ? FontWeight.bold
@@ -1901,7 +1886,7 @@ class _PlanPickerSheetState extends State<_PlanPickerSheet> {
                             width: selected ? 2.5 : 1,
                           ),
                           color: selected
-                              ? AppTheme.accentGreen.withOpacity(0.05)
+                              ? AppTheme.accentGreen.withValues(alpha: 0.05)
                               : null,
                         ),
                         child: Row(

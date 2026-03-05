@@ -57,14 +57,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 expandedHeight: 100,
                 floating: true,
                 pinned: true,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    tooltip: 'تحديث',
-                    onPressed: () => ref
-                        .invalidate(paginatedNotificationsProvider(user.uid)),
-                  ),
-                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -98,7 +90,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                         '$unreadCount غير مقروءة',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.white.withOpacity(0.9),
+                                          color: Colors.white.withValues(alpha: 0.9),
                                         ),
                                       ),
                                   ],
@@ -106,7 +98,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                 if (paginatedState.items.isNotEmpty)
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: IconButton(
@@ -417,7 +409,7 @@ class _FilterChip extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.primaryAmber.withOpacity(0.3),
+                    color: AppTheme.primaryAmber.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -441,7 +433,7 @@ class _FilterChip extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withOpacity(0.3)
+                      ? Colors.white.withValues(alpha: 0.3)
                       : Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -504,12 +496,12 @@ class _NotificationCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color:
-                  notification.isRead ? Colors.white : color.withOpacity(0.05),
+                  notification.isRead ? Colors.white : color.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: notification.isRead
                     ? Colors.grey.shade200
-                    : color.withOpacity(0.3),
+                    : color.withValues(alpha: 0.3),
                 width: notification.isRead ? 1 : 2,
               ),
             ),
@@ -519,7 +511,7 @@ class _NotificationCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: color, size: 24),

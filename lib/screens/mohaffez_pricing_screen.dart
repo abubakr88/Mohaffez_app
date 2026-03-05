@@ -38,21 +38,6 @@ class MohaffezPricingScreen extends ConsumerWidget {
             appBar: AppBar(
               // CHANGED: Clean Arabic UTF-8 text.
               title: const Text('إدارة الأسعار'),
-              leading: context.canPop()
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back_ios),
-                      onPressed: () => context.pop(),
-                      tooltip: 'رجوع',
-                    )
-                  : null,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'تحديث',
-                  onPressed: () =>
-                      ref.invalidate(pricingPlansProvider(mohaffezId)),
-                ),
-              ],
             ),
             body: plansAsync.when(
               data: (plans) => RefreshIndicator(

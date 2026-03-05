@@ -349,12 +349,12 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: _getMistakeColor(mistake.type).withOpacity(0.85),
+                    color: _getMistakeColor(mistake.type).withValues(alpha: 0.85),
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
+                        color: Colors.black.withValues(alpha: 0.3),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -380,7 +380,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                       border: Border.all(color: Colors.white, width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.blue.withOpacity(0.4),
+                          color: Colors.blue.withValues(alpha: 0.4),
                           blurRadius: 3,
                         ),
                       ],
@@ -418,7 +418,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _getMistakeColor(mistake.type).withOpacity(0.15),
+                  color: _getMistakeColor(mistake.type).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -618,7 +618,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -647,7 +647,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 border: Border.all(color: Colors.grey.shade300),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -1190,7 +1190,7 @@ class _JuzList extends StatelessWidget {
               boxShadow: isCurrent
                   ? [
                       BoxShadow(
-                        color: Colors.green.withOpacity(0.3),
+                        color: Colors.green.withValues(alpha: 0.3),
                         blurRadius: 6,
                         offset: const Offset(0, 3),
                       ),

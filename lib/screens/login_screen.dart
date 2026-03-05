@@ -152,7 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
+                                    color: Colors.black.withValues(alpha: 0.15),
                                     blurRadius: 30,
                                     offset: const Offset(0, 10),
                                   ),
@@ -201,7 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               borderRadius: AppThemeConstants.borderRadiusXl,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
+                                  color: Colors.black.withValues(alpha: 0.08),
                                   blurRadius: 20,
                                   offset: const Offset(0, 4),
                                 ),
@@ -473,7 +473,7 @@ class _RoleCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : AppThemeConstants.backgroundLight,
+          color: isSelected ? color.withValues(alpha: 0.1) : AppThemeConstants.backgroundLight,
           borderRadius: AppThemeConstants.borderRadiusMd,
           border: Border.all(
             color: isSelected ? color : AppThemeConstants.divider,

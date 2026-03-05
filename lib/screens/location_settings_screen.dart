@@ -38,22 +38,8 @@ class _LocationSettingsScreenState
           textDirection: TextDirection.rtl,
           child: Scaffold(
             appBar: AppBar(
-              leading: context.canPop()
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back_ios),
-                      onPressed: () => context.pop(),
-                      tooltip: 'رجوع',
-                    )
-                  : null,
               title: const Text('إعدادات الموقع'),
               backgroundColor: AppTheme.primaryAmber,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'تحديث',
-                  onPressed: () => ref.invalidate(currentUserProvider),
-                ),
-              ],
             ),
             body: Padding(
               padding: const EdgeInsets.all(16),

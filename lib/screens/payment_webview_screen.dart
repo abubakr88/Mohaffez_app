@@ -186,8 +186,15 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
     );
 
     Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      Navigator.popUntil(context, (route) => route.isFirst);
+      // FIXED: guard with both mounted (StatefulWidget) and context.mounted (BuildContext)
+      if (!mounted || !context.mounted) return;
+      try {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      } catch (e) {
+        // Navigator may already be in a different state if user navigated away
+        // during the 2-second delay. Absorb silently — payment already succeeded.
+        debugPrint('PaymentWebViewScreen: popUntil on stale context: $e');
+      }
     });
   }
 

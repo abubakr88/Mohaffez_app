@@ -50,7 +50,7 @@ extension MistakeTypeUI on MistakeType {
   Widget buildAvatar({double radius = 16}) {
     return CircleAvatar(
       radius: radius,
-      backgroundColor: color.withOpacity(0.15),
+      backgroundColor: color.withValues(alpha: 0.15),
       child: Icon(icon, size: radius, color: color),
     );
   }
@@ -94,12 +94,12 @@ extension QuranMistakeUI on QuranMistake {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.85),
+                color: color.withValues(alpha: 0.85),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -123,7 +123,7 @@ extension QuranMistakeUI on QuranMistake {
                   border: Border.all(color: Colors.white, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withOpacity(0.4),
+                      color: Colors.blue.withValues(alpha: 0.4),
                       blurRadius: 3,
                     ),
                   ],
@@ -145,9 +145,9 @@ extension QuranMistakeUI on QuranMistake {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.06),
+          color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -155,7 +155,7 @@ extension QuranMistakeUI on QuranMistake {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 18, color: color),

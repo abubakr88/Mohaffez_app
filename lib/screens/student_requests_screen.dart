@@ -3,16 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:go_router/go_router.dart';
 
 import '../providers/booking_provider.dart';
-import '../providers/auth_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../utils/arabic_labels.dart';
 import 'student_payment_screen.dart';
 
 // ============================================================================
@@ -133,13 +130,6 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       expandedHeight: 120,
       floating: true,
       pinned: true,
-      leading: context.canPop()
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
-              onPressed: () => context.pop(),
-              tooltip: 'رجوع',
-            )
-          : null,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -161,7 +151,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
@@ -202,13 +192,6 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           ),
         ),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: () => _refreshRequests(studentId),
-          tooltip: 'تحديث',
-        ),
-      ],
     );
   }
 
@@ -546,7 +529,7 @@ class _RequestCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: statusColor.withOpacity(0.3),
+          color: statusColor.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -562,7 +545,7 @@ class _RequestCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -947,7 +930,7 @@ class _RejectedRequestCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(

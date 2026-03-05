@@ -65,13 +65,6 @@ class _AdminTeacherCommissionsScreenState
           title: const Text('عمولات المحافظين'),
           backgroundColor: AppThemeConstants.primaryAmber,
           foregroundColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'تحديث',
-              onPressed: _refresh,
-            ),
-          ],
         ),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchAllCommissions(),

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/payment_model.dart';
@@ -86,7 +87,7 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
       // ✅ FREE SESSION FLOW (100% promo code)
       if (basePayment.amount <= 0.01) {
-        print('🎫 FREE SESSION: Creating payment document only');
+        debugPrint('🎫 FREE SESSION: Creating payment document only');
         
         // ✅ Only create payment document - Cloud Function handles everything else
         final freePayment = basePayment.copyWith(
@@ -98,8 +99,8 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
         final paymentId = await _repository.createPayment(freePayment);
         
-        print('✅ FREE SESSION: Payment document created: $paymentId');
-        print('🚀 Next: Call Cloud Function to create session');
+        debugPrint('✅ FREE SESSION: Payment document created: $paymentId');
+        debugPrint('🚀 Next: Call Cloud Function to create session');
         
         state = const AsyncValue.data(null);
         
@@ -112,7 +113,7 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
       }      /* PAYMOB_DISABLED - gateway path disabled, use direct payment flow
       else {
         // PAID SESSION FLOW (Gateway payment)
-        print('💳 PAID SESSION: Creating Paymob payment');
+        debugPrint('💳 PAID SESSION: Creating Paymob payment');
         
         final pendingPayment = basePayment.copyWith(
           status: PaymentStatus.pending,
@@ -171,8 +172,8 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
           sessionId: null,
         );
       }    } catch (e, stack) {
-      print('❌ ERROR in startPaymentAndHandleResult: $e');
-      print('Stack trace: $stack');
+      debugPrint('❌ ERROR in startPaymentAndHandleResult: $e');
+      debugPrint('Stack trace: $stack');
       state = AsyncValue.error(e, stack);
       return null;
     }

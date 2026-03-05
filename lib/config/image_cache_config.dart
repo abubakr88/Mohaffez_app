@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class ImageCacheConfig {
@@ -11,9 +12,9 @@ class ImageCacheConfig {
   static Future<void> clearCache() async {
     try {
       await DefaultCacheManager().emptyCache();
-      print('Cache cleared successfully');
+      debugPrint('Cache cleared successfully');
     } catch (e) {
-      print('Error clearing cache: $e');
+      debugPrint('Error clearing cache: $e');
     }
   }
   
@@ -25,7 +26,7 @@ class ImageCacheConfig {
       // You would need to implement custom cache manager for this
       return 'غير متاح'; // "Not available" in Arabic
     } catch (e) {
-      print('Error getting cache size: $e');
+      debugPrint('Error getting cache size: $e');
       return 'غير متاح';
     }
   }
@@ -34,9 +35,9 @@ class ImageCacheConfig {
   static Future<void> removeFromCache(String url) async {
     try {
       await DefaultCacheManager().removeFile(url);
-      print('File removed from cache: $url');
+      debugPrint('File removed from cache: $url');
     } catch (e) {
-      print('Error removing from cache: $e');
+      debugPrint('Error removing from cache: $e');
     }
   }
   
@@ -46,7 +47,7 @@ class ImageCacheConfig {
       final fileInfo = await DefaultCacheManager().getFileFromCache(url);
       return fileInfo != null && fileInfo.file.existsSync();
     } catch (e) {
-      print('Error checking cache: $e');
+      debugPrint('Error checking cache: $e');
       return false;
     }
   }
@@ -55,9 +56,9 @@ class ImageCacheConfig {
   static Future<void> preloadImage(String url) async {
     try {
       await DefaultCacheManager().downloadFile(url);
-      print('Image preloaded: $url');
+      debugPrint('Image preloaded: $url');
     } catch (e) {
-      print('Error preloading image: $e');
+      debugPrint('Error preloading image: $e');
     }
   }
   
@@ -67,7 +68,7 @@ class ImageCacheConfig {
       final fileInfo = await DefaultCacheManager().getFileFromCache(url);
       return fileInfo?.file.path;
     } catch (e) {
-      print('Error getting cached file: $e');
+      debugPrint('Error getting cached file: $e');
       return null;
     }
   }

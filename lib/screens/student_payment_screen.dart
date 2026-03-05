@@ -388,7 +388,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                         width: _selectedDPMethod == _DPMethod.online ? 2 : 1,
                       ),
                       color: _selectedDPMethod == _DPMethod.online
-                          ? AppTheme.accentGreen.withOpacity(0.08)
+                          ? AppTheme.accentGreen.withValues(alpha: 0.08)
                           : Colors.white,
                     ),
                     child: const Row(
@@ -424,7 +424,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                         width: _selectedDPMethod == _DPMethod.direct ? 2 : 1,
                       ),
                       color: _selectedDPMethod == _DPMethod.direct
-                          ? Colors.green.withOpacity(0.08)
+                          ? Colors.green.withValues(alpha: 0.08)
                           : Colors.white,
                     ),
                     child: const Row(
@@ -776,7 +776,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             color: selected ? AppTheme.accentGreen : Colors.grey.shade300,
             width: selected ? 2.5 : 1,
           ),
-          color: selected ? AppTheme.accentGreen.withOpacity(0.05) : null,
+          color: selected ? AppTheme.accentGreen.withValues(alpha: 0.05) : null,
         ),
         child: Row(children: [
           Icon(
@@ -818,7 +818,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.accentGreen, width: 2),
-        color: AppTheme.accentGreen.withOpacity(0.05),
+        color: AppTheme.accentGreen.withValues(alpha: 0.05),
       ),
       child: Row(
         children: [
@@ -840,7 +840,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: AppTheme.accentGreen.withOpacity(0.1),
+              color: AppTheme.accentGreen.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text('محدد',
@@ -884,7 +884,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.green.withOpacity(0.3),
+                    color: Colors.green.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4))
               ],
@@ -1020,13 +1020,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isFreeSession
-            ? Colors.green.withOpacity(0.1)
-            : AppTheme.primaryAmber.withOpacity(0.08),
+            ? Colors.green.withValues(alpha: 0.1)
+            : AppTheme.primaryAmber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isFreeSession
               ? Colors.green
-              : AppTheme.primaryAmber.withOpacity(0.25),
+              : AppTheme.primaryAmber.withValues(alpha: 0.25),
         ),
       ),
       child: Column(children: [

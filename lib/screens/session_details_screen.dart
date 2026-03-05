@@ -187,7 +187,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: policyColor.withOpacity(0.1),
+                  color: policyColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: policyColor),
                 ),
@@ -387,13 +387,6 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                         tooltip: 'رجوع',
                       )
                     : null,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: refreshScreen,
-                    tooltip: 'تحديث',
-                  ),
-                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -419,7 +412,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color:
-                                          Colors.white.withOpacity(0.2),
+                                          Colors.white.withValues(alpha: 0.2),
                                       borderRadius:
                                           BorderRadius.circular(16),
                                     ),
@@ -455,7 +448,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: Colors.white
-                                              .withOpacity(0.2),
+                                              .withValues(alpha: 0.2),
                                           borderRadius:
                                               BorderRadius.circular(20),
                                         ),
@@ -793,7 +786,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: getMistakeColor(mistake.type).withOpacity(0.15),
+                  color: getMistakeColor(mistake.type).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -954,7 +947,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8),
-              color: policyColor.withOpacity(0.1),
+              color: policyColor.withValues(alpha: 0.1),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1120,9 +1113,9 @@ class _AssignmentCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
+          color: color.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [

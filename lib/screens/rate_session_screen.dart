@@ -81,7 +81,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentGreen.withOpacity(0.1),
+                  color: AppTheme.accentGreen.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -163,7 +163,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
+                    color: Colors.amber.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(

@@ -190,13 +190,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
       expandedHeight: 120,
       floating: true,
       pinned: true,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'تحديث',
-          onPressed: () => ref.invalidate(nearbyMohaffezProvider(params)),
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(

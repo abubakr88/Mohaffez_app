@@ -74,23 +74,9 @@ class _CommissionDashboardScreenState
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => context.pop(),
-                  tooltip: 'رجوع',
-                )
-              : null,
           title: const Text('عمولات التطبيق (5%)'),
           backgroundColor: const Color(0xFFF59E0B),
           foregroundColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'تحديث (بيانات مباشرة)',
-              onPressed: () {},
-            ),
-          ],
         ),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchAllCommissions(),

@@ -55,21 +55,6 @@ class _CompletedSessionsScreenState
                 expandedHeight: 130,
                 floating: true,
                 pinned: true,
-                leading: context.canPop()
-                    ? IconButton(
-                        icon: const Icon(Icons.arrow_back_ios),
-                        onPressed: () => context.pop(),
-                        tooltip: 'رجوع',
-                      )
-                    : null,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    tooltip: 'تحديث',
-                    onPressed: () => ref.invalidate(
-                        completedSessionsProvider(widget.mohaffezId)),
-                  ),
-                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -91,7 +76,7 @@ class _CompletedSessionsScreenState
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
@@ -308,7 +293,7 @@ class CompletedSessionCard extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.purple.withOpacity(0.3), width: 1),
+        side: BorderSide(color: Colors.purple.withValues(alpha: 0.3), width: 1),
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.all(16),
@@ -316,7 +301,7 @@ class CompletedSessionCard extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.purple.withOpacity(0.1),
+            color: Colors.purple.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(

@@ -147,20 +147,6 @@ class _AppBarSliver extends ConsumerWidget {
       expandedHeight: 120,
       floating: true,
       pinned: true,
-      leading: context.canPop()
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
-              onPressed: () => context.pop(),
-              tooltip: 'رجوع',
-            )
-          : null,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: () => ref.invalidate(mohaffezStudentsProvider(mohaffezId)),
-          tooltip: ArabicLabels.refresh,
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(

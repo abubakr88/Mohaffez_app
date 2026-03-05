@@ -105,20 +105,6 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       expandedHeight: 120,
       floating: true,
       pinned: true,
-      leading: context.canPop()
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
-              onPressed: () => context.pop(),
-              tooltip: 'رجوع',
-            )
-          : null,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'تحديث',
-          onPressed: () => ref.invalidate(currentUserProvider),
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -140,7 +126,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -503,7 +489,7 @@ class _FilterChip extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.orange.withOpacity(0.3),
+                    color: Colors.orange.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -600,8 +586,8 @@ class PendingRequestCard extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isAwaitingPayment
-                        ? Colors.orange.withOpacity(0.1)
-                        : Colors.grey.withOpacity(0.1),
+                        ? Colors.orange.withValues(alpha: 0.1)
+                        : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isAwaitingPayment ? Colors.orange : Colors.grey,

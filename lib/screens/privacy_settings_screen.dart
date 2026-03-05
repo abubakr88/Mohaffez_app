@@ -85,21 +85,7 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => context.pop(),
-                  tooltip: 'رجوع',
-                )
-              : null,
           title: const Text("إعدادات الخصوصية"),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'تحديث',
-              onPressed: _loadSettings,
-            ),
-          ],
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())

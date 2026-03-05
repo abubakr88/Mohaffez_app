@@ -93,23 +93,9 @@ class _MohaffezWalletSettingsScreenState
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => context.pop(),
-                  tooltip: 'رجوع',
-                )
-              : null,
           title: const Text('أرقام محافظ الدفع المباشر'),
           backgroundColor: Colors.green,
           foregroundColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'تحديث',
-              onPressed: _loadWallets,
-            ),
-          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())

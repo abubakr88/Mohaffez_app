@@ -143,10 +143,10 @@ class AssignmentCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: _getRatingColor(rating).withOpacity(0.1),
+                  color: _getRatingColor(rating).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _getRatingColor(rating).withOpacity(0.3),
+                    color: _getRatingColor(rating).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(

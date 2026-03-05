@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -40,7 +41,7 @@ class FollowService {
 
       return true;
     } catch (e) {
-      print('Error following mohaffez: $e');
+      debugPrint('Error following mohaffez: $e');
       return false;
     }
   }
@@ -78,7 +79,7 @@ class FollowService {
 
       return true;
     } catch (e) {
-      print('Error unfollowing mohaffez: $e');
+      debugPrint('Error unfollowing mohaffez: $e');
       return false;
     }
   }
@@ -97,7 +98,7 @@ class FollowService {
 
       return followSnapshot.docs.isNotEmpty;
     } catch (e) {
-      print('Error checking follow status: $e');
+      debugPrint('Error checking follow status: $e');
       return false;
     }
   }
@@ -108,7 +109,7 @@ class FollowService {
       final userDoc = await _firestore.collection('users').doc(mohaffezId).get();
       return userDoc.data()?['followerCount'] as int? ?? 0;
     } catch (e) {
-      print('Error getting follower count: $e');
+      debugPrint('Error getting follower count: $e');
       return 0;
     }
   }

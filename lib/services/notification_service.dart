@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,7 +9,7 @@ import 'package:http/http.dart' as http;
 // Background message handler - must be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('NotificationService: Background message: ${message.messageId}');
+  debugPrint('NotificationService: Background message: ${message.messageId}');
   // Create notification in database when app is in background
   await NotificationService.createDatabaseNotificationFromRemote(message);
 }
@@ -39,9 +40,9 @@ class NotificationService {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('NotificationService: Permission granted');
+        debugPrint('NotificationService: Permission granted');
       } else {
-        print('NotificationService: Permission denied');
+        debugPrint('NotificationService: Permission denied');
       }
 
       // Initialize local notifications
@@ -59,7 +60,7 @@ class NotificationService {
       await localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (response) {
-          print('NotificationService: Notification tapped: ${response.payload}');
+          debugPrint('NotificationService: Notification tapped: ${response.payload}');
           handleNotificationTap(response.payload);
         },
       );
@@ -76,10 +77,10 @@ class NotificationService {
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen(handleForegroundMessage);
 
-      print('NotificationService: Initialized successfully');
+      debugPrint('NotificationService: Initialized successfully');
     } catch (e, stack) {
-      print('NotificationService: Initialization error: $e');
-      print('NotificationService: Stack trace: $stack');
+      debugPrint('NotificationService: Initialization error: $e');
+      debugPrint('NotificationService: Stack trace: $stack');
     }
   }
 
@@ -97,25 +98,25 @@ class NotificationService {
     await localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
-    print('NotificationService: Channel created');
+    debugPrint('NotificationService: Channel created');
   }
 
   /// Save FCM token with retry logic
   static Future<void> saveFCMToken() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      print('NotificationService: No authenticated user');
+      debugPrint('NotificationService: No authenticated user');
       return;
     }
 
     try {
       final token = await messaging.getToken();
       if (token == null) {
-        print('NotificationService: Failed to get FCM token');
+        debugPrint('NotificationService: Failed to get FCM token');
         if (_tokenRetryCount < _maxTokenRetries) {
           _tokenRetryCount++;
           final delay = Duration(seconds: 5 * _tokenRetryCount);
-          print('NotificationService: Retrying token fetch in ${delay.inSeconds}s');
+          debugPrint('NotificationService: Retrying token fetch in ${delay.inSeconds}s');
           Future.delayed(delay, () => saveFCMToken());
         }
         return;
@@ -126,10 +127,10 @@ class NotificationService {
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      print('NotificationService: FCM token saved: $token');
+      debugPrint('NotificationService: FCM token saved: $token');
       _tokenRetryCount = 0;
     } catch (e) {
-      print('NotificationService: Error saving token: $e');
+      debugPrint('NotificationService: Error saving token: $e');
       if (_tokenRetryCount < _maxTokenRetries) {
         _tokenRetryCount++;
         Future.delayed(Duration(seconds: 5 * _tokenRetryCount), () => saveFCMToken());
@@ -147,9 +148,9 @@ class NotificationService {
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      print('NotificationService: Token updated: $token');
+      debugPrint('NotificationService: Token updated: $token');
     } catch (e) {
-      print('NotificationService: Error updating token: $e');
+      debugPrint('NotificationService: Error updating token: $e');
     }
   }
 
@@ -185,9 +186,9 @@ class NotificationService {
           ),
           payload: jsonEncode(message.data),
         );
-        print('NotificationService: Foreground notification shown');
+        debugPrint('NotificationService: Foreground notification shown');
       } catch (e) {
-        print('NotificationService: Error showing notification: $e');
+        debugPrint('NotificationService: Error showing notification: $e');
       }
     }
   }
@@ -195,7 +196,7 @@ class NotificationService {
   /// Handle notification tap
   static void handleNotificationTap(String? payload) {
     if (payload != null && payload.isNotEmpty) {
-      print('NotificationService: Payload: $payload');
+      debugPrint('NotificationService: Payload: $payload');
       // The actual navigation will be handled in the UI layer
       // This is just for logging and data extraction
     }
@@ -221,9 +222,9 @@ class NotificationService {
         'data': data,
       });
 
-      print('NotificationService: Database notification created');
+      debugPrint('NotificationService: Database notification created');
     } catch (e) {
-      print('NotificationService: Error creating database notification: $e');
+      debugPrint('NotificationService: Error creating database notification: $e');
     }
   }
 
@@ -268,9 +269,9 @@ class NotificationService {
         },
       );
 
-      print('✅ Payment required notification sent');
+      debugPrint('✅ Payment required notification sent');
     } catch (e) {
-      print('❌ Error sending payment notification: $e');
+      debugPrint('❌ Error sending payment notification: $e');
     }
   }
 
@@ -305,9 +306,9 @@ class NotificationService {
         },
       );
 
-      print('✅ Session accepted notification sent');
+      debugPrint('✅ Session accepted notification sent');
     } catch (e) {
-      print('❌ Error sending session accepted notification: $e');
+      debugPrint('❌ Error sending session accepted notification: $e');
     }
   }
 
@@ -345,9 +346,9 @@ class NotificationService {
         },
       );
 
-      print('✅ Session rejected notification sent');
+      debugPrint('✅ Session rejected notification sent');
     } catch (e) {
-      print('❌ Error sending session rejected notification: $e');
+      debugPrint('❌ Error sending session rejected notification: $e');
     }
   }
 
@@ -382,9 +383,9 @@ class NotificationService {
         },
       );
 
-      print('✅ New request notification sent');
+      debugPrint('✅ New request notification sent');
     } catch (e) {
-      print('❌ Error sending new request notification: $e');
+      debugPrint('❌ Error sending new request notification: $e');
     }
   }
 
@@ -401,7 +402,7 @@ class NotificationService {
       final fcmToken = userDoc.data()?['fcmToken'] as String?;
 
       if (fcmToken == null || fcmToken.isEmpty) {
-        print('⚠️ No FCM token found for user: $userId');
+        debugPrint('⚠️ No FCM token found for user: $userId');
         return;
       }
 
@@ -421,25 +422,25 @@ class NotificationService {
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
-        print('✅ FCM notification sent successfully: ${result['messageId']}');
+        debugPrint('✅ FCM notification sent successfully: ${result['messageId']}');
       } else {
-        print('❌ FCM send failed (${response.statusCode}): ${response.body}');
+        debugPrint('❌ FCM send failed (${response.statusCode}): ${response.body}');
       }
     } catch (e) {
-      print('❌ Error sending FCM: $e');
+      debugPrint('❌ Error sending FCM: $e');
     }
   }
 
   /// Clear all notifications
   static Future<void> clearAllNotifications() async {
     await localNotifications.cancelAll();
-    print('NotificationService: All notifications cleared');
+    debugPrint('NotificationService: All notifications cleared');
   }
 
   /// Clear specific notification
   static Future<void> clearNotification(int id) async {
     await localNotifications.cancel(id);
-    print('NotificationService: Notification $id cleared');
+    debugPrint('NotificationService: Notification $id cleared');
   }
 
   /// Get unread notification count
@@ -452,7 +453,7 @@ class NotificationService {
           .get();
       return snapshot.docs.length;
     } catch (e) {
-      print('Error getting unread count: $e');
+      debugPrint('Error getting unread count: $e');
       return 0;
     }
   }

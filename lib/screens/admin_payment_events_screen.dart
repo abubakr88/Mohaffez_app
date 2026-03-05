@@ -286,7 +286,7 @@ class _AdminPaymentEventsScreenState
                                         fontSize: 12,
                                       ),
                                     ),
-                                    backgroundColor: color.withOpacity(0.15),
+                                    backgroundColor: color.withValues(alpha: 0.15),
                                     side: BorderSide(color: color, width: 0.8),
                                     padding: EdgeInsets.zero,
                                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

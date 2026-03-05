@@ -126,20 +126,6 @@ class _StudentSessionsScreenState extends ConsumerState<StudentSessionsScreen> {
       expandedHeight: 100,
       floating: true,
       pinned: true,
-      leading: context.canPop()
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
-              onPressed: () => context.pop(),
-              tooltip: 'رجوع',
-            )
-          : null,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'تحديث',
-          onPressed: _refreshSessions,
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(

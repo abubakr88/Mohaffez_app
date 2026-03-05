@@ -116,8 +116,14 @@ final pendingRequestsCountProvider =
 // UPCOMING SESSIONS
 // ============================================================================
 final upcomingSessionsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
+    // FIXED: Invalidate on app resume so DateTime.now() is always fresh
+    final lifecycleListener = AppLifecycleListener(
+      onResume: () => ref.invalidateSelf(),
+    );
+    ref.onDispose(lifecycleListener.dispose);
+
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
     return FirebaseFirestore.instance
@@ -650,7 +656,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       throw ArgumentError('Request ID cannot be empty');
     }
 
-    print('🎯 Accepting request: $requestId');
+    debugPrint('🎯 Accepting request: $requestId');
     state = const AsyncValue.loading();
     try {
       final requestSnap =
@@ -669,7 +675,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
       state = const AsyncValue.data(null);
     } catch (e, stack) {
-      print('❌ Error accepting request: $e');
+      debugPrint('❌ Error accepting request: $e');
       state = AsyncValue.error(e, stack);
       rethrow;
     }
@@ -684,7 +690,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
   // BUG-FIX-B: Move all document reads inside the transaction to avoid TOCTOU race
   Future<void> rejectRequest(String requestId, String? reason) async {
     try {
-      print('🚫 Rejecting request: $requestId');
+      debugPrint('🚫 Rejecting request: $requestId');
 
       // Declare notification data variables BEFORE the transaction
       String? notifyStudentId;
@@ -762,22 +768,41 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
         // Log subscription credit not consumed (if applicable) inside transaction
         if (subscriptionId != null) {
-          print('💳 Subscription credit NOT consumed (request rejected)');
+          debugPrint('💳 Subscription credit NOT consumed (request rejected)');
         }
       });
 
       // Notification using data captured from transaction (no re-read needed)
+      // FIXED: Wrap in try/catch with failedOperations fallback
       if (notifyStudentId != null) {
-        await _sendRejectionNotification(
-          studentId: notifyStudentId!,
-          mohaffezName: notifyMohaffezName ?? '',
-          reason: reason,
-        );
+        try {
+          await _sendRejectionNotification(
+            studentId: notifyStudentId!,
+            mohaffezName: notifyMohaffezName ?? '',
+            reason: reason,
+          );
+        } catch (e) {
+          // Enqueue for background retry — mirrors the cancellation flow
+          try {
+            await _firestore.collection('failedOperations').add({
+              'operationType': 'rejection-notification',
+              'requestId': requestId,
+              'studentId': notifyStudentId,
+              'error': e.toString(),
+              'timestamp': FieldValue.serverTimestamp(),
+              'retryCount': 0,
+              'status': 'pending-retry',
+            });
+          } catch (enqueueError) {
+            // Best-effort: log but do not rethrow — rejection itself succeeded
+            debugPrint('rejectRequest: failed to enqueue notification retry: $enqueueError');
+          }
+        }
       }
 
-      print('✅ Request rejected successfully');
+      debugPrint('✅ Request rejected successfully');
     } catch (e) {
-      print('❌ Error rejecting request: $e');
+      debugPrint('❌ Error rejecting request: $e');
       throw Exception('Failed to reject request: $e');
     }
   }
@@ -800,7 +825,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('❌ Error sending rejection notification: $e');
+      debugPrint('❌ Error sending rejection notification: $e');
     }
   }
 

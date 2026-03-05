@@ -35,8 +35,8 @@ class ProfileCompletionIndicator extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                color.withOpacity(0.1),
-                color.withOpacity(0.05),
+                color.withValues(alpha: 0.1),
+                color.withValues(alpha: 0.05),
               ],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,

@@ -1,5 +1,6 @@
 // lib/services/quran_service.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 
@@ -62,9 +63,9 @@ class QuranService {
       _quranData = json.decode(jsonString);
       _isLoaded = true;
       _usingMockData = false;
-      print('✅ Quran data loaded from JSON');
+      debugPrint('✅ Quran data loaded from JSON');
     } catch (e) {
-      print('⚠️ Using mock data: $e');
+      debugPrint('⚠️ Using mock data: $e');
       _quranData = _generateBasicQuranData();
       _isLoaded = true;
       _usingMockData = true;
@@ -107,7 +108,7 @@ class QuranService {
           .map((v) => Map<String, dynamic>.from(v as Map))
           .toList();
     } catch (e) {
-      print('Error getting verses for page $pageNumber: $e');
+      debugPrint('Error getting verses for page $pageNumber: $e');
       return _generateMockVersesForPage(pageNumber);
     }
   }

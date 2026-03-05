@@ -203,13 +203,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   SliverAppBar(
                     expandedHeight: 300,
                     pinned: true,
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: 'تحديث',
-                        onPressed: () => ref.invalidate(currentUserProvider),
-                      ),
-                    ],
                     flexibleSpace: FlexibleSpaceBar(
                       background: Stack(
                         fit: StackFit.expand,

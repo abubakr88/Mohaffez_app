@@ -1,5 +1,6 @@
 // lib/repositories/promo_code_repository.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/promo_code_model.dart';
 
@@ -24,7 +25,7 @@ class PromoCodeRepository {
 
       return promoCode;
     } catch (e) {
-      print('❌ Error validating promo code: $e');
+      debugPrint('❌ Error validating promo code: $e');
       return null;
     }
   }

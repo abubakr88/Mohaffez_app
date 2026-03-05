@@ -177,7 +177,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: AppThemeConstants.error.withOpacity(0.1),
+                      color: AppThemeConstants.error.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(

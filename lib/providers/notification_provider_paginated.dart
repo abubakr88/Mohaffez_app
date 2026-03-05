@@ -1,5 +1,6 @@
 // lib/providers/notification_provider_paginated.dart
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
@@ -130,7 +131,7 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
 
       state = state.copyWith(items: updatedItems);
     } catch (e) {
-      print('Error marking notification as read: $e');
+      debugPrint('Error marking notification as read: $e');
     }
   }
 
@@ -146,7 +147,7 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
 
       state = state.copyWith(items: updatedItems);
     } catch (e) {
-      print('Error marking all as read: $e');
+      debugPrint('Error marking all as read: $e');
     }
   }
 
@@ -162,7 +163,7 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
 
       state = state.copyWith(items: updatedItems);
     } catch (e) {
-      print('Error deleting notification: $e');
+      debugPrint('Error deleting notification: $e');
     }
   }
 
@@ -172,7 +173,7 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
       await repository.deleteAllNotifications(userId);
       state = const PaginationState();
     } catch (e) {
-      print('Error deleting all notifications: $e');
+      debugPrint('Error deleting all notifications: $e');
     }
   }
 }

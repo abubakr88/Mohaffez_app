@@ -450,13 +450,6 @@ class _AvailabilityManagementScreenState
               expandedHeight: 120,
               floating: true,
               pinned: true,
-              leading: context.canPop()
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back_ios),
-                      onPressed: () => context.pop(),
-                      tooltip: 'رجوع',
-                    )
-                  : null,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -478,7 +471,7 @@ class _AvailabilityManagementScreenState
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
@@ -645,7 +638,7 @@ class _AvailabilityManagementScreenState
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: color, size: 24),
@@ -738,7 +731,7 @@ class TimeSlotCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -815,7 +808,7 @@ class DayChip extends StatelessWidget {
           boxShadow: isEnabled
               ? [
                   BoxShadow(
-                    color: AppTheme.accentGreen.withOpacity(0.3),
+                    color: AppTheme.accentGreen.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),

@@ -121,17 +121,6 @@ class StudentHomeContent extends ConsumerWidget {
       pinned: true,
       elevation: 0,
       backgroundColor: AppThemeConstants.primaryAmber,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'تحديث',
-          onPressed: () {
-            ref.invalidate(currentUserProvider);
-            ref.invalidate(studentSessionsFirstPageProvider(studentId));
-            ref.invalidate(studentRequestsFirstPageProvider(studentId));
-          },
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(

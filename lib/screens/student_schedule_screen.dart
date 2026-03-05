@@ -111,7 +111,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                         calendarStyle: CalendarStyle(
                           todayDecoration: BoxDecoration(
                             color:
-                                AppThemeConstants.primaryAmber.withOpacity(0.5),
+                                AppThemeConstants.primaryAmber.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           selectedDecoration: const BoxDecoration(
@@ -151,20 +151,6 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
       expandedHeight: 100,
       floating: true,
       pinned: true,
-      leading: context.canPop()
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios),
-              onPressed: () => context.pop(),
-              tooltip: 'رجوع',
-            )
-          : null,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          tooltip: 'تحديث',
-          onPressed: _refreshSchedule,
-        ),
-      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
@@ -187,7 +173,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -310,7 +296,7 @@ class _SessionCard extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: AppThemeConstants.accentGreen.withOpacity(0.1),
+            color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(

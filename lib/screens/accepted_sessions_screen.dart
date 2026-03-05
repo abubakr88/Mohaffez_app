@@ -44,23 +44,7 @@ class AcceptedSessionsScreen extends ConsumerWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => context.pop(),
-                  tooltip: 'Ø±Ø¬ÙˆØ¹',
-                )
-              : null,
-          title: const Text('Ø§Ù„Ø¬Ù„Ø³Ø§Øª Ø§Ù„Ù…Ù‚Ø¨ÙˆÙ„Ø©'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                ref.invalidate(acceptedStudentSessionsProvider(studentId));
-              },
-              tooltip: 'ØªØ­Ø¯ÙŠØ«',
-            ),
-          ],
+          title: const Text('الجللسات المقبولة'),
         ),
         body: acceptedSessionsAsync.when(
           data: (acceptedSessions) {

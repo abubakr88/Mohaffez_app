@@ -53,6 +53,7 @@ import '../screens/maintenance_screen.dart';
 import '../screens/admin_audit_log_screen.dart';
 import '../screens/admin_wallet_settings_screen.dart';
 import '../screens/admin_teacher_commissions_screen.dart';
+import '../screens/mohaffez_schedule_screen.dart'; // ← teacher calendar
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -197,7 +198,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
 
           // ============================================
-          // ✅ UPDATED: WALLET SETTINGS ROUTE
+          // WALLET & COMMISSIONS
           // ============================================
           GoRoute(
             path: '/wallet-settings',
@@ -217,24 +218,24 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'payment',
             builder: (context, state) {
               final mohaffezId = state.pathParameters['mohaffezId']!;
-              final mohaffezName = state.uri.queryParameters['name'] ?? '';
+              final mohaffezName =
+                  state.uri.queryParameters['name'] ?? '';
               final requestId = state.uri.queryParameters['requestId'];
 
-              // ✅ FIX: Extract lockedRequest from extra
               final extra = state.extra as Map<String, dynamic>?;
               final lockedRequest =
                   extra?['lockedRequest'] as Map<String, dynamic>?;
 
-              // Parse query parameters (for backward compatibility)
-              final sessionType = state.uri.queryParameters['sessionType'];
+              final sessionType =
+                  state.uri.queryParameters['sessionType'];
               final timeSlot = state.uri.queryParameters['timeSlot'];
-              final sessionDateStr = state.uri.queryParameters['sessionDate'];
+              final sessionDateStr =
+                  state.uri.queryParameters['sessionDate'];
               final location = state.uri.queryParameters['location'];
               final latStr = state.uri.queryParameters['lat'];
               final lngStr = state.uri.queryParameters['lng'];
               final phone = state.uri.queryParameters['phone'];
 
-              // Parse timeSlot format "08:00-08:45"
               Map<String, dynamic>? preselectedTimeSlot;
               if (timeSlot != null && timeSlot.contains('-')) {
                 final parts = timeSlot.split('-');
@@ -246,13 +247,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 }
               }
 
-              // Parse session date
               DateTime? preselectedDate;
               if (sessionDateStr != null && sessionDateStr.isNotEmpty) {
                 preselectedDate = DateTime.tryParse(sessionDateStr);
               }
 
-              // Parse coordinates
               double? lat;
               double? lng;
               if (latStr != null && latStr.isNotEmpty) {
@@ -274,7 +273,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 mohaffezLat: lat,
                 mohaffezLng: lng,
                 mohaffezPhone: phone,
-                lockedRequest: lockedRequest, // ✅ Pass the locked request!
+                lockedRequest: lockedRequest,
               );
             },
           ),
@@ -296,7 +295,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/completed-sessions',
             name: 'completed-sessions',
             builder: (context, state) {
-              final mohaffezId = state.uri.queryParameters['mohaffezId'];
+              final mohaffezId =
+                  state.uri.queryParameters['mohaffezId'];
               if (mohaffezId == null || mohaffezId.isEmpty) {
                 return ErrorScreen(
                   error: 'معرف المحفظ مطلوب',
@@ -310,7 +310,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/upcoming-sessions',
             name: 'upcoming-sessions',
             builder: (context, state) {
-              final mohaffezId = state.uri.queryParameters['mohaffezId'];
+              final mohaffezId =
+                  state.uri.queryParameters['mohaffezId'];
               if (mohaffezId == null || mohaffezId.isEmpty) {
                 return ErrorScreen(
                   error: 'معرف المحفظ مطلوب',
@@ -328,7 +329,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/availability',
             name: 'availability',
-            builder: (context, state) => const AvailabilityManagementScreen(),
+            builder: (context, state) =>
+                const AvailabilityManagementScreen(),
           ),
           GoRoute(
             path: '/my-students',
@@ -358,6 +360,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'pricing-management',
             builder: (context, state) => const MohaffezPricingScreen(),
           ),
+
+          // ── NEW: Teacher Calendar ──────────────────────────────────────
+          GoRoute(
+            path: '/teacher-schedule',
+            name: 'teacher-schedule',
+            builder: (context, state) => const MohaffezScheduleScreen(),
+          ),
+          // ──────────────────────────────────────────────────────────────
+
+          // ============================================
+          // ADMIN ROUTES
+          // ============================================
           GoRoute(
             path: '/admin-home',
             name: 'admin-home',
@@ -384,7 +398,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/failed-ops',
             name: 'admin-failed-ops',
-            builder: (context, state) => const AdminFailedOperationsScreen(),
+            builder: (context, state) =>
+                const AdminFailedOperationsScreen(),
           ),
           GoRoute(
             path: '/admin/promo-codes',
@@ -394,7 +409,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/settings',
             name: 'admin-settings',
-            builder: (context, state) => const AdminSystemSettingsScreen(),
+            builder: (context, state) =>
+                const AdminSystemSettingsScreen(),
           ),
           GoRoute(
             path: '/admin/dev-mode',
@@ -414,22 +430,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/admin/payment-events',
             name: 'admin-payment-events',
-            builder: (context, state) => const AdminPaymentEventsScreen(),
+            builder: (context, state) =>
+                const AdminPaymentEventsScreen(),
           ),
           GoRoute(
             path: '/admin/commissions',
             name: 'admin-commissions',
-            builder: (context, state) => const CommissionDashboardScreen(),
+            builder: (context, state) =>
+                const CommissionDashboardScreen(),
           ),
           GoRoute(
             path: '/admin/teacher-commissions',
             name: 'admin-teacher-commissions',
-            builder: (context, state) => const AdminTeacherCommissionsScreen(),
+            builder: (context, state) =>
+                const AdminTeacherCommissionsScreen(),
           ),
           GoRoute(
             path: '/admin/wallet-numbers',
             name: 'admin-wallet-numbers',
-            builder: (context, state) => const AdminWalletSettingsScreen(),
+            builder: (context, state) =>
+                const AdminWalletSettingsScreen(),
           ),
           GoRoute(
             path: '/admin/audit-log',
@@ -495,7 +515,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authStateProvider);
 
-    // Show error state if timed out
     if (hasTimedOut && authAsync.isLoading) {
       return _buildTimeoutScreen();
     }
@@ -506,7 +525,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           gradient: LinearGradient(
             colors: [
               AppThemeConstants.primaryAmber,
-              AppThemeConstants.primaryAmberLight
+              AppThemeConstants.primaryAmberLight,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -516,9 +535,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo
               Container(
-                padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+                padding:
+                    const EdgeInsets.all(AppThemeConstants.spaceLg),
                 decoration: BoxDecoration(
                   color: AppThemeConstants.surfaceWhite,
                   borderRadius: AppThemeConstants.borderRadiusXl,
@@ -543,7 +562,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 ),
               ),
               Spacing.vXl,
-              // App Title
               Text(
                 'محفظ',
                 style: context.textTheme.displaySmall?.copyWith(
@@ -555,22 +573,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               Text(
                 'تطبيق تحفيظ القرآن الكريم',
                 style: context.textTheme.bodyLarge?.copyWith(
-                  color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
+                  color: AppThemeConstants.surfaceWhite
+                      .withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: AppThemeConstants.space2xl),
-              // Loading Indicator
               const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(
                     AppThemeConstants.surfaceWhite),
                 strokeWidth: 3,
               ),
               Spacing.vMd,
-              // Status Text
               Text(
                 _getStatusText(authAsync),
                 style: context.textTheme.bodyMedium?.copyWith(
-                  color: AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
+                  color: AppThemeConstants.surfaceWhite
+                      .withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -588,7 +606,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           gradient: LinearGradient(
             colors: [
               AppThemeConstants.primaryAmber,
-              AppThemeConstants.primaryAmberLight
+              AppThemeConstants.primaryAmberLight,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -596,13 +614,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         ),
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(AppThemeConstants.spaceXl),
+            padding:
+                const EdgeInsets.all(AppThemeConstants.spaceXl),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Error Icon
                 Container(
-                  padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+                  padding: const EdgeInsets.all(
+                      AppThemeConstants.spaceLg),
                   decoration: BoxDecoration(
                     color: AppThemeConstants.surfaceWhite,
                     shape: BoxShape.circle,
@@ -621,7 +640,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                 ),
                 Spacing.vXl,
-                // Error Title
                 Text(
                   'مشكلة في الاتصال',
                   style: context.textTheme.headlineSmall?.copyWith(
@@ -631,55 +649,59 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   textAlign: TextAlign.center,
                 ),
                 Spacing.vMd,
-                // Error Message
                 Text(
                   errorMessage ?? 'حدث خطأ في الاتصال',
                   style: context.textTheme.bodyLarge?.copyWith(
-                    color:
-                        AppThemeConstants.surfaceWhite.withValues(alpha: 0.7),
+                    color: AppThemeConstants.surfaceWhite
+                        .withValues(alpha: 0.7),
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(
-                    height:
-                        AppThemeConstants.spaceXl + AppThemeConstants.spaceSm),
-                // Action Buttons
+                  height: AppThemeConstants.spaceXl +
+                      AppThemeConstants.spaceSm,
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Retry Button
                     ElevatedButton.icon(
                       onPressed: _retry,
                       icon: const Icon(Icons.refresh),
                       label: const Text('إعادة المحاولة'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppThemeConstants.surfaceWhite,
-                        foregroundColor: AppThemeConstants.primaryAmber,
+                        backgroundColor:
+                            AppThemeConstants.surfaceWhite,
+                        foregroundColor:
+                            AppThemeConstants.primaryAmber,
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppThemeConstants.spaceLg,
                           vertical: AppThemeConstants.spaceMd,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: AppThemeConstants.borderRadiusMd,
+                          borderRadius:
+                              AppThemeConstants.borderRadiusMd,
                         ),
                       ),
                     ),
                     Spacing.hMd,
-                    // Go to Login Button
                     OutlinedButton.icon(
                       onPressed: _goToLogin,
                       icon: const Icon(Icons.login),
                       label: const Text('تسجيل الدخول'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppThemeConstants.surfaceWhite,
+                        foregroundColor:
+                            AppThemeConstants.surfaceWhite,
                         side: const BorderSide(
-                            color: AppThemeConstants.surfaceWhite, width: 2),
+                          color: AppThemeConstants.surfaceWhite,
+                          width: 2,
+                        ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppThemeConstants.spaceLg,
                           vertical: AppThemeConstants.spaceMd,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: AppThemeConstants.borderRadiusMd,
+                          borderRadius:
+                              AppThemeConstants.borderRadiusMd,
                         ),
                       ),
                     ),
@@ -721,7 +743,8 @@ class ErrorScreen extends StatelessWidget {
       child: Scaffold(
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+            padding:
+                const EdgeInsets.all(AppThemeConstants.spaceLg),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

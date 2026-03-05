@@ -85,19 +85,6 @@ class MohaffezHomeContent extends ConsumerWidget {
                 expandedHeight: 100,
                 floating: false,
                 pinned: true,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    tooltip: 'تحديث',
-                    onPressed: () {
-                      ref.invalidate(currentUserProvider);
-                      ref.invalidate(
-                          pendingRequestsFirstPageProvider(mohaffezId));
-                      ref.invalidate(upcomingSessionsProvider(mohaffezId));
-                      ref.invalidate(acceptedSessionsCountProvider(mohaffezId));
-                    },
-                  ),
-                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -468,6 +455,16 @@ class QuickActionsSection extends StatelessWidget {
               onTap: () {
                 context.push('/pending-requests?mohaffezId=$mohaffezId');
               },
+            ),
+            ActionCard(
+              icon: Icons.calendar_today,
+              title: 'جدول المواعيد',
+              gradient: const LinearGradient(
+                colors: [Colors.purple, Color(0xFFAB47BC)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () => context.go('/teacher-schedule'),
             ),
 
             // Upcoming Sessions

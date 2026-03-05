@@ -90,20 +90,6 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
               expandedHeight: 130,
               floating: true,
               pinned: true,
-              leading: context.canPop()
-                  ? IconButton(
-                      icon: const Icon(Icons.arrow_back_ios),
-                      onPressed: () => context.pop(),
-                      tooltip: 'رجوع',
-                    )
-                  : null,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'تحديث',
-                  onPressed: _refreshAssignments,
-                ),
-              ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
@@ -125,7 +111,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent>
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
@@ -337,7 +323,7 @@ class _ActiveAssignmentCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppTheme.accentGreen.withOpacity(0.1),
+                      color: AppTheme.accentGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -388,7 +374,7 @@ class _ActiveAssignmentCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
@@ -488,7 +474,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.green.withOpacity(0.3), width: 2),
+        side: BorderSide(color: Colors.green.withValues(alpha: 0.3), width: 2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -501,7 +487,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -543,7 +529,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.2),
+                      color: Colors.amber.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -741,9 +727,9 @@ class _CompletedAssignmentCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -817,9 +803,9 @@ class _AssignmentItem extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -829,7 +815,7 @@ class _AssignmentItem extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
+                  color: color.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 16),
@@ -891,7 +877,7 @@ class _CompletedAssignmentItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(icon, size: 16, color: color),

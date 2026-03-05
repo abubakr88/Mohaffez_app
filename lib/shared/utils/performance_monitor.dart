@@ -52,9 +52,9 @@ class PerformanceMonitor {
   /// Print performance report
   void printReport() {
     if (kDebugMode) {
-      print('📊 Performance Report:');
-      print('   Average FPS: ${averageFPS.toStringAsFixed(1)}');
-      print('   Dropped frames: ${droppedFramePercentage.toStringAsFixed(1)}%');
+      debugPrint('📊 Performance Report:');
+      debugPrint('   Average FPS: ${averageFPS.toStringAsFixed(1)}');
+      debugPrint('   Dropped frames: ${droppedFramePercentage.toStringAsFixed(1)}%');
     }
   }
 

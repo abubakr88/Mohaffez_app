@@ -13,13 +13,6 @@ class SettingsScreen extends ConsumerWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => context.pop(),
-                  tooltip: 'رجوع',
-                )
-              : null,
           title: const Text('الإعدادات'),
         ),
         body: ListView(
@@ -130,7 +123,7 @@ class SettingsScreen extends ConsumerWidget {
             borderRadius: AppThemeConstants.borderRadiusMd,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),

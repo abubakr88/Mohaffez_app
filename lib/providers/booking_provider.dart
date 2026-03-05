@@ -527,8 +527,6 @@ class BookingService {
       debugPrint('   mohaffezId: $mohaffezId');
       debugPrint('   studentId: $studentId');
       debugPrint('   slotLockId: $slotLockId');
-      final fallbackIdToken =
-          await FirebaseAuth.instance.currentUser?.getIdToken();
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'createSessionRequest',
@@ -559,7 +557,6 @@ class BookingService {
         'paymentAmount': paymentAmount,
         'sessionsCount': sessionsCount,
         'planType': planType,
-        if (fallbackIdToken != null) 'idToken': fallbackIdToken,
         if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
       });
 

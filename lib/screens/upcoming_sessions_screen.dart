@@ -45,21 +45,6 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                 expandedHeight: 130,
                 floating: true,
                 pinned: true,
-                leading: context.canPop()
-                    ? IconButton(
-                        icon: const Icon(Icons.arrow_back_ios),
-                        onPressed: () => context.pop(),
-                        tooltip: 'رجوع',
-                      )
-                    : null,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    tooltip: 'تحديث',
-                    onPressed: () =>
-                        ref.invalidate(upcomingSessionsProvider(mohaffezId)),
-                  ),
-                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
