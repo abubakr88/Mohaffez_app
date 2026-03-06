@@ -471,6 +471,11 @@ class ArabicLabels {
   static const String unknownError = 'خطأ غير معروف';
   static const String operationAt = 'تاريخ العملية';
   static const String retryCount = 'عدد المحاولات';
+  // WHY: Dedicated labels for failed-operations screen empty state and actions.
+  static const String noFailedOperations =
+      'لا توجد عمليات فاشلة — كل شيء يعمل بشكل صحيح ✓';
+  static const String retryOperation = 'إعادة المحاولة';
+  static const String dismissOperation = 'تجاهل';
 
   // ============================================
   // ADMIN PROMO CODES

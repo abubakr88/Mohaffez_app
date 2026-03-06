@@ -136,8 +136,10 @@ class AdminRepository {
   }
 
   Stream<List<Map<String, dynamic>>> watchFailedOperations() {
+    // WHY: Show only active failed operations and include legacy "pending" records.
     return _firestore
         .collection('failedOperations')
+        .where('status', whereIn: ['pending-retry', 'pending', 'failed'])
         .orderBy('timestamp', descending: true)
         .limit(100)
         .snapshots()

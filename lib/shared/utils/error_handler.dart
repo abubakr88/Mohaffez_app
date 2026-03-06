@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../theme/app_theme_constants.dart';
 
 class ErrorHandler {
   /// Show error snackbar with localized message
@@ -17,7 +18,7 @@ class ErrorHandler {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: Colors.red,
+        backgroundColor: AppThemeConstants.error, // WHY: Align utility snackbar colors with app theme constants.
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),
       ),
@@ -37,7 +38,7 @@ class ErrorHandler {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: AppThemeConstants.accentGreen, // WHY: Align utility snackbar colors with app theme constants.
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
       ),

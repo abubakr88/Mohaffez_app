@@ -209,36 +209,60 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
  * output: { recipientCount: number }
  */
 exports.sendBroadcastNotification = functions.https.onCall(async (data, context) => {
-    var _a, _b, _c;
+    var _a, _b;
     const performedBy = await ensureAdmin(context);
-    const title = (_a = data === null || data === void 0 ? void 0 : data.title) === null || _a === void 0 ? void 0 : _a.trim();
-    const body = (_b = data === null || data === void 0 ? void 0 : data.body) === null || _b === void 0 ? void 0 : _b.trim();
-    const targetRole = ((_c = data === null || data === void 0 ? void 0 : data.targetRole) !== null && _c !== void 0 ? _c : 'all');
-    if (!title || !body) {
-        throw new functions.https.HttpsError('invalid-argument', 'عنوان ونص الإشعار مطلوبان');
-    }
+    const title = data === null || data === void 0 ? void 0 : data.title;
+    const body = data === null || data === void 0 ? void 0 : data.body;
+    const targetRole = (_a = data === null || data === void 0 ? void 0 : data.targetRole) !== null && _a !== void 0 ? _a : 'all';
+    if (!title || !body)
+        throw new functions.https.HttpsError('invalid-argument', '');
     let query = admin_1.db.collection('users');
-    if (targetRole !== 'all') {
+    if (targetRole !== 'all')
         query = query.where('role', '==', targetRole);
-    }
     const usersSnap = await query.get();
     const tokens = [];
+    const userIds = []; // ✅ collect UIDs alongside tokens
     for (const doc of usersSnap.docs) {
         const token = doc.data().fcmToken;
-        if (token != null && token.length > 0)
+        if (token != null && token.length > 0) {
             tokens.push(token);
+            userIds.push(doc.id); // ✅ track which user owns each token
+        }
     }
     const chunkSize = 500;
-    // FIX-BROADCAST-1: Count actual FCM deliveries, not total tokens.
     let successCount = 0;
+    // FIX: Respect global FCM toggle for broadcast push sending while keeping in-app docs active.
+    const configDoc = await admin_1.db.collection('systemConfig').doc('global').get();
+    const fcmEnabled = ((_b = configDoc.data()) === null || _b === void 0 ? void 0 : _b.fcmEnabled) !== false;
     for (let i = 0; i < tokens.length; i += chunkSize) {
         const chunk = tokens.slice(i, i + chunkSize);
-        const batchResponse = await admin_1.messaging.sendEachForMulticast({
-            tokens: chunk,
-            notification: { title, body },
-            data: { type: 'broadcast', targetRole },
-        });
-        successCount += batchResponse.successCount;
+        const userChunk = userIds.slice(i, i + chunkSize); // ✅ same slice
+        let batchResponse = null;
+        if (fcmEnabled && chunk.length > 0) {
+            batchResponse = await admin_1.messaging.sendEachForMulticast({
+                tokens: chunk,
+                notification: { title, body },
+                data: { type: 'broadcast', targetRole },
+            });
+            successCount += batchResponse.successCount;
+        }
+        // FIX: Always write an in-app notification doc for every targeted user, even if FCM fails/disabled.
+        const writeBatch = admin_1.db.batch();
+        for (let j = 0; j < userChunk.length; j++) {
+            const notifRef = admin_1.db.collection('notifications').doc();
+            writeBatch.set(notifRef, {
+                userId: userChunk[j],
+                recipientId: userChunk[j],
+                senderId: performedBy,
+                title,
+                body,
+                type: 'broadcast',
+                isRead: false,
+                data: { type: 'broadcast', targetRole },
+                createdAt: admin_1.FieldValue.serverTimestamp(),
+            });
+        }
+        await writeBatch.commit();
     }
     await admin_1.db.collection('broadcastHistory').add({
         title,
@@ -253,11 +277,6 @@ exports.sendBroadcastNotification = functions.https.onCall(async (data, context)
         action: 'sendBroadcastNotification',
         performedBy,
         data: { title, targetRole, recipientCount: successCount },
-    });
-    functions.logger.info('Admin sent broadcast notification', {
-        performedBy,
-        targetRole,
-        recipientCount: successCount,
     });
     return { recipientCount: successCount };
 });

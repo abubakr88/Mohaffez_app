@@ -5,6 +5,7 @@ import '../models/pricing_plan_model.dart';
 import '../providers/pricing_provider.dart';
 import '../providers/user_provider.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/add_pricing_plan_sheet.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -252,14 +253,14 @@ class PricingPlanCard extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppThemeConstants.accentGreen.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   plan.description!,
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.green.shade700,
+                    color: AppThemeConstants.accentGreen,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

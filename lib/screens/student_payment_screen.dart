@@ -515,7 +515,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.accentGreen, // WHY: Replace direct green with themed accent green.
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -554,7 +554,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isFreeSession ? Colors.green : AppTheme.accentGreen,
+          backgroundColor: isFreeSession ? AppThemeConstants.accentGreen : AppTheme.accentGreen, // WHY: Replace direct green with themed accent green.
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -680,7 +680,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppThemeConstants.surfaceWhite, // WHY: Replace direct blue shade with themed surface color.
         border: Border.all(color: Colors.blue, width: 2),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -696,7 +696,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade900),
+                    color: AppThemeConstants.textPrimary), // WHY: Replace direct blue shade text with themed primary text.
               ),
             ),
           ]),
@@ -724,12 +724,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.amber.shade100,
+                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.1), // WHY: Replace direct amber shade with themed amber tint.
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(children: [
                 Icon(Icons.info_outline,
-                    size: 20, color: Colors.amber.shade900),
+                    size: 20, color: AppThemeConstants.primaryAmberDark), // WHY: Replace direct amber shade with themed amber dark.
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -737,7 +737,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                         ? 'اختر خطة الدفع واستكمل العملية.'
                         : 'اختر الخطة المناسبة لإتمام الحجز.',
                     style:
-                        TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                        TextStyle(fontSize: 12, color: AppThemeConstants.primaryAmberDark), // WHY: Replace direct amber shade with themed amber dark.
                   ),
                 ),
               ]),

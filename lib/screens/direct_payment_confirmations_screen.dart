@@ -260,12 +260,12 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               margin: const EdgeInsets.symmetric(vertical: 10),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.amber.shade50,
+                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.shade200),
+                border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
               ),
               child: Row(children: [
-                const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                const Icon(Icons.info_outline, color: AppThemeConstants.primaryAmber, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -273,7 +273,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     '${p.commissionAmount.toStringAsFixed(2)} ج.م  —  '
                     'يصلك صافي: '
                     '${(p.amount - p.commissionAmount).toStringAsFixed(2)} ج.م',
-                    style: const TextStyle(fontSize: 12, color: Colors.orange),
+                    style: const TextStyle(fontSize: 12, color: AppThemeConstants.primaryAmber),
                   ),
                 ),
               ]),

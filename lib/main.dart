@@ -16,6 +16,7 @@ import 'config/app_router.dart';
 import 'shared/theme/app_theme_constants.dart';
 import 'shared/theme/app_theme_data.dart';
 import 'services/cache_service.dart';
+import 'services/notification_service.dart';
 import 'providers/system_config_provider.dart';
 import 'shared/widgets/dev_mode_overlay.dart';
 
@@ -260,11 +261,43 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
 // ============================================
 // MAIN APP WIDGET
 // ============================================
-class MyApp extends ConsumerWidget {
+// FIX: Observe app lifecycle and refresh FCM token whenever app resumes.
+class _AppLifecycleObserver extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      NotificationService.refreshTokenIfNeeded();
+    }
+  }
+}
+
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  late final _AppLifecycleObserver _appLifecycleObserver;
+
+  @override
+  void initState() {
+    super.initState();
+    // FIX: Register lifecycle observer so token refresh runs on every resume.
+    _appLifecycleObserver = _AppLifecycleObserver();
+    WidgetsBinding.instance.addObserver(_appLifecycleObserver);
+  }
+
+  @override
+  void dispose() {
+    // FIX: Remove lifecycle observer to prevent leaks.
+    WidgetsBinding.instance.removeObserver(_appLifecycleObserver);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(systemConfigProvider);
     ref.watch(devModeProvider);
 

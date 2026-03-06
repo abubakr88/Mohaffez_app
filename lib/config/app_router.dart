@@ -61,31 +61,51 @@ import '../screens/suspended_screen.dart';
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
   final Ref ref;
+  bool _scheduled = false;
 
   GoRouterNotifier(this.ref) {
-    // Pre-warm: keeps the stream alive and loaded from app start
-    ref.listen(isUserSuspendedProvider, (_, __) {});
+    // Pre-warm suspension stream — MUST be first to ensure it is mounted
+    // before any redirect fires, preventing ConcurrentModificationError.
+    ref.listen(isUserSuspendedProvider, (_, __) => _scheduleNotify());
 
-    ref.listen(authStateProvider, (_, __) {
-      notifyListeners();
-    });
+    // Pre-warm auth stream
+    ref.listen(authStateProvider, (_, __) => _scheduleNotify());
+
+    // Pre-warm current user — only notify once data or error is available
     ref.listen<AsyncValue<UserModel?>>(currentUserProvider, (prev, next) {
       if (next.hasValue || next.hasError) {
-        notifyListeners();
+        _scheduleNotify();
       }
     });
-    ref.listen<bool>(
-      isUserSuspendedProvider.select((value) => value.valueOrNull ?? false),
-      (prev, next) {
-        if (prev != next) notifyListeners();
-      },
-    );
+  }
+
+  /// Coalesces multiple simultaneous provider fires into a single
+  /// [notifyListeners] call per microtask cycle.
+  /// This prevents the triple-redirect storm on sign-out and reduces
+  /// App Check token request pressure.
+  void _scheduleNotify() {
+    if (_scheduled) return;
+    _scheduled = true;
+    Future.microtask(() {
+      _scheduled = false;
+      // Guard against notifying after disposal (e.g. hot-restart edge cases).
+      if (!_disposed) notifyListeners();
+    });
+  }
+
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   String? redirect(BuildContext context, GoRouterState state) {
     return GuardManager.checkGuards(ref, state);
   }
 }
+
 
 // Main GoRouter Provider
 final goRouterProvider = Provider<GoRouter>((ref) {

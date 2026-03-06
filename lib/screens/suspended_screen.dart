@@ -19,51 +19,39 @@ class SuspendedScreen extends ConsumerStatefulWidget {
 
 class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
   bool _hadSuspension = false;
-  bool _isRedirecting = false;
+  bool _isRedirectingAfterLift = false;
 
-  String _homeByRole(String? role) {
-    if (role == 'admin') return '/admin-home';
-    if (role == 'mohaffez') return '/mohaffez-home';
-    return '/home';
-  }
-
-  void _redirectAfterUnsuspend() {
-    if (_isRedirecting) return;
-    _isRedirecting = true;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final role = ref.read(currentUserRoleProvider);
-      final home = _homeByRole(role);
-
-      // WHY: Inform the user in real-time that access has been restored.
-      if (_hadSuspension) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(ArabicLabels.suspensionLifted)),
-        );
-      }
-      context.go(home);
-    });
-  }
+  String _homeByRole(String? role) =>
+      role == 'admin' ? '/admin-home' : (role == 'mohaffez' ? '/mohaffez-home' : '/home');
 
   Future<void> _contactSupport() async {
-    final uri = Uri(
+    final whatsappUri = Uri.parse('https://wa.me/201000000000');
+    final mailtoUri = Uri(
       scheme: 'mailto',
-      path: 'support@almohaffez.app',
+      path: 'support@mohaffez.com',
       queryParameters: <String, String>{
         'subject': ArabicLabels.accountSuspended,
       },
     );
 
-    final canLaunch = await canLaunchUrl(uri);
+    final canOpenWhatsApp = await canLaunchUrl(whatsappUri);
     if (!mounted) return;
+    if (canOpenWhatsApp) {
+      await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      if (!mounted) return; // WHY: Guard context after async launch.
+      return;
+    }
 
-    if (canLaunch) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final canOpenMail = await canLaunchUrl(mailtoUri);
+    if (!mounted) return; // WHY: Guard context after async capability check.
+    if (canOpenMail) {
+      await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+      if (!mounted) return; // WHY: Guard context after async launch.
     }
   }
 
   Future<void> _logout() async {
+    // WHY: `AuthNotifier` exposes `logout()` in this codebase (sign-out behavior).
     await ref.read(authNotifierProvider.notifier).logout();
     if (!mounted) return;
     context.go('/login');
@@ -71,7 +59,29 @@ class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final suspensionStream = ref.watch(currentUserSuspensionProvider.stream);
+    final suspensionAsync = ref.watch(currentUserSuspensionProvider);
+
+    ref.listen<AsyncValue<dynamic>>(currentUserSuspensionProvider, (previous, next) {
+      next.whenData((suspension) {
+        if (suspension != null) {
+          _hadSuspension = true;
+          _isRedirectingAfterLift = false;
+          return;
+        }
+        if (!_hadSuspension || _isRedirectingAfterLift) return;
+
+        _isRedirectingAfterLift = true;
+        // WHY: Route/snackbar are deferred to avoid build-phase navigation.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final homeRoute = _homeByRole(ref.read(currentUserRoleProvider));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text(ArabicLabels.suspensionLifted)),
+          );
+          context.go(homeRoute);
+        });
+      });
+    });
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -80,28 +90,16 @@ class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
         child: Scaffold(
           backgroundColor: AppThemeConstants.backgroundLight,
           body: SafeArea(
-            child: StreamBuilder(
-              stream: suspensionStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final suspension = snapshot.data;
-                if (suspension == null) {
-                  _redirectAfterUnsuspend();
-                  return const SizedBox.shrink();
-                }
+            child: suspensionAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (suspension) {
+                if (suspension == null) return const SizedBox.shrink();
 
                 _hadSuspension = true;
-
-                final hasExpiry =
-                    !suspension.isPermanent && suspension.expiresAt != null;
-                final expiryText = hasExpiry
-                    ? DateFormat('dd/MM/yyyy', 'ar')
-                        .format(suspension.expiresAt!)
-                    : ArabicLabels.permanentSuspension;
+                final isPermanent = suspension.isPermanent;
+                final expiresAt = suspension.expiresAt;
+                final theme = Theme.of(context).textTheme;
 
                 return Padding(
                   padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
@@ -112,108 +110,100 @@ class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
                         children: [
                           const Icon(
                             Icons.gpp_bad_rounded,
-                            size: AppThemeConstants.icon3xl,
+                            size: 80, // WHY: Required fixed icon size.
                             color: AppThemeConstants.error,
                           ),
-                          const SizedBox(height: AppThemeConstants.spaceLg),
-                          const Text(
+                          const SizedBox(height: AppThemeConstants.space2xl),
+                          Text(
                             ArabicLabels.accountSuspended,
-                            style: TextStyle(
-                              fontSize: 28,
+                            textAlign: TextAlign.center,
+                            style: theme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: AppThemeConstants.textPrimary,
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: AppThemeConstants.spaceSm),
-                          const Text(
+                          const SizedBox(height: AppThemeConstants.spaceMd),
+                          Text(
                             ArabicLabels.accountSuspendedSubtitle,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 15,
+                            style: theme.bodyMedium?.copyWith(
                               color: AppThemeConstants.textSecondary,
                             ),
                           ),
                           const SizedBox(height: AppThemeConstants.spaceLg),
                           Container(
                             width: double.infinity,
-                            padding:
-                                const EdgeInsets.all(AppThemeConstants.spaceMd),
+                            padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
                             decoration: BoxDecoration(
-                              color: AppThemeConstants.surfaceWhite,
+                              // WHY: Use amber-tinted suspension reason card.
+                              color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                               borderRadius: AppThemeConstants.borderRadiusMd,
-                              border: Border.all(color: AppThemeConstants.divider),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   ArabicLabels.suspensionReason,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppThemeConstants.textPrimary,
+                                  style: theme.labelLarge?.copyWith(
+                                    color: AppThemeConstants.primaryAmber,
                                   ),
                                 ),
-                                const SizedBox(
-                                  height: AppThemeConstants.spaceSm,
-                                ),
+                                const SizedBox(height: AppThemeConstants.spaceXs),
                                 Text(
                                   suspension.reason,
-                                  style: const TextStyle(
-                                    color: AppThemeConstants.textSecondary,
+                                  style: theme.bodyMedium?.copyWith(
+                                    color: AppThemeConstants.textPrimary,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: AppThemeConstants.spaceMd),
-                          Container(
-                            width: double.infinity,
-                            padding:
-                                const EdgeInsets.all(AppThemeConstants.spaceMd),
-                            decoration: BoxDecoration(
-                              color: AppThemeConstants.surfaceWhite,
-                              borderRadius: AppThemeConstants.borderRadiusMd,
-                              border: Border.all(color: AppThemeConstants.divider),
-                            ),
-                            child: Text(
-                              '${ArabicLabels.suspensionExpiry}: $expiryText',
-                              style: const TextStyle(
-                                color: AppThemeConstants.textPrimary,
-                                fontWeight: FontWeight.w600,
+                          if (!isPermanent && expiresAt != null) ...[
+                            const SizedBox(height: AppThemeConstants.spaceMd),
+                            Text(
+                              '${ArabicLabels.suspensionExpiry}: ${DateFormat('dd/MM/yyyy', 'ar').format(expiresAt)}',
+                              style: theme.bodyMedium?.copyWith(
+                                color: AppThemeConstants.textSecondary,
                               ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                          const SizedBox(height: AppThemeConstants.spaceLg),
+                          ],
+                          if (isPermanent) ...[
+                            const SizedBox(height: AppThemeConstants.spaceMd),
+                            Text(
+                              ArabicLabels.permanentSuspension,
+                              style: theme.bodyMedium?.copyWith(
+                                color: AppThemeConstants.error,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                          const SizedBox(height: AppThemeConstants.spaceXl),
                           SizedBox(
                             width: double.infinity,
-                            child: ElevatedButton(
+                            child: ElevatedButton.icon(
                               onPressed: _contactSupport,
+                              icon: const Icon(Icons.support_agent),
+                              label: const Text(ArabicLabels.contactSupport),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppThemeConstants.primaryAmber,
                                 foregroundColor: AppThemeConstants.textOnPrimary,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: AppThemeConstants.spaceMd,
-                                ),
                               ),
-                              child: const Text(ArabicLabels.contactSupport),
                             ),
                           ),
-                          const SizedBox(height: AppThemeConstants.spaceSm),
+                          const SizedBox(height: AppThemeConstants.spaceMd),
                           SizedBox(
                             width: double.infinity,
-                            child: OutlinedButton(
+                            child: OutlinedButton.icon(
                               onPressed: _logout,
+                              icon: const Icon(Icons.logout),
+                              label: const Text(ArabicLabels.logout),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: AppThemeConstants.textPrimary,
+                                foregroundColor: AppThemeConstants.error,
                                 side: const BorderSide(
-                                  color: AppThemeConstants.divider,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: AppThemeConstants.spaceMd,
+                                  color: AppThemeConstants.error,
                                 ),
                               ),
-                              child: const Text(ArabicLabels.logout),
                             ),
                           ),
                         ],

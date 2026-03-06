@@ -172,8 +172,8 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [
-                              AppThemeConstants.accentGreen,
-                              Color(0xFF43A047),
+                              AppThemeConstants.accentGreenDark, // WHY: Use theme green-dark instead of hardcoded hex.
+                              AppThemeConstants.accentGreen, // WHY: Use theme green instead of hardcoded hex.
                             ],
                           ),
                           borderRadius: BorderRadius.circular(16),

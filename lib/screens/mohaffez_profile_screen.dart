@@ -375,9 +375,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.green.shade50,
+          color: AppThemeConstants.accentGreen.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.shade200),
+          border: Border.all(color: AppThemeConstants.accentGreen.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -433,14 +433,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   Widget _buildTrustItem(IconData icon, String title, String subtitle) {
     return Column(
       children: [
-        Icon(icon, color: Colors.green.shade700, size: 28),
+        Icon(icon, color: AppThemeConstants.accentGreen, size: 28),
         const SizedBox(height: 6),
         Text(
           title,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.bold,
-            color: Colors.green.shade700,
+            color: AppThemeConstants.accentGreen,
           ),
         ),
         Text(

@@ -154,6 +154,26 @@ class NotificationService {
     }
   }
 
+  // FIX: Refresh and upsert the latest FCM token when app returns to foreground.
+  static Future<void> refreshTokenIfNeeded() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final token = await messaging.getToken();
+      if (token == null || token.isEmpty) return;
+
+      await _firestore.collection('users').doc(user.uid).set({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (kDebugMode) debugPrint('NotificationService: FCM token refreshed on resume');
+    } catch (e) {
+      if (kDebugMode) debugPrint('NotificationService: FCM token refresh failed: $e');
+    }
+  }
+
   /// Handle foreground messages
   static Future<void> handleForegroundMessage(RemoteMessage message) async {
     final notification = message.notification;

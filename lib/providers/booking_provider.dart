@@ -322,20 +322,27 @@ class BookingService {
     }
   }
 
-  Future<String?> _ensureAppCheckForCallable(String flowLabel) async {
+  /// Warms up the App Check token using the SDK cache.
+  /// This is NON-FATAL — a missing or stale token never blocks the booking flow.
+  /// Firebase enforces App Check server-side; the callable is always sent.
+  Future<void> _ensureAppCheckForCallable(String flowLabel) async {
     try {
-      final token = await FirebaseAppCheck.instance.getToken(true);
+      // forceRefresh: false — use cached token, avoid Firebase rate limiting.
+      final token = await FirebaseAppCheck.instance.getToken(false);
       if (token == null || token.isEmpty) {
-        if (kDebugMode) debugPrint('❌ [$flowLabel] App Check token is null/empty.');
-        return 'تعذر التحقق من App Check. أعد تشغيل التطبيق ثم حاول مرة أخرى';
+        if (kDebugMode) {
+          debugPrint('⚠️ $flowLabel App Check token is null/empty (non-fatal).');
+        }
+      } else {
+        if (kDebugMode) debugPrint('✅ $flowLabel App Check token ready (cached).');
       }
-      if (kDebugMode) debugPrint('✅ [$flowLabel] App Check token ready.');
-      return null;
-    } catch (e, stack) {
-      if (kDebugMode) debugPrint('❌ [$flowLabel] Failed to get App Check token: $e');
-      if (kDebugMode) debugPrintStack(stackTrace: stack);
-      return 'فشل التحقق من App Check. تحقق من إعداد Firebase Console';
+    } catch (e) {
+      // Non-fatal: log and continue. The callable will still be sent normally.
+      if (kDebugMode) {
+        debugPrint('⚠️ $flowLabel App Check token fetch failed (non-fatal): $e');
+      }
     }
+    // Returns void — intentionally never blocks the caller.
   }
 
   // ── Free Session ───────────────────────────────────────────────────────────
@@ -363,10 +370,9 @@ class BookingService {
       if (authError != null) {
         return BookingResult.failure(authError);
       }
-      final appCheckError = await _ensureAppCheckForCallable('FREE SESSION');
-      if (appCheckError != null) {
-        return BookingResult.failure(appCheckError);
-      }
+
+      // Non-fatal warm-up only — never blocks the caller.
+      await _ensureAppCheckForCallable('FREE SESSION');
 
       if (kDebugMode) debugPrint('🔄 [FREE SESSION] Starting Cloud Function call...');
       if (kDebugMode) debugPrint('📍 Function: confirmFreeSession');
@@ -510,15 +516,9 @@ class BookingService {
         }
         return BookingResult.failure(authError);
       }
-      final appCheckError = await _ensureAppCheckForCallable('SESSION REQUEST');
-      if (appCheckError != null) {
-        if (lockResult?.success == true) {
-          await _releaseSlotLock(lockResult!).catchError((e) {
-            if (kDebugMode) debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
-          });
-        }
-        return BookingResult.failure(appCheckError);
-      }
+
+      // Non-fatal warm-up only — never blocks the caller.
+      await _ensureAppCheckForCallable('SESSION REQUEST');
 
       final DateTime actualSlotDate =
           slotDate ?? DateTime(slotStart.year, slotStart.month, slotStart.day);

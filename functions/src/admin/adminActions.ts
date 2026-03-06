@@ -260,37 +260,39 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
 
   const chunkSize = 500;
   let successCount = 0;
+  // FIX: Respect global FCM toggle for broadcast push sending while keeping in-app docs active.
+  const configDoc = await db.collection('systemConfig').doc('global').get();
+  const fcmEnabled = configDoc.data()?.fcmEnabled !== false;
 
   for (let i = 0; i < tokens.length; i += chunkSize) {
     const chunk = tokens.slice(i, i + chunkSize);
     const userChunk = userIds.slice(i, i + chunkSize); // ✅ same slice
 
-    const batchResponse = await messaging.sendEachForMulticast({
-      tokens: chunk,
-      notification: { title, body },
-      data: { type: 'broadcast', targetRole },
-    });
+    let batchResponse: admin.messaging.BatchResponse | null = null;
+    if (fcmEnabled && chunk.length > 0) {
+      batchResponse = await messaging.sendEachForMulticast({
+        tokens: chunk,
+        notification: { title, body },
+        data: { type: 'broadcast', targetRole },
+      });
+      successCount += batchResponse.successCount;
+    }
 
-    successCount += batchResponse.successCount;
-
-    // ✅ FIX: Write notification doc for each user so it appears in their notification list
+    // FIX: Always write an in-app notification doc for every targeted user, even if FCM fails/disabled.
     const writeBatch = db.batch();
     for (let j = 0; j < userChunk.length; j++) {
-      const sendResult = batchResponse.responses[j];
-      if (sendResult.success) { // only write for successful FCM deliveries
-        const notifRef = db.collection('notifications').doc();
-        writeBatch.set(notifRef, {
-          userId: userChunk[j],
-          recipientId: userChunk[j],
-          senderId: performedBy,
-          title,
-          body,
-          type: 'broadcast',
-          isRead: false,
-          data: { type: 'broadcast', targetRole },
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      }
+      const notifRef = db.collection('notifications').doc();
+      writeBatch.set(notifRef, {
+        userId: userChunk[j],
+        recipientId: userChunk[j],
+        senderId: performedBy,
+        title,
+        body,
+        type: 'broadcast',
+        isRead: false,
+        data: { type: 'broadcast', targetRole },
+        createdAt: FieldValue.serverTimestamp(),
+      });
     }
     await writeBatch.commit();
   }

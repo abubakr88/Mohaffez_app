@@ -44,6 +44,10 @@ class SkeletonList extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
       itemCount: itemCount,
+      // ✅ FIX: These two lines resolve the unbounded height crash.
+      // Use when SkeletonList is inside a Column or non-scrollable parent.
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (_, __) => SkeletonCard(height: itemHeight),
     );
   }
