@@ -126,6 +126,7 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
     if (!directPaymentRequestId)
         throw new functions.https.HttpsError("invalid-argument", "معرف الطلب مطلوب");
     return admin_1.db.runTransaction(async (tx) => {
+        var _a;
         const dpRef = admin_1.db.collection("directPaymentRequests").doc(directPaymentRequestId);
         const dpSnap = await tx.get(dpRef);
         if (!dpSnap.exists)
@@ -139,6 +140,20 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
         const reqSnap = await tx.get(reqRef);
         if (!reqSnap.exists)
             throw new functions.https.HttpsError("not-found", "الطلب غير موجود");
+        const reqData = reqSnap.data();
+        // BUG-2 FIX: Idempotency - if already accepted, return the existing sessionId
+        if (reqData.status === STATUS.ACCEPTED) {
+            throw new functions.https.HttpsError('already-exists', JSON.stringify({
+                success: true,
+                sessionId: (_a = reqData.sessionId) !== null && _a !== void 0 ? _a : dp.sessionId,
+                message: 'Session already confirmed.',
+            }));
+        }
+        // Safety guard: only proceed from the expected state
+        if (reqData.status !== STATUS.AWAITING_DIRECT) {
+            throw new functions.https.HttpsError('failed-precondition', `Cannot confirm payment: request is in status '${reqData.status}', ` +
+                `expected '${STATUS.AWAITING_DIRECT}'.`);
+        }
         const sessionRef = admin_1.db.collection("hafizSessions").doc();
         // Create hafiz session
         tx.set(sessionRef, {

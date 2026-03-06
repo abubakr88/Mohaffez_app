@@ -23,6 +23,7 @@ class AuthGuard implements RouteGuard {
   static const Set<String> publicRoutes = {
     splashPath,
     loginPath,
+    '/register',
     '/maintenance',
   };
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../providers/user_provider.dart';
 import '../repositories/user_repository.dart';
 import 'pick_location_screen.dart';
@@ -47,23 +48,23 @@ class _LocationSettingsScreenState
                 children: [
                   // Info Card
                   Card(
-                    color: Colors.blue.shade50,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
+                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.06),
+                    child: const Padding(
+                      padding: EdgeInsets.all(16),
                       child: Row(
                         children: [
                           Icon(
                             Icons.info_outline,
-                            color: Colors.blue.shade700,
+                            color: AppThemeConstants.primaryAmber,
                             size: 28,
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'حدد موقعك حتى يتمكن الطلاب من العثور عليك في البحث القريب',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.blue.shade900,
+                                color: AppThemeConstants.textPrimary,
                                 height: 1.4,
                               ),
                             ),
@@ -183,17 +184,17 @@ class _LocationSettingsScreenState
                             )
                           : Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.shade100,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    Icons.warning_amber,
-                                    color: Colors.orange.shade700,
-                                    size: 24,
-                                  ),
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    child: const Icon(
+                                      Icons.warning_amber,
+                                      color: AppThemeConstants.primaryAmber,
+                                      size: 24,
+                                    ),
                                 ),
                                 const SizedBox(width: 12),
                                 const Expanded(

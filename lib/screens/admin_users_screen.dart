@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminUsersScreen extends ConsumerWidget {
@@ -17,7 +18,7 @@ class AdminUsersScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text(ArabicLabels.allUsers)),
+        appBar: const AdminAppBar(title: ArabicLabels.allUsers),
         body: Column(
           children: [
             // Search TextField
@@ -199,3 +200,5 @@ class AdminUsersScreen extends ConsumerWidget {
     );
   }
 }
+
+

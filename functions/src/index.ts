@@ -28,6 +28,7 @@ export { studentMarkedDirectPayment, mohaffezConfirmDirectPayment, mohaffezRejec
 export {
   setUserRole,
   suspendUser,
+  unsuspendUser,
   deleteUserAccount,
   sendBroadcastNotification,
   triggerCommissionJobManually,
@@ -39,9 +40,14 @@ export {
 export { checkAppVersion } from './admin/appVersionCheck';
 export { checkMaintenanceMode } from './admin/maintenanceCheck';
 export { checkVersion } from './admin/appVersion';
+export { setAdminClaim } from './setAdminClaim';
 
 export {
   processWeeklyCommissions,
   markCommissionPaid,
   mohaffezReportCommissionPayment,
 } from './payments/commissions';
+
+// Suspension triggers
+export { onUserSuspended } from './onUserSuspended';
+export { onUserUnsuspended } from './onUserUnsuspended';

@@ -1,9 +1,11 @@
-// lib/shared/widgets/interactive_quran_page.dart
+﻿// lib/shared/widgets/interactive_quran_page.dart
 
 import 'package:flutter/material.dart';
 import '../../models/quran_mistake_model.dart';
 import '../../services/quran_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'quran/mistake_detail_dialog.dart';
+import 'quran/mistake_type_selector.dart';
+import 'quran/quran_page_image.dart';
 
 class InteractiveQuranPage extends StatefulWidget {
   final int pageNumber;
@@ -96,15 +98,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       children: [
         if (widget.isEditable) _buildMistakeTypeSelector(),
         Expanded(
-          child: GestureDetector(
-            onTapDown: widget.isEditable ? _handleTapDown : null,
-            child: Stack(
-              children: [
-                _buildQuranPageImage(),
-                ..._buildMistakeMarkers(),
-              ],
-            ),
-          ),
+          child: _buildQuranPageImage(),
         ),
         if (_hasAnyComments()) _buildCommentLegend(),
         _buildPageNavigation(),
@@ -117,46 +111,14 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _buildQuranPageImage() {
-    return Container(
-      key: _imageKey,
-      color: const Color(0xFFF5F3E8),
-      child: Center(
-        child: CachedNetworkImage(
-          imageUrl: QuranService().getPageImageUrl(currentPage),
-          fit: BoxFit.contain,
-          placeholder: (context, url) => Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text('تحميل صفحة $currentPage...'),
-            ],
-          ),
-          errorWidget: (context, url, error) {
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.menu_book, color: Colors.grey, size: 64),
-                const SizedBox(height: 16),
-                Text(
-                  'صفحة $currentPage',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'الجزء ${pageInfo?['juz'] ?? ''}',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'تأكد من الاتصال بالإنترنت',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+    return QuranPageImage(
+      imageKey: _imageKey,
+      currentPage: currentPage,
+      pageInfo: pageInfo,
+      mistakes: widget.existingMistakes
+          .where((m) => m.pageNumber == currentPage)
+          .toList(),
+      onTapDown: _handleTapDown,
     );
   }
 
@@ -175,7 +137,27 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     final xPosition = (localPosition.dx / size.width).clamp(0.0, 1.0);
     final yPosition = (localPosition.dy / size.height).clamp(0.0, 1.0);
 
+    final tappedMistake = _findTappedMistake(xPosition, yPosition);
+    if (tappedMistake != null) {
+      _showMistakeDetails(tappedMistake);
+      return;
+    }
+
+    if (!widget.isEditable) return;
     _showMistakeDialog(xPosition, yPosition);
+  }
+
+  QuranMistake? _findTappedMistake(double x, double y) {
+    const threshold = 0.03;
+    for (final mistake
+        in widget.existingMistakes.where((m) => m.pageNumber == currentPage)) {
+      final dx = (mistake.xPosition - x).abs();
+      final dy = (mistake.yPosition - y).abs();
+      if (dx <= threshold && dy <= threshold) {
+        return mistake;
+      }
+    }
+    return null;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -321,216 +303,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   // MISTAKE MARKERS
   // ─────────────────────────────────────────────────────────────────────────────
 
-  List<Widget> _buildMistakeMarkers() {
-    final RenderBox? box =
-        _imageKey.currentContext?.findRenderObject() as RenderBox?;
-    final Size size = box?.size ?? MediaQuery.of(context).size;
-
-    return widget.existingMistakes
-        .where((m) => m.pageNumber == currentPage)
-        .map((mistake) {
-      final hasComment =
-          mistake.correctionNote != null && mistake.correctionNote!.isNotEmpty;
-
-      final double xPos = mistake.xPosition.clamp(0.0, 1.0);
-      final double yPos = mistake.yPosition.clamp(0.0, 1.0);
-      final x = xPos * size.width - 16;
-      final y = yPos * size.height - 16;
-
-      return Positioned(
-        left: x,
-        top: y,
-        child: GestureDetector(
-          onTap: () => _showMistakeDetails(mistake),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Tooltip(
-                message: _getMistakeTypeLabel(mistake.type),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: _getMistakeColor(mistake.type).withValues(alpha: 0.85),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _getMistakeIcon(mistake.type),
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              if (hasComment)
-                Positioned(
-                  top: -5,
-                  right: -5,
-                  child: Container(
-                    width: 15,
-                    height: 15,
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade700,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withValues(alpha: 0.4),
-                          blurRadius: 3,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.chat_bubble,
-                      size: 8,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // VIEW MISTAKE DETAILS DIALOG
-  // ─────────────────────────────────────────────────────────────────────────────
-
   void _showMistakeDetails(QuranMistake mistake) {
-    final hasComment =
-        mistake.correctionNote != null && mistake.correctionNote!.isNotEmpty;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _getMistakeColor(mistake.type).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _getMistakeIcon(mistake.type),
-                  color: _getMistakeColor(mistake.type),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _getMistakeTypeLabel(mistake.type),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _getMistakeColor(mistake.type),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _detailRow(Icons.menu_book, 'الصفحة', '${mistake.pageNumber}'),
-              _detailRow(Icons.format_list_numbered, 'الآية', '${mistake.ayahNumber}'),
-              if (mistake.wordText != null && mistake.wordText!.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Text(
-                  'الكلمة / الموضع',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade200),
-                  ),
-                  child: Text(
-                    mistake.wordText!,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-              if (hasComment) ...[
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Icon(Icons.chat_bubble, size: 16, color: Colors.blue.shade700),
-                    const SizedBox(width: 6),
-                    Text(
-                      'تعليق المعلم',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.blue.shade800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Text(
-                    mistake.correctionNote!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.blue.shade900,
-                      height: 1.6,
-                    ),
-                  ),
-                ),
-              ],
-              if (!hasComment && widget.isEditable) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(Icons.chat_bubble_outline,
-                        size: 14, color: Colors.grey.shade400),
-                    const SizedBox(width: 6),
-                    Text(
-                      'لا يوجد تعليق لهذا الخطأ',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إغلاق'),
-            ),
-          ],
-        ),
-      ),
-    );
+    showMistakeDetailDialog(context, mistake, isEditable: widget.isEditable);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -538,35 +312,9 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _buildMistakeTypeSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.grey.shade100,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: MistakeType.values.map((type) {
-            final isSelected = selectedMistakeType == type;
-            return Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: ChoiceChip(
-                avatar: Icon(
-                  _getMistakeIcon(type),
-                  size: 16,
-                  color: isSelected ? Colors.white : Colors.black87,
-                ),
-                label: Text(_getMistakeTypeLabel(type)),
-                selected: isSelected,
-                onSelected: (_) => setState(() => selectedMistakeType = type),
-                selectedColor: _getMistakeColor(type),
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
+    return MistakeTypeSelector(
+      selectedType: selectedMistakeType,
+      onChanged: (type) => setState(() => selectedMistakeType = type),
     );
   }
 
@@ -721,27 +469,6 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                 : null,
             tooltip: 'الصفحة التالية',
           ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // DETAIL ROW HELPER
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  Widget _detailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: Colors.grey.shade600),
-          const SizedBox(width: 6),
-          Text('$label: ',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -1231,3 +958,6 @@ class _JuzList extends StatelessWidget {
     );
   }
 }
+
+
+

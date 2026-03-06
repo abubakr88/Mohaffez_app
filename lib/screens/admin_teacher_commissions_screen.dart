@@ -7,6 +7,7 @@ import '../models/direct_payment_model.dart';
 import '../providers/admin_provider.dart';
 import '../services/direct_payment_service.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 
 class AdminTeacherCommissionsScreen extends ConsumerStatefulWidget {
   const AdminTeacherCommissionsScreen({super.key});
@@ -62,11 +63,7 @@ class _AdminTeacherCommissionsScreenState
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('عمولات المحافظين'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
-        ),
+        appBar: const AdminAppBar(title: 'عمولات المحافظين'),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchAllCommissions(),
           builder: (context, snap) {
@@ -274,11 +271,7 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('$mohaffezName — مستحقاته'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
-        ),
+        appBar: AdminAppBar(title: '$mohaffezName — مستحقاته'),
         body: Column(
           children: [
             // Summary header
@@ -492,3 +485,5 @@ class _WeekSummaryCard extends StatelessWidget {
     );
   }
 }
+
+

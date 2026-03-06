@@ -1,15 +1,16 @@
-// lib/screens/student_assignments_screen.dart
+﻿// lib/screens/student_assignments_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../shared/widgets/interactive_quran_page.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
+import '../utils/arabic_labels.dart';
 import '../models/quran_mistake_model.dart';
 import '../utils/quran_mistake_utils.dart';
 
@@ -24,7 +25,7 @@ class StudentAssignmentsScreen extends ConsumerWidget {
       data: (user) {
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('الرجاء تسجيل الدخول')),
+            body: Center(child: Text(ArabicLabels.pleaseLoginFirst)),
           );
         }
 
@@ -82,7 +83,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.accentGreen, const Color(0xFF66BB6A)],
+                        colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -111,7 +112,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                                 const SizedBox(width: 16),
                                 const Expanded(
                                   child: Text(
-                                    'واجباتي',
+                                    ArabicLabels.myAssignments,
                                     style: TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.bold,
@@ -139,8 +140,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                     if (completedSessions.isEmpty) {
                       return const EmptyState(
                         icon: Icons.inventory_2_outlined,
-                        title: 'لا توجد واجبات مكتملة',
-                        message: 'أكمل واجباتك لتظهر هنا',
+                        title: ArabicLabels.noCompletedAssignments,
+                        message: ArabicLabels.completeAssignmentsToAppear,
                         animated: true,
                       );
                     }
@@ -174,7 +175,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
 }
 
 // ============================================================================
-// COMPLETED ASSIGNMENT CARD - ✅ UPDATED WITH NEW EVALUATION FEATURES
+  // COMPLETED ASSIGNMENT CARD
 // ============================================================================
 
 class _CompletedAssignmentCard extends ConsumerWidget {
@@ -188,12 +189,13 @@ class _CompletedAssignmentCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mohaffezName = session['mohaffezName'] as String? ?? 'محفظ';
+    final mohaffezName =
+        session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
     final sessionDate = session['sessionDate'] as DateTime?;
 
-    // ✅ NEW: التقييمات
+    // Evaluation values
     final previousHifzCompleted = session['previousHifzCompleted'] as bool?;
     final previousHifzRating = session['previousHifzRating'] as int? ?? 0;
     final previousMurajaCompleted = session['previousMurajaCompleted'] as bool?;
@@ -254,7 +256,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-                // ✅ عرض التقييم العام
+                // Session rating
                 if (sessionRating > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -284,23 +286,27 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               ],
             ),
 
-            // ✅ تقييم الأداء السابق
+            // Previous assignment evaluation
             if (previousHifzCompleted != null ||
                 previousMurajaCompleted != null) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 12),
-              Row(
+              const Row(
                 children: [
                   Icon(Icons.assignment_turned_in,
-                      size: 18, color: Colors.blue.shade700),
-                  const SizedBox(width: 8),
-                  Text(
-                    'تقييم أدائك في التكليف السابق:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700,
+                      size: 18, color: AppThemeConstants.textPrimary),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      ArabicLabels.assignmentPerformanceInPreviousTask,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.textPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -308,7 +314,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               const SizedBox(height: 12),
               if (previousHifzCompleted != null)
                 _buildPerformanceBadge(
-                  'الحفظ',
+                  ArabicLabels.previousHifz,
                   previousHifzCompleted,
                   previousHifzRating,
                   Colors.green,
@@ -316,7 +322,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               if (previousMurajaCompleted != null) ...[
                 const SizedBox(height: 8),
                 _buildPerformanceBadge(
-                  'المراجعة',
+                  ArabicLabels.previousMuraja,
                   previousMurajaCompleted,
                   previousMurajaRating,
                   Colors.blue,
@@ -327,9 +333,9 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
+                    border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,7 +347,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'ملاحظات على أدائك:',
+                              ArabicLabels.performanceNotesOnYourWork,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -362,7 +368,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               ],
             ],
 
-            // ✅ التكليف الجديد المعطى
+            // Next assignment
             if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),
@@ -371,12 +377,16 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                 children: [
                   Icon(Icons.assignment, size: 18, color: Colors.grey.shade700),
                   const SizedBox(width: 8),
-                  Text(
-                    'التكليف الجديد للجلسة القادمة:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
+                  Expanded(
+                    child: Text(
+                      ArabicLabels.newAssignmentForNextSession,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ],
@@ -385,7 +395,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               if (hifz.isNotEmpty)
                 _CompletedAssignmentItem(
                   icon: Icons.book,
-                  label: 'حفظ',
+                  label: ArabicLabels.hifz,
                   content: hifz,
                   color: Colors.green,
                 ),
@@ -394,13 +404,13 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               if (muraja.isNotEmpty)
                 _CompletedAssignmentItem(
                   icon: Icons.refresh,
-                  label: 'مراجعة',
+                  label: ArabicLabels.muraja,
                   content: muraja,
                   color: Colors.blue,
                 ),
             ],
 
-            // ✅ رسالة من المحفظ
+            // Message from mohaffez
             if (sessionNotes != null && sessionNotes.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),
@@ -422,7 +432,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'رسالة من المحفّظ:',
+                            ArabicLabels.messageFromMohaffez,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -442,7 +452,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               ),
             ],
 
-            // ✅ Mistakes Review Card
+            // Mistakes review card
             _MistakeReviewCard(session: session),
           ],
         ),
@@ -450,7 +460,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
     );
   }
 
-  // ✅ دالة مساعدة لعرض شارة الأداء
+  // Performance badge
   Widget _buildPerformanceBadge(
     String label,
     bool completed,
@@ -472,9 +482,13 @@ class _CompletedAssignmentCard extends ConsumerWidget {
             color: completed ? color : Colors.red,
           ),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
           ),
           const SizedBox(width: 8),
           if (completed) ...[
@@ -499,13 +513,17 @@ class _CompletedAssignmentCard extends ConsumerWidget {
               ),
             ),
           ] else
-            Text(
-              'لم يُكمل',
+            Expanded(
+              child: Text(
+              ArabicLabels.assignmentNotCompleted,
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.red.shade700,
                 fontWeight: FontWeight.w600,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             ),
         ],
       ),
@@ -514,72 +532,7 @@ class _CompletedAssignmentCard extends ConsumerWidget {
 }
 
 // ============================================================================
-// ASSIGNMENT ITEM WIDGET (ACTIVE)
-// ============================================================================
-
-class _AssignmentItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String content;
-  final Color color;
-
-  const _AssignmentItem({
-    required this.icon,
-    required this.label,
-    required this.content,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 16),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            content,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// ASSIGNMENT ITEM WIDGET (COMPLETED) - ✅ UPDATED
+// ASSIGNMENT ITEM WIDGET (COMPLETED)
 // ============================================================================
 
 class _CompletedAssignmentItem extends StatelessWidget {
@@ -627,6 +580,8 @@ class _CompletedAssignmentItem extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: color,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -635,6 +590,8 @@ class _CompletedAssignmentItem extends StatelessWidget {
                     fontSize: 14,
                     height: 1.5,
                   ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -675,8 +632,8 @@ class _MistakeReviewCard extends StatelessWidget {
           textDirection: TextDirection.rtl,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('مراجعة الأخطاء'),
-              backgroundColor: Colors.orange.shade700,
+              title: const Text(ArabicLabels.reviewMistakes),
+              backgroundColor: AppThemeConstants.primaryAmber,
             ),
             body: InteractiveQuranPage(
               pageNumber: startPage,
@@ -701,9 +658,9 @@ class _MistakeReviewCard extends StatelessWidget {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade200),
+        border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -711,14 +668,18 @@ class _MistakeReviewCard extends StatelessWidget {
           // Header
           Row(
             children: [
-              Icon(Icons.menu_book, color: Colors.orange.shade700),
+              const Icon(Icons.menu_book, color: AppThemeConstants.primaryAmber),
               const SizedBox(width: 8),
-              Text(
-                'أخطاء الجلسة (${_mistakes.length})',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange.shade800,
+              Expanded(
+                child: Text(
+                  '${ArabicLabels.sessionMistakes} (${_mistakes.length})',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeConstants.primaryAmber,
+                  ),
                 ),
               ),
             ],
@@ -754,9 +715,9 @@ class _MistakeReviewCard extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: () => _openMushaf(context),
               icon: const Icon(Icons.auto_stories),
-              label: const Text('مراجعة الأخطاء في المصحف'),
+              label: const Text(ArabicLabels.reviewMistakesInMushaf),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade700,
+                backgroundColor: AppThemeConstants.primaryAmber,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
@@ -767,3 +728,6 @@ class _MistakeReviewCard extends StatelessWidget {
     );
   }
 }
+
+
+

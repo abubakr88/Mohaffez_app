@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/system_config_model.dart';
 import '../providers/system_config_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminSystemSettingsScreen extends ConsumerStatefulWidget {
@@ -79,8 +80,8 @@ class _AdminSystemSettingsScreenState
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text(ArabicLabels.systemSettings),
+        appBar: AdminAppBar(
+          title: ArabicLabels.systemSettings,
           bottom: TabBar(
             controller: _tabController,
             tabs: const [
@@ -279,3 +280,5 @@ class _AdminSystemSettingsScreenState
     );
   }
 }
+
+

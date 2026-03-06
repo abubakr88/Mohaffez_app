@@ -8,6 +8,7 @@ import '../providers/booking_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import 'student_payment_screen.dart';
@@ -555,6 +556,8 @@ class _RequestCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         statusText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -586,10 +589,11 @@ class _RequestCard extends StatelessWidget {
             const SizedBox(height: 8),
 
             // ── Session type + time chips ───────────────────────────────────
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _buildDetailChip(Icons.schedule, preferredTimeSlot),
-                const SizedBox(width: 8),
                 _buildDetailChip(
                     Icons.location_on, _getSessionTypeLabel(sessionType)),
               ],
@@ -602,23 +606,30 @@ class _RequestCard extends StatelessWidget {
                 Icon(Icons.calendar_today,
                     size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 6),
-                Text(
-                  slotDate != null
-                      ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate)}'
-                      : 'التاريخ غير محدد',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
+                Expanded(
+                  child: Text(
+                    slotDate != null
+                        ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate)}'
+                        : 'التاريخ غير محدد',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  createdAt != null
-                      ? 'طُلب ${DateFormat('dd/MM', 'ar').format(createdAt)}'
-                      : '',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
+                Flexible(
+                  child: Text(
+                    createdAt != null
+                        ? 'طُلب ${DateFormat('dd/MM', 'ar').format(createdAt)}'
+                        : '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                 ),
               ],
@@ -630,21 +641,21 @@ class _RequestCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
                     Icon(Icons.warning_amber,
-                        color: Colors.orange.shade700, size: 20),
-                    const SizedBox(width: 8),
+                        color: AppThemeConstants.primaryAmber, size: 20),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'يجب الدفع خلال 10 ساعات لتأكيد الحجز',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.orange.shade900,
+                          color: AppThemeConstants.primaryAmber,
                         ),
                       ),
                     ),
@@ -687,9 +698,9 @@ class _RequestCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.surfaceWhite,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -710,11 +721,11 @@ class _RequestCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text(
+                          const Text(
                             'في انتظار تأكيد المعلم باستلام المبلغ. ستصلك إشعار فور التأكيد.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.blue.shade700,
+                              color: AppThemeConstants.textPrimary,
                             ),
                           ),
                         ],
@@ -842,7 +853,7 @@ class _RequestCard extends StatelessWidget {
       // Both spellings — with and without space — handled
       case 'awaitingpayment':
       case 'awaiting_payment':
-        return ('في انتظار الدفع', Colors.orange.shade700, Icons.payment);
+        return ('في انتظار الدفع', AppThemeConstants.primaryAmber, Icons.payment);
 
       case 'awaiting_direct_payment_confirmation':
         return ('في انتظار تأكيد المعلم', Colors.blue, Icons.hourglass_top);
@@ -970,10 +981,11 @@ class _RejectedRequestCard extends StatelessWidget {
             const SizedBox(height: 8),
 
             // Session Details
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _buildDetailChip(Icons.schedule, preferredTimeSlot),
-                const SizedBox(width: 8),
                 _buildDetailChip(
                     Icons.location_on, _getSessionTypeLabel(sessionType)),
               ],
@@ -986,23 +998,30 @@ class _RejectedRequestCard extends StatelessWidget {
                 Icon(Icons.calendar_today,
                     size: 14, color: Colors.grey.shade600),
                 const SizedBox(width: 6),
-                Text(
-                  slotDate != null
-                      ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate!)}'
-                      : 'التاريخ غير محدد',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
+                Expanded(
+                  child: Text(
+                    slotDate != null
+                        ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate!)}'
+                        : 'التاريخ غير محدد',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  requestDate != null
-                      ? 'طُلب ${DateFormat('dd/MM', 'ar').format(requestDate!)}'
-                      : '',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
+                Flexible(
+                  child: Text(
+                    requestDate != null
+                        ? 'طُلب ${DateFormat('dd/MM', 'ar').format(requestDate!)}'
+                        : '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                 ),
               ],
@@ -1014,21 +1033,21 @@ class _RejectedRequestCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
+                  color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade300),
+                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline,
-                        color: Colors.orange.shade900, size: 20),
+                    const Icon(Icons.info_outline,
+                        color: AppThemeConstants.primaryAmber, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'السبب: $rejectionReason',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.orange.shade900,
+                          color: AppThemeConstants.primaryAmber,
                         ),
                       ),
                     ),
@@ -1056,6 +1075,8 @@ class _RejectedRequestCard extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
               color: Colors.grey.shade800,
@@ -1079,3 +1100,5 @@ class _RejectedRequestCard extends StatelessWidget {
     }
   }
 }
+
+

@@ -20,9 +20,18 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // WHY: Prefer custom claim to avoid Firestore reads during rule evaluation.
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isSuspended() {
+      // WHY: Block sensitive create flows when caller has an active suspension doc.
       return isAuthenticated() &&
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+             exists(/databases/$(database)/documents/userSuspensions/$(request.auth.uid));
     }
 
     // ============================================
@@ -133,6 +142,7 @@ service cloud.firestore {
                     request.auth.uid == resource.data.mohaffezId);
 
       allow create: if isAuthenticated() &&
+                     !isSuspended() &&
                      request.auth.uid == request.resource.data.studentId;
 
       // ─── Mohaffez-only transitions ───────────────────────────────────────
@@ -217,6 +227,7 @@ service cloud.firestore {
       ));
 
       allow create: if isAuthenticated() &&
+        !isSuspended() &&
         (
           // Mohaffez pre-creates the session atomically with the accept
           (request.auth.uid == request.resource.data.mohaffezId &&
@@ -271,6 +282,7 @@ service cloud.firestore {
       );
 
       allow create: if isAuthenticated() &&
+                    !isSuspended() &&
                     request.auth.uid == request.resource.data.studentId &&
                     request.resource.data.status == 'pending' &&
                     request.resource.data.amount >= 0 &&
@@ -313,6 +325,7 @@ service cloud.firestore {
       );
 
       allow create: if isAuthenticated() &&
+                    !isSuspended() &&
                     request.auth.uid == request.resource.data.studentId &&
                     request.resource.data.status == 'active' &&
                     request.resource.data.remainingSessions > 0 &&
@@ -426,6 +439,7 @@ service cloud.firestore {
     match /follows/{followId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
+                    !isSuspended() &&
                     request.auth.uid == request.resource.data.studentId &&
                     request.resource.data.studentId is string &&
                     request.resource.data.mohaffezId is string &&
@@ -438,6 +452,7 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
+                    !isSuspended() &&
                     request.auth.uid == request.resource.data.studentId &&
                     request.resource.data.rating >= 1 &&
                     request.resource.data.rating <= 5 &&
@@ -520,9 +535,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /userSuspensions/{userId} {
-      allow read: if isAdmin() || isOwner(userId);
-      allow write: if isAdmin();
+    match /userSuspensions/{suspensionId} {
+      // WHY: Split write permissions by operation for explicit, predictable enforcement.
+      allow read: if isAdmin() || isOwner(suspensionId);
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /broadcastHistory/{id} {

@@ -361,6 +361,19 @@ class ArabicLabels {
   // ============================================
   static const String hifz = 'حفظ';
   static const String muraja = 'مراجعة';
+  static const String myAssignments = 'واجباتي';
+  static const String pleaseLoginFirst = 'الرجاء تسجيل الدخول';
+  static const String noCompletedAssignments = 'لا توجد واجبات مكتملة';
+  static const String completeAssignmentsToAppear = 'أكمل واجباتك لتظهر هنا';
+  static const String assignmentPerformanceInPreviousTask =
+      'تقييم أدائك في التكليف السابق:';
+  static const String performanceNotesOnYourWork = 'ملاحظات على أدائك:';
+  static const String newAssignmentForNextSession =
+      'التكليف الجديد للجلسة القادمة:';
+  static const String messageFromMohaffez = 'رسالة من المحفّظ:';
+  static const String reviewMistakes = 'مراجعة الأخطاء';
+  static const String sessionMistakes = 'أخطاء الجلسة';
+  static const String reviewMistakesInMushaf = 'مراجعة الأخطاء في المصحف';
   static const String hifzAssignment = 'واجب الحفظ';
   static const String murajaAssignment = 'واجب المراجعة';
   static const String previousAssignments = 'الواجبات السابقة';
@@ -658,4 +671,16 @@ class ArabicLabels {
       return '${distanceInKm.toStringAsFixed(1)} كم';
     }
   }
+  // WHY: Centralized suspension labels for lockout UX and admin actions.
+  static const String accountSuspended = '\u062A\u0645 \u062A\u0642\u064A\u064A\u062F \u062D\u0633\u0627\u0628\u0643';
+  static const String accountSuspendedSubtitle =
+      '\u0644\u0627 \u064A\u0645\u0643\u0646\u0643 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0627\u0644\u062A\u0637\u0628\u064A\u0642 \u062D\u0627\u0644\u064A\u0627\u064B. \u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645 \u0644\u0645\u0632\u064A\u062F \u0645\u0646 \u0627\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062A.';
+  static const String suspensionReason = '\u0633\u0628\u0628 \u0627\u0644\u062A\u0642\u064A\u064A\u062F';
+  static const String suspensionExpiry = '\u064A\u0646\u062A\u0647\u064A \u0627\u0644\u062A\u0642\u064A\u064A\u062F \u0641\u064A';
+  static const String permanentSuspension = '\u062A\u0642\u064A\u064A\u062F \u062F\u0627\u0626\u0645';
+  static const String contactSupport = '\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645';
+  static const String suspensionLifted = '\u062A\u0645 \u0631\u0641\u0639 \u0627\u0644\u062A\u0642\u064A\u064A\u062F \u0639\u0646 \u062D\u0633\u0627\u0628\u0643';
+  static const String restrictUser = '\u062A\u0642\u064A\u064A\u062F \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645';
+  static const String liftRestriction = '\u0631\u0641\u0639 \u0627\u0644\u062A\u0642\u064A\u064A\u062F';
+  static const String suspensionType = '\u0646\u0648\u0639 \u0627\u0644\u062A\u0642\u064A\u064A\u062F';
 }

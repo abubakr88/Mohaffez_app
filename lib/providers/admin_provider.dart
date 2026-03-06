@@ -3,7 +3,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../repositories/admin_repository.dart';
-import 'user_provider.dart';
 
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {
   return AdminRepository(FirebaseFirestore.instance);
@@ -126,128 +125,117 @@ final auditLogProvider =
 });
 
 class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
-  final Ref _ref;
   final AdminRepository _repository;
   final FirebaseFunctions _functions;
 
-  AdminActionsNotifier(this._ref, this._repository, this._functions)
+  AdminActionsNotifier(this._repository, this._functions)
       : super(const AsyncValue.data(null));
 
-  String get _adminUid => _ref.read(currentUserProvider).value?.uid ?? '';
+  void _reset() {
+    if (state.hasError) state = const AsyncValue.data(null);
+  }
+
+  Future<void> _runAction(Future<void> Function() action) async {
+    _reset();
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(action);
+  }
+
+  Future<void> _callFunction(
+    String functionName,
+    Map<String, dynamic> params,
+  ) async {
+    await _runAction(() async {
+      await _functions.httpsCallable(functionName).call(params);
+    });
+  }
 
   Future<void> suspendUser(
       String userId, String reason, DateTime? expiresAt) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await _repository.suspendUser(userId, _adminUid, reason, expiresAt);
+    await _callFunction('suspendUser', {
+      'userId': userId,
+      'reason': reason,
+      'expiresAt': expiresAt?.toIso8601String(),
     });
   }
 
   Future<void> unsuspendUser(String userId) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await _repository.unsuspendUser(userId, _adminUid);
-    });
+    await _callFunction('unsuspendUser', {'userId': userId});
   }
 
   Future<void> deleteUserData(String userId) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('deleteUserAccount');
-      await callable.call({'userId': userId});
-    });
+    await _callFunction('deleteUserAccount', {'userId': userId});
   }
 
   Future<void> updateUserRole(String userId, String newRole) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('setUserRole');
-      await callable.call({'userId': userId, 'newRole': newRole});
+    await _callFunction('setUserRole', {
+      'userId': userId,
+      'newRole': newRole,
     });
   }
 
   Future<void> approveCredential(String userId, String credentialId) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('approveCredential');
-      await callable.call({'userId': userId, 'credentialId': credentialId});
+    await _callFunction('approveCredential', {
+      'userId': userId,
+      'credentialId': credentialId,
     });
   }
 
   Future<void> rejectCredential(
       String userId, String credentialId, String reason) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('rejectCredential');
-      await callable.call({'userId': userId, 'credentialId': credentialId, 'reason': reason});
+    await _callFunction('rejectCredential', {
+      'userId': userId,
+      'credentialId': credentialId,
+      'reason': reason,
     });
   }
 
   Future<void> dismissFailedOperation(String operationId) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    await _runAction(() async {
       await _repository.dismissFailedOperation(operationId);
     });
   }
 
   Future<void> createPromoCode(Map<String, dynamic> data) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    await _runAction(() async {
       await _repository.createPromoCode(data);
     });
   }
 
   Future<void> togglePromoCode(String promoId, bool isActive) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    await _runAction(() async {
       await _repository.togglePromoCode(promoId, isActive);
     });
   }
 
   Future<void> deletePromoCode(String promoId) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    await _runAction(() async {
       await _repository.deletePromoCode(promoId);
     });
   }
 
   Future<void> triggerCommissionJob() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('triggerCommissionJobManually');
-      await callable.call();
-    });
+    await _callFunction('triggerCommissionJobManually', const {});
   }
 
   Future<void> markCommissionPaid(String commissionId) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('markCommissionPaid');
-      await callable.call({'commissionId': commissionId});
+    await _callFunction('markCommissionPaid', {
+      'commissionId': commissionId,
     });
   }
 
   Future<void> triggerCleanupJob() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('triggerCleanupJobManually');
-      await callable.call();
-    });
+    await _callFunction('triggerCleanupJobManually', const {});
   }
 
   Future<void> releaseAllExpiredLocks() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final callable = _functions.httpsCallable('releaseExpiredSlotLocks');
-      await callable.call();
-    });
+    await _callFunction('releaseExpiredSlotLocks', const {});
   }
 }
 
 final adminActionsProvider =
     StateNotifierProvider<AdminActionsNotifier, AsyncValue<void>>((ref) {
   return AdminActionsNotifier(
-    ref,
     ref.watch(adminRepositoryProvider),
     FirebaseFunctions.instance,
   );

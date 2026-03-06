@@ -7,6 +7,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../shared/widgets/empty_state.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../services/credential_service.dart';
 import 'dart:io';
 
@@ -101,7 +102,10 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                 background: Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Colors.purple, Color(0xFFAB47BC)],
+                      colors: [
+                        AppThemeConstants.primaryAmber,
+                        AppThemeConstants.primaryAmberLight,
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -826,7 +830,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                 )
               : null,
           title: const Text('إضافة شهادة'),
-          backgroundColor: Colors.purple,
+          backgroundColor: AppThemeConstants.primaryAmber,
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -997,7 +1001,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                   child: ElevatedButton(
                     onPressed: uploading ? null : _submitCredential,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
+                      backgroundColor: AppThemeConstants.primaryAmber,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: uploading

@@ -7,6 +7,7 @@ import '../providers/admin_provider.dart';
 import '../providers/system_config_provider.dart';
 import '../services/app_version_service.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminHomeScreen extends ConsumerStatefulWidget {
@@ -89,8 +90,8 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text(ArabicLabels.adminDashboard),
+        appBar: AdminAppBar(
+          title: ArabicLabels.adminDashboard,
           actions: [
             if (devActive)
               const Padding(
@@ -234,3 +235,5 @@ class _AdminNavTile extends StatelessWidget {
     );
   }
 }
+
+

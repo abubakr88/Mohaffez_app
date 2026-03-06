@@ -21,6 +21,10 @@ function parseFlutterDate(iso) {
     }
     return new Date(iso);
 }
+// FIXED: BUG-5 - strip both hyphens AND en-dashes
+function normalizeTimeSlot(raw) {
+    return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
+}
 exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
     var _a;
     functions.logger.info("🎫 confirmFreeSession v6.0 (17/2/2026) - Enhanced Logging");
@@ -196,11 +200,11 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             const availabilityData = availabilityDoc.data();
             if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
                 const timeSlots = availabilityData.timeSlots;
-                const normalizedSlot = preferredTimeSlot.replace(/ /g, "");
+                const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
                 let slotFound = false;
                 let slotEnabled = false;
                 for (const slot of timeSlots) {
-                    const slotTime = `${slot.startTime}-${slot.endTime}`.replace(/ /g, "");
+                    const slotTime = normalizeTimeSlot(`${slot.startTime}-${slot.endTime}`);
                     if (slotTime === normalizedSlot && slot.sessionType === sessionType) {
                         slotFound = true;
                         slotEnabled = slot.enabled === true;
@@ -387,9 +391,9 @@ exports.confirmFreeSession = functions.https.onCall(async (data, context) => {
             const availabilityData = availabilityDoc.data();
             if (availabilityData && Array.isArray(availabilityData.timeSlots)) {
                 const timeSlots = availabilityData.timeSlots;
-                const normalizedSlot = preferredTimeSlot.replace(/ /g, "");
+                const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
                 const updatedSlots = timeSlots.map((slot) => {
-                    const slotTime = `${slot.startTime}-${slot.endTime}`.replace(/ /g, "");
+                    const slotTime = normalizeTimeSlot(`${slot.startTime}-${slot.endTime}`);
                     if (slotTime === normalizedSlot && slot.sessionType === sessionType && slot.enabled) {
                         return Object.assign(Object.assign({}, slot), { enabled: false });
                     }

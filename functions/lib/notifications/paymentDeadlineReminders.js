@@ -37,25 +37,50 @@ exports.sendPaymentDeadlineReminders = functions.pubsub
             if (!studentId) {
                 continue;
             }
-            await (0, notificationHelpers_1.createAndSendNotification)({
-                userId: studentId,
-                senderId: typeof data.mohaffezId === 'string' ? data.mohaffezId : null,
-                title: '⏰ تذكير: باقي ساعتان للدفع',
-                body: `سيتم إلغاء طلب جلستك مع ${teacherName} إذا لم تدفع`,
-                type: 'payment_deadline_reminder',
-                isRead: false,
-                data: {
+            // BUG-FIX-A: Claim the flag atomically BEFORE sending the notification.
+            // This prevents duplicate sends if the transaction succeeds but FCM fails,
+            // or if the cron fires again before the flag write completes.
+            let shouldSend = false;
+            try {
+                await admin_1.db.runTransaction(async (transaction) => {
+                    var _a;
+                    const fresh = await transaction.get(doc.ref);
+                    if (!fresh.exists)
+                        return;
+                    if (((_a = fresh.data()) === null || _a === void 0 ? void 0 : _a.reminderSent) === true)
+                        return; // already claimed
+                    transaction.update(doc.ref, {
+                        reminderSent: true,
+                        reminderSentAt: admin_1.FieldValue.serverTimestamp(),
+                        updatedAt: admin_1.FieldValue.serverTimestamp(),
+                    });
+                    shouldSend = true;
+                });
+            }
+            catch (flagError) {
+                functions.logger.error('Failed to claim reminderSent flag', {
+                    requestId: doc.id, error: flagError
+                });
+                // FIXED: BUG-7 - log to failedOperations for retry
+                await logFailedOperation(doc.id, flagError);
+                continue; // skip this doc safely — try again next cron tick
+            }
+            if (shouldSend) {
+                await (0, notificationHelpers_1.createAndSendNotification)({
+                    userId: studentId,
+                    senderId: typeof data.mohaffezId === 'string' ? data.mohaffezId : null,
+                    title: '⏰ تذكير: باقي ساعتان للدفع',
+                    body: `سيتم إلغاء طلب جلستك مع ${teacherName} إذا لم تدفع`,
                     type: 'payment_deadline_reminder',
-                    requestId: doc.id,
-                    route: '/payment',
-                },
-                highPriority: true,
-            });
-            await doc.ref.update({
-                reminderSent: true,
-                reminderSentAt: admin_1.FieldValue.serverTimestamp(),
-                updatedAt: admin_1.FieldValue.serverTimestamp(),
-            });
+                    isRead: false,
+                    data: {
+                        type: 'payment_deadline_reminder',
+                        requestId: doc.id,
+                        route: '/payment',
+                    },
+                    highPriority: true,
+                });
+            }
         }
         catch (error) {
             functions.logger.error('Failed to process payment deadline reminder', {

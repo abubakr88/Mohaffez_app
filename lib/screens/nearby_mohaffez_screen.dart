@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../shared/constants/app_theme.dart';
+import '../shared/widgets/skeleton_card.dart';
 import '../shared/widgets/cached_avatar.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -165,8 +166,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                     ),
                   );
                 },
-                loading: () => const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()),
+                loading: () => const SliverToBoxAdapter(
+                  child: SkeletonList(itemCount: 6, itemHeight: 90),
                 ),
                 error: (error, stack) => SliverFillRemaining(
                   child: ErrorDisplay.dataLoad(
@@ -528,7 +529,9 @@ class MohaffezCard extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 12),
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
                       children: [
                         if (distance != null) ...[
                           _InfoBadge(
@@ -538,14 +541,12 @@ class MohaffezCard extends StatelessWidget {
                                 : '${distance!.toStringAsFixed(1)} كم',
                             color: Colors.blue,
                           ),
-                          const SizedBox(width: 12),
                         ],
                         _InfoBadge(
                           icon: Icons.star,
                           label: mohaffez.rating.toStringAsFixed(1),
                           color: Colors.amber,
                         ),
-                        const SizedBox(width: 12),
                         _InfoBadge(
                           icon: Icons.people,
                           label: '${mohaffez.followerCount}',

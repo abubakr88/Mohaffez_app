@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../shared/constants/app_theme.dart';
+import '../shared/widgets/skeleton_card.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../providers/mohaffez_profile_providers.dart';
 import '../providers/user_provider.dart';
 import '../providers/booking_provider.dart';
@@ -456,20 +458,20 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.orange.shade100,
+        color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.orange.shade700, size: 20),
+          Icon(icon, color: AppThemeConstants.primaryAmber, size: 20),
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: Colors.orange.shade700,
+              color: AppThemeConstants.primaryAmber,
             ),
           ),
         ],
@@ -505,20 +507,20 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.shade200),
+                border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.orange.shade700),
-                  const SizedBox(width: 12),
+                  Icon(Icons.info_outline, color: AppThemeConstants.primaryAmber),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'لا توجد خطط تسعير متاحة لهذا النوع من الجلسات',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.orange.shade700,
+                        color: AppThemeConstants.primaryAmber,
                       ),
                     ),
                   ),
@@ -941,9 +943,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               // Option 2: Request now, pay after acceptance
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.surfaceWhite,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
                 ),
                 child: ListTile(
                   leading: Container(
@@ -1205,6 +1207,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         if (profile['specialization'] != null)
                           Text(
@@ -1213,6 +1217,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                               fontSize: 14,
                               color: Colors.white70,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                       ],
                     ),
@@ -1435,9 +1441,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ],
             );
           },
-          loading: () => const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+          loading: () => const SizedBox(
+            height: 280,
+            child: SkeletonList(itemCount: 3, itemHeight: 84),
           ),
           error: (_, __) => const SizedBox.shrink(),
         );
@@ -1586,11 +1592,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       Icon(Icons.calendar_today,
                           color: Colors.grey.shade400, size: 32),
                       const SizedBox(width: 12),
-                      Text(
-                        'لا توجد أوقات متاحة',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey.shade600,
+                      Expanded(
+                        child: Text(
+                          'لا توجد أوقات متاحة',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                       ),
                     ],
@@ -1673,11 +1683,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                             const Icon(Icons.calendar_today,
                                 size: 18, color: AppTheme.accentGreen),
                             const SizedBox(width: 8),
-                            Text(
-                              '${arabicDays[dayOfWeek - 1]} - ${DateFormat('dd/MM', 'ar').format(targetDate)}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: Text(
+                                '${arabicDays[dayOfWeek - 1]} - ${DateFormat('dd/MM', 'ar').format(targetDate)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -1758,9 +1772,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ],
             );
           },
-          loading: () => const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+          loading: () => const SizedBox(
+            height: 320,
+            child: SkeletonList(itemCount: 4, itemHeight: 70),
           ),
           error: (_, __) => Padding(
             padding: const EdgeInsets.all(16),
@@ -1844,9 +1858,9 @@ class _PlanPickerSheetState extends State<_PlanPickerSheet> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.surfaceWhite,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1928,11 +1942,15 @@ class _PlanPickerSheetState extends State<_PlanPickerSheet> {
                                 ],
                               ),
                             ),
-                            Text(
-                              '${plan.priceEGP.toStringAsFixed(0)} ج.م',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                            Flexible(
+                              child: Text(
+                                '${plan.priceEGP.toStringAsFixed(0)} ج.م',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ],
@@ -1972,3 +1990,5 @@ class _PlanPickerSheetState extends State<_PlanPickerSheet> {
     );
   }
 }
+
+

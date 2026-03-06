@@ -519,3 +519,4 @@ class _AssignmentChip extends StatelessWidget {
     );
   }
 }
+

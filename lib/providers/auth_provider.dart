@@ -17,7 +17,13 @@ import '../services/cache_service.dart';
 import '../services/notification_service.dart';
 
 final authStateProvider = StreamProvider<User?>((ref) {
-  return FirebaseAuth.instance.authStateChanges();
+  return FirebaseAuth.instance.authStateChanges().asyncMap((firebaseUser) async {
+    // WHY: Refresh claims at app session start so admin role is immediately available in rules.
+    if (firebaseUser != null) {
+      await firebaseUser.getIdToken(true);
+    }
+    return firebaseUser;
+  });
 });
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -42,6 +48,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
 
       if (cred.user == null) throw Exception('فشل تسجيل الدخول');
 
+      // WHY: Force immediate claim propagation after login (no 1-hour token wait).
+      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+
       final userId = cred.user!.uid;
 
       // Wait for user doc with retry (Firestore may lag after auth).
@@ -53,6 +62,26 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       }
 
       final data = userDoc.data() as Map<String, dynamic>;
+
+      // ✅ FIX: Check suspension BEFORE caching — prevents white screen.
+      // Check 1: users doc status field.
+      final status = data['status'] as String? ?? 'active';
+      if (status == 'suspended') {
+        await _authService.logout();
+        throw Exception('\u062A\u0645 \u062A\u0639\u0644\u064A\u0642 \u062D\u0633\u0627\u0628\u0643. \u064A\u0631\u062C\u0649 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645.');
+      }
+
+      // Check 2: userSuspensions collection (source of truth).
+      final suspensionDoc = await FirebaseFirestore.instance
+          .collection('userSuspensions')
+          .doc(userId)
+          .get();
+      if (suspensionDoc.exists &&
+          (suspensionDoc.data()?['isActive'] == true)) {
+        await _authService.logout();
+        throw Exception('\u062A\u0645 \u062A\u0639\u0644\u064A\u0642 \u062D\u0633\u0627\u0628\u0643. \u064A\u0631\u062C\u0649 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645.');
+      }
+
       await CacheService.saveUserId(userId);
       await CacheService.saveUserRole(data['role'] as String);
       await CacheService.saveUserName(data['name'] as String);

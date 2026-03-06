@@ -227,6 +227,14 @@ exports.onSessionCreated = functions.firestore
     const sessionId = context.params.sessionId;
     const studentId = asString(data.studentId, '');
     const mohaffezId = asString(data.mohaffezId, '');
+    // FIXED: BUG-3
+    const alreadySent = asBoolean(data['notificationsAlreadySent'], false);
+    if (alreadySent) {
+        functions.logger.info('onSessionCreated: skipping — notifications already sent', {
+            sessionId: context.params.sessionId,
+        });
+        return;
+    }
     // Append creation event
     try {
         await sessionEventStore.appendEvent({

@@ -154,12 +154,16 @@ class StudentHomeContent extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        'مرحباً بك',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: AppThemeConstants.surfaceWhite,
+                      const Expanded(
+                        child: Text(
+                          'مرحباً بك',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: AppThemeConstants.surfaceWhite,
+                          ),
                         ),
                       ),
                     ],
@@ -710,11 +714,15 @@ class RecentAssignmentsSection extends ConsumerWidget {
                               ),
                             ),
                             if (sessionDate != null)
-                              Text(
-                                '${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
+                              Flexible(
+                                child: Text(
+                                  '${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
                               ),
                           ],

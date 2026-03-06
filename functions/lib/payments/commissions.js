@@ -28,10 +28,23 @@ async function processWeeklyCommissionsNow() {
     for (const doc of overdue.docs) {
         try {
             const d = doc.data();
-            await doc.ref.update({
-                status: 'overdue',
-                updatedAt: admin_1.FieldValue.serverTimestamp(),
+            // FIX: Use atomic transition guard to prevent double-notify on retry
+            const transitioned = await admin_1.db.runTransaction(async (tx) => {
+                const fresh = await tx.get(doc.ref);
+                if (!fresh.exists)
+                    return false;
+                if (fresh.data().status !== 'pending')
+                    return false; // already processed
+                tx.update(doc.ref, {
+                    status: 'overdue',
+                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+                });
+                return true;
             });
+            if (!transitioned) {
+                processed++;
+                continue; // skip notification — this commission was already handled
+            }
             if (d.mohaffezId && d.commissionAmount > 0) {
                 await (0, notificationHelpers_1.createAndSendNotification)({
                     userId: d.mohaffezId,
@@ -93,16 +106,32 @@ exports.markCommissionPaid = functions.https.onCall(async (data, context) => {
     const summaryRef = admin_1.db
         .collection('weeklyCommissionSummaries')
         .doc(weeklyCommissionSummaryId);
-    await summaryRef.update({
-        status: 'paid',
-        paidAt: admin_1.FieldValue.serverTimestamp(),
-        markedPaidBy: context.auth.uid,
-        updatedAt: admin_1.FieldValue.serverTimestamp(),
+    // FIX: Use transaction with idempotency guard to prevent double-pay
+    let summaryData;
+    const committed = await admin_1.db.runTransaction(async (tx) => {
+        const snap = await tx.get(summaryRef);
+        if (!snap.exists)
+            return false;
+        const d = snap.data();
+        // Idempotency: if already paid, return false
+        if (d.status === 'paid')
+            return false;
+        const allowedStatuses = ['pending', 'overdue', 'pendingVerification'];
+        if (!allowedStatuses.includes(d.status)) {
+            throw new functions.https.HttpsError('failed-precondition', `Cannot mark as paid: current status is '${d.status}'.`);
+        }
+        tx.update(summaryRef, {
+            status: 'paid',
+            paidAt: admin_1.FieldValue.serverTimestamp(),
+            markedPaidBy: context.auth.uid,
+            updatedAt: admin_1.FieldValue.serverTimestamp(),
+        });
+        summaryData = d;
+        return true;
     });
-    const summarySnap = await summaryRef.get();
-    const s = summarySnap.data();
-    if (!s)
-        return { success: true };
+    if (!committed)
+        return { success: true }; // idempotent early return
+    const s = summaryData;
     // Mark all individual commission records for this week as paid
     const pending = await admin_1.db
         .collection('commissions')
@@ -151,30 +180,39 @@ exports.mohaffezReportCommissionPayment = functions.https.onCall(async (data, co
     const summaryRef = admin_1.db
         .collection('weeklyCommissionSummaries')
         .doc(weeklyCommissionSummaryId);
-    const summarySnap = await summaryRef.get();
-    if (!summarySnap.exists) {
-        throw new functions.https.HttpsError('not-found', 'لم يتم العثور على الملخص');
-    }
-    const summary = summarySnap.data();
-    // Ownership — mohaffez can only report their own commissions
-    if (summary.mohaffezId !== mohaffezId) {
-        throw new functions.https.HttpsError('permission-denied', 'ليس لديك صلاحية');
-    }
-    // Idempotency — already reported or already paid, return success silently
-    if (summary.status === 'pendingVerification' || summary.status === 'paid') {
+    // BUG-FIX-C: wrap status check + update atomically to prevent TOCTOU double-notify
+    let summaryForNotification;
+    const committed = await admin_1.db.runTransaction(async (tx) => {
+        const snap = await tx.get(summaryRef);
+        if (!snap.exists) {
+            throw new functions.https.HttpsError('not-found', 'لم يتم العثور على الملخص');
+        }
+        const d = snap.data();
+        // Ownership check (inside transaction)
+        if (d.mohaffezId !== mohaffezId) {
+            throw new functions.https.HttpsError('permission-denied', 'ليس لديك صلاحية');
+        }
+        // Idempotency (atomic — inside transaction)
+        if (d.status === 'pendingVerification' || d.status === 'paid') {
+            return false;
+        }
+        // Precondition: only pending/overdue can be reported
+        const allowed = ['pending', 'overdue'];
+        if (!allowed.includes(d.status)) {
+            throw new functions.https.HttpsError('failed-precondition', `لا يمكن الإبلاغ عن دفعة بحالة: ${d.status}`);
+        }
+        tx.update(summaryRef, {
+            status: 'pendingVerification',
+            mohaffezReportedAt: admin_1.FieldValue.serverTimestamp(),
+            mohaffezNote: note !== null && note !== void 0 ? note : null,
+            updatedAt: admin_1.FieldValue.serverTimestamp(),
+        });
+        summaryForNotification = d;
+        return true;
+    });
+    if (!committed) {
         return { success: true, message: 'تم الإرسال مسبقاً' };
     }
-    // Only pending or overdue summaries can be reported
-    if (!['pending', 'overdue'].includes(summary.status)) {
-        throw new functions.https.HttpsError('failed-precondition', `لا يمكن الإبلاغ عن دفعة بحالة: ${summary.status}`);
-    }
-    // Admin SDK write — bypasses Firestore security rules
-    await summaryRef.update({
-        status: 'pendingVerification',
-        mohaffezReportedAt: admin_1.FieldValue.serverTimestamp(),
-        mohaffezNote: note !== null && note !== void 0 ? note : null,
-        updatedAt: admin_1.FieldValue.serverTimestamp(),
-    });
     // Fan-out notification to all admin users
     const adminSnap = await admin_1.db
         .collection('users')
@@ -186,14 +224,14 @@ exports.mohaffezReportCommissionPayment = functions.https.onCall(async (data, co
             userId: adminDoc.id,
             senderId: mohaffezId,
             title: 'تحويل عمولة بانتظار التحقق',
-            body: `${summary.mohaffezName} أرسل عمولة الأسبوع ${summary.weekNumber}: ${(_a = summary.commissionAmount) === null || _a === void 0 ? void 0 : _a.toFixed(2)} ج.م`,
+            body: `${summaryForNotification.mohaffezName} أرسل عمولة الأسبوع ${summaryForNotification.weekNumber}: ${(_a = summaryForNotification.commissionAmount) === null || _a === void 0 ? void 0 : _a.toFixed(2)} ج.م`,
             type: 'commission_payment_reported',
             isRead: false,
             highPriority: true,
             data: {
                 weeklyCommissionSummaryId,
                 mohaffezId,
-                commissionAmount: (_b = summary.commissionAmount) === null || _b === void 0 ? void 0 : _b.toString(),
+                commissionAmount: (_b = summaryForNotification.commissionAmount) === null || _b === void 0 ? void 0 : _b.toString(),
             },
         }).catch((err) => 
         // Admin FCM failure must not fail the callable for the mohaffez
@@ -202,8 +240,8 @@ exports.mohaffezReportCommissionPayment = functions.https.onCall(async (data, co
     functions.logger.info('Commission payment reported by mohaffez', {
         weeklyCommissionSummaryId,
         mohaffezId,
-        weekNumber: summary.weekNumber,
-        amount: summary.commissionAmount,
+        weekNumber: summaryForNotification.weekNumber,
+        amount: summaryForNotification.commissionAmount,
     });
     return { success: true };
 });

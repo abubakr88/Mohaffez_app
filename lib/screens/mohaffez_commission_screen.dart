@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
 
@@ -37,7 +38,7 @@ class _MohaffezCommissionScreenState
                 )
               : null,
           title: const Text('مستحقات المنصة'),
-          backgroundColor: const Color(0xFFF59E0B),
+          backgroundColor: AppThemeConstants.primaryAmber,
           foregroundColor: Colors.white,
         ),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
@@ -258,7 +259,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                   icon: const Icon(Icons.payment, size: 18),
                   label: const Text('ادفع الآن'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
+                    backgroundColor: AppThemeConstants.primaryAmber,
                     foregroundColor: Colors.white,
                     padding:
                         const EdgeInsets.symmetric(vertical: 12),
@@ -458,16 +459,16 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                  color: AppThemeConstants.primaryAmber.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFF59E0B)),
+                  border: Border.all(color: AppThemeConstants.primaryAmber),
                 ),
                 child: Text(
                   'المبلغ المستحق: ${widget.summary.commissionAmount.toStringAsFixed(2)} ج.م',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFF59E0B),
+                    color: AppThemeConstants.primaryAmber,
                   ),
                 ),
               ),
@@ -495,7 +496,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _submitPayment,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B),
+                    backgroundColor: AppThemeConstants.primaryAmber,
                     foregroundColor: Colors.white,
                     padding:
                         const EdgeInsets.symmetric(vertical: 16),
@@ -617,7 +618,7 @@ class _WalletTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(_icon, color: const Color(0xFFF59E0B)),
+        leading: Icon(_icon, color: AppThemeConstants.primaryAmber),
         title: Text(_label),
         subtitle: Text(value),
         trailing: IconButton(
@@ -636,3 +637,5 @@ class _WalletTile extends StatelessWidget {
     );
   }
 }
+
+

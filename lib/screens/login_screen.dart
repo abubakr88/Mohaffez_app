@@ -1,6 +1,7 @@
-// FILE: lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../providers/auth_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
@@ -18,13 +19,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
 
-  bool _isLogin = true;
   bool _obscurePassword = true;
-  String _selectedRole = 'student';
-  
-  // ✅ NEW: Form validation state
   bool _autoValidate = false;
 
   late AnimationController _animationController;
@@ -47,39 +43,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    // ✅ Enable auto-validation after first submit attempt
     setState(() {
       _autoValidate = true;
     });
-
     if (!_formKey.currentState!.validate()) return;
 
     final notifier = ref.read(authNotifierProvider.notifier);
-
-    if (_isLogin) {
-      await notifier.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-    } else {
-      await notifier.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        name: _nameController.text.trim(),
-        role: _selectedRole,
-      );
-    }
+    await notifier.signIn(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
 
     if (!mounted) return;
-    
     final state = ref.read(authNotifierProvider);
-
     if (state.hasError) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -109,7 +90,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       child: Scaffold(
         body: Stack(
           children: [
-            // Gradient Background
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -124,9 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ),
             ),
-            // Offline Banner
             const OfflineBanner(),
-            // Content
             SafeArea(
               child: Center(
                 child: SingleChildScrollView(
@@ -135,18 +113,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     opacity: _fadeAnimation,
                     child: Form(
                       key: _formKey,
-                      // ✅ IMPROVED: Enable auto-validation mode
                       autovalidateMode: _autoValidate
                           ? AutovalidateMode.onUserInteraction
                           : AutovalidateMode.disabled,
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Logo with Shadow
                           Hero(
                             tag: 'app-logo',
                             child: Container(
-                              padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+                              padding:
+                                  const EdgeInsets.all(AppThemeConstants.spaceLg),
                               decoration: BoxDecoration(
                                 color: AppThemeConstants.surfaceWhite,
                                 shape: BoxShape.circle,
@@ -171,9 +147,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                           ),
                           Spacing.vXl,
-                          // Title
                           Text(
-                            _isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد',
+                            'تسجيل الدخول',
                             style: Theme.of(context)
                                 .textTheme
                                 .headlineMedium
@@ -183,19 +158,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                           ),
                           Spacing.vSm,
-                          Text(
-                            _isLogin
-                                ? 'مرحبًا بعودتك!'
-                                : 'انضم إلى مجتمع المحفظين',
-                            style: const TextStyle(
+                          const Text(
+                            'مرحبًا بعودتك!',
+                            style: TextStyle(
                               fontSize: 14,
                               color: AppThemeConstants.textSecondary,
                             ),
                           ),
-                          const SizedBox(height: AppThemeConstants.spaceXl + AppThemeConstants.spaceSm),
-                          // Form Card
+                          const SizedBox(
+                            height: AppThemeConstants.spaceXl +
+                                AppThemeConstants.spaceSm,
+                          ),
                           Container(
-                            padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+                            padding:
+                                const EdgeInsets.all(AppThemeConstants.spaceLg),
                             decoration: BoxDecoration(
                               color: AppThemeConstants.surfaceWhite,
                               borderRadius: AppThemeConstants.borderRadiusXl,
@@ -209,35 +185,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                             child: Column(
                               children: [
-                                // Name Field (Sign Up Only)
-                                if (!_isLogin) ...[
-                                  TextFormField(
-                                    controller: _nameController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'الاسم الكامل',
-                                      prefixIcon: Icon(Icons.person_outline),
-                                      border: OutlineInputBorder(
-                                        borderRadius: AppThemeConstants.borderRadiusMd,
-                                      ),
-                                      filled: true,
-                                      fillColor: AppThemeConstants.backgroundLight,
-                                      // ✅ NEW: Error styling
-                                      errorMaxLines: 2,
-                                    ),
-                                    // ✅ IMPROVED: Better validation messages
-                                    validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
-                                        return 'الرجاء إدخال الاسم الكامل';
-                                      }
-                                      if (value.trim().length < 3) {
-                                        return 'الاسم يجب أن يكون 3 أحرف على الأقل';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  Spacing.vMd,
-                                ],
-                                // Email Field
                                 TextFormField(
                                   controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
@@ -246,13 +193,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     labelText: 'البريد الإلكتروني',
                                     prefixIcon: Icon(Icons.email_outlined),
                                     border: OutlineInputBorder(
-                                      borderRadius: AppThemeConstants.borderRadiusMd,
+                                      borderRadius:
+                                          AppThemeConstants.borderRadiusMd,
                                     ),
                                     filled: true,
                                     fillColor: AppThemeConstants.backgroundLight,
                                     errorMaxLines: 2,
                                   ),
-                                  // ✅ IMPROVED: Better email validation
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
                                       return 'الرجاء إدخال البريد الإلكتروني';
@@ -267,7 +214,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   },
                                 ),
                                 Spacing.vMd,
-                                // Password Field
                                 TextFormField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
@@ -287,13 +233,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       },
                                     ),
                                     border: const OutlineInputBorder(
-                                      borderRadius: AppThemeConstants.borderRadiusMd,
+                                      borderRadius:
+                                          AppThemeConstants.borderRadiusMd,
                                     ),
                                     filled: true,
                                     fillColor: AppThemeConstants.backgroundLight,
-                                    errorMaxLines: 3,
                                   ),
-                                  // ✅ IMPROVED: More detailed password validation
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
                                       return 'الرجاء إدخال كلمة المرور';
@@ -301,74 +246,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     if (value.length < 8) {
                                       return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
                                     }
-                                    if (!_isLogin && value.length < 8) {
-                                      // Additional validation for signup
-                                      if (!value.contains(RegExp(r'[A-Z]'))) {
-                                        return 'يجب أن تحتوي على حرف كبير واحد على الأقل';
-                                      }
-                                      if (!value.contains(RegExp(r'[0-9]'))) {
-                                        return 'يجب أن تحتوي على رقم واحد على الأقل';
-                                      }
-                                    }
                                     return null;
                                   },
                                 ),
-                                // Role Selection (Sign Up Only)
-                                if (!_isLogin) ...[
-                                  const SizedBox(height: AppThemeConstants.spaceLg - AppThemeConstants.spaceSm),
-                                  const Text(
-                                    'اختر نوع الحساب',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _RoleCard(
-                                          icon: Icons.school,
-                                          title: 'محفّظ',
-                                          subtitle: 'معلم القرآن',
-                                          color: AppThemeConstants.primaryAmber,
-                                          isSelected: _selectedRole == 'mohaffez',
-                                          onTap: () {
-                                            setState(() {
-                                              _selectedRole = 'mohaffez';
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
-                                      Expanded(
-                                        child: _RoleCard(
-                                          icon: Icons.person,
-                                          title: 'طالب',
-                                          subtitle: 'دارس القرآن',
-                                          color: AppThemeConstants.accentGreen,
-                                          isSelected: _selectedRole == 'student',
-                                          onTap: () {
-                                            setState(() {
-                                              _selectedRole = 'student';
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
                                 Spacing.vLg,
-                                // Submit Button
                                 SizedBox(
                                   width: double.infinity,
                                   height: AppThemeConstants.buttonHeightLarge,
                                   child: ElevatedButton(
                                     onPressed: isLoading ? null : _submit,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppThemeConstants.primaryAmber,
+                                      backgroundColor:
+                                          AppThemeConstants.primaryAmber,
                                       shape: const RoundedRectangleBorder(
-                                        borderRadius: AppThemeConstants.borderRadiusMd,
+                                        borderRadius:
+                                            AppThemeConstants.borderRadiusMd,
                                       ),
                                       elevation: AppThemeConstants.elevationSm,
                                     ),
@@ -380,57 +272,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               strokeWidth: 2,
                                               valueColor:
                                                   AlwaysStoppedAnimation<Color>(
-                                                      AppThemeConstants.surfaceWhite),
+                                                AppThemeConstants.surfaceWhite,
+                                              ),
                                             ),
                                           )
-                                        : Text(
-                                            _isLogin
-                                                ? 'تسجيل الدخول'
-                                                : 'إنشاء حساب',
-                                            style: const TextStyle(
+                                        : const Text(
+                                            'تسجيل الدخول',
+                                            style: TextStyle(
                                               fontSize: 18,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          Spacing.vLg,
-                          // Toggle Login/SignUp
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _isLogin = !_isLogin;
-                                _nameController.clear();
-                                // ✅ Reset auto-validation when switching modes
-                                _autoValidate = false;
-                              });
-                            },
-                            child: RichText(
-                              text: TextSpan(
-                                style: const TextStyle(
-                                  color: AppThemeConstants.textPrimary,
-                                  fontSize: 15,
+                                const SizedBox(height: AppThemeConstants.spaceLg),
+                                const Row(
+                                  children: [
+                                    Expanded(child: Divider()),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: AppThemeConstants.spaceMd,
+                                      ),
+                                      child: Text('أو'),
+                                    ),
+                                    Expanded(child: Divider()),
+                                  ],
                                 ),
-                                children: [
-                                  TextSpan(
-                                    text: _isLogin
-                                        ? 'ليس لديك حساب؟ '
-                                        : 'لديك حساب بالفعل؟ ',
-                                  ),
-                                  TextSpan(
-                                    text: _isLogin
-                                        ? 'إنشاء حساب جديد'
-                                        : 'تسجيل الدخول',
-                                    style: const TextStyle(
-                                      color: AppThemeConstants.primaryAmber,
-                                      fontWeight: FontWeight.bold,
+                                const SizedBox(height: AppThemeConstants.spaceLg),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: AppThemeConstants.buttonHeightMedium,
+                                  child: OutlinedButton(
+                                    onPressed: () => context.push('/register'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor:
+                                          AppThemeConstants.primaryAmber,
+                                      side: const BorderSide(
+                                        color: AppThemeConstants.primaryAmber,
+                                      ),
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius:
+                                            AppThemeConstants.borderRadiusMd,
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'إنشاء حساب جديد',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -446,69 +340,3 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 }
-
-// Role Selection Card
-class _RoleCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _RoleCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.1) : AppThemeConstants.backgroundLight,
-          borderRadius: AppThemeConstants.borderRadiusMd,
-          border: Border.all(
-            color: isSelected ? color : AppThemeConstants.divider,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 48,
-              color: isSelected ? color : AppThemeConstants.textDisabled,
-            ),
-            Spacing.vSm,
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? color : AppThemeConstants.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppThemeConstants.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-

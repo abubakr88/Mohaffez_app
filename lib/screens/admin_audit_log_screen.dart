@@ -5,6 +5,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminAuditLogScreen extends ConsumerWidget {
@@ -31,7 +32,7 @@ class AdminAuditLogScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text(ArabicLabels.auditLogTitle)),
+        appBar: const AdminAppBar(title: ArabicLabels.auditLogTitle),
         body: auditLog.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
@@ -231,3 +232,5 @@ class AdminAuditLogScreen extends ConsumerWidget {
     );
   }
 }
+
+

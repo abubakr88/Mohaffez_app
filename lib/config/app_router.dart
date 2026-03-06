@@ -7,12 +7,14 @@ import 'package:go_router/go_router.dart';
 import '../models/session_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/suspension_provider.dart';
 import '../providers/user_provider.dart';
 import '../screens/availability_management_screen.dart';
 import '../screens/completed_sessions_screen.dart';
 import '../screens/commission_dashboard_screen.dart';
 import '../screens/home_shell.dart';
 import '../screens/login_screen.dart';
+import '../screens/register_screen.dart';
 import '../screens/mohaffez_commission_screen.dart';
 import '../screens/mohaffez_credentials_screen.dart';
 import '../screens/mohaffez_home.dart';
@@ -54,12 +56,16 @@ import '../screens/admin_audit_log_screen.dart';
 import '../screens/admin_wallet_settings_screen.dart';
 import '../screens/admin_teacher_commissions_screen.dart';
 import '../screens/mohaffez_schedule_screen.dart'; // ← teacher calendar
+import '../screens/suspended_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
   final Ref ref;
 
   GoRouterNotifier(this.ref) {
+    // Pre-warm: keeps the stream alive and loaded from app start
+    ref.listen(isUserSuspendedProvider, (_, __) {});
+
     ref.listen(authStateProvider, (_, __) {
       notifyListeners();
     });
@@ -68,6 +74,12 @@ class GoRouterNotifier extends ChangeNotifier {
         notifyListeners();
       }
     });
+    ref.listen<bool>(
+      isUserSuspendedProvider.select((value) => value.valueOrNull ?? false),
+      (prev, next) {
+        if (prev != next) notifyListeners();
+      },
+    );
   }
 
   String? redirect(BuildContext context, GoRouterState state) {
@@ -100,9 +112,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
         path: '/maintenance',
         name: 'maintenance',
         builder: (context, state) => const MaintenanceScreen(),
+      ),
+      GoRoute(
+        // WHY: Keep lockout route outside HomeShell for a full-screen suspension state.
+        path: '/suspended',
+        name: 'suspended',
+        builder: (context, state) => const SuspendedScreen(),
       ),
 
       // ============================================

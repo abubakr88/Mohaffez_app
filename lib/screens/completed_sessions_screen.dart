@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/session_provider_paginated.dart';
@@ -58,7 +59,10 @@ class _CompletedSessionsScreenState
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.purple, Color(0xFFAB47BC)],
+                        colors: [
+                          AppThemeConstants.primaryAmber,
+                          AppThemeConstants.primaryAmberLight
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -125,7 +129,7 @@ class _CompletedSessionsScreenState
                                       style: const TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.purple,
+                                        color: AppThemeConstants.primaryAmber,
                                       ),
                                     ),
                                   ),
@@ -325,11 +329,15 @@ class CompletedSessionCard extends StatelessWidget {
                 Icon(Icons.calendar_today,
                     size: 12, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
-                Text(
-                  completedAt != null
-                      ? '${ArabicLabels.completed} ${DateFormat('dd/MM/yyyy', 'ar').format(completedAt)}'
-                      : ArabicLabels.notSpecified,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                Expanded(
+                  child: Text(
+                    completedAt != null
+                        ? '${ArabicLabels.completed} ${DateFormat('dd/MM/yyyy', 'ar').format(completedAt)}'
+                        : ArabicLabels.notSpecified,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
                 ),
               ],
             ),
@@ -337,12 +345,17 @@ class CompletedSessionCard extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  ...List.generate(
-                    10,
-                    (index) => Icon(
-                      index < sessionRating ? Icons.star : Icons.star_border,
-                      size: 14,
-                      color: Colors.amber,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 2,
+                      children: List.generate(
+                        10,
+                        (index) => Icon(
+                          index < sessionRating ? Icons.star : Icons.star_border,
+                          size: 14,
+                          color: Colors.amber,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -633,12 +646,16 @@ class CompletedSessionCard extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: Colors.grey.shade600),
           const SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              '$label: ',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           Expanded(

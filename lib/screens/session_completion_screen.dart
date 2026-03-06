@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../providers/session_provider_paginated.dart';
 import '../shared/utils/error_handler.dart';
 import '../models/quran_mistake_model.dart';
@@ -207,21 +208,21 @@ class _SessionCompletionScreenState
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.shade200),
+                    border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(Icons.warning_amber_rounded,
-                          color: Colors.orange.shade700, size: 28),
-                      const SizedBox(width: 12),
+                          color: AppThemeConstants.primaryAmber, size: 28),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'هذه جلسة متأخرة - يُفضل إكمال الجلسات في موعدها',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.orange.shade900,
+                            color: AppThemeConstants.primaryAmber,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -309,12 +310,16 @@ class _SessionCompletionScreenState
                                     Icon(Icons.menu_book,
                                         size: 18, color: Colors.green),
                                     SizedBox(width: 8),
-                                    Text(
+                                    Expanded(
+                                      child: Text(
                                       'الحفظ المطلوب كان:',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
+                                    ),
                                     ),
                                   ],
                                 ),
@@ -357,9 +362,9 @@ class _SessionCompletionScreenState
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
+                              color: AppThemeConstants.surfaceWhite,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue.shade200),
+                              border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,12 +374,16 @@ class _SessionCompletionScreenState
                                     Icon(Icons.history_edu,
                                         size: 18, color: Colors.blue),
                                     SizedBox(width: 8),
-                                    Text(
+                                    Expanded(
+                                      child: Text(
                                       'المراجعة المطلوبة كانت:',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
+                                    ),
                                     ),
                                   ],
                                 ),
@@ -471,12 +480,12 @@ class _SessionCompletionScreenState
                         decoration: BoxDecoration(
                           color: sessionMistakes.isEmpty
                               ? Colors.green.shade50
-                              : Colors.orange.shade50,
+                              : AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: sessionMistakes.isEmpty
                                 ? Colors.green.shade200
-                                : Colors.orange.shade200,
+                                : AppThemeConstants.primaryAmber.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Row(
@@ -698,12 +707,16 @@ class _SessionCompletionScreenState
           child: Icon(icon, color: color, size: 24),
         ),
         const SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
         ),
       ],
@@ -816,3 +829,5 @@ class _SessionCompletionScreenState
     }
   }
 }
+
+

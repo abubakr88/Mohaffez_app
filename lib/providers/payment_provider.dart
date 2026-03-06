@@ -188,9 +188,10 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       await _repository.consumeSession(subscriptionId);
       return true;
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('useSubscriptionSession failed: $e');
+      state = AsyncValue.error(e, stack);
       return false;
     }
   }
 }
-

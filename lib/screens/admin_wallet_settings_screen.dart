@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/system_config_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 
 class AdminWalletSettingsScreen extends ConsumerStatefulWidget {
   const AdminWalletSettingsScreen({super.key});
@@ -86,11 +87,7 @@ class _AdminWalletSettingsScreenState
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('أرقام محافظ المنصة'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
-        ),
+        appBar: const AdminAppBar(title: 'أرقام محافظ المنصة'),
         body: ListView(
           padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
           children: [
@@ -212,3 +209,5 @@ class _AdminWalletSettingsScreenState
     );
   }
 }
+
+

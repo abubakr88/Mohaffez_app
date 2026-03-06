@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -119,7 +120,7 @@ class _AdminPaymentEventsScreenState
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
+        appBar: AdminAppBar(
           leading: context.canPop()
               ? IconButton(
                   icon: const Icon(Icons.arrow_back_ios),
@@ -127,7 +128,7 @@ class _AdminPaymentEventsScreenState
                   tooltip: 'رجوع',
                 )
               : null,
-          title: const Text('أحداث الدفع'),
+          title: '????? ?????',
         ),
         body: Column(
           children: [
@@ -401,3 +402,6 @@ class _AdminPaymentEventsScreenState
     );
   }
 }
+
+
+

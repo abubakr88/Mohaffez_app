@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../providers/suspension_provider.dart';
+import '../providers/user_provider.dart';
 import 'route_guard.dart';
 import 'guards/timeout_guard.dart';
 import 'guards/auth_guard.dart';
@@ -24,6 +26,24 @@ class GuardManager {
   /// Execute all guards and return first redirect result.
   static String? checkGuards(Ref ref, GoRouterState state) {
     final current = state.uri;
+
+    final isSuspended = ref.read(isUserSuspendedProvider).value ?? false;
+    final currentUser = ref.read(currentUserProvider).value;
+    final isStatusSuspended = currentUser?.status == 'suspended';
+
+    // WHY: Lock out if either the suspension doc OR users.status says suspended.
+    if (isSuspended || isStatusSuspended) {
+      if (state.matchedLocation != '/suspended') return '/suspended';
+      return null;
+    }
+
+    // WHY: Once suspension is lifted, route user away from lock screen immediately.
+    if (state.matchedLocation == '/suspended') {
+      final role = ref.read(currentUserRoleProvider);
+      if (role == 'admin') return '/admin-home';
+      if (role == 'mohaffez') return '/mohaffez-home';
+      return '/home';
+    }
 
     if (kDebugMode) {
       debugPrint('🔍 GuardManager: checking ${current.path}${_query(current)}');

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminPromoCodesScreen extends ConsumerStatefulWidget {
@@ -42,7 +43,7 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text(ArabicLabels.promoCodes)),
+        appBar: const AdminAppBar(title: ArabicLabels.promoCodes),
         floatingActionButton: FloatingActionButton(
           backgroundColor: AppThemeConstants.primaryAmber,
           child: const Icon(Icons.add),
@@ -246,3 +247,5 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
     );
   }
 }
+
+

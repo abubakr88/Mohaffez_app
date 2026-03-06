@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminSlotLocksScreen extends ConsumerWidget {
@@ -34,7 +35,7 @@ class AdminSlotLocksScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text(ArabicLabels.slotLocksManagement)),
+        appBar: const AdminAppBar(title: ArabicLabels.slotLocksManagement),
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: AppThemeConstants.primaryAmber,
           onPressed: () => run(actions.releaseAllExpiredLocks),
@@ -105,3 +106,5 @@ class _CountdownState extends State<_Countdown> {
         '${remaining.inMinutes}:${(s % 60).toString().padLeft(2, '0')}');
   }
 }
+
+

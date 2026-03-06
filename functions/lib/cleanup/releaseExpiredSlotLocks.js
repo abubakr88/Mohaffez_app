@@ -5,7 +5,8 @@ exports.releaseExpiredSlotLocksNow = releaseExpiredSlotLocksNow;
 const functions = require("firebase-functions");
 const admin_1 = require("../utils/admin");
 function normalizeTimeSlot(raw) {
-    return raw.replace(/\s+/g, '');
+    // FIXED: BUG-5 - strip both hyphens AND en-dashes
+    return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
 }
 async function releaseExpiredSlotLocksNow() {
     const now = admin_1.default.firestore.Timestamp.now();

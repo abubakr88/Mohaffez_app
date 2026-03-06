@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/system_config_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminBroadcastScreen extends ConsumerStatefulWidget {
@@ -162,7 +163,7 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text(ArabicLabels.broadcastNotifications)),
+        appBar: const AdminAppBar(title: ArabicLabels.broadcastNotifications),
         body: Padding(
           padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
           child: Column(
@@ -265,3 +266,5 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
     );
   }
 }
+
+

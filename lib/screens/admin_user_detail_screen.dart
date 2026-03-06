@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' show DateFormat;
 
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminUserDetailScreen extends ConsumerStatefulWidget {
@@ -74,7 +75,7 @@ class _AdminUserDetailScreenState
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text(ArabicLabels.userDetails)),
+        appBar: const AdminAppBar(title: ArabicLabels.userDetails),
         body: ListView(
           padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
           children: [
@@ -547,3 +548,5 @@ class _CredentialsSection extends StatelessWidget {
     );
   }
 }
+
+

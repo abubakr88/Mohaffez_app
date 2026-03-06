@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/user_provider.dart';
@@ -108,7 +109,10 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.orange, Color(0xFFFF6F00)],
+              colors: [
+                AppThemeConstants.primaryAmber,
+                AppThemeConstants.primaryAmberLight,
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -479,16 +483,19 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.orange : Colors.white,
+          color: isSelected ? AppThemeConstants.primaryAmber : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.orange : Colors.grey.shade300,
+            color: isSelected
+                ? AppThemeConstants.primaryAmber
+                : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.orange.withValues(alpha: 0.3),
+                    color: AppThemeConstants.primaryAmber
+                        .withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -603,6 +610,8 @@ class PendingRequestCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         isAwaitingPayment ? 'في انتظار الدفع' : 'قيد المراجعة',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -694,13 +703,17 @@ class PendingRequestCard extends StatelessWidget {
                 children: [
                   const Icon(Icons.payment, size: 16, color: Colors.green),
                   const SizedBox(width: 6),
-                  Text(
-                    '${request['planTitle'] ?? 'خطة دفع'} — '
-                    '${(request['paymentAmount'] as num).toStringAsFixed(0)} جنيه',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.green,
-                        fontWeight: FontWeight.w600),
+                  Expanded(
+                    child: Text(
+                      '${request['planTitle'] ?? 'خطة دفع'} — '
+                      '${(request['paymentAmount'] as num).toStringAsFixed(0)} جنيه',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.green,
+                          fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),
@@ -769,6 +782,8 @@ class PendingRequestCard extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           '$label:',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,

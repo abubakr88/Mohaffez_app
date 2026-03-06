@@ -14,7 +14,8 @@ const STATUS = {
     CANCELLED: 'cancelled',
 };
 function normalizeTimeSlot(raw) {
-    return raw.replace(/\s/g, '');
+    // FIXED: BUG-5 - strip both hyphens AND en-dashes
+    return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
 }
 function parseFlutterDate(iso) {
     if (!iso.endsWith('Z') && !/[+\-]\d{2}:\d{2}$/.test(iso)) {
@@ -155,8 +156,15 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
                         }
                         return slot;
                     });
-                    if (!changed)
+                    // FIXED: BUG-5 - Warn if slot disable was skipped due to mismatch
+                    if (!changed) {
+                        functions.logger.warn('createSessionRequest: slot disable skipped — no matching slot found', {
+                            lockTimeSlot,
+                            lockSessionType,
+                            availableSlots: slots.map((s) => `${s.startTime}-${s.endTime}:${s.sessionType}`),
+                        });
                         updatedSlots = null;
+                    }
                 }
             }
         }

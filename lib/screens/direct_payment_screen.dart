@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
+import '../shared/theme/app_theme_constants.dart';
 
 class DirectPaymentScreen extends StatefulWidget {
   final String requestId;
@@ -150,7 +151,7 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                 )
               : null,
           title: const Text('الدفع المباشر'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppThemeConstants.accentGreen,
           foregroundColor: Colors.white,
         ),
         body: _loading
@@ -170,7 +171,10 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                            colors: [
+                              AppThemeConstants.accentGreen,
+                              Color(0xFF43A047),
+                            ],
                           ),
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -208,11 +212,12 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? Colors.green.shade50
+                                  ? AppThemeConstants.accentGreen
+                                      .withValues(alpha: 0.08)
                                   : Colors.grey.shade50,
                               border: Border.all(
                                 color: isSelected
-                                    ? Colors.green
+                                    ? AppThemeConstants.accentGreen
                                     : Colors.grey.shade300,
                                 width: isSelected ? 2 : 1,
                               ),
@@ -223,7 +228,9 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                                 isSelected
                                     ? Icons.radio_button_checked
                                     : Icons.radio_button_unchecked,
-                                color: isSelected ? Colors.green : Colors.grey,
+                                color: isSelected
+                                    ? AppThemeConstants.accentGreen
+                                    : Colors.grey,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -237,9 +244,9 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                                     const SizedBox(height: 4),
                                     Row(children: [
                                       Text(number,
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                               fontSize: 18,
-                                              color: Colors.green.shade700,
+                                              color: AppThemeConstants.accentGreen,
                                               fontWeight: FontWeight.w600,
                                               letterSpacing: 1.2)),
                                       const SizedBox(width: 8),
@@ -334,7 +341,7 @@ class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
                           color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppThemeConstants.accentGreen,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),

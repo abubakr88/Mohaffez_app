@@ -137,6 +137,39 @@ export const suspendUser = functions.https.onCall(async (data, context) => {
  * input: { userId: string }
  * output: { success: true }
  */
+export const unsuspendUser = functions.https.onCall(async (data, context) => {
+  const performedBy = await ensureAdmin(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+
+  if (!userId) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
+  }
+
+  await auth.getUser(userId);
+
+  const batch = db.batch();
+  batch.update(db.collection('users').doc(userId), {
+    status: 'active',
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  // WHY: Deleting suspension doc fully lifts lockout; guards/rules key off document existence.
+  batch.delete(db.collection('userSuspensions').doc(userId));
+  await batch.commit();
+
+  await writeAuditLog({
+    action: 'unsuspendUser',
+    performedBy,
+    targetUserId: userId,
+  });
+
+  functions.logger.info('Admin unsuspended user', { performedBy, userId });
+  return { success: true };
+});
+
+/**
+ * input: { userId: string }
+ * output: { success: true }
+ */
 export const deleteUserAccount = functions.https.onCall(async (data, context) => {
   const performedBy = await ensureAdmin(context);
   const userId = (data?.userId as string | undefined)?.trim();
@@ -204,37 +237,62 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
  */
 export const sendBroadcastNotification = functions.https.onCall(async (data, context) => {
   const performedBy = await ensureAdmin(context);
-  const title = (data?.title as string | undefined)?.trim();
-  const body = (data?.body as string | undefined)?.trim();
-  const targetRole = ((data?.targetRole as TargetRole | undefined) ?? 'all');
+  const title = data?.title as string | undefined;
+  const body = data?.body as string | undefined;
+  const targetRole = (data?.targetRole as TargetRole | undefined) ?? 'all';
 
-  if (!title || !body) {
-    throw new functions.https.HttpsError('invalid-argument', 'عنوان ونص الإشعار مطلوبان');
-  }
+  if (!title || !body) throw new functions.https.HttpsError('invalid-argument', '');
 
   let query: FirebaseFirestore.Query = db.collection('users');
-  if (targetRole !== 'all') {
-    query = query.where('role', '==', targetRole);
-  }
+  if (targetRole !== 'all') query = query.where('role', '==', targetRole);
 
   const usersSnap = await query.get();
   const tokens: string[] = [];
+  const userIds: string[] = []; // ✅ collect UIDs alongside tokens
+
   for (const doc of usersSnap.docs) {
     const token = doc.data().fcmToken as string | undefined;
-    if (token != null && token.length > 0) tokens.push(token);
+    if (token != null && token.length > 0) {
+      tokens.push(token);
+      userIds.push(doc.id); // ✅ track which user owns each token
+    }
   }
 
   const chunkSize = 500;
-  // FIX-BROADCAST-1: Count actual FCM deliveries, not total tokens.
   let successCount = 0;
+
   for (let i = 0; i < tokens.length; i += chunkSize) {
     const chunk = tokens.slice(i, i + chunkSize);
+    const userChunk = userIds.slice(i, i + chunkSize); // ✅ same slice
+
     const batchResponse = await messaging.sendEachForMulticast({
       tokens: chunk,
       notification: { title, body },
       data: { type: 'broadcast', targetRole },
     });
+
     successCount += batchResponse.successCount;
+
+    // ✅ FIX: Write notification doc for each user so it appears in their notification list
+    const writeBatch = db.batch();
+    for (let j = 0; j < userChunk.length; j++) {
+      const sendResult = batchResponse.responses[j];
+      if (sendResult.success) { // only write for successful FCM deliveries
+        const notifRef = db.collection('notifications').doc();
+        writeBatch.set(notifRef, {
+          userId: userChunk[j],
+          recipientId: userChunk[j],
+          senderId: performedBy,
+          title,
+          body,
+          type: 'broadcast',
+          isRead: false,
+          data: { type: 'broadcast', targetRole },
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+    }
+    await writeBatch.commit();
   }
 
   await db.collection('broadcastHistory').add({
@@ -251,12 +309,6 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
     action: 'sendBroadcastNotification',
     performedBy,
     data: { title, targetRole, recipientCount: successCount },
-  });
-
-  functions.logger.info('Admin sent broadcast notification', {
-    performedBy,
-    targetRole,
-    recipientCount: successCount,
   });
 
   return { recipientCount: successCount };

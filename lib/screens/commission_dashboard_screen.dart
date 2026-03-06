@@ -6,6 +6,7 @@ import '../models/direct_payment_model.dart';
 import '../providers/admin_provider.dart';
 import '../services/direct_payment_service.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../shared/widgets/admin_app_bar.dart';
 
 class CommissionDashboardScreen extends ConsumerStatefulWidget {
   const CommissionDashboardScreen({super.key});
@@ -72,11 +73,7 @@ class _CommissionDashboardScreenState
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('عمولات التطبيق (5%)'),
-          backgroundColor: const Color(0xFFF59E0B),
-          foregroundColor: Colors.white,
-        ),
+        appBar: const AdminAppBar(title: 'عمولات التطبيق (5%)'),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchAllCommissions(),
           builder: (context, snap) {
@@ -144,7 +141,7 @@ class _CommissionDashboardScreenState
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _isRunningJob ? null : _triggerCommissionJob,
-          backgroundColor: _isRunningJob ? Colors.grey : const Color(0xFFF59E0B),
+          backgroundColor: _isRunningJob ? Colors.grey : AppThemeConstants.primaryAmber,
           icon: _isRunningJob
               ? const SizedBox(
                   width: 20,
@@ -262,3 +259,7 @@ class _WeekSummaryCard extends StatelessWidget {
     );
   }
 }
+
+
+
+

@@ -394,6 +394,8 @@ class StatCard extends StatelessWidget {
                   color: color,
                   height: 1.1,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 6),
               Text(
@@ -403,6 +405,8 @@ class StatCard extends StatelessWidget {
                   color: Colors.grey.shade700,
                   fontWeight: FontWeight.w500,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -500,7 +504,7 @@ class QuickActionsSection extends StatelessWidget {
               icon: Icons.account_balance_wallet,
               title: 'مستحقات المنصة',
               gradient: const LinearGradient(
-                colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
+                colors: [AppThemeConstants.primaryAmber, Color(0xFFFBBF24)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -730,14 +734,18 @@ class UpcomingSessionsSection extends ConsumerWidget {
                                     color: Colors.grey.shade600,
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    sessionDate != null
-                                        ? DateFormat('dd/MM/yyyy', 'ar')
-                                            .format(sessionDate)
-                                        : ArabicLabels.notSpecified,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
+                                  Flexible(
+                                    child: Text(
+                                      sessionDate != null
+                                          ? DateFormat('dd/MM/yyyy', 'ar')
+                                              .format(sessionDate)
+                                          : ArabicLabels.notSpecified,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -747,11 +755,15 @@ class UpcomingSessionsSection extends ConsumerWidget {
                                     color: Colors.grey.shade600,
                                   ),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    timeSlot,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
+                                  Flexible(
+                                    child: Text(
+                                      timeSlot,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -802,3 +814,5 @@ class UpcomingSessionsSection extends ConsumerWidget {
     );
   }
 }
+
+

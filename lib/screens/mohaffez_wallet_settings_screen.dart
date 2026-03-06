@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../services/direct_payment_service.dart';
 
 class MohaffezWalletSettingsScreen extends StatefulWidget {
@@ -64,7 +65,7 @@ class _MohaffezWalletSettingsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم حفظ أرقام المحافظ بنجاح'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppThemeConstants.accentGreen,
         ),
       );
     } catch (e) {
@@ -93,7 +94,7 @@ class _MohaffezWalletSettingsScreenState
       child: Scaffold(
         appBar: AppBar(
           title: const Text('أرقام محافظ الدفع المباشر'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppThemeConstants.accentGreen,
           foregroundColor: Colors.white,
         ),
         body: _loading
@@ -181,7 +182,7 @@ class _MohaffezWalletSettingsScreenState
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppThemeConstants.accentGreen,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
 
@@ -24,7 +25,7 @@ class DirectPaymentConfirmationsScreen extends StatelessWidget {
                 )
               : null,
           title: const Text('تأكيد المدفوعات المباشرة'),
-          backgroundColor: const Color(0xFFF59E0B),
+          backgroundColor: AppThemeConstants.primaryAmber,
           foregroundColor: Colors.white,
           actions: [
             IconButton(
@@ -204,7 +205,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
             // ── Header ──────────────────────────────────────────────────────
             Row(children: [
               CircleAvatar(
-                backgroundColor: Colors.green.shade100,
+                backgroundColor:
+                    AppThemeConstants.accentGreen.withValues(alpha: 0.15),
                 child: Text(
                   p.studentName.isNotEmpty ? p.studentName[0] : '؟',
                   style: TextStyle(
@@ -230,7 +232,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade700,
+                  color: AppThemeConstants.accentGreen,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -297,7 +299,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                           color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppThemeConstants.accentGreen,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
@@ -340,3 +342,5 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         ]),
       );
 }
+
+

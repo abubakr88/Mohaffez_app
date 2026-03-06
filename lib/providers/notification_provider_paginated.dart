@@ -44,14 +44,17 @@ class PaginatedNotificationsNotifier extends StateNotifier<PaginationState<Notif
 
   /// Initialize with first page from real-time stream
   void initializeWithFirstPage(List<NotificationModel> firstPage) {
-    if (state.items.isEmpty && firstPage.isNotEmpty) {
-      state = PaginationState(
-        items: firstPage,
-        lastDocument: null,
-        hasMore: firstPage.length >= 20, // Assume more if we got full page
-        isLoadingMore: false,
-      );
-    }
+    // Always sync first page from real-time stream.
+    // Preserve paginated extras (page 2+) that are not in the stream snapshot.
+    final firstPageIds = firstPage.map((e) => e.id).toSet();
+    final paginatedExtras = state.items
+        .where((item) => !firstPageIds.contains(item.id))
+        .toList();
+    state = state.copyWith(
+      items: [...firstPage, ...paginatedExtras],
+      hasMore: firstPage.length >= 20 || paginatedExtras.isNotEmpty,
+      isLoadingMore: false,
+    );
   }
 
   /// Load more notifications (paginated)

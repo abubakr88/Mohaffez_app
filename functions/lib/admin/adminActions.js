@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.suspendUser = exports.setUserRole = void 0;
+exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.unsuspendUser = exports.suspendUser = exports.setUserRole = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
@@ -122,6 +122,34 @@ exports.suspendUser = functions.https.onCall(async (data, context) => {
  * input: { userId: string }
  * output: { success: true }
  */
+exports.unsuspendUser = functions.https.onCall(async (data, context) => {
+    var _a;
+    const performedBy = await ensureAdmin(context);
+    const userId = (_a = data === null || data === void 0 ? void 0 : data.userId) === null || _a === void 0 ? void 0 : _a.trim();
+    if (!userId) {
+        throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
+    }
+    await admin_1.auth.getUser(userId);
+    const batch = admin_1.db.batch();
+    batch.update(admin_1.db.collection('users').doc(userId), {
+        status: 'active',
+        updatedAt: admin_1.FieldValue.serverTimestamp(),
+    });
+    // WHY: Deleting suspension doc fully lifts lockout; guards/rules key off document existence.
+    batch.delete(admin_1.db.collection('userSuspensions').doc(userId));
+    await batch.commit();
+    await writeAuditLog({
+        action: 'unsuspendUser',
+        performedBy,
+        targetUserId: userId,
+    });
+    functions.logger.info('Admin unsuspended user', { performedBy, userId });
+    return { success: true };
+});
+/**
+ * input: { userId: string }
+ * output: { success: true }
+ */
 exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
     var _a;
     const performedBy = await ensureAdmin(context);
@@ -159,8 +187,15 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
         });
     }
     batch.delete(admin_1.db.collection('users').doc(userId));
+    // FIXED: BUG-2 - Delete Auth FIRST, then Firestore
+    try {
+        await admin_1.auth.deleteUser(userId);
+    }
+    catch (authErr) {
+        functions.logger.error('deleteUserAccount: Auth delete failed', { userId, authErr });
+        throw new functions.https.HttpsError('internal', 'Failed to delete auth account');
+    }
     await batch.commit();
-    await admin_1.auth.deleteUser(userId);
     await writeAuditLog({
         action: 'deleteUserAccount',
         performedBy,

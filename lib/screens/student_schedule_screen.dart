@@ -338,3 +338,4 @@ class _SessionCard extends StatelessWidget {
     }
   }
 }
+
