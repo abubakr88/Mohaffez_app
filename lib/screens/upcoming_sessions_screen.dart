@@ -953,8 +953,8 @@ class SessionCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-              ],git add *
-              
+              ],
+
             ],
           ),
         ),
