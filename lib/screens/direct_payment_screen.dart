@@ -157,12 +157,22 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       }
     }
 
-    // Fetch single-session price when amount is not pre-supplied
+    // Fetch price based on plan type
     if (widget.amount == null) {
-      await _fetchSingleSessionPrice(
-        resolvedMohaffezId ?? slotContext?.mohaffezId ?? '',
-        resolvedSessionType ?? '',
-      );
+      final isBundlePlan = widget.planType == 'bundle' ||
+                           widget.planType == 'subscription';
+
+      if (isBundlePlan && widget.planId != null) {
+        await _fetchBundlePlanPrice(
+          resolvedMohaffezId ?? slotContext?.mohaffezId ?? '',
+          widget.planId!,
+        );
+      } else {
+        await _fetchSingleSessionPrice(
+          resolvedMohaffezId ?? slotContext?.mohaffezId ?? '',
+          resolvedSessionType ?? '',
+        );
+      }
     } else {
       resolvedAmount = widget.amount;
     }
@@ -197,6 +207,27 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   Text('تعذّر جلب سعر الجلسة، تواصل مع المعلم مباشرة')),
         );
       }
+    }
+  }
+
+  Future<void> _fetchBundlePlanPrice(String mohaffezId, String planId) async {
+    try {
+      final repository = ref.read(pricingRepositoryProvider);
+      final plans = await repository.getPlansForTeacher(mohaffezId);
+      final bundlePlan = plans.firstWhere(
+        (plan) => plan.id == planId,
+        orElse: () => throw Exception('Bundle plan not found'),
+      );
+      if (!mounted) return;
+      setState(() => resolvedAmount = bundlePlan.priceEGP);
+    } catch (e) {
+      debugPrint('Error fetching bundle plan price: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text('تعذّر جلب سعر الباقة، تواصل مع المعلم مباشرة')),
+      );
     }
   }
 

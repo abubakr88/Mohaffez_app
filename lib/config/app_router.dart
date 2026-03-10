@@ -38,6 +38,7 @@ import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
 import '../screens/student_payment_screen.dart';
 import '../screens/mohaffez_pricing_screen.dart';
+import '../screens/select_bundle_plan_screen.dart';
 import '../screens/student_sessions_screen.dart';
 import '../screens/student_schedule_screen.dart';
 import '../screens/admin_home_screen.dart';
@@ -64,6 +65,7 @@ import '../screens/confirm_bundle_session_screen.dart'; // Path A: Confirm bundl
 import '../screens/student/booking_confirmation_screen.dart'; // Booking confirmation
 import '../providers/booking_flow_provider.dart';
 import '../screens/direct_booking_request_screen.dart'; // Path C — Request First
+import '../screens/select_bundle_plan_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -234,13 +236,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/booking/select-bundle-plan',
             name: 'booking-select-bundle-plan',
-            builder: (context, state) {
-              // Read slot context from bookingFlowProvider via ProviderScope
-              // We must use a ConsumerWidget wrapper to access ref inside GoRouter builder
-              return const _BundlePlanSelectionWrapper();
-            },
+            builder: (context, state) => const SelectBundlePlanScreen(),
           ),
-          GoRoute(
+                    GoRoute(
             path: '/booking/confirm-bundle-session',
             name: 'booking-confirm-bundle-session',
             builder: (context, state) => const ConfirmBundleSessionScreen(),
@@ -872,71 +870,6 @@ class ErrorScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Wrapper widget to access bookingFlowProvider inside GoRouter builder
-class _BundlePlanSelectionWrapper extends ConsumerWidget {
-  const _BundlePlanSelectionWrapper();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final flow = ref.watch(bookingFlowProvider);
-    final slotContext = flow.slotContext;
-
-    // Safety: if slotContext is somehow null, go back
-    if (slotContext == null) {
-      // Use addPostFrameCallback to avoid calling context.go during build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('انتهت صلاحية بيانات الجلسة، أعد المحاولة'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          context.go('/home');
-        }
-      });
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    // Parse slot date for StudentPaymentScreen
-    DateTime? preselectedDate;
-    try {
-      preselectedDate = DateTime.parse(slotContext.slotDate);
-    } catch (_) {}
-
-    // Parse preselected time slot for StudentPaymentScreen
-    Map<String, String>? preselectedTimeSlot;
-    if (slotContext.preferredTimeSlot.contains('-')) {
-      final parts = slotContext.preferredTimeSlot.split('-');
-      if (parts.length >= 2) {
-        preselectedTimeSlot = {
-          'startTime': parts[0].trim(),
-          'endTime': parts[1].trim(),
-        };
-      }
-    }
-
-    return StudentPaymentScreen(
-      mohaffezId: slotContext.mohaffezId,
-      mohaffezName: slotContext.mohaffezName,
-      preselectedSessionType: slotContext.sessionType,
-      preselectedTimeSlot: preselectedTimeSlot,
-      preselectedDate: preselectedDate,
-      mohaffezPhone: slotContext.mohaffezPhone,
-      mohaffezAddress: slotContext.imamAddressText,
-      mohaffezLat: slotContext.imamAddressLat,
-      mohaffezLng: slotContext.imamAddressLng,
-      // These two flags tell StudentPaymentScreen to:
-      // 1. Only show bundle/subscription plans (not per-session)
-      // 2. After payment confirmed, also create the first session
-      showBundlePlansOnly: true,
-      autoBookFirstSession: true,
     );
   }
 }

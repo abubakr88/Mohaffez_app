@@ -1,4 +1,11 @@
-// src/bookings/createSessionRequest.ts
+// CHANGES vs original:
+// 1. Added: validityDays extraction + rawPlanType/isBundlePlan computation after destructure
+// 2. Fixed: initialStatus — bundle directpayment requests start at PENDING (not AWAITING_PAYMENT)
+//    because teacher-first rule applies to all bundles regardless of payment method
+// 3. Added: validityDays to transaction.set()
+// 4. Updated: notification title/body in 4f to reflect bundle vs single
+// All other logic (slot lock, conflict guard, availability disable, etc.) is UNTOUCHED
+
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
@@ -84,6 +91,16 @@ export const createSessionRequest = functions.https.onCall(
       slotLockId,
     } = data;
 
+    // ── NEW: plan fields with safe defaults ────────────────────────────────
+    // rawPlanType / isBundlePlan used later for initialStatus and notification
+    const rawPlanType: string =
+      (data.planType as string | undefined) ?? 'single';
+    const isBundlePlan =
+      rawPlanType === 'bundle' || rawPlanType === 'subscription';
+    const validityDays: number | null =
+      typeof data.validityDays === 'number' ? data.validityDays : null;
+    // ──────────────────────────────────────────────────────────────────────
+
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (
       !mohaffezId ||
@@ -149,6 +166,8 @@ export const createSessionRequest = functions.https.onCall(
       hasSlotLockId: !!slotLockId,
       selectedPaymentMethod,
       requiresPaymentOnAcceptance,
+      rawPlanType,
+      isBundlePlan,
     });
 
     // ── 4. Transaction ─────────────────────────────────────────────────────
@@ -251,7 +270,8 @@ export const createSessionRequest = functions.https.onCall(
                   lockTimeSlot,
                   lockSessionType,
                   availableSlots: slots.map(
-                    (s: any) => `${s.startTime}-${s.endTime}:${s.sessionType}`
+                    (s: any) =>
+                      `${s.startTime}-${s.endTime}:${s.sessionType}`
                   ),
                 }
               );
@@ -264,7 +284,6 @@ export const createSessionRequest = functions.https.onCall(
       // ── 4b. Conflict guard ─────────────────────────────────────────────
       // FIX-BOOKING-1: Guard against all live statuses, not just PENDING.
       // Required Firestore composite index: (mohaffezId ASC, status ASC, slotDate ASC)
-      // Add this index to firestore.indexes.json if not already present.
       const LIVE_STATUSES = [
         STATUS.PENDING,
         STATUS.AWAITING_PAYMENT,
@@ -316,14 +335,14 @@ export const createSessionRequest = functions.https.onCall(
       // ── 4c. Write sessionRequest ───────────────────────────────────────
       const requestRef = db.collection('sessionRequests').doc();
 
-      // BUG-1 FIX: Compute initial status based on payment method.
-      // directpayment → student pays immediately, no teacher-accept step
-      //                 needed first, so start at awaitingpayment directly.
-      // All other methods → teacher accepts first, so start at pending.
+      // NEW — Bundle/subscription requests ALWAYS start at PENDING, even when
+      // selectedPaymentMethod == 'directpayment', because the teacher must
+      // accept first (Path B teacher-first rule).
+      // Only single-session directpayment requests bypass to AWAITING_PAYMENT.
       const initialStatus =
-        selectedPaymentMethod === 'directpayment'
-          ? STATUS.AWAITING_PAYMENT
-          : STATUS.PENDING;
+        selectedPaymentMethod === 'directpayment' && !isBundlePlan
+          ? STATUS.AWAITING_PAYMENT  // ← BUG-1 FIX (single direct only)
+          : STATUS.PENDING;          // ← bundles always require teacher accept first
 
       transaction.set(requestRef, {
         studentId,
@@ -342,15 +361,16 @@ export const createSessionRequest = functions.https.onCall(
         subscriptionId: subscriptionId ?? null,
         planId: (data.planId as string) ?? null,
         planTitle: (data.planTitle as string) ?? null,
+        planType: rawPlanType,              // NEW: always written
         paymentAmount:
           typeof data.paymentAmount === 'number' ? data.paymentAmount : null,
         sessionsCount:
           typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
-        planType: (data.planType as string) ?? null,
+        validityDays: validityDays,         // NEW
         requiresPaymentOnAcceptance: requiresPaymentOnAcceptance ?? false,
         selectedPaymentMethod: selectedPaymentMethod ?? 'pay_after_acceptance',
         slotLockId: slotLockId ?? null,
-        status: initialStatus,           // ← BUG-1 FIX (was: STATUS.PENDING)
+        status: initialStatus,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -372,13 +392,18 @@ export const createSessionRequest = functions.https.onCall(
       }
 
       // ── 4f. Notify mohaffez ────────────────────────────────────────────
+      // NEW: bundle requests show plan name/count in the notification
       const notifRef = db.collection('notifications').doc();
       transaction.set(notifRef, {
         userId: mohaffezId,
         recipientId: mohaffezId,
         senderId: studentId,
-        title: 'طلب حجز جديد',
-        body: `${studentName} يطلب حجز جلسة معك`,
+        title: isBundlePlan
+          ? `طلب حزمة جديد من ${studentName}`
+          : 'طلب حجز جديد',
+        body: isBundlePlan
+          ? `${(data.planTitle as string) ?? ''} — ${data.sessionsCount ?? ''} جلسة`
+          : `${studentName} يطلب حجز جلسة معك`,
         type: 'sessionRequest',
         isRead: false,
         data: {
@@ -387,6 +412,7 @@ export const createSessionRequest = functions.https.onCall(
           studentName,
           sessionType,
           preferredTimeSlot,
+          planType: rawPlanType,
         },
         createdAt: FieldValue.serverTimestamp(),
       });
@@ -397,6 +423,8 @@ export const createSessionRequest = functions.https.onCall(
         mohaffezId,
         sessionType,
         preferredTimeSlot,
+        rawPlanType,
+        initialStatus,
       });
 
       return { success: true, requestId: requestRef.id };

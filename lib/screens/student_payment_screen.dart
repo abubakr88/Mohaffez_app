@@ -142,6 +142,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   @override
   void initState() {
     super.initState();
+    // Force direct-payment method for bundle booking flow.
+    // WHY: bundle purchases go through studentMarkedDirectPayment CF
+    //      (student notifies teacher → teacher confirms), NOT Paymob.
+    //      Leaving the default as DPMethod.online causes "Pay Now"
+    //      (Paymob gateway) to appear instead of the request flow.
+    if (widget.showBundlePlansOnly) {
+      _selectedDPMethod = _DPMethod.direct;
+    }
     debugPrint(
       '🔍 [PaymentScreen] isLockedRequest=$isLockedRequest planId=${widget.lockedRequest?['planId']} paymentAmount=${widget.lockedRequest?['paymentAmount']}',
     );

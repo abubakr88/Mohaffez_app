@@ -140,58 +140,14 @@ class DirectPaymentService {
     }
   }
 
-  // WHY: Called when mohaffez confirms a bundle/subscription payment.
-  // BUG-2+3 FIX: Creates a subscription instead of a single session.
-  static Future<Map<String, dynamic>> mohaffezConfirmBundlePayment({
+    // WHY: Called when mohaffez confirms a bundle/subscription payment.
+    // BUG-2+3 FIX: Creates a subscription instead of a single session.
+  static Future<void> mohaffezConfirmBundlePayment({
     required String paymentId,
-    required String studentId,
-    required String planId,
-    required String planTitle,
-    required String planType,
-    required int sessionsCount,
-    int? validityDays,
-    // isSlotCoupled: slot fields for auto-booking first session
-    String? slotDate,
-    String? slotStart,
-    String? slotEnd,
-    String? preferredTimeSlot,
-    String? sessionType,
   }) async {
-    try {
-      final payload = <String, dynamic>{
-        'paymentId': paymentId,
-        'studentId': studentId,
-        'planId': planId,
-        'planTitle': planTitle,
-        'planType': planType,
-        'sessionsCount': sessionsCount,
-        if (validityDays != null) 'validityDays': validityDays,
-        // Only include slot fields when all are present (triggers isSlotCoupled on CF)
-        if (slotDate != null &&
-            slotStart != null &&
-            slotEnd != null &&
-            preferredTimeSlot != null &&
-            sessionType != null) ...{
-          'slotDate': slotDate,
-          'slotStart': slotStart,
-          'slotEnd': slotEnd,
-          'preferredTimeSlot': preferredTimeSlot,
-          'sessionType': sessionType,
-        },
-      };
-      final result = await _functions
-          .httpsCallable(
-            'confirmBundleDirectPayment',
-            options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
-          )
-          .call(payload);
-      return Map<String, dynamic>.from(result.data as Map);
-    } on FirebaseFunctionsException catch (e) {
-      if (e.code == 'already-exists') {
-        return {'success': true, 'message': e.message};
-      }
-      rethrow;
-    }
+    final callable = FirebaseFunctions.instance
+        .httpsCallable('confirmBundleDirectPayment');
+    await callable.call({'paymentId': paymentId});
   }
 
   // ── Mohaffez: reject payment ─────────────────────────────────────────────

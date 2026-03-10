@@ -1,4 +1,11 @@
-// lib/screens/direct_payment_confirmations_screen.dart
+// CHANGES vs original:
+// _confirm() → bundle/subscription path now calls mohaffezConfirmBundlePayment
+//   with ONLY paymentId. All other params (planId, planTitle, slotDate, etc.)
+//   were removed because confirmBundleDirectPayment CF now reads them directly
+//   from the directPaymentRequests doc server-side.
+// WHY: The CF caller changed from student → mohaffez, so the CF reads all
+//   plan/slot/student fields from the stored doc instead of trusting the caller.
+// All other logic (reject flow, UI, commission hint, bundle badge) is UNCHANGED.
 
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -157,21 +164,16 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
     setState(() => _loading = true);
     try {
       if (isBundleOrSubscription) {
+        // CHANGED: Only pass paymentId.
+        // WHY: confirmBundleDirectPayment CF now reads planId, planTitle,
+        //      planType, sessionsCount, validityDays, slotDate, slotStart,
+        //      slotEnd, preferredTimeSlot, sessionType, studentId directly
+        //      from the directPaymentRequests doc server-side.
+        //      Passing these from the client was a security risk — the mohaffez
+        //      could have manipulated them. Now the server is the single source
+        //      of truth.
         await DirectPaymentService.mohaffezConfirmBundlePayment(
           paymentId: widget.payment.id,
-          studentId: widget.payment.studentId,
-          planId: widget.payment.planId ?? '',
-          planTitle: widget.payment.planTitle?.isNotEmpty == true
-              ? widget.payment.planTitle!
-              : widget.payment.sessionType,
-          planType: planType,
-          sessionsCount: widget.payment.sessionsCount ?? 1,
-          validityDays: widget.payment.validityDays,
-          slotDate: widget.payment.slotDate,
-          slotStart: widget.payment.slotStart,
-          slotEnd: widget.payment.slotEnd,
-          preferredTimeSlot: widget.payment.preferredTimeSlot,
-          sessionType: widget.payment.sessionType,
         );
         messenger.showSnackBar(
           SnackBar(
@@ -183,6 +185,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
           ),
         );
       } else {
+        // Single-session direct payment — unchanged
         await DirectPaymentService.mohaffezConfirm(widget.payment.id);
         messenger.showSnackBar(
           const SnackBar(
@@ -227,8 +230,10 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('رفض',
-                    style: TextStyle(color: Colors.white)),
+                child: const Text(
+                  'رفض',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -298,8 +303,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     Text('أرسل إشعار الدفع: $dateStr',
-                        style:
-                            const TextStyle(color: Colors.grey, fontSize: 12)),
+                        style: const TextStyle(
+                            color: Colors.grey, fontSize: 12)),
                   ],
                 ),
               ),
@@ -320,7 +325,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ),
             ]),
 
-            // Bundle badge
+            // ── Bundle badge ─────────────────────────────────────────────────
             if (p.planType != null &&
                 (p.planType == 'bundle' ||
                     p.planType == 'subscription')) ...[

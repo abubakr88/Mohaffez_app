@@ -639,44 +639,70 @@ class PendingRequestCard extends ConsumerWidget {
                 ),
               ],
             ),
-            // BUG-C FIX: Add bundle info row
+            // Bundle/Subscription info row (replaces BUG-C FIX)
             if (isBundlePlan) ...[
               const SizedBox(height: 6),
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppThemeConstants.primaryAmber),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.collections_bookmark_outlined,
-                        size: 14, color: AppThemeConstants.primaryAmber),
-                    const SizedBox(width: 4),
-                    Text(
-                      planType == 'bundle'
-                          ? 'حزمة ${sessionsCount ?? ''} جلسات'
-                          : 'اشتراك شهري',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppThemeConstants.primaryAmberDark,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: planType == 'subscription'
+                          ? Colors.purple.shade50
+                          : Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: planType == 'subscription'
+                            ? Colors.purple.shade300
+                            : Colors.amber.shade400,
                       ),
                     ),
-                  ]),
-                ),
-                if (planTitle != null && planTitle.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      planTitle,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.card_membership,
+                          size: 13,
+                          color: planType == 'subscription'
+                              ? Colors.purple.shade700
+                              : Colors.amber.shade800,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          planType == 'subscription' ? 'اشتراك' : 'حزمة',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: planType == 'subscription'
+                                ? Colors.purple.shade700
+                                : Colors.amber.shade800,
+                          ),
+                        ),
+                        if (planTitle != null && planTitle.isNotEmpty) ...[
+                          const SizedBox(width: 5),
+                          Text(
+                            '· $planTitle',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: planType == 'subscription'
+                                  ? Colors.purple.shade600
+                                  : Colors.amber.shade700,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 5),
+                        Text(
+                          '${sessionsCount ?? 0} جلسة',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ]),
+              ),
             ],
 
             const SizedBox(height: 12),

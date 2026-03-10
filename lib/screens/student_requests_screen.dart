@@ -188,7 +188,11 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           mohaffezPhone: lockedRequest['mohaffezPhone'] as String?,
           // amount = null → DirectPaymentScreen auto-fetches single-session
           // price from the teacher's pricing plans
-          // planType = null → treated as single, no bundle UI shown
+          planType: lockedRequest['planType'] as String?,
+          planId: lockedRequest['planId'] as String?,
+          planTitle: lockedRequest['planTitle'] as String?,
+          sessionsCount: lockedRequest['sessionsCount'] as int?,
+          validityDays: lockedRequest['validityDays'] as int?,
         ),
       ),
     );
