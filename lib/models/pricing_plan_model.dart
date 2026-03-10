@@ -71,3 +71,16 @@ class TimestampConverter implements JsonConverter<DateTime?, Object?> {
     return Timestamp.fromDate(date);
   }
 }
+
+// BUG-6 FIX: PlanTypeConverter for SubscriptionModel
+class PlanTypeConverter implements JsonConverter<PlanType, String> {
+  const PlanTypeConverter();
+
+  @override
+  PlanType fromJson(String json) =>
+      PlanType.values.firstWhere((e) => e.name == json,
+          orElse: () => PlanType.single);
+
+  @override
+  String toJson(PlanType type) => type.name;
+}

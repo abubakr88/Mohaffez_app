@@ -270,6 +270,7 @@ enum NotificationFilter {
   assignmentUpdated,
   paymentRequired, // ✅ NEW
   sessionRejected, // ✅ NEW
+  subscriptionCreated, // FIX-3: Add subscription notifications
   follow,
   system,
 }
@@ -304,6 +305,9 @@ final filteredNotificationsProvider = Provider.family<List<NotificationModel>, S
         break;
       case NotificationFilter.sessionRejected: // ✅ NEW
         filterType = 'session_rejected';
+        break;
+      case NotificationFilter.subscriptionCreated: // FIX-3
+        filterType = 'subscription_created';
         break;
       case NotificationFilter.follow:
         filterType = 'follow';

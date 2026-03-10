@@ -9,18 +9,24 @@
 // - [FIX] Added 'status' field to match UserModel defaults
 // - [FIX] Delete orphan Auth account if Firestore write fails in signUp
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/cache_service.dart';
 import '../services/notification_service.dart';
+import 'booking_flow_provider.dart';
 
 final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges().asyncMap((firebaseUser) async {
-    // WHY: Refresh claims at app session start so admin role is immediately available in rules.
     if (firebaseUser != null) {
-      await firebaseUser.getIdToken(true);
+      try {
+        await firebaseUser.getIdToken(false).timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('authStateProvider: token refresh failed, using cached: $e');
+        // Non-fatal: fall back silently, stream still resolves with the user
+      }
     }
     return firebaseUser;
   });
@@ -150,6 +156,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
 
     state = await AsyncValue.guard(() async {
       await _authService.logout();
+      // Reset booking flow provider on sign-out
+      _ref.read(bookingFlowProvider.notifier).reset();
       await CacheService.clearAll();
       _ref.invalidate(authStateProvider);
     });

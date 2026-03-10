@@ -57,6 +57,13 @@ import '../screens/admin_wallet_settings_screen.dart';
 import '../screens/admin_teacher_commissions_screen.dart';
 import '../screens/mohaffez_schedule_screen.dart'; // ← teacher calendar
 import '../screens/suspended_screen.dart';
+import '../screens/active_subscriptions_screen.dart'; // BUG-8: Active subscriptions screen
+import '../screens/direct_payment_screen.dart'; // Path C: Direct payment route
+import '../screens/booking_method_screen.dart'; // Booking method screen
+import '../screens/confirm_bundle_session_screen.dart'; // Path A: Confirm bundle session
+import '../screens/student/booking_confirmation_screen.dart'; // Booking confirmation
+import '../providers/booking_flow_provider.dart';
+import '../screens/direct_booking_request_screen.dart'; // Path C — Request First
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -217,12 +224,52 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
 
           // ============================================
+          // BOOKING ROUTES (All Paths)
+          // ============================================
+          GoRoute(
+            path: '/booking/method',
+            name: 'booking-method',
+            builder: (context, state) => const BookingMethodScreen(),
+          ),
+          GoRoute(
+            path: '/booking/select-bundle-plan',
+            name: 'booking-select-bundle-plan',
+            builder: (context, state) {
+              // Read slot context from bookingFlowProvider via ProviderScope
+              // We must use a ConsumerWidget wrapper to access ref inside GoRouter builder
+              return const _BundlePlanSelectionWrapper();
+            },
+          ),
+          GoRoute(
+            path: '/booking/confirm-bundle-session',
+            name: 'booking-confirm-bundle-session',
+            builder: (context, state) => const ConfirmBundleSessionScreen(),
+          ),
+          GoRoute(
+            path: '/booking/direct-payment',
+            name: 'booking-direct-payment',
+            builder: (context, state) => DirectPaymentScreen(),
+          ),
+          // ── Path C — Request First (direct payment, teacher must accept first) ──────
+          GoRoute(
+            path: '/booking/direct-request',
+            name: 'booking-direct-request',
+            builder: (context, state) => const DirectBookingRequestScreen(),
+          ),
+
+                    // ============================================
           // SHARED ROUTES (Both Student & Mohaffez)
           // ============================================
           GoRoute(
             path: '/notifications',
             name: 'notifications',
             builder: (context, state) => const NotificationsScreen(),
+          ),
+          // BUG-8 FIX: Route for active subscriptions screen
+          GoRoute(
+            path: '/active-subscriptions',
+            name: 'active-subscriptions',
+            builder: (context, state) => const ActiveSubscriptionsScreen(),
           ),
           GoRoute(
             path: '/profile',
@@ -825,6 +872,71 @@ class ErrorScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Wrapper widget to access bookingFlowProvider inside GoRouter builder
+class _BundlePlanSelectionWrapper extends ConsumerWidget {
+  const _BundlePlanSelectionWrapper();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final flow = ref.watch(bookingFlowProvider);
+    final slotContext = flow.slotContext;
+
+    // Safety: if slotContext is somehow null, go back
+    if (slotContext == null) {
+      // Use addPostFrameCallback to avoid calling context.go during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('انتهت صلاحية بيانات الجلسة، أعد المحاولة'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          context.go('/home');
+        }
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Parse slot date for StudentPaymentScreen
+    DateTime? preselectedDate;
+    try {
+      preselectedDate = DateTime.parse(slotContext.slotDate);
+    } catch (_) {}
+
+    // Parse preselected time slot for StudentPaymentScreen
+    Map<String, String>? preselectedTimeSlot;
+    if (slotContext.preferredTimeSlot.contains('-')) {
+      final parts = slotContext.preferredTimeSlot.split('-');
+      if (parts.length >= 2) {
+        preselectedTimeSlot = {
+          'startTime': parts[0].trim(),
+          'endTime': parts[1].trim(),
+        };
+      }
+    }
+
+    return StudentPaymentScreen(
+      mohaffezId: slotContext.mohaffezId,
+      mohaffezName: slotContext.mohaffezName,
+      preselectedSessionType: slotContext.sessionType,
+      preselectedTimeSlot: preselectedTimeSlot,
+      preselectedDate: preselectedDate,
+      mohaffezPhone: slotContext.mohaffezPhone,
+      mohaffezAddress: slotContext.imamAddressText,
+      mohaffezLat: slotContext.imamAddressLat,
+      mohaffezLng: slotContext.imamAddressLng,
+      // These two flags tell StudentPaymentScreen to:
+      // 1. Only show bundle/subscription plans (not per-session)
+      // 2. After payment confirmed, also create the first session
+      showBundlePlansOnly: true,
+      autoBookFirstSession: true,
     );
   }
 }

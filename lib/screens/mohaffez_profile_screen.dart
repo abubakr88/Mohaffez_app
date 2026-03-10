@@ -1,18 +1,20 @@
+// lib/screens/mohaffez_profile_screen.dart
+
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/skeleton_card.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../providers/mohaffez_profile_providers.dart';
 import '../providers/user_provider.dart';
-import '../providers/booking_provider.dart';
 import '../providers/pricing_provider.dart';
 import '../models/pricing_plan_model.dart';
-import '../repositories/payment_repository.dart';
-import 'student_payment_screen.dart';
+import '../models/slot_context.dart';
+import '../providers/booking_flow_provider.dart';
 
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -31,17 +33,99 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
       _MohaffezProfileScreenState();
 }
 
-class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
+class _MohaffezProfileScreenState
+    extends ConsumerState<MohaffezProfileScreen> {
   String selectedSessionType = 'home';
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
   int? selectedDayOfWeek;
-  bool isBooking = false;
+
+  // ─── Navigation helper ────────────────────────────────────────────────────
+
+  /// Validates slot selection, builds SlotContext, and navigates to the
+  /// booking method screen. Used by all three entry points on this page.
+  void _navigateToBookingMethod() {
+    if (selectedTimeSlot == null || selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اختر موعداً من التقويم أولاً'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    final profileValue =
+        ref.read(mohaffezProfileProvider(widget.mohaffezId)).value ?? {};
+    final slotContext = _buildSlotContext(profileValue);
+    ref.read(bookingFlowProvider.notifier).setSlotContext(slotContext);
+    context.push('/booking/method');
+  }
+
+  // ─── SlotContext builder ──────────────────────────────────────────────────
+
+  /// Safely parses HH:mm time strings and builds a [SlotContext].
+  /// Uses [int.tryParse] with fallback to 0 to avoid RangeError on
+  /// malformed or missing time data.
+  SlotContext _buildSlotContext(Map<String, dynamic>? profileValue) {
+    final startRaw =
+        selectedTimeSlot!['startTime'] as String? ?? '0:0';
+    final endRaw =
+        selectedTimeSlot!['endTime'] as String? ?? '0:0';
+
+    final startParts = startRaw.split(':');
+    final endParts = endRaw.split(':');
+
+    final startHour =
+        int.tryParse(startParts.elementAtOrNull(0) ?? '') ?? 0;
+    final startMin =
+        int.tryParse(startParts.elementAtOrNull(1) ?? '') ?? 0;
+    final endHour =
+        int.tryParse(endParts.elementAtOrNull(0) ?? '') ?? 0;
+    final endMin =
+        int.tryParse(endParts.elementAtOrNull(1) ?? '') ?? 0;
+
+    final slotStart = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      startHour,
+      startMin,
+    );
+    final slotEnd = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      endHour,
+      endMin,
+    );
+
+    return SlotContext(
+      mohaffezId: widget.mohaffezId,
+      mohaffezName: profileValue?['name'] as String? ?? '',
+      mohaffezPhone: profileValue?['phoneNumber'] as String?,
+      sessionType: selectedSessionType,
+      preferredTimeSlot: '$startRaw - $endRaw',
+      slotDate: DateTime(
+        selectedDate!.year,
+        selectedDate!.month,
+        selectedDate!.day,
+      ).toIso8601String(),
+      slotStart: slotStart.toIso8601String(),
+      slotEnd: slotEnd.toIso8601String(),
+      imamAddressText: profileValue?['addressText'] as String?,
+      imamAddressLat: profileValue?['addressLat'] as double?,
+      imamAddressLng: profileValue?['addressLng'] as double?,
+    );
+  }
+
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
-    final plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    final profileAsync =
+        ref.watch(mohaffezProfileProvider(widget.mohaffezId));
+    final plansAsync =
+        ref.watch(activePricingPlansProvider(widget.mohaffezId));
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -63,32 +147,20 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     children: [
                       _buildBasicInfo(profile),
                       const SizedBox(height: 16),
-
-                      // Pricing Preview Banner
                       _buildPricingPreviewBanner(plansAsync),
                       const SizedBox(height: 16),
-
                       if (profile['bio'] != null &&
                           (profile['bio'] as String).isNotEmpty)
                         _buildBioSection(profile['bio'] as String),
                       const SizedBox(height: 16),
-
                       _buildCredentialsSection(ref),
                       const SizedBox(height: 16),
-
-                      // Trust Badges Section
                       _buildTrustBadgesSection(),
                       const SizedBox(height: 16),
-
-                      // Session Type Selector
                       _buildSessionTypeSelector(),
                       const SizedBox(height: 16),
-
-                      // Detailed Pricing Plans (Horizontal Scroll)
                       _buildPricingSection(plansAsync),
                       const SizedBox(height: 16),
-
-                      // Availability Section
                       _buildAvailabilitySection(ref, profile),
                       const SizedBox(height: 24),
                     ],
@@ -133,7 +205,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           color: AppTheme.accentGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: AppTheme.accentGreen.withValues(alpha: 0.3),
+                            color:
+                                AppTheme.accentGreen.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Column(
@@ -187,28 +260,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Booking button
                       SizedBox(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton.icon(
-                          onPressed: isBooking
-                              ? null
-                              : () => sendBookingRequest(profileAsync.value!),
-                          icon: isBooking
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.send),
-                          label: Text(
-                            isBooking ? 'جاري الإرسال...' : 'إرسال طلب الحجز',
-                            style: const TextStyle(
+                          onPressed: _navigateToBookingMethod,
+                          icon: const Icon(Icons.send),
+                          label: const Text(
+                            'إرسال طلب الحجز',
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -231,14 +291,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // Pricing Preview Banner (Most Prominent)
+  // ─── Pricing preview banner ───────────────────────────────────────────────
+
   Widget _buildPricingPreviewBanner(
       AsyncValue<List<PricingPlanModel>> plansAsync) {
     return plansAsync.when(
       data: (plans) {
         if (plans.isEmpty) return const SizedBox.shrink();
 
-        // Filter by selected session type
         final relevantPlans = plans.where((plan) {
           if (selectedSessionType == 'home') {
             return plan.mode == SessionMode.home;
@@ -254,7 +314,6 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         if (relevantPlans.isEmpty) return const SizedBox.shrink();
 
-        // Get best value plan (lowest price per session)
         final sortedPlans = List<PricingPlanModel>.from(relevantPlans)
           ..sort((a, b) => (a.priceEGP / a.sessionsCount)
               .compareTo(b.priceEGP / b.sessionsCount));
@@ -293,10 +352,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     children: [
                       const Text(
                         'الأسعار تبدأ من',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -310,10 +366,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       ),
                       const Text(
                         'لكل جلسة',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                     ],
                   ),
@@ -323,19 +376,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.local_offer,
-                      color: Colors.white,
-                      size: 40,
-                    ),
+                    child: const Icon(Icons.local_offer,
+                        color: Colors.white, size: 40),
                   ),
                 ],
               ),
               if (savings > 0) ...[
                 const SizedBox(height: 16),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
@@ -343,7 +393,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.savings, color: Colors.white, size: 18),
+                      const Icon(Icons.savings,
+                          color: Colors.white, size: 18),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
@@ -368,7 +419,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // Trust Badges Section
+  // ─── Trust badges ─────────────────────────────────────────────────────────
+
   Widget _buildTrustBadgesSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -377,43 +429,29 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         decoration: BoxDecoration(
           color: AppThemeConstants.accentGreen.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppThemeConstants.accentGreen.withValues(alpha: 0.3)),
+          border: Border.all(
+              color: AppThemeConstants.accentGreen.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
-            // Trust Icons
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+                _buildTrustItem(Icons.lock, 'دفع آمن', 'تشفير 256-bit'),
                 _buildTrustItem(
-                  Icons.lock,
-                  'دفع آمن',
-                  'تشفير 256-bit',
-                ),
-                _buildTrustItem(
-                  Icons.verified_user,
-                  'معتمد',
-                  'موثق ومضمون',
-                ),
-                _buildTrustItem(
-                  Icons.replay,
-                  'استرجاع',
-                  'خلال ساعتين',
-                ),
+                    Icons.verified_user, 'معتمد', 'موثق ومضمون'),
+                _buildTrustItem(Icons.replay, 'استرجاع', 'خلال ساعتين'),
               ],
             ),
             const SizedBox(height: 12),
             const Divider(),
             const SizedBox(height: 8),
-
-            // Payment Methods
             const Text(
               'طرق الدفع المتاحة',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey),
             ),
             const SizedBox(height: 8),
             Row(
@@ -421,7 +459,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               children: [
                 _buildPaymentMethodBadge(Icons.credit_card, 'بطاقة'),
                 const SizedBox(width: 12),
-                _buildPaymentMethodBadge(Icons.account_balance_wallet, 'محفظة'),
+                _buildPaymentMethodBadge(
+                    Icons.account_balance_wallet, 'محفظة'),
               ],
             ),
           ],
@@ -445,10 +484,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         ),
         Text(
           subtitle,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
         ),
       ],
     );
@@ -479,15 +515,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // Pricing Section with horizontal cards and main button
-  Widget _buildPricingSection(AsyncValue<List<PricingPlanModel>> plansAsync) {
+  // ─── Pricing section ──────────────────────────────────────────────────────
+
+  Widget _buildPricingSection(
+      AsyncValue<List<PricingPlanModel>> plansAsync) {
     return plansAsync.when(
       data: (plans) {
-        if (plans.isEmpty) {
-          return const SizedBox.shrink();
-        }
+        if (plans.isEmpty) return const SizedBox.shrink();
 
-        // Filter plans by selected session type
         final relevantPlans = plans.where((plan) {
           if (selectedSessionType == 'home') {
             return plan.mode == SessionMode.home;
@@ -507,13 +542,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                color:
+                    AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
+                border: Border.all(
+                    color: AppThemeConstants.primaryAmber
+                        .withValues(alpha: 0.4)),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppThemeConstants.primaryAmber),
+                  Icon(Icons.info_outline,
+                      color: AppThemeConstants.primaryAmber),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -537,10 +576,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 'خطط التسعير المتاحة',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style:
+                    TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 12),
@@ -551,65 +588,28 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: relevantPlans.length,
                 itemBuilder: (context, index) {
-                  final plan = relevantPlans[index];
-                  return _buildPricingCard(plan);
+                  return _buildPricingCard(relevantPlans[index]);
                 },
               ),
             ),
             const SizedBox(height: 16),
-
-            // Main button to view all plans and pay
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // ✅ Get mohaffez profile data for location
-                    final profileValue = ref
-                        .read(mohaffezProfileProvider(widget.mohaffezId))
-                        .value;
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (ctx) => StudentPaymentScreen(
-                          mohaffezId: widget.mohaffezId,
-                          mohaffezName: _getMohaffezName(),
-                          // ✅ Pass preselected slot data
-                          preselectedSessionType: selectedSessionType,
-                          preselectedTimeSlot: selectedTimeSlot,
-                          preselectedDate: selectedDate,
-                          // ✅ Pass location data
-                          location: profileValue?['addressText'] as String?,
-                          mohaffezAddress:
-                              profileValue?['addressText'] as String?,
-                          mohaffezLat: profileValue?['addressLat'] as double?,
-                          mohaffezLng: profileValue?['addressLng'] as double?,
-                          mohaffezPhone:
-                              profileValue?['phoneNumber'] as String?,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.payments, size: 24),
-                  label: const Text(
-                    'عرض جميع الخطط والدفع',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: AppTheme.primaryAmber,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
+                child: const SizedBox.shrink()
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Text(
+                'اختر موعدًا أولاً لحجز باقة أو جلسة',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 13,
                 ),
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -620,38 +620,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // Pricing card (clickable)
   Widget _buildPricingCard(PricingPlanModel plan) {
     final pricePerSession = plan.priceEGP / plan.sessionsCount;
-
-    return GestureDetector(
-      onTap: () {
-        // ✅ Get mohaffez profile data for location
-        final profileValue =
-            ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
-
-        // Navigate to payment screen when card is tapped
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (ctx) => StudentPaymentScreen(
-              mohaffezId: widget.mohaffezId,
-              mohaffezName: _getMohaffezName(),
-              // ✅ Pass preselected slot data
-              preselectedSessionType: selectedSessionType,
-              preselectedTimeSlot: selectedTimeSlot,
-              preselectedDate: selectedDate,
-              // ✅ Pass location data
-              location: profileValue?['addressText'] as String?,
-              mohaffezAddress: profileValue?['addressText'] as String?,
-              mohaffezLat: profileValue?['addressLat'] as double?,
-              mohaffezLng: profileValue?['addressLng'] as double?,
-              mohaffezPhone: profileValue?['phoneNumber'] as String?,
-            ),
-          ),
-        );
-      },
-      child: Container(
+    return Container(
         width: 180,
         margin: const EdgeInsets.only(left: 12),
         padding: const EdgeInsets.all(14),
@@ -674,7 +645,6 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Title
             Text(
               plan.title,
               style: const TextStyle(
@@ -686,7 +656,6 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 6),
-            // Price
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -709,9 +678,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ],
             ),
             const Spacer(),
-            // Bottom info
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(12),
@@ -739,421 +708,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
-  String _getMohaffezName() {
-    final profileValue =
-        ref.read(mohaffezProfileProvider(widget.mohaffezId)).value;
-    return profileValue?['name'] ?? '';
-  }
+  // ─── AppBar ───────────────────────────────────────────────────────────────
 
-  // MAIN BOOKING FUNCTION - Handles payment flow
-  Future<void> sendBookingRequest(Map<String, dynamic> profile) async {
-    if (selectedTimeSlot == null || selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ الرجاء اختيار موعد وساعة'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final user = ref.read(currentUserProvider).value;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ يجب تسجيل الدخول أولاً'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Validation
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    if (selectedDate!.isBefore(today)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('❌ لا يمكن حجز موعد في الماضي'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() => isBooking = true);
-
-    try {
-      // CHECK: Does student have active subscription?
-      final paymentRepo = ref.read(paymentRepositoryProvider);
-      final activeSubscription = await paymentRepo.getActiveSubscription(
-        user.uid,
-        widget.mohaffezId,
-      );
-
-      if (activeSubscription != null &&
-          activeSubscription.remainingSessions > 0) {
-        // HAS SUBSCRIPTION: Send request directly (credit on hold)
-        await _sendRequestWithSubscription(profile, activeSubscription);
-      } else {
-        // NO SUBSCRIPTION: Show options
-        await _showBookingOptionsDialog(profile);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => isBooking = false);
-      }
-    }
-  }
-
-  // Send request with existing subscription (credit held, consumed on acceptance)
-  Future<void> _sendRequestWithSubscription(
-    Map<String, dynamic> profile,
-    dynamic subscription,
-  ) async {
-    final user = ref.read(currentUserProvider).value!;
-
-    final startParts = (selectedTimeSlot!['startTime'] as String).split(':');
-    final endParts = (selectedTimeSlot!['endTime'] as String).split(':');
-
-    final slotStart = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-      int.parse(startParts[0]),
-      int.parse(startParts[1]),
-    );
-
-    final slotEnd = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-      int.parse(endParts[0]),
-      int.parse(endParts[1]),
-    );
-
-    final slotDate = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-    );
-
-    // Create request with subscription reference
-    final result = await ref.read(bookingServiceProvider).createSessionRequest(
-          mohaffezId: widget.mohaffezId,
-          studentId: user.uid,
-          studentName: user.name,
-          mohaffezName: profile['name'] ?? '',
-          sessionType: selectedSessionType,
-          preferredTimeSlot:
-              '${selectedTimeSlot!['startTime']} - ${selectedTimeSlot!['endTime']}',
-          slotStart: slotStart,
-          slotEnd: slotEnd,
-          slotDate: slotDate,
-          imamAddressText: profile['addressText'],
-          imamAddressLat: profile['addressLat'],
-          imamAddressLng: profile['addressLng'],
-          mohaffezPhone: profile['phoneNumber'],
-          subscriptionId: subscription.id,
-          isPaid: false,
-        );
-
-    if (result.isSuccess && mounted) {
-      setState(() {
-        selectedTimeSlot = null;
-        selectedDate = null;
-        selectedDayOfWeek = null;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '✅ تم إرسال طلب الحجز!\nسيتم خصم جلسة عند قبول المحفظ\n(${subscription.remainingSessions} جلسة متاحة)',
-          ),
-          backgroundColor: AppTheme.accentGreen,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  // Show dialog: Buy package OR send free request (pay later)
-  Future<void> _showBookingOptionsDialog(Map<String, dynamic> profile) async {
-    if (!mounted) return;
-
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: ui.TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('كيف تريد الحجز؟'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'اختر طريقة الحجز المناسبة لك:',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-
-              // Option 1: Buy package now
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade100,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.local_offer, color: Colors.green),
-                  ),
-                  title: const Text(
-                    'شراء باقة الآن',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    'احصل على خصم مع الباقات واحجز مباشرة',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () => Navigator.pop(ctx, 'buy_package'),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Option 2: Request now, pay after acceptance
-              Container(
-                decoration: BoxDecoration(
-                  color: AppThemeConstants.surfaceWhite,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
-                ),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.send, color: Colors.blue),
-                  ),
-                  title: const Text(
-                    'إرسال طلب مجاني',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    'ادفع فقط إذا قبل المحفظ الطلب',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () => Navigator.pop(ctx, 'free_request'),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (choice == 'buy_package' && mounted) {
-      // ✅ Navigate to payment screen to buy package, passing the selected slot + location data
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (ctx) => StudentPaymentScreen(
-            mohaffezId: widget.mohaffezId,
-            mohaffezName: profile['name'] ?? '',
-            // ✅ Pass preselected slot data
-            preselectedSessionType: selectedSessionType,
-            preselectedTimeSlot: selectedTimeSlot,
-            preselectedDate: selectedDate,
-            // ✅ Pass location data from profile
-            location: profile['addressText'] as String?,
-            mohaffezAddress: profile['addressText'] as String?,
-            mohaffezLat: profile['addressLat'] as double?,
-            mohaffezLng: profile['addressLng'] as double?,
-            mohaffezPhone: profile['phoneNumber'] as String?,
-            // Show only subscription packages
-            showSubscriptionsOnly: true,
-          ),
-        ),
-      );
-
-      if (result == true && mounted) {
-        // After buying package, send request automatically
-        final paymentRepo = ref.read(paymentRepositoryProvider);
-        final newSubscription = await paymentRepo.getActiveSubscription(
-          ref.read(currentUserProvider).value!.uid,
-          widget.mohaffezId,
-        );
-
-        if (newSubscription != null) {
-          await _sendRequestWithSubscription(profile, newSubscription);
-        }
-      }
-    } else if (choice == 'free_request' && mounted) {
-      // Send free request (pay after acceptance)
-      await _sendFreeRequest(profile);
-    }
-  }
-
-  // Send free request (payment happens AFTER teacher accepts)
-  Future<void> _sendFreeRequest(Map<String, dynamic> profile) async {
-    await _showPlanSelectionAndSend(profile);
-  }
-
-  Future<void> _showPlanSelectionAndSend(Map<String, dynamic> profile) async {
-    final plans =
-        await ref.read(activePricingPlansProvider(widget.mohaffezId).future);
-    if (!mounted) return;
-
-    final filtered = plans.where((p) {
-      if (selectedSessionType == 'home') return p.mode == SessionMode.home;
-      if (selectedSessionType == 'mosque') return p.mode == SessionMode.mosque;
-      return p.mode == SessionMode.online;
-    }).toList();
-
-    if (filtered.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لا توجد خطط تسعير متاحة لإرسال الطلب'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final chosenPlan = await showModalBottomSheet<PricingPlanModel>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => _PlanPickerSheet(
-        plans: filtered,
-        sessionType: selectedSessionType,
-        slotDate: selectedDate!,
-        timeSlot: selectedTimeSlot!,
-      ),
-    );
-    if (chosenPlan == null) return;
-
-    if (!mounted) return;
-    await _sendRequest(profile, chosenPlan);
-  }
-
-  Future<void> _sendRequest(
-    Map<String, dynamic> profile,
-    PricingPlanModel plan,
-  ) async {
-    final user = ref.read(currentUserProvider).value!;
-
-    final startParts = (selectedTimeSlot!['startTime'] as String).split(':');
-    final endParts = (selectedTimeSlot!['endTime'] as String).split(':');
-
-    final slotStart = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-      int.parse(startParts[0]),
-      int.parse(startParts[1]),
-    );
-
-    final slotEnd = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-      int.parse(endParts[0]),
-      int.parse(endParts[1]),
-    );
-
-    final slotDate = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-    );
-
-    final planId = plan.id;
-    final planTitle = plan.title;
-    final paymentAmount = plan.priceEGP;
-    final sessionsCount = plan.sessionsCount;
-    final planType = plan.type.name;
-
-    debugPrint(
-      '🔍 [BookingDebug] planId=$planId | planTitle=$planTitle | paymentAmount=$paymentAmount | sessionsCount=$sessionsCount | planType=$planType',
-    );
-    assert(planId != null,
-        'planId must not be null — student must select a plan before booking');
-
-    final result = await ref.read(bookingServiceProvider).createSessionRequest(
-          mohaffezId: widget.mohaffezId,
-          studentId: user.uid,
-          studentName: user.name,
-          mohaffezName: profile['name'] ?? '',
-          sessionType: selectedSessionType,
-          preferredTimeSlot:
-              '${selectedTimeSlot!['startTime']} - ${selectedTimeSlot!['endTime']}',
-          slotStart: slotStart,
-          slotEnd: slotEnd,
-          slotDate: slotDate,
-          imamAddressText: profile['addressText'],
-          imamAddressLat: profile['addressLat'],
-          imamAddressLng: profile['addressLng'],
-          mohaffezPhone: profile['phoneNumber'],
-          isPaid: false,
-          planId: planId,
-          planTitle: planTitle,
-          paymentAmount: paymentAmount,
-          sessionsCount: sessionsCount,
-          planType: planType,
-          requiresPaymentOnAcceptance: true,
-        );
-
-    if (result.isSuccess && mounted) {
-      setState(() {
-        selectedTimeSlot = null;
-        selectedDate = null;
-        selectedDayOfWeek = null;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '✅ تم إرسال طلب الحجز!\nسيتم إشعارك عند قبول المحفظ للدفع',
-          ),
-          backgroundColor: AppTheme.accentGreen,
-          duration: Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  Widget _buildAppBar(BuildContext context, Map<String, dynamic> profile) {
+  Widget _buildAppBar(
+      BuildContext context, Map<String, dynamic> profile) {
     return SliverAppBar(
       expandedHeight: 140,
       pinned: true,
@@ -1214,9 +775,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           Text(
                             profile['specialization'],
                             style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
-                            ),
+                                fontSize: 14, color: Colors.white70),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1231,6 +790,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       ),
     );
   }
+
+  // ─── Basic info ───────────────────────────────────────────────────────────
 
   Widget _buildBasicInfo(Map<String, dynamic> profile) {
     return Padding(
@@ -1283,15 +844,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
         ],
       ),
     );
   }
+
+  // ─── Bio ──────────────────────────────────────────────────────────────────
 
   Widget _buildBioSection(String bio) {
     return Padding(
@@ -1301,10 +861,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         children: [
           const Text(
             'نبذة تعريفية',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Container(
@@ -1325,16 +882,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  // ─── Credentials ──────────────────────────────────────────────────────────
+
   Widget _buildCredentialsSection(WidgetRef ref) {
     return Consumer(
       builder: (context, ref, _) {
-        final credentials = ref.watch(credentialsProvider(widget.mohaffezId));
+        final credentials =
+            ref.watch(credentialsProvider(widget.mohaffezId));
         return credentials.when(
           data: (creds) {
-            if (creds.isEmpty) {
-              return const SizedBox.shrink();
-            }
-
+            if (creds.isEmpty) return const SizedBox.shrink();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1343,9 +900,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   child: Text(
                     'الشهادات والمؤهلات',
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1353,7 +908,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   height: 140,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: creds.length,
                     itemBuilder: (context, index) {
                       final cred = creds[index];
@@ -1364,8 +920,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         decoration: BoxDecoration(
                           color: Colors.purple.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border:
-                              Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color:
+                                  Colors.purple.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1392,7 +949,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                             Row(
                               children: [
                                 Icon(Icons.business,
-                                    size: 16, color: Colors.grey.shade600),
+                                    size: 16,
+                                    color: Colors.grey.shade600),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
@@ -1412,14 +970,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.1),
+                                color:
+                                    Colors.green.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.check_circle,
-                                      size: 14, color: Colors.green.shade700),
+                                      size: 14,
+                                      color: Colors.green.shade700),
                                   const SizedBox(width: 4),
                                   Text(
                                     'معتمدة',
@@ -1451,6 +1011,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  // ─── Session type selector ────────────────────────────────────────────────
+
   Widget _buildSessionTypeSelector() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1459,10 +1021,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         children: [
           const Text(
             'نوع الجلسة',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1474,9 +1033,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     children: [
                       Icon(Icons.home, size: 18),
                       SizedBox(width: 6),
-                      Flexible(
-                        child: Text('بيت الطالب'),
-                      ),
+                      Flexible(child: Text('بيت الطالب')),
                     ],
                   ),
                   selected: selectedSessionType == 'home',
@@ -1490,7 +1047,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       });
                     }
                   },
-                  selectedColor: AppTheme.primaryAmber.withValues(alpha: 0.3),
+                  selectedColor:
+                      AppTheme.primaryAmber.withValues(alpha: 0.3),
                   labelStyle: TextStyle(
                     fontWeight: selectedSessionType == 'home'
                         ? FontWeight.bold
@@ -1506,9 +1064,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     children: [
                       Icon(Icons.mosque, size: 18),
                       SizedBox(width: 6),
-                      Flexible(
-                        child: Text('المسجد'),
-                      ),
+                      Flexible(child: Text('المسجد')),
                     ],
                   ),
                   selected: selectedSessionType == 'mosque',
@@ -1522,7 +1078,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       });
                     }
                   },
-                  selectedColor: AppTheme.accentGreen.withValues(alpha: 0.3),
+                  selectedColor:
+                      AppTheme.accentGreen.withValues(alpha: 0.3),
                   labelStyle: TextStyle(
                     fontWeight: selectedSessionType == 'mosque'
                         ? FontWeight.bold
@@ -1538,9 +1095,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     children: [
                       Icon(Icons.videocam, size: 18),
                       SizedBox(width: 6),
-                      Flexible(
-                        child: Text('أونلاين'),
-                      ),
+                      Flexible(child: Text('أونلاين')),
                     ],
                   ),
                   selected: selectedSessionType == 'online',
@@ -1569,11 +1124,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  // ─── Availability section ─────────────────────────────────────────────────
+
   Widget _buildAvailabilitySection(
       WidgetRef ref, Map<String, dynamic> profile) {
     return Consumer(
       builder: (context, ref, _) {
-        final availability = ref.watch(availabilityProvider(widget.mohaffezId));
+        final availability =
+            ref.watch(availabilityProvider(widget.mohaffezId));
         return availability.when(
           data: (slots) {
             if (slots.isEmpty) {
@@ -1598,9 +1156,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.grey.shade600,
-                          ),
+                              fontSize: 15,
+                              color: Colors.grey.shade600),
                         ),
                       ),
                     ],
@@ -1616,7 +1173,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               'الخميس',
               'الجمعة',
               'السبت',
-              'الأحد'
+              'الأحد',
             ];
 
             return Column(
@@ -1627,19 +1184,19 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   child: Text(
                     'الأوقات المتاحة - اختر الوقت المناسب',
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 12),
                 ...slots.map((slot) {
                   final dayOfWeek = slot['dayOfWeek'] as int;
                   final timeSlots =
-                      List<Map<String, dynamic>>.from(slot['timeSlots'] ?? []);
+                      List<Map<String, dynamic>>.from(
+                          slot['timeSlots'] ?? []);
 
                   final now = DateTime.now();
-                  final today = DateTime(now.year, now.month, now.day);
+                  final today =
+                      DateTime(now.year, now.month, now.day);
                   final currentDayOfWeek = today.weekday;
 
                   int daysUntil = dayOfWeek - currentDayOfWeek;
@@ -1655,9 +1212,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
                   final enabledSlots = timeSlots.where((ts) {
                     if (ts['enabled'] != true) return false;
-                    if (ts['sessionType'] != selectedSessionType) return false;
+                    if (ts['sessionType'] != selectedSessionType) {
+                      return false;
+                    }
                     if (isToday) {
-                      final parts = (ts['startTime'] as String).split(':');
+                      final parts =
+                          (ts['startTime'] as String).split(':');
                       final slotTime = DateTime(
                         today.year,
                         today.month,
@@ -1670,18 +1230,21 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     return true;
                   }).toList();
 
-                  if (enabledSlots.isEmpty) return const SizedBox.shrink();
+                  if (enabledSlots.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
 
                   return Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             const Icon(Icons.calendar_today,
-                                size: 18, color: AppTheme.accentGreen),
+                                size: 18,
+                                color: AppTheme.accentGreen),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1700,69 +1263,65 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: enabledSlots
-                              .map(
-                                (ts) => GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      selectedTimeSlot = ts;
-                                      selectedDate = targetDate;
-                                      selectedDayOfWeek = dayOfWeek;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: selectedTimeSlot == ts &&
-                                              selectedDayOfWeek == dayOfWeek
-                                          ? AppTheme.accentGreen
-                                          : Colors.green.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: selectedTimeSlot == ts &&
-                                                selectedDayOfWeek == dayOfWeek
-                                            ? AppTheme.accentGreen
-                                            : Colors.green.shade200,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.access_time,
-                                          size: 14,
-                                          color: selectedTimeSlot == ts &&
-                                                  selectedDayOfWeek == dayOfWeek
-                                              ? Colors.white
-                                              : Colors.green.shade700,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '${ts['startTime']} - ${ts['endTime']}',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: selectedTimeSlot == ts &&
-                                                    selectedDayOfWeek ==
-                                                        dayOfWeek
-                                                ? Colors.white
-                                                : Colors.green.shade700,
-                                          ),
-                                        ),
-                                        if (selectedTimeSlot == ts &&
-                                            selectedDayOfWeek == dayOfWeek) ...[
-                                          const SizedBox(width: 4),
-                                          const Icon(Icons.check_circle,
-                                              size: 16, color: Colors.white),
-                                        ],
-                                      ],
-                                    ),
+                          children: enabledSlots.map((ts) {
+                            final isSelected = selectedTimeSlot == ts &&
+                                selectedDayOfWeek == dayOfWeek;
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedTimeSlot = ts;
+                                  selectedDate = targetDate;
+                                  selectedDayOfWeek = dayOfWeek;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppTheme.accentGreen
+                                      : Colors.green.shade50,
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppTheme.accentGreen
+                                        : Colors.green.shade200,
+                                    width: 2,
                                   ),
                                 ),
-                              )
-                              .toList(),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.access_time,
+                                      size: 14,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.green.shade700,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${ts['startTime']} - ${ts['endTime']}',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.green.shade700,
+                                      ),
+                                    ),
+                                    if (isSelected) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.check_circle,
+                                          size: 16,
+                                          color: Colors.white),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
                         const SizedBox(height: 4),
                       ],
@@ -1788,207 +1347,3 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 }
-
-class _PlanPickerSheet extends StatefulWidget {
-  const _PlanPickerSheet({
-    required this.plans,
-    required this.sessionType,
-    required this.slotDate,
-    required this.timeSlot,
-  });
-
-  final List<PricingPlanModel> plans;
-  final String sessionType;
-  final DateTime slotDate;
-  final Map<String, dynamic> timeSlot;
-
-  @override
-  State<_PlanPickerSheet> createState() => _PlanPickerSheetState();
-}
-
-class _PlanPickerSheetState extends State<_PlanPickerSheet> {
-  PricingPlanModel? selectedPlan;
-
-  String _sessionTypeLabel(String type) {
-    switch (type) {
-      case 'home':
-        return 'بيت الطالب';
-      case 'mosque':
-        return 'المسجد';
-      default:
-        return 'أونلاين';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final timeLabel =
-        '${widget.timeSlot['startTime'] ?? ''} - ${widget.timeSlot['endTime'] ?? ''}';
-    return Directionality(
-      textDirection: ui.TextDirection.rtl,
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 12,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'اختر خطة الدفع قبل إرسال الطلب',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppThemeConstants.surfaceWhite,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'النوع: ${_sessionTypeLabel(widget.sessionType)}',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'التاريخ: ${DateFormat('EEEE، dd MMMM yyyy', 'ar').format(widget.slotDate)}',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'الوقت: $timeLabel',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: widget.plans.length,
-                  itemBuilder: (context, index) {
-                    final plan = widget.plans[index];
-                    final selected = selectedPlan?.id == plan.id;
-                    return GestureDetector(
-                      onTap: () => setState(() => selectedPlan = plan),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: selected
-                                ? AppTheme.accentGreen
-                                : Colors.grey.shade300,
-                            width: selected ? 2.5 : 1,
-                          ),
-                          color: selected
-                              ? AppTheme.accentGreen.withValues(alpha: 0.05)
-                              : null,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              selected
-                                  ? Icons.check_circle
-                                  : Icons.circle_outlined,
-                              color: AppTheme.accentGreen,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    plan.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    plan.sessionsCount > 1
-                                        ? '${plan.sessionsCount} جلسات'
-                                        : 'جلسة واحدة',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Flexible(
-                              child: Text(
-                                '${plan.priceEGP.toStringAsFixed(0)} ج.م',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: selectedPlan == null
-                      ? null
-                      : () => Navigator.pop(context, selectedPlan),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    backgroundColor: AppTheme.accentGreen,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    disabledForegroundColor: Colors.grey.shade600,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'إرسال الطلب',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-

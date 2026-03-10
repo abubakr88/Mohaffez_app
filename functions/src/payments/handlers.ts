@@ -292,8 +292,31 @@ export async function createSubscriptionFromPayment(
   const planType     = parseString(metadata['planType'],     'single');
   const sessionsCount = parseNumber(metadata['sessionsCount'], 1);
   const validityDays  = typeof metadata['validityDays'] === 'number' ? metadata['validityDays'] : undefined;
+  const sessionType   = parseString(metadata['sessionType'],   '');
 
   return db.runTransaction(async (transaction) => {
+    // BUG-5 FIX: Check maxActiveSubscriptions before creating subscription
+    const configDoc = await transaction.get(db.collection('systemConfig').doc('global'));
+    const maxActive: number = (configDoc.data()?.maxActiveSubscriptions as number) ?? 3;
+
+    const studentId = payment.studentId;
+    const mohaffezId = payment.mohaffezId;
+
+    // CONSTRAINT: one active bundle per studentId+mohaffezId+sessionType
+    const activeSubsQuery = db.collection('subscriptions')
+      .where('studentId', '==', studentId)
+      .where('mohaffezId', '==', mohaffezId)
+      .where('sessionType', '==', sessionType)
+      .where('status', '==', 'active');
+    const activeSubs = await transaction.get(activeSubsQuery);
+
+    if (activeSubs.size >= maxActive) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        `لا يمكن إنشاء أكثر من ${maxActive} اشتراكات نشطة مع نفس المعلم`
+      );
+    }
+
     const subscriptionRef = db.collection('subscriptions').doc();
     let expiryDate: FirebaseFirestore.Timestamp | null = null;
 

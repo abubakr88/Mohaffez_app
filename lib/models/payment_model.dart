@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_model.dart';
+import 'user_model.dart' hide TimestampConverter;
+import 'pricing_plan_model.dart'; // For PlanType, PlanTypeConverter, and TimestampConverter
 
 part 'payment_model.freezed.dart';
 part 'payment_model.g.dart';
@@ -52,6 +53,8 @@ class PaymentModel with _$PaymentModel {
     required String mohaffezName,
     required String planId,
     required String planTitle,
+    // BUG-7 FIX: Add root-level planType field for querying by type
+    @PlanTypeConverter() PlanType? planType,
     required double amount,
     @Default('EGP') String currency,
     required PaymentMethod method,
@@ -74,9 +77,17 @@ class PaymentModel with _$PaymentModel {
 
   factory PaymentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    // BUG-7 FIX: Parse planType at root level
+    final planTypeStr = data['planType'] as String?;
+    final planType = planTypeStr != null
+        ? PlanType.values.firstWhere(
+            (e) => e.name == planTypeStr,
+            orElse: () => PlanType.single)
+        : PlanType.single;
     return PaymentModel.fromJson({
       ...data,
       'id': doc.id,
+      'planType': planType.name,
     });
   }
 }

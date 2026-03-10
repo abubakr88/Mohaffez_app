@@ -13,9 +13,9 @@ final bookingServiceProvider = Provider<BookingService>((ref) {
   return BookingService();
 });
 
-final bookingFlowProvider =
-    StateNotifierProvider<BookingFlowNotifier, BookingState>((ref) {
-  return BookingFlowNotifier(ref.read(bookingServiceProvider));
+final legacyBookingFlowProvider =
+    StateNotifierProvider<LegacyBookingFlowNotifier, LegacyBookingState>((ref) {
+  return LegacyBookingFlowNotifier(ref.read(bookingServiceProvider));
 });
 
 enum BookingPaymentMethod {
@@ -23,6 +23,7 @@ enum BookingPaymentMethod {
   payAfterAcceptance,
   buyNewPackage,
   freeSession,
+  directPayment,
 }
 
 extension BookingPaymentMethodValue on BookingPaymentMethod {
@@ -36,18 +37,25 @@ extension BookingPaymentMethodValue on BookingPaymentMethod {
         return 'buy_new_package';
       case BookingPaymentMethod.freeSession:
         return 'free_session';
+      case BookingPaymentMethod.directPayment:
+        // ── FIX: CF checks selectedPaymentMethod === 'directpayment'
+        //    (no underscore). The previous value 'direct_payment' never
+        //    matched, so createSessionRequest always wrote status: 'pending'
+        //    instead of 'awaitingpayment', forcing the orphan-recovery path
+        //    on every single direct-payment booking.
+        return 'directpayment'; // ← was: 'direct_payment'
     }
   }
 }
 
-class BookingState {
+class LegacyBookingState {
   final BookingPaymentMethod? selectedPaymentMethod;
   final bool isSubmitting;
   final bool isSuccess;
   final String? sessionId;
   final String? error;
 
-  const BookingState({
+  const LegacyBookingState({
     this.selectedPaymentMethod,
     this.isSubmitting = false,
     this.isSuccess = false,
@@ -55,37 +63,35 @@ class BookingState {
     this.error,
   });
 
-  BookingState copyWith({
+  LegacyBookingState copyWith({
     BookingPaymentMethod? selectedPaymentMethod,
     bool clearSelectedPaymentMethod = false,
     bool? isSubmitting,
     bool? isSuccess,
     String? sessionId,
-    // FIX: Allow explicitly setting error to null by using a sentinel pattern
     Object? error = _kSentinel,
   }) {
-    return BookingState(
+    return LegacyBookingState(
       selectedPaymentMethod: clearSelectedPaymentMethod
           ? null
           : selectedPaymentMethod ?? this.selectedPaymentMethod,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSuccess: isSuccess ?? this.isSuccess,
       sessionId: sessionId ?? this.sessionId,
-      // FIX: If caller passed error: null explicitly, use null; otherwise keep existing
       error: error == _kSentinel ? this.error : error as String?,
     );
   }
 }
 
-// Sentinel to distinguish "not passed" from "explicitly null" in copyWith
 const Object _kSentinel = Object();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFIER
 // ─────────────────────────────────────────────────────────────────────────────
 
-class BookingFlowNotifier extends StateNotifier<BookingState> {
-  BookingFlowNotifier(this._bookingService) : super(const BookingState());
+class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
+  LegacyBookingFlowNotifier(this._bookingService)
+      : super(const LegacyBookingState());
 
   final BookingService _bookingService;
 
@@ -117,7 +123,6 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
     String? requestId,
     String? paymentId,
   }) async {
-    // Clear previous error on new attempt
     state = state.copyWith(isSubmitting: true, error: null);
 
     try {
@@ -195,9 +200,6 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
     int? sessionsCount,
     String? planType,
   }) async {
-    // FIX BUG #1 + #2: Clear error on new attempt; do NOT use a bare `finally`
-    // that only resets isSubmitting — it was masking all errors and never
-    // setting isSuccess/error on the state, so the UI had no feedback.
     state = state.copyWith(isSubmitting: true, error: null);
 
     try {
@@ -237,7 +239,6 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
         planType: planType,
       );
 
-      // FIX BUG #1: Mirror createFreeSession — always write result into state
       if (result.isSuccess) {
         state = state.copyWith(
           isSubmitting: false,
@@ -256,9 +257,6 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
 
       return result;
     } catch (e, stack) {
-      // FIX BUG #1 (continued): Exceptions were caught but state was left with
-      // isSubmitting: true because `finally` ran before the catch could set
-      // the error. Now we handle everything in catch explicitly.
       if (kDebugMode) debugPrint('❌ [createSessionRequest] Unexpected error: $e');
       if (kDebugMode) debugPrintStack(stackTrace: stack);
       state = state.copyWith(
@@ -268,10 +266,6 @@ class BookingFlowNotifier extends StateNotifier<BookingState> {
       );
       return BookingResult.failure(e.toString());
     }
-    // NOTE: `finally` block intentionally removed. A bare `finally` that only
-    // calls state.copyWith(isSubmitting: false) will execute AFTER the catch
-    // block but BEFORE its state write is observed by the UI on some Flutter
-    // rebuild cycles, resulting in a flash of stale state.
   }
 }
 
@@ -308,41 +302,46 @@ class BookingService {
     }
 
     try {
-      final token = await user.getIdToken(true);
+      final token = await user.getIdToken(false);
       if (token == null || token.isEmpty) {
-        if (kDebugMode) debugPrint('❌ [$flowLabel] Refreshed Firebase ID token is empty.');
+        if (kDebugMode) {
+          debugPrint(
+              '❌ [$flowLabel] Refreshed Firebase ID token is empty.');
+        }
         return 'تعذر التحقق من تسجيل الدخول. حاول تسجيل الخروج ثم الدخول مرة أخرى';
       }
       if (kDebugMode) debugPrint('✅ [$flowLabel] Auth ready. uid=${user.uid}');
       return null;
     } catch (e, stack) {
-      if (kDebugMode) debugPrint('❌ [$flowLabel] Failed to refresh Firebase ID token: $e');
+      if (kDebugMode) {
+        debugPrint(
+            '❌ [$flowLabel] Failed to refresh Firebase ID token: $e');
+      }
       if (kDebugMode) debugPrintStack(stackTrace: stack);
       return 'تعذر التحقق من تسجيل الدخول. تحقق من الاتصال ثم حاول مرة أخرى';
     }
   }
 
-  /// Warms up the App Check token using the SDK cache.
-  /// This is NON-FATAL — a missing or stale token never blocks the booking flow.
-  /// Firebase enforces App Check server-side; the callable is always sent.
   Future<void> _ensureAppCheckForCallable(String flowLabel) async {
+    if (kDebugMode) return;
     try {
-      // forceRefresh: false — use cached token, avoid Firebase rate limiting.
       final token = await FirebaseAppCheck.instance.getToken(false);
       if (token == null || token.isEmpty) {
         if (kDebugMode) {
-          debugPrint('⚠️ $flowLabel App Check token is null/empty (non-fatal).');
+          debugPrint(
+              '⚠️ $flowLabel App Check token is null/empty (non-fatal).');
         }
       } else {
-        if (kDebugMode) debugPrint('✅ $flowLabel App Check token ready (cached).');
+        if (kDebugMode) {
+          debugPrint('✅ $flowLabel App Check token ready (cached).');
+        }
       }
     } catch (e) {
-      // Non-fatal: log and continue. The callable will still be sent normally.
       if (kDebugMode) {
-        debugPrint('⚠️ $flowLabel App Check token fetch failed (non-fatal): $e');
+        debugPrint(
+            '⚠️ $flowLabel App Check token fetch failed (non-fatal): $e');
       }
     }
-    // Returns void — intentionally never blocks the caller.
   }
 
   // ── Free Session ───────────────────────────────────────────────────────────
@@ -371,15 +370,16 @@ class BookingService {
         return BookingResult.failure(authError);
       }
 
-      // Non-fatal warm-up only — never blocks the caller.
       await _ensureAppCheckForCallable('FREE SESSION');
 
-      if (kDebugMode) debugPrint('🔄 [FREE SESSION] Starting Cloud Function call...');
-      if (kDebugMode) debugPrint('📍 Function: confirmFreeSession');
-      if (kDebugMode) debugPrint('👤 Student: $studentId');
-      if (kDebugMode) debugPrint('👨‍🏫 Mohaffez: $mohaffezId');
-      if (kDebugMode) debugPrint('🎟️ Promo: $promoCode');
-      if (kDebugMode) debugPrint('🔑 RequestId: $requestId');
+      if (kDebugMode) {
+        debugPrint('🔄 [FREE SESSION] Starting Cloud Function call...');
+        debugPrint('📍 Function: confirmFreeSession');
+        debugPrint('👤 Student: $studentId');
+        debugPrint('👨‍🏫 Mohaffez: $mohaffezId');
+        debugPrint('🎟️ Promo: $promoCode');
+        debugPrint('🔑 RequestId: $requestId');
+      }
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'confirmFreeSession',
@@ -387,7 +387,6 @@ class BookingService {
       );
 
       final data = {
-        // FIX-3: Send slot date-times as UTC ISO strings to avoid timezone drift in Cloud Functions
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
         'studentId': studentId,
@@ -410,11 +409,11 @@ class BookingService {
 
       final result = await callable.call(data);
 
-      if (kDebugMode) debugPrint('✅ [FREE SESSION] Response received');
-      if (kDebugMode) debugPrint('📄 Response: ${result.data}');
+      if (kDebugMode) {
+        debugPrint('✅ [FREE SESSION] Response received');
+        debugPrint('📄 Response: ${result.data}');
+      }
 
-      // FIX: Type-safe response parsing — original code could throw a cast
-      // exception if data was not a Map, silently failing the whole flow.
       if (result.data is! Map) {
         return BookingResult.failure('استجابة غير متوقعة من الخادم');
       }
@@ -436,10 +435,12 @@ class BookingService {
       if (kDebugMode) debugPrint('❌ Cloud Function failure: $errorMsg');
       return BookingResult.failure(errorMsg);
     } on FirebaseFunctionsException catch (e) {
-      if (kDebugMode) debugPrint('❌ [FREE SESSION] FirebaseFunctionsException');
-      if (kDebugMode) debugPrint('   Code: ${e.code}');
-      if (kDebugMode) debugPrint('   Message: ${e.message}');
-      if (kDebugMode) debugPrint('   Details: ${e.details}');
+      if (kDebugMode) {
+        debugPrint('❌ [FREE SESSION] FirebaseFunctionsException');
+        debugPrint('   Code: ${e.code}');
+        debugPrint('   Message: ${e.message}');
+        debugPrint('   Details: ${e.details}');
+      }
 
       final String errorMessage;
       switch (e.code) {
@@ -467,8 +468,10 @@ class BookingService {
 
       return BookingResult.failure(errorMessage);
     } catch (e, stackTrace) {
-      if (kDebugMode) debugPrint('❌ [FREE SESSION] Unexpected error: $e');
-      if (kDebugMode) debugPrintStack(stackTrace: stackTrace);
+      if (kDebugMode) {
+        debugPrint('❌ [FREE SESSION] Unexpected error: $e');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       return BookingResult.failure('حدث خطأ غير متوقع: ${e.toString()}');
     }
   }
@@ -500,7 +503,6 @@ class BookingService {
     int? sessionsCount,
     String? planType,
   }) async {
-    // Pre-populate lockResult if slotLockId was already acquired by the caller
     final SlotLockResult? lockResult = slotLockId != null
         ? SlotLockResult(success: true, lockId: slotLockId)
         : null;
@@ -511,22 +513,29 @@ class BookingService {
       if (authError != null) {
         if (lockResult?.success == true) {
           await _releaseSlotLock(lockResult!).catchError((e) {
-            if (kDebugMode) debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
+            if (kDebugMode) {
+              debugPrint(
+                  '⚠️ [SESSION REQUEST] Failed to release lock: $e');
+            }
           });
         }
         return BookingResult.failure(authError);
       }
 
-      // Non-fatal warm-up only — never blocks the caller.
       await _ensureAppCheckForCallable('SESSION REQUEST');
 
       final DateTime actualSlotDate =
           slotDate ?? DateTime(slotStart.year, slotStart.month, slotStart.day);
 
-      if (kDebugMode) debugPrint('🔄 [SESSION REQUEST] Calling createSessionRequest CF...');
-      if (kDebugMode) debugPrint('   mohaffezId: $mohaffezId');
-      if (kDebugMode) debugPrint('   studentId: $studentId');
-      if (kDebugMode) debugPrint('   slotLockId: $slotLockId');
+      if (kDebugMode) {
+        debugPrint(
+            '🔄 [SESSION REQUEST] Calling createSessionRequest CF...');
+        debugPrint('   mohaffezId: $mohaffezId');
+        debugPrint('   studentId: $studentId');
+        debugPrint('   slotLockId: $slotLockId');
+        debugPrint(
+            '   selectedPaymentMethod: ${(paymentMethod ?? BookingPaymentMethod.payAfterAcceptance).value}');
+      }
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'createSessionRequest',
@@ -534,7 +543,6 @@ class BookingService {
       );
 
       final result = await callable.call({
-        // FIX-3: Send slot date-times as UTC ISO strings to avoid timezone drift in Cloud Functions
         'mohaffezId': mohaffezId,
         'studentId': studentId,
         'studentName': studentName,
@@ -550,6 +558,9 @@ class BookingService {
         'mohaffezPhone': mohaffezPhone,
         'subscriptionId': subscriptionId,
         'requiresPaymentOnAcceptance': requiresPaymentOnAcceptance,
+        // ── Value is always a plain string via the .value extension ─────────
+        // e.g. BookingPaymentMethod.directPayment → 'directpayment'
+        //      BookingPaymentMethod.payAfterAcceptance → 'pay_after_acceptance'
         'selectedPaymentMethod':
             (paymentMethod ?? BookingPaymentMethod.payAfterAcceptance).value,
         'planId': planId,
@@ -560,13 +571,10 @@ class BookingService {
         if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
       });
 
-      if (kDebugMode) debugPrint('✅ [SESSION REQUEST] Response: ${result.data}');
+      if (kDebugMode) {
+        debugPrint('✅ [SESSION REQUEST] Response: ${result.data}');
+      }
 
-      // FIX BUG #2 (service layer): Guard against non-Map response before
-      // any field access. The original code did result.data['success'] directly,
-      // which throws a NoSuchMethodError if data is null or not a Map — this
-      // exception was silently caught, lock was released, and failure returned
-      // without any useful context.
       if (result.data is! Map) {
         if (kDebugMode) {
           debugPrint(
@@ -578,7 +586,6 @@ class BookingService {
       final responseMap = Map<String, dynamic>.from(result.data as Map);
 
       if (responseMap['success'] == true) {
-        // FIX: requestId may be null for some payment flows — don't hard-cast
         final requestId = responseMap['requestId'] as String?;
         if (kDebugMode) debugPrint('🎉 Session request created: $requestId');
         return BookingResult.success(requestId ?? '');
@@ -586,21 +593,23 @@ class BookingService {
 
       final errorMsg =
           responseMap['message'] as String? ?? 'فشل في إنشاء طلب الجلسة';
-      if (kDebugMode) debugPrint('❌ [SESSION REQUEST] CF returned failure: $errorMsg');
+      if (kDebugMode) {
+        debugPrint('❌ [SESSION REQUEST] CF returned failure: $errorMsg');
+      }
       return BookingResult.failure(errorMsg);
     } on FirebaseFunctionsException catch (e) {
-      if (kDebugMode) debugPrint('❌ [SESSION REQUEST] FirebaseFunctionsException');
-      if (kDebugMode) debugPrint('   Code: ${e.code}');
-      if (kDebugMode) debugPrint('   Message: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('❌ [SESSION REQUEST] FirebaseFunctionsException');
+        debugPrint('   Code: ${e.code}');
+        debugPrint('   Message: ${e.message}');
+      }
 
-      // FIX BUG #3: Release the slot lock on CF-level errors so the slot
-      // doesn't stay locked indefinitely. The original catch was generic
-      // and would release, but FirebaseFunctionsException was not caught
-      // separately — it fell into the generic catch which DID call release,
-      // but .catchError((_) {}) swallowed any release failures silently.
       if (lockResult?.success == true) {
         await _releaseSlotLock(lockResult!).catchError((e) {
-          if (kDebugMode) debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
+          if (kDebugMode) {
+            debugPrint(
+                '⚠️ [SESSION REQUEST] Failed to release lock: $e');
+          }
         });
       }
 
@@ -616,7 +625,6 @@ class BookingService {
           errorMessage = 'الطلب غير موجود';
           break;
         case 'failed-precondition':
-          // Covers: slot lock expired, slot already booked, slot disabled
           errorMessage =
               e.message ?? 'لا يمكن إتمام الحجز. الرجاء المحاولة مرة أخرى';
           break;
@@ -635,8 +643,10 @@ class BookingService {
 
       return BookingResult.failure(errorMessage);
     } catch (e, stack) {
-      if (kDebugMode) debugPrint('❌ [SESSION REQUEST] Unexpected error: $e');
-      if (kDebugMode) debugPrintStack(stackTrace: stack);
+      if (kDebugMode) {
+        debugPrint('❌ [SESSION REQUEST] Unexpected error: $e');
+        debugPrintStack(stackTrace: stack);
+      }
 
       if (lockResult?.success == true) {
         await _releaseSlotLock(lockResult!).catchError((releaseErr) {
@@ -729,8 +739,8 @@ class BookingService {
       String? notifyStudentName;
 
       await _firestore.runTransaction((transaction) async {
-        // ── READ phase (inside transaction) ──────────────────────────────
-        final requestRef = _firestore.collection('sessionRequests').doc(requestId);
+        final requestRef =
+            _firestore.collection('sessionRequests').doc(requestId);
         final requestSnap = await transaction.get(requestRef);
 
         if (!requestSnap.exists) {
@@ -740,12 +750,10 @@ class BookingService {
         final requestData = requestSnap.data()!;
         final status = requestData['status'] as String? ?? 'pending';
 
-        // Idempotency: if already cancelled, return early
         if (status == 'cancelled') {
           return;
         }
 
-        // Guard: cannot cancel a completed session/request
         if (status == 'completed') {
           throw Exception('Cannot cancel completed session');
         }
@@ -759,22 +767,22 @@ class BookingService {
         final timeSlot = requestData['preferredTimeSlot'] as String?;
         final sessionType = requestData['sessionType'] as String?;
 
-        // ── WRITE phase ──────────────────────────────────────────────────
         transaction.update(requestRef, {
           'status': 'cancelled',
           'cancelledAt': FieldValue.serverTimestamp(),
           'cancelledBy': 'student',
         });
 
-        // Release slot lock inside same transaction
         if (slotLockId != null && slotLockId.trim().isNotEmpty) {
-          final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
+          final lockRef =
+              _firestore.collection('slotLocks').doc(slotLockId);
           transaction.delete(lockRef);
         }
 
-        // Re-enable availability slot if needed
-        if (mohaffezId != null && slotDate != null &&
-            timeSlot != null && sessionType != null) {
+        if (mohaffezId != null &&
+            slotDate != null &&
+            timeSlot != null &&
+            sessionType != null) {
           final availRef = await _findAvailabilityRefTransaction(
             transaction: transaction,
             mohaffezId: mohaffezId,
@@ -783,9 +791,11 @@ class BookingService {
           if (availRef != null) {
             final availSnap = await transaction.get(availRef);
             if (availSnap.exists) {
-              final availData = availSnap.data() as Map<String, dynamic>?;
+              final availData =
+                  availSnap.data() as Map<String, dynamic>?;
               if (availData != null) {
-                final updated = _computeRestoredSlots(availData, timeSlot, sessionType);
+                final updated = _computeRestoredSlots(
+                    availData, timeSlot, sessionType);
                 if (updated != null) {
                   transaction.update(availRef, {
                     'timeSlots': updated,
@@ -797,9 +807,9 @@ class BookingService {
           }
         }
 
-        // Send notification inside transaction
         if (mohaffezId != null && notifyStudentId != null) {
-          final notifRef = _firestore.collection('notifications').doc();
+          final notifRef =
+              _firestore.collection('notifications').doc();
           transaction.set(notifRef, {
             'userId': mohaffezId,
             'recipientId': mohaffezId,
@@ -816,31 +826,41 @@ class BookingService {
 
       return BookingResult.success(requestId);
     } catch (e, stack) {
-      if (kDebugMode) debugPrint('❌ [cancelSessionRequest] Error: $e');
-      if (kDebugMode) debugPrintStack(stackTrace: stack);
+      if (kDebugMode) {
+        debugPrint('❌ [cancelSessionRequest] Error: $e');
+        debugPrintStack(stackTrace: stack);
+      }
       return BookingResult.failure(e.toString());
     }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  String _normalizeTimeSlot(String raw) => raw.replaceAll(' ', '');
+  // ── BUG-5 FIX: Also strip en-dash (U+2013) and em-dash (U+2014) to match
+  //    the Cloud Function normalizeTimeSlot() behaviour. Without this, a slot
+  //    whose display label contains an en-dash could fail the equality check
+  //    during lock release or slot restore, leaving the slot disabled.
+  String _normalizeTimeSlot(String raw) => raw
+      .replaceAll(' ', '')
+      .replaceAll('\u2013', '-') // en-dash → hyphen
+      .replaceAll('\u2014', '-'); // em-dash → hyphen
 
-  // Helper method for finding availability reference inside transaction
   Future<DocumentReference?> _findAvailabilityRefTransaction({
     required Transaction transaction,
     required String mohaffezId,
     required Timestamp slotDate,
   }) async {
     final slotDateObj = slotDate.toDate();
-    final dayOfWeek = slotDateObj.weekday == 7 ? 7 : slotDateObj.weekday + 1;
-    
+    final dayOfWeek =
+        slotDateObj.weekday == 7 ? 7 : slotDateObj.weekday + 1;
+
     final availQuery = _firestore
-        .collection('users').doc(mohaffezId)
+        .collection('users')
+        .doc(mohaffezId)
         .collection('availability')
         .where('dayOfWeek', isEqualTo: dayOfWeek)
         .limit(1);
-    
+
     final availSnap = await availQuery.get();
     if (availSnap.docs.isEmpty) return null;
     return availSnap.docs.first.reference;
@@ -852,7 +872,8 @@ class BookingService {
     String sessionType,
   ) {
     final timeSlots =
-        List<Map<String, dynamic>>.from(availabilityData['timeSlots'] ?? []);
+        List<Map<String, dynamic>>.from(
+            availabilityData['timeSlots'] ?? []);
     final normalizedSelected = _normalizeTimeSlot(timeSlot);
     var restored = false;
     for (final slot in timeSlots) {
@@ -877,8 +898,13 @@ class BookingService {
     return _firestore
         .collection('sessionRequests')
         .where('studentId', isEqualTo: studentId)
-        .where('status',
-            whereIn: ['pending', 'awaiting_payment', 'rejected', 'cancelled'])
+        .where('status', whereIn: [
+          'pending',
+          'awaitingpayment',
+          'awaitingdirectpaymentconfirmation',
+          'rejected',
+          'cancelled',
+        ])
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) {
@@ -891,11 +917,16 @@ class BookingService {
     return _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', whereIn: ['pending', 'awaitingpayment'])
+        .where('status', whereIn: [
+          'pending',
+          'awaitingpayment',
+          'awaitingdirectpaymentconfirmation',
+        ])
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => <String, dynamic>{...doc.data(), 'id': doc.id})
+            .map((doc) =>
+                <String, dynamic>{...doc.data(), 'id': doc.id})
             .toList());
   }
 }

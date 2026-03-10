@@ -12,17 +12,18 @@ import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import 'student_payment_screen.dart';
+import 'direct_payment_screen.dart';
 
 // ============================================================================
 // FILTER ENUM AND PROVIDER
 // ============================================================================
 enum RequestFilter {
-  all, // الكل
-  pending, // قيد الانتظار
-  accepted, // مقبول
-  rejected, // مرفوض
-  cancelled, // ملغي
-  awaitingPayment, // في انتظار الدفع
+  all,
+  pending,
+  accepted,
+  rejected,
+  cancelled,
+  awaitingPayment,
 }
 
 final requestFilterProvider =
@@ -48,6 +49,149 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
     await ref
         .read(studentRequestsFirstPageProvider(studentId).future)
         .catchError((_) => <Map<String, dynamic>>[]);
+  }
+
+  /// Returns true only when the student still needs to initiate payment.
+  /// NOTE: 'awaitingdirectpaymentconfirmation' is intentionally excluded —
+  /// the student already sent the payment, so no "Pay Now" button is needed.
+  bool _requiresPayment(Map<String, dynamic> request) {
+    final status = (request['status'] as String? ?? '').toLowerCase();
+    return status == 'awaitingpayment' ||
+        status == 'awaiting_payment' ||
+        status == 'awaitingdirectpayment';
+  }
+
+  // ── Navigate to payment ──────────────────────────────────────────────────
+  Future<void> _navigateToPayment(Map<String, dynamic> request) async {
+    try {
+      final requestId =
+          request['id'] as String? ?? request['requestId'] as String?;
+      final mohaffezId = request['mohaffezId'] as String?;
+
+      if (requestId == null || mohaffezId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('بيانات الطلب غير مكتملة'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final mohaffezName = request['mohaffezName'] as String? ?? '';
+      final sessionType = request['sessionType'] as String?;
+      final location = request['imamAddressText'] as String?;
+      final mohaffezPhone = request['mohaffezPhone'] as String?;
+      final lat = (request['imamAddressLat'] as num?)?.toDouble();
+      final lng = (request['imamAddressLng'] as num?)?.toDouble();
+
+      // Fetch fresh Firestore data to get selectedPaymentMethod and latest
+      // slot details written by the teacher on acceptance.
+      Map<String, dynamic> lockedRequest = Map<String, dynamic>.from(request);
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('sessionRequests')
+            .doc(requestId)
+            .get();
+        if (snap.exists && snap.data() != null) {
+          lockedRequest = Map<String, dynamic>.from(snap.data()!);
+        }
+      } catch (_) {
+        // Fall back to in-memory map
+      }
+
+      if (!context.mounted) return;
+
+      // ── KEY FIX: Route based on payment method ─────────────────────────
+      // Requests created via "Request First" flow (DirectBookingRequestScreen)
+      // have selectedPaymentMethod = 'directpayment'.  These must go to
+      // DirectPaymentScreen (cash/wallet mark-as-paid), NOT StudentPaymentScreen
+      // which shows Paymob plan selection.
+      final selectedPaymentMethod =
+          lockedRequest['selectedPaymentMethod'] as String?;
+
+      if (selectedPaymentMethod == 'directpayment') {
+        _openDirectPaymentScreen(
+          requestId: requestId,
+          mohaffezId: mohaffezId,
+          mohaffezName: mohaffezName,
+          lockedRequest: lockedRequest,
+        );
+        return;
+      }
+
+      // ── Original flow: plan selection + Paymob / online gateway ─────────
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StudentPaymentScreen(
+            mohaffezId: mohaffezId,
+            mohaffezName: mohaffezName,
+            requestId: requestId,
+            preselectedSessionType: sessionType,
+            location: location,
+            mohaffezAddress: location,
+            mohaffezLat: lat,
+            mohaffezLng: lng,
+            mohaffezPhone: mohaffezPhone,
+            lockedRequest: lockedRequest,
+          ),
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('navigateToPayment error: $e\n$st');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Routes to [DirectPaymentScreen] with all slot data extracted from the
+  /// accepted request.  Called only when selectedPaymentMethod = 'directpayment'.
+  void _openDirectPaymentScreen({
+    required String requestId,
+    required String mohaffezId,
+    required String mohaffezName,
+    required Map<String, dynamic> lockedRequest,
+  }) {
+    // Converts Firestore Timestamp or ISO String to DateTime
+    DateTime? toDate(dynamic raw) {
+      if (raw is Timestamp) return raw.toDate();
+      if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
+      return null;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DirectPaymentScreen(
+          requestId: requestId,
+          mohaffezId: mohaffezId,
+          mohaffezName: mohaffezName,
+          sessionType: lockedRequest['sessionType'] as String?,
+          preferredTimeSlot: lockedRequest['preferredTimeSlot'] as String? ??
+              lockedRequest['timeSlot'] as String?,
+          slotDate: toDate(lockedRequest['slotDate']),
+          slotStart: toDate(lockedRequest['slotStart']),
+          slotEnd: toDate(lockedRequest['slotEnd']),
+          imamAddressText: lockedRequest['imamAddressText'] as String? ??
+              lockedRequest['location'] as String?,
+          imamAddressLat:
+              (lockedRequest['imamAddressLat'] as num?)?.toDouble(),
+          imamAddressLng:
+              (lockedRequest['imamAddressLng'] as num?)?.toDouble(),
+          mohaffezPhone: lockedRequest['mohaffezPhone'] as String?,
+          // amount = null → DirectPaymentScreen auto-fetches single-session
+          // price from the teacher's pricing plans
+          // planType = null → treated as single, no bundle UI shown
+        ),
+      ),
+    );
   }
 
   @override
@@ -97,19 +241,11 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           onRefresh: () => _refreshRequests(studentId),
           child: CustomScrollView(
             slivers: [
-              // App Bar with Filter
               _buildAppBar(context, ref, filter, studentId),
-
-              // Search Bar
               _buildSearchBar(),
-
-              // Filter Chips
               _buildFilterChips(ref, filter),
-
-              // Requests List
               _buildRequestsList(
                   context, ref, studentId, requestsAsync, filter),
-
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
             ],
           ),
@@ -155,11 +291,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                           color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(
-                          Icons.request_page,
-                          size: 24,
-                          color: Colors.white,
-                        ),
+                        child: const Icon(Icons.request_page,
+                            size: 24, color: Colors.white),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -178,9 +311,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                             Text(
                               'إدارة طلبات الحجز',
                               style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white70,
-                              ),
+                                  fontSize: 13, color: Colors.white70),
                             ),
                           ],
                         ),
@@ -206,9 +337,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         child: TextField(
           controller: searchController,
           onChanged: (value) {
-            setState(() {
-              searchQuery = value.toLowerCase().trim();
-            });
+            setState(() => searchQuery = value.toLowerCase().trim());
           },
           decoration: InputDecoration(
             hintText: 'البحث في الطلبات...',
@@ -218,15 +347,12 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       searchController.clear();
-                      setState(() {
-                        searchQuery = '';
-                      });
+                      setState(() => searchQuery = '');
                     },
                   )
                 : null,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+                borderRadius: BorderRadius.circular(12)),
             filled: true,
             fillColor: Colors.grey.shade100,
           ),
@@ -249,32 +375,29 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
     ];
 
     return SliverToBoxAdapter(
-      child: Container(
+      child: SizedBox(
         height: 50,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           itemCount: filters.length,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (context, index) {
             final (filter, label, icon) = filters[index];
             final isSelected = selectedFilter == filter;
-
             return ChoiceChip(
-              avatar: Icon(
-                icon,
-                size: 18,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
-              ),
+              avatar: Icon(icon,
+                  size: 18,
+                  color: isSelected ? Colors.white : Colors.grey.shade700),
               label: Text(label),
               selected: isSelected,
-              onSelected: (_) {
-                ref.read(requestFilterProvider.notifier).state = filter;
-              },
+              onSelected: (_) =>
+                  ref.read(requestFilterProvider.notifier).state = filter,
               selectedColor: AppTheme.primaryAmber,
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.grey.shade700,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight:
+                    isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             );
           },
@@ -295,10 +418,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   ) {
     return requestsAsync.when(
       data: (allRequests) {
-        // Apply filters
         var filteredRequests = _applyFilters(allRequests, filter);
 
-        // Apply search
         if (searchQuery.isNotEmpty) {
           filteredRequests = filteredRequests.where((req) {
             final mohaffezName =
@@ -330,6 +451,9 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                 return _RequestCard(
                   request: request,
                   onCancel: () => _handleCancel(context, ref, request),
+                  onPayNow: _requiresPayment(request)
+                      ? () => _navigateToPayment(request)
+                      : null,
                 );
               },
               childCount: filteredRequests.length,
@@ -337,9 +461,9 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           ),
         );
       },
-      loading: () => const SliverFillRemaining(
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator())),
       error: (e, _) => SliverFillRemaining(
         child: ErrorDisplay.dataLoad(
           onRetry: () =>
@@ -368,6 +492,10 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         return requests.where((r) {
           final s = r['status'] as String? ?? '';
           return s == 'awaitingpayment' ||
+              s == 'awaiting_payment' ||
+              s == 'awaitingdirectpayment' ||
+              // also show "sent payment, awaiting teacher confirm" here
+              s == 'awaitingdirectpaymentconfirmation' ||
               s == 'awaiting_direct_payment_confirmation';
         }).toList();
     }
@@ -403,9 +531,15 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
 
     if (requestId == null) return;
 
-    // Only allow cancel for certain statuses
-    final canCancel =
-        ['pending', 'awaitingpayment', 'accepted'].contains(status);
+    final canCancel = [
+      'pending',
+      'awaitingpayment',
+      'awaiting_payment',
+      'accepted',
+      'awaitingdirectpaymentconfirmation',
+      'awaiting_direct_payment_confirmation',
+    ].contains(status);
+
     if (!canCancel) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -416,7 +550,6 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       return;
     }
 
-    // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => Directionality(
@@ -434,8 +567,10 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('إلغاء الطلب'),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('إلغاء الطلب',
+                  style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -443,8 +578,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
     );
 
     if (confirmed != true) return;
+    if (!context.mounted) return;
 
-    // Execute cancellation
     try {
       final bookingService = ref.read(bookingServiceProvider);
       final result = await bookingService.cancelSessionRequest(requestId);
@@ -458,7 +593,6 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             ),
           );
         }
-        // Refresh the list
         final user = ref.read(currentUserProvider).value;
         if (user != null) {
           ref.invalidate(studentRequestsFirstPageProvider(user.uid));
@@ -485,17 +619,19 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
 class _RequestCard extends StatelessWidget {
   final Map<String, dynamic> request;
   final VoidCallback onCancel;
+  final VoidCallback? onPayNow;
 
   const _RequestCard({
     required this.request,
     required this.onCancel,
+    this.onPayNow,
   });
 
   @override
   Widget build(BuildContext context) {
     final mohaffezName = request['mohaffezName'] as String? ?? 'غير معروف';
     final sessionType = request['sessionType'] as String? ?? '';
-    final status = request['status'] as String? ?? 'pending';
+    final status = (request['status'] as String? ?? 'pending').toLowerCase();
     final preferredTimeSlot = request['preferredTimeSlot'] as String? ??
         request['timeSlot'] as String? ??
         '08:00';
@@ -507,11 +643,20 @@ class _RequestCard extends StatelessWidget {
 
     final (statusText, statusColor, statusIcon) = _getStatusInfo(status);
 
-    // Only allow cancel for statuses where it still makes sense
-    final canCancel =
-        ['pending', 'awaitingpayment', 'accepted'].contains(status);
+    // Normalize: covers both spellings from Firestore
+    final isAwaitingDirectConfirmation =
+        status == 'awaitingdirectpaymentconfirmation' ||
+            status == 'awaiting_direct_payment_confirmation';
 
-    // Rejected requests get their own dedicated card
+    final canCancel = [
+      'pending',
+      'awaitingpayment',
+      'awaiting_payment',
+      'accepted',
+      'awaitingdirectpaymentconfirmation',
+      'awaiting_direct_payment_confirmation',
+    ].contains(status);
+
     if (status == 'rejected') {
       return _RejectedRequestCard(
         mohaffezName: mohaffezName,
@@ -539,168 +684,126 @@ class _RequestCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header: Status badge + Cancel ──────────────────────────────
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 16, color: statusColor),
-                      const SizedBox(width: 6),
-                      Text(
-                        statusText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                if (canCancel)
-                  IconButton(
-                    icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-                    onPressed: onCancel,
-                    tooltip: 'إلغاء الطلب',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // ── Mohaffez Name ───────────────────────────────────────────────
-            Text(
-              mohaffezName,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // ── Session type + time chips ───────────────────────────────────
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildDetailChip(Icons.schedule, preferredTimeSlot),
-                _buildDetailChip(
-                    Icons.location_on, _getSessionTypeLabel(sessionType)),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // ── Date row ────────────────────────────────────────────────────
-            Row(
-              children: [
-                Icon(Icons.calendar_today,
-                    size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    slotDate != null
-                        ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate)}'
-                        : 'التاريخ غير محدد',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ),
-                Flexible(
-                  child: Text(
-                    createdAt != null
-                        ? 'طُلب ${DateFormat('dd/MM', 'ar').format(createdAt)}'
-                        : '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // ── AWAITING PAYMENT — pay now block ────────────────────────────
-            if (status == 'awaitingpayment') ...[
-              const SizedBox(height: 12),
+            // ── Header: Status badge + Cancel ────────────────────────────
+            Row(children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.warning_amber,
-                        color: AppThemeConstants.primaryAmber, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'يجب الدفع خلال 10 ساعات لتأكيد الحجز',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppThemeConstants.primaryAmber,
-                        ),
+                    Icon(statusIcon, size: 16, color: statusColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      statusText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
                       ),
                     ),
                   ],
                 ),
               ),
+              const Spacer(),
+              if (canCancel && !isAwaitingDirectConfirmation)
+                IconButton(
+                  icon:
+                      const Icon(Icons.cancel_outlined, color: Colors.red),
+                  onPressed: onCancel,
+                  tooltip: 'إلغاء الطلب',
+                ),
+            ]),
+            const SizedBox(height: 12),
+
+            // ── Mohaffez Name ───────────────────────────────────────────
+            Text(
+              mohaffezName,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+
+            // ── Session type + time chips ───────────────────────────────
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildDetailChip(Icons.schedule, preferredTimeSlot),
+                _buildDetailChip(Icons.location_on,
+                    _getSessionTypeLabel(sessionType)),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // ── Date row ────────────────────────────────────────────────
+            Row(children: [
+              Icon(Icons.calendar_today,
+                  size: 14, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  slotDate != null
+                      ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate)}'
+                      : 'التاريخ غير محدد',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 13, color: Colors.grey.shade700),
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  createdAt != null
+                      ? 'طُلب ${DateFormat('dd/MM', 'ar').format(createdAt)}'
+                      : '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12, color: Colors.grey.shade500),
+                ),
+              ),
+            ]),
+
+            // ── PAY NOW BUTTON ───────────────────────────────────────────
+            if (onPayNow != null) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _navigateToPayment(context),
-                  icon: const Icon(Icons.payment, size: 20),
-                  label: const Text(
-                    'ادفع الآن',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  onPressed: onPayNow,
+                  icon: const Icon(Icons.payment, size: 18),
+                  label: const Text('ادفع الآن'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppThemeConstants.accentGreen,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: onCancel,
-                icon: const Icon(Icons.cancel_outlined,
-                    color: Colors.red, size: 18),
-                label: const Text('إلغاء الطلب',
-                    style: TextStyle(color: Colors.red)),
-              ),
             ],
 
-            // ── AWAITING DIRECT PAYMENT CONFIRMATION ────────────────────────
-            if (status == 'awaiting_direct_payment_confirmation') ...[
+            // ── AWAITING DIRECT PAYMENT CONFIRMATION ─────────────────────
+            // Shown when student has already sent payment and is waiting
+            // for the teacher to confirm receipt.
+            // FIX: Handles both Firestore spellings (with and without underscores)
+            if (isAwaitingDirectConfirmation) ...[
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.surfaceWhite,
+                  color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
+                  border: Border.all(
+                      color: Colors.blue.shade200),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -722,11 +825,11 @@ class _RequestCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'في انتظار تأكيد المعلم باستلام المبلغ. ستصلك إشعار فور التأكيد.',
+                            'في انتظار تأكيد المعلم باستلام المبلغ.'
+                            ' ستصلك إشعار فور التأكيد.',
                             style: TextStyle(
-                              fontSize: 12,
-                              color: AppThemeConstants.textPrimary,
-                            ),
+                                fontSize: 12,
+                                color: AppThemeConstants.textPrimary),
                           ),
                         ],
                       ),
@@ -735,7 +838,6 @@ class _RequestCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              // Allow cancel even in this state
               TextButton.icon(
                 onPressed: onCancel,
                 icon: const Icon(Icons.cancel_outlined,
@@ -750,77 +852,6 @@ class _RequestCard extends StatelessWidget {
     );
   }
 
-  // ── Navigate to payment screen ──────────────────────────────────────────
-  Future<void> _navigateToPayment(BuildContext context) async {
-    final requestId = request['id'] as String?;
-    final mohaffezId = request['mohaffezId'] as String?;
-    final mohaffezName = request['mohaffezName'] as String? ?? '';
-
-    if (requestId == null || mohaffezId == null) return;
-
-    Map<String, dynamic>? lockedRequest;
-    try {
-      final snap = await FirebaseFirestore.instance
-          .collection('sessionRequests')
-          .doc(requestId)
-          .get();
-      lockedRequest = snap.data();
-    } catch (_) {
-      lockedRequest = null;
-    }
-    final resolvedLockedRequest =
-        lockedRequest ?? Map<String, dynamic>.from(request);
-
-    debugPrint(
-      '🔍 [PaymentNav] lockedRequest planId=${resolvedLockedRequest['planId']} paymentAmount=${resolvedLockedRequest['paymentAmount']}',
-    );
-
-    DateTime? slotDate;
-    DateTime? slotStart;
-    DateTime? slotEnd;
-
-    final rawSlotDate = resolvedLockedRequest['slotDate'];
-    final rawSlotStart = resolvedLockedRequest['slotStart'];
-    final rawSlotEnd = resolvedLockedRequest['slotEnd'];
-
-    if (rawSlotDate is Timestamp) slotDate = rawSlotDate.toDate();
-    if (rawSlotDate is DateTime) slotDate = rawSlotDate;
-    if (rawSlotStart is Timestamp) slotStart = rawSlotStart.toDate();
-    if (rawSlotStart is DateTime) slotStart = rawSlotStart;
-    if (rawSlotEnd is Timestamp) slotEnd = rawSlotEnd.toDate();
-    if (rawSlotEnd is DateTime) slotEnd = rawSlotEnd;
-
-    slotDate ??= DateTime.now();
-    slotStart ??= slotDate;
-    slotEnd ??= slotDate.add(const Duration(hours: 1));
-    if (!context.mounted) return;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => StudentPaymentScreen(
-          mohaffezId: mohaffezId,
-          mohaffezName: mohaffezName,
-          requestId: requestId,
-          lockedRequest: resolvedLockedRequest,
-          sessionType: resolvedLockedRequest['sessionType'] as String?,
-          sessionDate: slotDate,
-          timeSlot: resolvedLockedRequest['preferredTimeSlot'] as String? ??
-              resolvedLockedRequest['timeSlot'] as String?,
-          location: resolvedLockedRequest['imamAddressText'] as String?,
-          mohaffezAddress: resolvedLockedRequest['imamAddressText'] as String?,
-          mohaffezLat:
-              (resolvedLockedRequest['imamAddressLat'] as num?)?.toDouble(),
-          mohaffezLng:
-              (resolvedLockedRequest['imamAddressLng'] as num?)?.toDouble(),
-          mohaffezPhone: resolvedLockedRequest['mohaffezPhone'] as String?,
-        ),
-      ),
-    );
-  }
-
-  // ── Helpers ─────────────────────────────────────────────────────────────
-
   Widget _buildDetailChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -833,50 +864,43 @@ class _RequestCard extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: Colors.grey.shade700),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-          ),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13, color: Colors.grey.shade800)),
         ],
       ),
     );
   }
 
   (String, Color, IconData) _getStatusInfo(String status) {
-    // Normalize: trim + lowercase to catch any Firestore inconsistencies
-    final s = status.trim().toLowerCase();
-
-    switch (s) {
+    switch (status.trim().toLowerCase()) {
       case 'pending':
         return ('قيد الانتظار', Colors.orange, Icons.pending);
-
-      // Both spellings — with and without space — handled
       case 'awaitingpayment':
       case 'awaiting_payment':
-        return ('في انتظار الدفع', AppThemeConstants.primaryAmber, Icons.payment);
-
+        return ('في انتظار الدفع', AppThemeConstants.primaryAmber,
+            Icons.payment);
+      case 'awaitingdirectpayment':
+        return ('في انتظار الدفع', AppThemeConstants.primaryAmber,
+            Icons.payment);
+      case 'awaitingdirectpaymentconfirmation':
       case 'awaiting_direct_payment_confirmation':
-        return ('في انتظار تأكيد المعلم', Colors.blue, Icons.hourglass_top);
-
+        return ('في انتظار تأكيد المعلم', Colors.blue,
+            Icons.hourglass_top);
       case 'accepted':
       case 'confirmed':
         return ('مقبول', Colors.green, Icons.check_circle);
-
       case 'rejected':
       case 'declined':
         return ('مرفوض', Colors.red, Icons.cancel);
-
       case 'cancelled':
       case 'canceled':
         return ('ملغي', Colors.grey, Icons.block);
-
       case 'completed':
       case 'done':
         return ('مكتمل', Colors.purple, Icons.done_all);
-
       case 'expired':
         return ('منتهي', Colors.red.shade300, Icons.timer_off);
-
       default:
         debugPrint('⚠️ Unknown request status: "$status"');
         return ('غير معروف', Colors.grey, Icons.help_outline);
@@ -934,125 +958,102 @@ class _RejectedRequestCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.cancel, size: 16, color: Colors.red),
-                      SizedBox(width: 6),
-                      Text(
-                        'مرفوض',
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cancel, size: 16, color: Colors.red),
+                    SizedBox(width: 6),
+                    Text('مرفوض',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red)),
+                  ],
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                  onPressed: onDismiss,
-                  tooltip: 'حذف',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Mohaffez Name
-            Text(
-              mohaffezName,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
               ),
-            ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey),
+                onPressed: onDismiss,
+                tooltip: 'حذف',
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Text(mohaffezName,
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-
-            // Session Details
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 _buildDetailChip(Icons.schedule, preferredTimeSlot),
-                _buildDetailChip(
-                    Icons.location_on, _getSessionTypeLabel(sessionType)),
+                _buildDetailChip(Icons.location_on,
+                    _getSessionTypeLabel(sessionType)),
               ],
             ),
             const SizedBox(height: 12),
-
-            // Date Info
-            Row(
-              children: [
-                Icon(Icons.calendar_today,
-                    size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    slotDate != null
-                        ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate!)}'
-                        : 'التاريخ غير محدد',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
+            Row(children: [
+              Icon(Icons.calendar_today,
+                  size: 14, color: Colors.grey.shade600),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  slotDate != null
+                      ? 'الموعد: ${DateFormat('dd/MM/yyyy', 'ar').format(slotDate!)}'
+                      : 'التاريخ غير محدد',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 13, color: Colors.grey.shade700),
                 ),
-                Flexible(
-                  child: Text(
-                    requestDate != null
-                        ? 'طُلب ${DateFormat('dd/MM', 'ar').format(requestDate!)}'
-                        : '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
+              ),
+              Flexible(
+                child: Text(
+                  requestDate != null
+                      ? 'طُلب ${DateFormat('dd/MM', 'ar').format(requestDate!)}'
+                      : '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12, color: Colors.grey.shade500),
                 ),
-              ],
-            ),
-
-            // Rejection Reason
-            if (rejectionReason != null && rejectionReason!.isNotEmpty) ...[
+              ),
+            ]),
+            if (rejectionReason != null &&
+                rejectionReason!.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                  color: AppThemeConstants.primaryAmber
+                      .withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
+                  border: Border.all(
+                      color: AppThemeConstants.primaryAmber
+                          .withValues(alpha: 0.4)),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline,
-                        color: AppThemeConstants.primaryAmber, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'السبب: $rejectionReason',
-                        style: const TextStyle(
+                child: Row(children: [
+                  const Icon(Icons.info_outline,
+                      color: AppThemeConstants.primaryAmber, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'السبب: $rejectionReason',
+                      style: const TextStyle(
                           fontSize: 13,
-                          color: AppThemeConstants.primaryAmber,
-                        ),
-                      ),
+                          color: AppThemeConstants.primaryAmber),
                     ),
-                  ],
-                ),
+                  ),
+                ]),
               ),
             ],
           ],
@@ -1063,7 +1064,8 @@ class _RejectedRequestCard extends StatelessWidget {
 
   Widget _buildDetailChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(8),
@@ -1073,15 +1075,11 @@ class _RejectedRequestCard extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: Colors.grey.shade700),
           const SizedBox(width: 6),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade800,
-            ),
-          ),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 13, color: Colors.grey.shade800)),
         ],
       ),
     );
@@ -1100,5 +1098,3 @@ class _RejectedRequestCard extends StatelessWidget {
     }
   }
 }
-
-

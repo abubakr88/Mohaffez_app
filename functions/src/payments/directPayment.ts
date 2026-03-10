@@ -1,401 +1,486 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { db, FieldValue } from "../utils/admin";
+// FIX (Bug 3): Import parseFlutterDate so slot timestamps are stored as UTC,
+// not shifted by the server's local timezone.
+import {
+  getWeekNumber,
+  getWeekStart,
+  getWeekEnd,
+  getNextMonday,
+  parseFlutterDate,
+} from "../utils/dateHelpers";
 
 const COMMISSION_RATE = 0.05;
+
 const STATUS = {
-  PENDING: 'pending',
-  AWAITING_PAYMENT: 'awaitingpayment',
-  AWAITING_DIRECT: 'awaitingdirectpaymentconfirmation',
-  ACCEPTED: 'accepted',
-  REJECTED: 'rejected',
-  CANCELLED: 'cancelled',
+  PENDING: "pending",
+  AWAITINGPAYMENT: "awaitingpayment",
+  AWAITINGDIRECT: "awaitingdirectpaymentconfirmation",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  CANCELLED: "cancelled",
 } as const;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function getWeekEnd(date: Date): Date {
-  const ws = getWeekStart(date);
-  ws.setDate(ws.getDate() + 6);
-  ws.setHours(23, 59, 59, 999);
-  return ws;
-}
-function getNextMonday(date: Date): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + 1);
-  d.setHours(12, 0, 0, 0);
-  return d;
-}
-
-// ─── 1. Student marks that they've paid ───────────────────────────────────────
+// 1. Student marks that they've paid
 export const studentMarkedDirectPayment = functions.https.onCall(
   async (data, context) => {
-    if (!context.auth)
-      throw new functions.https.HttpsError("unauthenticated", "غير مصادق عليه");
-
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "");
     const studentId = context.auth.uid;
+
     const {
-      requestId, mohaffezId, mohaffezName, studentName,
-      amount, sessionType, preferredTimeSlot,
-      slotDate, slotStart, slotEnd,
-      paymentMethod, studentNote,
-      imamAddressText, imamAddressLat, imamAddressLng, mohaffezPhone,
+      requestId,       // WHY: nullable — Path C (fresh booking) has no prior sessionRequest
+      mohaffezId,
+      mohaffezName,
+      studentName,
+      amount,
+      sessionType,
+      preferredTimeSlot,
+      slotDate,
+      slotStart,
+      slotEnd,
+      paymentMethod,
+      studentNote,
+      imamAddressText,
+      imamAddressLat,
+      imamAddressLng,
+      mohaffezPhone,
+      planType,
+      planId,
+      planTitle, // FIX BUG-13: Accept planTitle from client
+      sessionsCount,
+      validityDays,
     } = data;
 
-    if (!requestId || !mohaffezId || !amount || !paymentMethod)
-      throw new functions.https.HttpsError("invalid-argument", "بيانات غير مكتملة");
+    const finalPlanType = (planType as string | undefined) ?? "single";
+    const finalPlanId = (planId as string | undefined) ?? "";
+    const finalPlanTitle = (planTitle as string | undefined) ?? ""; // FIX BUG-13
+    const finalSessionsCount = (sessionsCount as number | undefined) ?? 1;
+    const finalValidityDays = (validityDays as number | null | undefined) ?? null;
 
-    return db.runTransaction(async (tx) => {
-      const reqRef = db.collection("sessionRequests").doc(requestId);
-      const reqSnap = await tx.get(reqRef);
-      if (!reqSnap.exists)
-        throw new functions.https.HttpsError("not-found", "الطلب غير موجود");
+    // FIX: requestId is now OPTIONAL (Path C has no prior sessionRequest).
+    // Only mohaffezId, amount, and paymentMethod are always required.
+    if (!mohaffezId || !amount || !paymentMethod)
+      throw new functions.https.HttpsError("invalid-argument", "Missing required fields");
 
-      const reqData = reqSnap.data()!;
+    // FIX BUG-14: Validate slot date format before parsing
+    if (!slotDate || !slotStart || !slotEnd)
+      throw new functions.https.HttpsError("invalid-argument", "Missing slot time fields");
 
-      if (reqData.status === STATUS.ACCEPTED)
-        throw new functions.https.HttpsError("already-exists",
-          JSON.stringify({ success: true, message: "الجلسة مقبولة بالفعل" }));
+    // FIX BUG-16: Validate future date
+    const parsedSlotDate = parseFlutterDate(slotDate as string);
+    if (parsedSlotDate < new Date()) {
+      throw new functions.https.HttpsError("invalid-argument", "Cannot book slots in the past");
+    }
 
-      if (reqData.status === STATUS.AWAITING_DIRECT)
-        throw new functions.https.HttpsError("already-exists",
-          JSON.stringify({ success: true, message: "تم إرسال إشعار الدفع بالفعل، انتظر تأكيد المحفظ" }));
+    return db
+      .runTransaction(async (tx) => {
 
-      if (reqData.status !== STATUS.AWAITING_PAYMENT) {
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          `Cannot mark payment: request status is '${reqData.status}', expected 'awaitingpayment'.`
-        );
-      }
+        // ── Optional: only process sessionRequest if one was linked ──────────
+        if (requestId) {
+          const reqRef = db.collection("sessionRequests").doc(requestId as string);
+          const reqSnap = await tx.get(reqRef);
+          if (!reqSnap.exists)
+            throw new functions.https.HttpsError("not-found", "sessionRequest not found");
+          const reqData = reqSnap.data()!;
 
-      const dpRef = db.collection("directPaymentRequests").doc();
-      tx.set(dpRef, {
-        id: dpRef.id,
-        sessionRequestId: requestId,
-        studentId, studentName, mohaffezId, mohaffezName,
-        amount,
-        commissionAmount: amount * COMMISSION_RATE,
-        commissionRate: COMMISSION_RATE,
-        sessionType, preferredTimeSlot,
-        sessionDate: admin.firestore.Timestamp.fromDate(new Date(slotDate)),
-        slotStart: admin.firestore.Timestamp.fromDate(new Date(slotStart)),
-        slotEnd: admin.firestore.Timestamp.fromDate(new Date(slotEnd)),
-        imamAddressText: imamAddressText || null,
-        imamAddressLat: imamAddressLat || null,
-        imamAddressLng: imamAddressLng || null,
-        mohaffezPhone: mohaffezPhone || null,
-        paymentMethod,
-        studentNote: studentNote || null,
-        status: "pending_confirmation",
-        studentConfirmedAt: FieldValue.serverTimestamp(),
-        mohaffezConfirmedAt: null,
-        sessionId: null,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+          // Idempotency guards
+          if (reqData.status === STATUS.ACCEPTED)
+            throw new functions.https.HttpsError(
+              "already-exists",
+              JSON.stringify({ success: true, message: "Already confirmed" })
+            );
+          if (reqData.status === STATUS.AWAITINGDIRECT)
+            throw new functions.https.HttpsError(
+              "already-exists",
+              JSON.stringify({ success: true, message: "Already marked as paid" })
+            );
 
-      tx.update(reqRef, {
-        status: STATUS.AWAITING_DIRECT,
-        directPaymentRequestId: dpRef.id,
-        directPaymentMethod: paymentMethod,
-        directPaymentAmount: amount,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+          const isDirectPaymentPath =
+            reqData.selectedPaymentMethod === "directpayment";
+          const acceptableStatuses: string[] = [STATUS.AWAITINGPAYMENT];
+          if (isDirectPaymentPath) acceptableStatuses.push(STATUS.PENDING);
 
-      // Notify mohaffez
-      const notifRef = db.collection("notifications").doc();
-      tx.set(notifRef, {
-        userId: mohaffezId, recipientId: mohaffezId, senderId: studentId,
-        title: "💰 طالب يدعي دفع الرسوم",
-        body: `${studentName} يقول أنه أرسل ${amount} ج.م عبر ${paymentMethod}`,
-        type: "direct_payment_pending",
-        isRead: false,
-        data: {
+          if (!acceptableStatuses.includes(reqData.status as string))
+            throw new functions.https.HttpsError(
+              "failed-precondition",
+              `Cannot mark payment: request status is ${reqData.status as string}.`
+            );
+
+          // Update linked sessionRequest
+          tx.update(reqRef, {
+            status: STATUS.AWAITINGDIRECT,
+            directPaymentRequestId: "", // filled below after dpRef is created
+            directPaymentMethod: paymentMethod,
+            directPaymentAmount: amount,
+            updatedAt: FieldValue.serverTimestamp(),
+            planType: finalPlanType,
+            planId: finalPlanId,
+            planTitle: finalPlanTitle, // FIX BUG-13
+            sessionsCount: finalSessionsCount,
+            validityDays: finalValidityDays,
+          });
+        }
+
+        // ── Always: create directPaymentRequest ──────────────────────────────
+        const dpRef = db.collection("directPaymentRequests").doc();
+
+        tx.set(dpRef, {
+          id: dpRef.id,
+          // WHY: null when Path C — mohaffez confirm flow still works because
+          // mohaffezConfirmDirectPayment checks dp.sessionRequestId and only
+          // updates the request doc when it is non-null.
+          sessionRequestId: (requestId as string | undefined) ?? null,
+          studentId,
+          studentName,
+          mohaffezId,
+          mohaffezName,
+          amount,
+          commissionAmount: (amount as number) * COMMISSION_RATE,
+          commissionRate: COMMISSION_RATE,
+          sessionType,
+          preferredTimeSlot,
+          sessionDate: admin.firestore.Timestamp.fromDate(
+            parseFlutterDate(slotDate as string)
+          ),
+          slotStart: admin.firestore.Timestamp.fromDate(
+            parseFlutterDate(slotStart as string)
+          ),
+          slotEnd: admin.firestore.Timestamp.fromDate(
+            parseFlutterDate(slotEnd as string)
+          ),
+          imamAddressText: imamAddressText ?? null,
+          imamAddressLat: imamAddressLat ?? null,
+          imamAddressLng: imamAddressLng ?? null,
+          mohaffezPhone: mohaffezPhone ?? null,
+          paymentMethod,
+          studentNote: studentNote ?? null,
+          status: "pendingconfirmation",
+          studentConfirmedAt: FieldValue.serverTimestamp(),
+          mohaffezConfirmedAt: null,
+          sessionId: null,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          planType: finalPlanType,
+          planId: finalPlanId,
+          planTitle: finalPlanTitle, // FIX BUG-13
+          sessionsCount: finalSessionsCount,
+          validityDays: finalValidityDays,
+        });
+
+        // Update requestId with dpRef.id if request exists
+        if (requestId) {
+          tx.update(db.collection("sessionRequests").doc(requestId as string), {
+            directPaymentRequestId: dpRef.id,
+          });
+        }
+
+        // ── Notify mohaffez ───────────────────────────────────────────────────
+        const notifRef = db.collection("notifications").doc();
+        tx.set(notifRef, {
+          userId: mohaffezId,
+          recipientId: mohaffezId,
+          senderId: studentId,
+          title:
+            finalPlanType === "bundle" || finalPlanType === "subscription"
+              ? "طلب دفع مباشر لباقة"
+              : "طلب دفع مباشر",
+          body:
+            finalPlanType === "bundle" || finalPlanType === "subscription"
+              ? `${studentName} أكد دفع ${amount} جنيه. الباقة: ${finalPlanTitle} (${finalSessionsCount} جلسات). الطريقة: ${paymentMethod}`
+              : `${studentName} أكد دفع ${amount} جنيه. الطريقة: ${paymentMethod}`,
+          type: "directpaymentpending",
+          isRead: false,
+          data: {
+            directPaymentRequestId: dpRef.id,
+            sessionRequestId: (requestId as string | undefined) ?? null,
+            studentId,
+            studentName,
+            amount: (amount as number).toString(),
+            paymentMethod,
+            planType: finalPlanType,
+            planId: finalPlanId,
+            planTitle: finalPlanTitle,
+            sessionsCount: finalSessionsCount,
+            validityDays: finalValidityDays,
+          },
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+        return {
+          success: true,
           directPaymentRequestId: dpRef.id,
-          sessionRequestId: requestId,
-          studentId, studentName,
-          amount: amount.toString(), paymentMethod,
-        },
-        createdAt: FieldValue.serverTimestamp(),
+          message: "تم إرسال إشعار للمحفظ. يرجى الانتظار حتى يؤكد استلام المبلغ.",
+        };
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string }).code === "already-exists")
+          return JSON.parse((e as Error).message);
+        throw e;
       });
-
-      return { success: true, directPaymentRequestId: dpRef.id,
-        message: "تم إرسال إشعار الدفع للمحفظ. انتظر التأكيد." };
-
-    }).catch((e) => {
-      if (e.code === "already-exists") return JSON.parse(e.message);
-      throw e;
-    });
   }
 );
 
-// ─── 2. Mohaffez confirms payment received → session auto-accepted ─────────────
+// 2. Mohaffez confirms payment received → session auto-accepted
 export const mohaffezConfirmDirectPayment = functions.https.onCall(
   async (data, context) => {
-    if (!context.auth)
-      throw new functions.https.HttpsError("unauthenticated", "غير مصادق عليه");
-
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "");
     const mohaffezId = context.auth.uid;
-    const { directPaymentRequestId } = data;
+
+    // FIX BUG-10: Validate caller is actually a mohaffez
+    const callerDoc = await db.collection('users').doc(mohaffezId).get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== 'mohaffez') {
+      throw new functions.https.HttpsError('permission-denied', 'Caller must be a mohaffez');
+    }
+
+    const directPaymentRequestId = data as string;
     if (!directPaymentRequestId)
-      throw new functions.https.HttpsError("invalid-argument", "معرف الطلب مطلوب");
+      throw new functions.https.HttpsError("invalid-argument", "directPaymentRequestId required");
 
-    return db.runTransaction(async (tx) => {
-      const dpRef = db.collection("directPaymentRequests").doc(directPaymentRequestId);
-      const dpSnap = await tx.get(dpRef);
-      if (!dpSnap.exists) throw new functions.https.HttpsError("not-found", "طلب الدفع غير موجود");
+    return db
+      .runTransaction(async (tx) => {
+        const dpRef = db
+          .collection("directPaymentRequests")
+          .doc(directPaymentRequestId);
+        const dpSnap = await tx.get(dpRef);
+        if (!dpSnap.exists) throw new functions.https.HttpsError("not-found", "Payment request not found");
+        const dp = dpSnap.data()!;
 
-      const dp = dpSnap.data()!;
-      if (dp.mohaffezId !== mohaffezId)
-        throw new functions.https.HttpsError("permission-denied", "غير مصرح لك");
+        if (dp.mohaffezId !== mohaffezId)
+          throw new functions.https.HttpsError("permission-denied", "This payment is not for you");
 
-      if (dp.status === "confirmed")
-        throw new functions.https.HttpsError("already-exists",
-          JSON.stringify({ success: true, sessionId: dp.sessionId, message: "تم التأكيد مسبقاً" }));
+        if (dp.status === "confirmed")
+          throw new functions.https.HttpsError(
+            "already-exists",
+            JSON.stringify({ success: true, sessionId: dp.sessionId, message: "Already confirmed" })
+          );
 
-      const reqRef = db.collection("sessionRequests").doc(dp.sessionRequestId);
-      const reqSnap = await tx.get(reqRef);
-      if (!reqSnap.exists) throw new functions.https.HttpsError("not-found", "الطلب غير موجود");
+        // FIX: sessionRequestId is now optional (Path C has no prior request).
+        // Only read/validate/update the sessionRequest doc when it exists.
+        let reqRef: FirebaseFirestore.DocumentReference | null = null;
 
-      const reqData = reqSnap.data()!;
+        if (dp.sessionRequestId) {
+          reqRef = db
+            .collection("sessionRequests")
+            .doc(dp.sessionRequestId as string);
+          const reqSnap = await tx.get(reqRef);
 
-      // BUG-2 FIX: Idempotency - if already accepted, return the existing sessionId
-      if (reqData.status === STATUS.ACCEPTED) {
-        throw new functions.https.HttpsError(
-          'already-exists',
-          JSON.stringify({
-            success: true,
-            sessionId: reqData.sessionId ?? dp.sessionId,
-            message: 'Session already confirmed.',
-          })
-        );
-      }
+          if (!reqSnap.exists)
+            throw new functions.https.HttpsError("not-found", "sessionRequest not found");
 
-      // Safety guard: only proceed from the expected state
-      if (reqData.status !== STATUS.AWAITING_DIRECT) {
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          `Cannot confirm payment: request is in status '${reqData.status}', ` +
-          `expected '${STATUS.AWAITING_DIRECT}'.`
-        );
-      }
+          const reqData = reqSnap.data()!;
 
-      const sessionRef = db.collection("hafizSessions").doc();
+          if (reqData.status === STATUS.ACCEPTED)
+            throw new functions.https.HttpsError(
+              "already-exists",
+              JSON.stringify({ success: true, message: "Session already accepted" })
+            );
+        }
 
-      // Create hafiz session
-      tx.set(sessionRef, {
-        requestId: dp.sessionRequestId, directPaymentRequestId,
-        mohaffezId, studentId: dp.studentId,
-        mohaffezName: dp.mohaffezName, studentName: dp.studentName,
-        sessionType: dp.sessionType,
-        location: dp.imamAddressText || "",
-        mohaffezPhone: dp.mohaffezPhone || null,
-        imamAddressLat: dp.imamAddressLat || null,
-        imamAddressLng: dp.imamAddressLng || null,
-        imamAddressText: dp.imamAddressText || null,
-        preferredTimeSlot: dp.preferredTimeSlot,
-        timeSlot: dp.preferredTimeSlot,
-        sessionDate: dp.sessionDate,
-        slotStart: dp.slotStart,
-        slotEnd: dp.slotEnd,
-        status: STATUS.ACCEPTED,
-        isPaid: true,
-        sessionPrice: dp.amount,
-        paymentMethod: dp.paymentMethod,
-        createdAt: FieldValue.serverTimestamp(),
-        acceptedAt: FieldValue.serverTimestamp(),
-        reminder24hSent: false, reminder1hSent: false,
-        juzCount: 1, sessionRating: 10,
+        // ── Create hafizSession (ONLY place for single direct payments) ──────
+        const sessionRef = db.collection("hafizSessions").doc();
+
+        const sessionDate = dp.sessionDate as admin.firestore.Timestamp;
+        const slotStart = dp.slotStart as admin.firestore.Timestamp;
+        const slotEnd = dp.slotEnd as admin.firestore.Timestamp;
+
+        tx.set(sessionRef, {
+          requestId: (dp.sessionRequestId as string | null) ?? null,
+          mohaffezId,
+          studentId: dp.studentId,
+          mohaffezName: dp.mohaffezName,
+          studentName: dp.studentName,
+          sessionType: dp.sessionType,
+          preferredTimeSlot: dp.preferredTimeSlot,
+          sessionDate,
+          slotStart,
+          slotEnd,
+          status: "accepted",
+          isPaid: true,
+          sessionPrice: dp.amount,
+          paymentType: "directpayment",
+          directPaymentRequestId,
+          mohaffezPhone: dp.mohaffezPhone ?? null,
+          imamAddressText: dp.imamAddressText ?? null,
+          imamAddressLat: dp.imamAddressLat ?? null,
+          imamAddressLng: dp.imamAddressLng ?? null,
+          createdAt: FieldValue.serverTimestamp(),
+          acceptedAt: FieldValue.serverTimestamp(),
+          reminder24hSent: false,
+          reminder1hSent: false,
+          juzCount: 1,
+          sessionRating: 10,
+          notificationsAlreadySent: true, // FIX BUG-12: Prevent duplicate notifications
+        });
+
+        // ── Update directPaymentRequest ──────────────────────────────────────
+        tx.update(dpRef, {
+          status: "confirmed",
+          sessionId: sessionRef.id,
+          mohaffezConfirmedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        // ── Update sessionRequest if it exists ───────────────────────────────
+        if (reqRef) {
+          tx.update(reqRef, {
+            status: STATUS.ACCEPTED,
+            isPaid: true,
+            paidAt: FieldValue.serverTimestamp(),
+            sessionId: sessionRef.id,
+            directPaymentConfirmedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+
+        // ── Commission tracking ──────────────────────────────────────────────
+        const commissionAmount = (dp.amount as number) * COMMISSION_RATE;
+        const sessionDateObj = sessionDate.toDate();
+        const weekNumber = getWeekNumber(sessionDateObj);
+        const year = sessionDateObj.getFullYear();
+        const weekStart = getWeekStart(sessionDateObj);
+        const weekEnd = getWeekEnd(sessionDateObj);
+        const dueDate = getNextMonday(sessionDateObj);
+
+        const commissionId = `${mohaffezId}_${year}_W${weekNumber}`;
+        const commissionRef = db.collection("weeklyCommissions").doc(commissionId);
+        const commissionSnap = await tx.get(commissionRef);
+
+        if (commissionSnap.exists) {
+          tx.update(commissionRef, {
+            totalSessions: FieldValue.increment(1),
+            totalRevenue: FieldValue.increment(dp.amount as number),
+            commissionAmount: FieldValue.increment(commissionAmount),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          tx.set(commissionRef, {
+            mohaffezId,
+            mohaffezName: dp.mohaffezName,
+            weekNumber,
+            year,
+            totalSessions: 1,
+            totalRevenue: dp.amount,
+            commissionAmount,
+            commissionRate: COMMISSION_RATE,
+            status: "pending",
+            weekStart: admin.firestore.Timestamp.fromDate(weekStart),
+            weekEnd: admin.firestore.Timestamp.fromDate(weekEnd),
+            dueDate: admin.firestore.Timestamp.fromDate(dueDate),
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+
+        // ── Notify student ────────────────────────────────────────────────────
+        const notifRef = db.collection("notifications").doc();
+        tx.set(notifRef, {
+          userId: dp.studentId,
+          recipientId: dp.studentId,
+          senderId: mohaffezId,
+          title: "تم تأكيد الدفع المباشر!",
+          body: `${dp.mohaffezName as string} أكد استلام المبلغ! تم تأكيد جلستك تلقائياً`,
+          type: "directpaymentconfirmed",
+          isRead: false,
+          data: {
+            sessionId: sessionRef.id,
+            sessionRequestId: (dp.sessionRequestId as string | null) ?? null,
+            directPaymentRequestId,
+          },
+          createdAt: FieldValue.serverTimestamp(),
+        });
+
+        return { success: true, sessionId: sessionRef.id, message: "تم تأكيد الدفع! تم إنشاء الجلسة تلقائياً" };
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string }).code === "already-exists")
+          return JSON.parse((e as Error).message);
+        functions.logger.error("mohaffezConfirmDirectPayment failed", e);
+        throw e;
       });
-
-      // Update request
-      tx.update(reqRef, {
-        status: STATUS.ACCEPTED, isPaid: true,
-        paidAt: FieldValue.serverTimestamp(),
-        sessionId: sessionRef.id,
-        directPaymentConfirmedAt: FieldValue.serverTimestamp(),
-        notificationsAlreadySent: true,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-
-      // Update direct payment record
-      tx.update(dpRef, {
-        status: "confirmed", sessionId: sessionRef.id,
-        mohaffezConfirmedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-
-      // Track commission
-      const now = new Date();
-      const weekNumber = getWeekNumber(now);
-      const weekStart = getWeekStart(now);
-      const weekEnd = getWeekEnd(now);
-
-      const commRef = db.collection("commissions").doc();
-      tx.set(commRef, {
-        id: commRef.id, mohaffezId, mohaffezName: dp.mohaffezName,
-        studentId: dp.studentId, sessionId: sessionRef.id,
-        directPaymentRequestId, sessionRequestId: dp.sessionRequestId,
-        amount: dp.amount, commissionAmount: dp.commissionAmount,
-        commissionRate: COMMISSION_RATE, paymentMethod: dp.paymentMethod,
-        status: STATUS.PENDING, weekNumber, year: now.getFullYear(),
-        weekStart: admin.firestore.Timestamp.fromDate(weekStart),
-        weekEnd: admin.firestore.Timestamp.fromDate(weekEnd),
-        createdAt: FieldValue.serverTimestamp(), paidAt: null,
-      });
-
-      // Upsert weekly summary
-      const summaryId = `${mohaffezId}_${now.getFullYear()}_w${weekNumber}`;
-      const summaryRef = db.collection("weeklyCommissionSummaries").doc(summaryId);
-      tx.set(summaryRef, {
-        mohaffezId, mohaffezName: dp.mohaffezName,
-        weekNumber, year: now.getFullYear(),
-        weekStart: admin.firestore.Timestamp.fromDate(weekStart),
-        weekEnd: admin.firestore.Timestamp.fromDate(weekEnd),
-        totalSessions: FieldValue.increment(1),
-        totalRevenue: FieldValue.increment(dp.amount),
-        commissionAmount: FieldValue.increment(dp.commissionAmount),
-        commissionRate: COMMISSION_RATE, status: STATUS.PENDING,
-        dueDate: admin.firestore.Timestamp.fromDate(getNextMonday(weekEnd)),
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-
-      // Notify student
-      const notifRef = db.collection("notifications").doc();
-      tx.set(notifRef, {
-        userId: dp.studentId, recipientId: dp.studentId, senderId: mohaffezId,
-        title: "✅ تم تأكيد الدفع!",
-        body: `${dp.mohaffezName} أكد استلام دفعتك. تم قبول الجلسة!`,
-        type: "direct_payment_confirmed", isRead: false,
-        data: { sessionId: sessionRef.id, sessionRequestId: dp.sessionRequestId,
-          directPaymentRequestId },
-        createdAt: FieldValue.serverTimestamp(),
-      });
-
-      return { success: true, sessionId: sessionRef.id,
-        message: "تم تأكيد الدفع وقبول الجلسة!" };
-
-    }).catch((e) => {
-      if (e.code === "already-exists") return JSON.parse(e.message);
-      functions.logger.error("mohaffezConfirmDirectPayment failed", { e });
-      throw e;
-    });
   }
 );
 
-// ─── 3. Mohaffez rejects payment (student didn't pay) ─────────────────────────
-// ✅ FIX: Changed from db.batch() to db.runTransaction() so the status
-//    re-check at dp.status happens on a consistent snapshot, preventing
-//    a race condition where confirm and reject execute simultaneously.
+// 3. Mohaffez rejects payment (student didn't pay)
 export const mohaffezRejectDirectPayment = functions.https.onCall(
   async (data, context) => {
-    if (!context.auth) {
-      throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
-    }
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "");
     const mohaffezId = context.auth.uid;
-    const { directPaymentRequestId, rejectionReason } = data;
 
-    if (!directPaymentRequestId) {
-      throw new functions.https.HttpsError('invalid-argument', 'directPaymentRequestId مطلوب');
+    // FIX BUG-10: Validate caller is actually a mohaffez
+    const callerDoc = await db.collection('users').doc(mohaffezId).get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== 'mohaffez') {
+      throw new functions.https.HttpsError('permission-denied', 'Caller must be a mohaffez');
     }
 
-    return db.runTransaction(async (tx) => {
-      // ── READ (inside transaction — guarantees latest snapshot) ────────────
-      const dpRef  = db.collection('directPaymentRequests').doc(directPaymentRequestId);
-      const dpSnap = await tx.get(dpRef);   // ✅ was: dpRef.get() outside transaction
+    const { directPaymentRequestId, rejectionReason } = data;
+    if (!directPaymentRequestId)
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "directPaymentRequestId required"
+      );
 
-      if (!dpSnap.exists) {
-        throw new functions.https.HttpsError('not-found', 'طلب الدفع غير موجود');
-      }
-      const dp = dpSnap.data()!;
+    return db
+      .runTransaction(async (tx) => {
+        const dpRef = db
+          .collection("directPaymentRequests")
+          .doc(directPaymentRequestId);
+        const dpSnap = await tx.get(dpRef);
+        if (!dpSnap.exists) throw new functions.https.HttpsError("not-found", "Payment request not found");
+        const dp = dpSnap.data()!;
 
-      if (dp.mohaffezId !== mohaffezId) {
-        throw new functions.https.HttpsError('permission-denied', 'غير مصرح لك');
-      }
+        if (dp.mohaffezId !== mohaffezId)
+          throw new functions.https.HttpsError("permission-denied", "This payment is not for you");
 
-      // ── STATUS GUARD (now atomic — no TOCTOU race) ────────────────────────
-      if (dp.status === 'confirmed') {
-        // Cannot reject an already-confirmed payment
-        throw new functions.https.HttpsError(
-          'failed-precondition',
-          'تم تأكيد الدفع بالفعل ولا يمكن رفضه',
-        );
-      }
+        if (dp.status === "confirmed")
+          throw new functions.https.HttpsError("failed-precondition", "Cannot reject confirmed payment");
+        if (dp.status === "rejected")
+          throw new functions.https.HttpsError(
+            "already-exists",
+            JSON.stringify({ success: true, message: "Already rejected" })
+          );
 
-      if (dp.status === STATUS.REJECTED) {
-        // Idempotent early return
-        throw new functions.https.HttpsError(
-          'already-exists',
-          JSON.stringify({ success: true, message: 'تم الرفض مسبقاً' }),
-        );
-      }
+        tx.update(dpRef, {
+          status: "rejected",
+          rejectionReason: rejectionReason ?? null,
+          mohaffezRejectedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
 
-      // ── READS for related docs ─────────────────────────────────────────────
-      const reqRef  = db.collection('sessionRequests').doc(dp.sessionRequestId);
-      const reqSnap = await tx.get(reqRef);
+        if (dp.sessionRequestId) {
+          const reqRef = db.collection("sessionRequests").doc(dp.sessionRequestId as string);
+          tx.update(reqRef, {
+            status: STATUS.AWAITINGPAYMENT,
+            directPaymentRequestId: null,
+            directPaymentRejectedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
 
-      if (!reqSnap.exists) {
-        throw new functions.https.HttpsError('not-found', 'طلب الجلسة غير موجود');
-      }
+        const notifRef = db.collection("notifications").doc();
+        tx.set(notifRef, {
+          userId: dp.studentId,
+          recipientId: dp.studentId,
+          senderId: mohaffezId,
+          title: "تم رفض الدفع المباشر",
+          body: rejectionReason
+            ? `${dp.mohaffezName} رفض طلب الدفع: ${rejectionReason}`
+            : `${dp.mohaffezName} رفض طلب الدفع`,
+          type: "directpaymentrejected",
+          isRead: false,
+          data: {
+            sessionRequestId: dp.sessionRequestId,
+            directPaymentRequestId,
+          },
+          createdAt: FieldValue.serverTimestamp(),
+        });
 
-      // ── WRITES ────────────────────────────────────────────────────────────
-      const notifRef = db.collection('notifications').doc();
-
-      tx.update(dpRef, {
-        status:             STATUS.REJECTED,
-        rejectionReason:    rejectionReason || '',
-        mohaffezConfirmedAt: FieldValue.serverTimestamp(),
-        updatedAt:           FieldValue.serverTimestamp(),
+        return { success: true, message: "تم رفض طلب الدفع" };
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string }).code === "already-exists")
+          return JSON.parse((e as Error).message);
+        throw e;
       });
-
-      const retryDeadline = new Date();
-      retryDeadline.setHours(retryDeadline.getHours() + 24);
-
-      tx.update(reqRef, {
-        paymentDeadline:           admin.firestore.Timestamp.fromDate(retryDeadline),
-        reminderSent:              false,
-        status:                  STATUS.AWAITING_PAYMENT,
-        directPaymentRejectedAt:  FieldValue.serverTimestamp(),
-        updatedAt:                FieldValue.serverTimestamp(),
-      });
-
-      tx.set(notifRef, {
-        userId:      dp.studentId,
-        recipientId: dp.studentId,
-        senderId:    mohaffezId,
-        title:       'لم يتم تأكيد دفعتك',
-        body:        `${dp.mohaffezName} لم يتأكد من استلام دفعتك. يرجى المحاولة مرة أخرى.`,
-        type:        'directpaymentrejected',
-        isRead:      false,
-        data: {
-          sessionRequestId:      dp.sessionRequestId,
-          directPaymentRequestId,
-          rejectionReason:       rejectionReason || '',
-        },
-        createdAt: FieldValue.serverTimestamp(),
-      });
-
-      return { success: true, message: 'تم رفض الدفع وإعادة الطالب لمرحلة الدفع' };
-
-    }).catch((e: any) => {
-      if (e.code === 'already-exists') return JSON.parse(e.message);
-      functions.logger.error('mohaffezRejectDirectPayment failed', e);
-      throw e;
-    });
-  },
+  }
 );
-
-

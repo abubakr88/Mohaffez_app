@@ -134,7 +134,9 @@ class StudentHomeContent extends ConsumerWidget {
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Column(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -192,6 +194,7 @@ class StudentHomeContent extends ConsumerWidget {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
           ),

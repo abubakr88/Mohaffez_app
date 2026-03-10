@@ -3,6 +3,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { db, FieldValue } from "../utils/admin";
+import { EventStore } from "../services/EventStore";
 
 const STATUS = {
   PENDING: 'pending',
@@ -446,28 +447,8 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         status: "completed",
         paidAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-        subscriptionId: sessionRef.id,
+        sessionId: sessionRef.id,
         notes: "Free session via promo code",
-      });
-
-      // Log payment event
-      const eventRef = db.collection("paymentEvents").doc();
-      transaction.set(eventRef, {
-        eventId: eventRef.id,
-        eventType: "payment_completed",
-        paymentId: paymentId,
-        userId: studentId,
-        data: {
-          amount: 0,
-          method: "free",
-          promoCode: promoCode,
-          sessionId: sessionRef.id,
-        },
-        metadata: {
-          source: "cloud_function",
-          notes: "Free session confirmed via confirmFreeSession",
-        },
-        timestamp: FieldValue.serverTimestamp(),
       });
     }
 
@@ -626,6 +607,34 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       retryCount: 0,
       status: 'pending-retry',
     });
+  }
+
+  // BUG #1 FIX: Call EventStore and update payment document after transaction commits
+  // This ensures the payment event is properly recorded for analytics
+  if (paymentId && paymentId.trim() !== '') {
+    try {
+      const eventStore = new EventStore();
+      await eventStore.appendFreeSessionCompletedEvent({
+        paymentId: paymentId,
+        userId: studentId,
+        promoCode: promoCode,
+      });
+      functions.logger.info('EventStore: Free session completed event appended', { paymentId, studentId });
+
+      // Also ensure payment document is marked as completed (idempotent update)
+      await db.collection('payments').doc(paymentId).update({
+        status: 'completed',
+        paidAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      functions.logger.info('Payment document marked as completed', { paymentId });
+    } catch (eventStoreError) {
+      // Do NOT throw - the session is already confirmed
+      functions.logger.error('Failed to update payment status via EventStore (non-critical)', {
+        paymentId,
+        error: eventStoreError instanceof Error ? eventStoreError.message : String(eventStoreError),
+      });
+    }
   }
 
   return result;

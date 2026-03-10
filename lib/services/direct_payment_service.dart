@@ -37,23 +37,39 @@ class DirectPaymentService {
   }
 
   // ── Student: mark payment sent ───────────────────────────────────────────
+  // WHY: Called when student claims to have paid via direct payment method.
+  // BUG-12 FIX: Now forwards bundle plan info (planType, planId, sessionsCount, validityDays)
+  // to backend CF so mohaffez knows this is a bundle payment.
+  // BUG-A FIX: Made requestId and slot fields nullable for bundle purchases
   static Future<Map<String, dynamic>> studentMarkPaid({
-    required String requestId,
+    // BUG-A FIX: Made nullable for bundle purchases
+    String? requestId,
     required String mohaffezId,
     required String mohaffezName,
     required String studentName,
+    // BUG-A FIX: Added studentEmail and studentPhone
+    String studentEmail = '',
+    String studentPhone = '',
     required double amount,
     required String sessionType,
     required String preferredTimeSlot,
-    required DateTime slotDate,
-    required DateTime slotStart,
-    required DateTime slotEnd,
+    // BUG-A FIX: Made nullable for bundle purchases
+    DateTime? slotDate,
+    DateTime? slotStart,
+    DateTime? slotEnd,
     required String paymentMethod,
     String? studentNote,
     String? imamAddressText,
     double? imamAddressLat,
     double? imamAddressLng,
     String? mohaffezPhone,
+    // BUG-12 FIX: Bundle plan fields
+    // BUG-A FIX: Added planTitle
+    String? planType,
+    String? planId,
+    String? planTitle,
+    int? sessionsCount,
+    int? validityDays,
   }) async {
     try {
       final result = await _functions
@@ -62,22 +78,30 @@ class DirectPaymentService {
             options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
           )
           .call({
-        'requestId':          requestId,
+        if (requestId != null)   'requestId': requestId,
         'mohaffezId':         mohaffezId,
         'mohaffezName':       mohaffezName,
         'studentName':        studentName,
+        if (studentEmail.isNotEmpty) 'studentEmail': studentEmail,
+        if (studentPhone.isNotEmpty) 'studentPhone': studentPhone,
         'amount':             amount,
         'sessionType':        sessionType,
         'preferredTimeSlot':  preferredTimeSlot,
-        'slotDate':           slotDate.toIso8601String(),
-        'slotStart':          slotStart.toIso8601String(),
-        'slotEnd':            slotEnd.toIso8601String(),
+        if (slotDate != null)         'slotDate': slotDate!.toIso8601String(),
+        if (slotStart != null)        'slotStart': slotStart!.toIso8601String(),
+        if (slotEnd != null)          'slotEnd': slotEnd!.toIso8601String(),
         'paymentMethod':      paymentMethod,
         if (studentNote != null)    'studentNote':    studentNote,
         if (imamAddressText != null) 'imamAddressText': imamAddressText,
         if (imamAddressLat != null)  'imamAddressLat':  imamAddressLat,
         if (imamAddressLng != null)  'imamAddressLng':  imamAddressLng,
         if (mohaffezPhone != null)   'mohaffezPhone':   mohaffezPhone,
+        // BUG-12 FIX: Forward bundle plan fields to backend
+        if (planType != null)       'planType': planType,
+        if (planId != null)          'planId': planId,
+        if (planTitle != null)        'planTitle': planTitle,
+        if (sessionsCount != null)   'sessionsCount': sessionsCount,
+        if (validityDays != null)     'validityDays': validityDays,
       });
       return Map<String, dynamic>.from(result.data as Map);
     } on FirebaseFunctionsException catch (e) {
@@ -107,6 +131,60 @@ class DirectPaymentService {
             options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
           )
           .call({'directPaymentRequestId': directPaymentRequestId});
+      return Map<String, dynamic>.from(result.data as Map);
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'already-exists') {
+        return {'success': true, 'message': e.message};
+      }
+      rethrow;
+    }
+  }
+
+  // WHY: Called when mohaffez confirms a bundle/subscription payment.
+  // BUG-2+3 FIX: Creates a subscription instead of a single session.
+  static Future<Map<String, dynamic>> mohaffezConfirmBundlePayment({
+    required String paymentId,
+    required String studentId,
+    required String planId,
+    required String planTitle,
+    required String planType,
+    required int sessionsCount,
+    int? validityDays,
+    // isSlotCoupled: slot fields for auto-booking first session
+    String? slotDate,
+    String? slotStart,
+    String? slotEnd,
+    String? preferredTimeSlot,
+    String? sessionType,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'paymentId': paymentId,
+        'studentId': studentId,
+        'planId': planId,
+        'planTitle': planTitle,
+        'planType': planType,
+        'sessionsCount': sessionsCount,
+        if (validityDays != null) 'validityDays': validityDays,
+        // Only include slot fields when all are present (triggers isSlotCoupled on CF)
+        if (slotDate != null &&
+            slotStart != null &&
+            slotEnd != null &&
+            preferredTimeSlot != null &&
+            sessionType != null) ...{
+          'slotDate': slotDate,
+          'slotStart': slotStart,
+          'slotEnd': slotEnd,
+          'preferredTimeSlot': preferredTimeSlot,
+          'sessionType': sessionType,
+        },
+      };
+      final result = await _functions
+          .httpsCallable(
+            'confirmBundleDirectPayment',
+            options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+          )
+          .call(payload);
       return Map<String, dynamic>.from(result.data as Map);
     } on FirebaseFunctionsException catch (e) {
       if (e.code == 'already-exists') {

@@ -67,7 +67,11 @@ void main() async {
       debugPrint('Firebase App Check activated (debug mode)');
     }
 
-    await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+    // Auto-refresh only needed in production — debug provider has a strict
+    // rate limit and the SDK handles tokens automatically on emulators.
+    if (kReleaseMode) {
+      await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+    }
 
     if (kDebugMode) {
       FirebaseAppCheck.instance.onTokenChange.listen((token) {

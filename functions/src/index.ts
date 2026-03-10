@@ -24,6 +24,10 @@ export { confirmFreeSession } from './bookings/confirmFreeSession';
 export { createSessionRequest } from './bookings/createSessionRequest';
 export { studentMarkedDirectPayment, mohaffezConfirmDirectPayment, mohaffezRejectDirectPayment } from './payments/directPayment';
 
+// Bundle and subscription payment functions
+export { confirmBundleDirectPayment } from './payments/confirmBundleDirectPayment';
+export { confirmSubscriptionSession } from './payments/confirmSubscriptionSession';
+
 // Admin functions
 export {
   setUserRole,

@@ -1,3 +1,5 @@
+// lib/screens/direct_payment_confirmations_screen.dart
+
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -104,18 +106,91 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
   // ── Confirm ───────────────────────────────────────────────────────────────
   Future<void> _confirm() async {
-    // ✅ Capture BEFORE any await — context may be invalid after await
+    final planType = widget.payment.planType ?? 'single';
+    final isBundleOrSubscription =
+        planType == 'bundle' || planType == 'subscription';
+
+    final String confirmMessage;
+    if (isBundleOrSubscription) {
+      confirmMessage =
+          'هل تأكد استلام مبلغ ${widget.payment.amount.toStringAsFixed(0)} جنيه'
+          ' من ${widget.payment.studentName}'
+          ' مقابل ${planType == 'bundle' ? "حزمة ${widget.payment.sessionsCount ?? 1} جلسات" : "اشتراك شهري"}؟';
+    } else {
+      confirmMessage =
+          'هل تأكد استلام مبلغ ${widget.payment.amount.toStringAsFixed(0)} جنيه'
+          ' من ${widget.payment.studentName}؟';
+    }
+
+    // ✅ BUG-1 FIX: Capture messenger BEFORE showDialog — showDialog is also async.
+    //    Original code placed this capture AFTER the await, risking a deactivated-
+    //    context crash if the widget was disposed while the dialog was open.
     final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأكيد استلام الدفع'),
+        content: Text(confirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppThemeConstants.accentGreen,
+            ),
+            child: const Text('نعم'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // ✅ BUG-1 FIX: Guard against setState after dispose.
+    //    _reject() already had this guard — _confirm() was missing it.
+    if (!mounted) return;
 
     setState(() => _loading = true);
     try {
-      await DirectPaymentService.mohaffezConfirm(widget.payment.id);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('✅ تم قبول الجلسة وإشعار الطالب!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (isBundleOrSubscription) {
+        await DirectPaymentService.mohaffezConfirmBundlePayment(
+          paymentId: widget.payment.id,
+          studentId: widget.payment.studentId,
+          planId: widget.payment.planId ?? '',
+          planTitle: widget.payment.planTitle?.isNotEmpty == true
+              ? widget.payment.planTitle!
+              : widget.payment.sessionType,
+          planType: planType,
+          sessionsCount: widget.payment.sessionsCount ?? 1,
+          validityDays: widget.payment.validityDays,
+          slotDate: widget.payment.slotDate,
+          slotStart: widget.payment.slotStart,
+          slotEnd: widget.payment.slotEnd,
+          preferredTimeSlot: widget.payment.preferredTimeSlot,
+          sessionType: widget.payment.sessionType,
+        );
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم تأكيد الحزمة — الطالب يمتلك الآن'
+              ' ${widget.payment.sessionsCount ?? 1} جلسات',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        await DirectPaymentService.mohaffezConfirm(widget.payment.id);
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('✅ تم قبول الجلسة وإشعار الطالب!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } on Exception catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('خطأ: $e')));
     } finally {
@@ -152,7 +227,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('رفض', style: TextStyle(color: Colors.white)),
+                child: const Text('رفض',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -160,7 +236,6 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       },
     );
 
-    // ✅ Check mounted BEFORE setState after showDialog returns
     if (reason == null) return;
     if (!mounted) return;
 
@@ -245,6 +320,39 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ),
             ]),
 
+            // Bundle badge
+            if (p.planType != null &&
+                (p.planType == 'bundle' ||
+                    p.planType == 'subscription')) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.primaryAmber
+                      .withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border:
+                      Border.all(color: AppThemeConstants.primaryAmber),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.collections_bookmark_outlined,
+                      size: 14, color: AppThemeConstants.primaryAmber),
+                  const SizedBox(width: 4),
+                  Text(
+                    p.planType == 'bundle'
+                        ? 'حزمة ${p.sessionsCount ?? ''} جلسات'
+                        : 'اشتراك شهري',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeConstants.primaryAmberDark,
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+
             const Divider(height: 20),
 
             // ── Info rows ───────────────────────────────────────────────────
@@ -260,12 +368,16 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               margin: const EdgeInsets.symmetric(vertical: 10),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.06),
+                color: AppThemeConstants.primaryAmber
+                    .withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
+                border: Border.all(
+                    color: AppThemeConstants.primaryAmber
+                        .withValues(alpha: 0.3)),
               ),
               child: Row(children: [
-                const Icon(Icons.info_outline, color: AppThemeConstants.primaryAmber, size: 16),
+                const Icon(Icons.info_outline,
+                    color: AppThemeConstants.primaryAmber, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -273,7 +385,9 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     '${p.commissionAmount.toStringAsFixed(2)} ج.م  —  '
                     'يصلك صافي: '
                     '${(p.amount - p.commissionAmount).toStringAsFixed(2)} ج.م',
-                    style: const TextStyle(fontSize: 12, color: AppThemeConstants.primaryAmber),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppThemeConstants.primaryAmber),
                   ),
                 ),
               ]),
@@ -296,11 +410,13 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     label: const Text(
                       'استلمت الدفع',
                       style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppThemeConstants.accentGreen,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -336,11 +452,9 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               style: const TextStyle(color: Colors.grey, fontSize: 13)),
           Expanded(
             child: Text(value,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 13)),
           ),
         ]),
       );
 }
-
-

@@ -50,6 +50,7 @@ class SessionModel with _$SessionModel {
     @Default(false) bool isPaid,
     String? paymentId,
     String? subscriptionId,
+    String? paymentType, // 'bundle' | 'subscription' | 'direct' | null
     double? sessionPrice,
 
     // ONLINE SESSION FIELDS

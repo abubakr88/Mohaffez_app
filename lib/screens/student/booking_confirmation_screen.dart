@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../providers/booking_provider.dart';
+import '../../providers/booking_provider.dart' show legacyBookingFlowProvider, BookingPaymentMethod;
 
 class BookingConfirmationDetails {
   final String mohaffezId;
@@ -425,7 +425,7 @@ class _BookingConfirmationScreenState
     setState(() => _isSubmitting = true);
     try {
       final result =
-          await ref.read(bookingFlowProvider.notifier).createSessionRequest(
+          await ref.read(legacyBookingFlowProvider.notifier).createSessionRequest(
                 mohaffezId: d.mohaffezId,
                 studentId: d.studentId,
                 studentName: d.studentName,

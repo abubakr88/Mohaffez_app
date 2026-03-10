@@ -1,361 +1,849 @@
+// lib/screens/direct_payment_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/direct_payment_model.dart';
+import '../models/pricing_plan_model.dart';
+import '../providers/booking_flow_provider.dart';
+import '../providers/booking_provider.dart';
+import '../providers/user_provider.dart';
+import '../repositories/pricing_repository.dart';
 import '../services/direct_payment_service.dart';
 import '../shared/theme/app_theme_constants.dart';
 
-class DirectPaymentScreen extends StatefulWidget {
-  final String requestId;
-  final String mohaffezId;
-  final String mohaffezName;
-  final String studentName;
-  final double amount;
-  final String sessionType;
-  final String preferredTimeSlot;
-  final DateTime slotDate;
-  final DateTime slotStart;
-  final DateTime slotEnd;
+class DirectPaymentScreen extends ConsumerStatefulWidget {
+  final String? requestId;
+  final String? mohaffezId;
+  final String? mohaffezName;
+  final String? studentName;
+  final String studentEmail;
+  final String studentPhone;
+  final double? amount;
+  final String? sessionType;
+  final String? preferredTimeSlot;
+  final DateTime? slotDate;
+  final DateTime? slotStart;
+  final DateTime? slotEnd;
   final String? imamAddressText;
   final double? imamAddressLat;
   final double? imamAddressLng;
   final String? mohaffezPhone;
+  final String? planType;
+  final String? planId;
+  final String? planTitle;
+  final int? sessionsCount;
+  final int? validityDays;
+  final bool autoBookFirstSession;
 
   const DirectPaymentScreen({
     super.key,
-    required this.requestId,
-    required this.mohaffezId,
-    required this.mohaffezName,
-    required this.studentName,
-    required this.amount,
-    required this.sessionType,
-    required this.preferredTimeSlot,
-    required this.slotDate,
-    required this.slotStart,
-    required this.slotEnd,
+    this.requestId,
+    this.mohaffezId,
+    this.mohaffezName,
+    this.studentName,
+    this.studentEmail = '',
+    this.studentPhone = '',
+    this.amount,
+    this.sessionType,
+    this.preferredTimeSlot,
+    this.slotDate,
+    this.slotStart,
+    this.slotEnd,
     this.imamAddressText,
     this.imamAddressLat,
     this.imamAddressLng,
     this.mohaffezPhone,
+    this.planType,
+    this.planId,
+    this.planTitle,
+    this.sessionsCount,
+    this.validityDays,
+    this.autoBookFirstSession = false,
   });
 
   @override
-  State<DirectPaymentScreen> createState() => _DirectPaymentScreenState();
+  ConsumerState<DirectPaymentScreen> createState() =>
+      _DirectPaymentScreenState();
 }
 
-class _DirectPaymentScreenState extends State<DirectPaymentScreen> {
-  Map<String, String?> _wallets = {};
-  DirectPaymentMethod? _selectedMethod;
-  bool _loading = true;
-  bool _submitting = false;
-  final _noteController = TextEditingController();
+class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
+  Map<String, String?> wallets = {};
+  DirectPaymentMethod? selectedMethod;
+  bool loading = true;
+  bool submitting = false;
+  final noteController = TextEditingController();
+
+  // Resolved values — prefer widget params, fall back to bookingFlowProvider
+  String? resolvedMohaffezId;
+  String? resolvedMohaffezName;
+  String? resolvedStudentName;
+  String? resolvedStudentEmail;
+  String? resolvedStudentPhone;
+  double? resolvedAmount;
+  String? resolvedSessionType;
+  String? resolvedTimeSlot;
+  DateTime? resolvedSlotDate;
+  DateTime? resolvedSlotStart;
+  DateTime? resolvedSlotEnd;
+  String? resolvedImamAddressText;
+  double? resolvedImamAddressLat;
+  double? resolvedImamAddressLng;
+  String? resolvedMohaffezPhone;
 
   @override
   void initState() {
     super.initState();
-    _loadWallets();
+    _initializeFromProvider();
   }
 
-  Future<void> _loadWallets() async {
-    final wallets =
-        await DirectPaymentService.getMohaffezWalletNumbers(widget.mohaffezId);
-    setState(() {
-      _wallets = wallets;
-      _loading = false;
-    });
-  }
+  Future<void> _initializeFromProvider() async {
+    final flow = ref.read(bookingFlowProvider);
+    final slotContext = flow.slotContext;
+    final currentUser = ref.read(currentUserProvider).value;
 
-  List<DirectPaymentMethod> get _availableMethods => DirectPaymentMethod.values
-      .where((m) => (_wallets[m.value] ?? '').isNotEmpty)
-      .toList();
-
-  // ignore: unused_element
-  String get _selectedNumber => _wallets[_selectedMethod?.value ?? ''] ?? '';
-
-  Future<void> _confirmPayment() async {
-    // Early exit — no await here so context is safe
-    if (_selectedMethod == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اختر طريقة الدفع أولاً')));
+    // ── FIX: Only guard when BOTH provider context AND widget params are absent.
+    // When navigating from StudentRequestsScreen (Pay Now), mohaffezId is passed
+    // directly as a widget param — slotContext is intentionally null.
+    // Crashing here was the root cause of the wrong screen being shown.
+    if (slotContext == null && widget.mohaffezId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('بيانات الجلسة غير مكتملة، يرجى المحاولة مرة أخرى'),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
       return;
     }
 
-    setState(() => _submitting = true);
+    // Resolve values: widget params win over provider context
+    resolvedMohaffezId = widget.mohaffezId ?? slotContext?.mohaffezId;
+    resolvedMohaffezName = widget.mohaffezName ?? slotContext?.mohaffezName;
+    resolvedStudentName = widget.studentName ?? currentUser?.name ?? '';
+    resolvedStudentEmail = widget.studentEmail.isNotEmpty
+        ? widget.studentEmail
+        : currentUser?.email ?? '';
+    resolvedStudentPhone = widget.studentPhone.isNotEmpty
+        ? widget.studentPhone
+        : currentUser?.phoneNumber ?? '';
+    resolvedSessionType = widget.sessionType ?? slotContext?.sessionType;
+    resolvedTimeSlot =
+        widget.preferredTimeSlot ?? slotContext?.preferredTimeSlot;
+    resolvedImamAddressText =
+        widget.imamAddressText ?? slotContext?.imamAddressText;
+    resolvedImamAddressLat =
+        widget.imamAddressLat ?? slotContext?.imamAddressLat;
+    resolvedImamAddressLng =
+        widget.imamAddressLng ?? slotContext?.imamAddressLng;
+    resolvedMohaffezPhone =
+        widget.mohaffezPhone ?? slotContext?.mohaffezPhone;
 
-    try {
-      await DirectPaymentService.studentMarkPaid(
-        requestId: widget.requestId,
-        mohaffezId: widget.mohaffezId,
-        mohaffezName: widget.mohaffezName,
-        studentName: widget.studentName,
-        amount: widget.amount,
-        sessionType: widget.sessionType,
-        preferredTimeSlot: widget.preferredTimeSlot,
-        slotDate: widget.slotDate,
-        slotStart: widget.slotStart,
-        slotEnd: widget.slotEnd,
-        paymentMethod: _selectedMethod!.value,
-        studentNote: _noteController.text.trim().isEmpty
-            ? null
-            : _noteController.text.trim(),
-        imamAddressText: widget.imamAddressText,
-        imamAddressLat: widget.imamAddressLat,
-        imamAddressLng: widget.imamAddressLng,
-        mohaffezPhone: widget.mohaffezPhone,
+    // Slot dates: prefer widget DateTime params first, then parse from provider
+    if (widget.slotDate != null) {
+      resolvedSlotDate = widget.slotDate;
+      resolvedSlotStart = widget.slotStart;
+      resolvedSlotEnd = widget.slotEnd;
+    } else if (slotContext != null) {
+      if (slotContext.slotDate.isNotEmpty) {
+        resolvedSlotDate = DateTime.tryParse(slotContext.slotDate);
+      }
+      if (slotContext.slotStart.isNotEmpty) {
+        resolvedSlotStart = DateTime.tryParse(slotContext.slotStart);
+      }
+      if (slotContext.slotEnd.isNotEmpty) {
+        resolvedSlotEnd = DateTime.tryParse(slotContext.slotEnd);
+      }
+    }
+
+    // Fetch single-session price when amount is not pre-supplied
+    if (widget.amount == null) {
+      await _fetchSingleSessionPrice(
+        resolvedMohaffezId ?? slotContext?.mohaffezId ?? '',
+        resolvedSessionType ?? '',
       );
+    } else {
+      resolvedAmount = widget.amount;
+    }
 
-      if (!mounted) return; // FIXED: FIX-1 — widget may be disposed after await
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog( // ✅ use dialogContext, not outer context
-          title: const Text('تم إرسال الإشعار ✅'),
-          content: const Text(
-            'تم إرسال إشعار الدفع للمحفظ.\n'
-            'سيتم قبول جلستك فور تأكيده استلام المبلغ.',
-            textAlign: TextAlign.center,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // ✅ dialogContext is always valid here — dialog is still mounted
-                Navigator.of(dialogContext).popUntil((r) => r.isFirst);
-              },
-              child: const Text('حسناً'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return; // FIXED: FIX-1 — guard before ScaffoldMessenger too
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('خطأ: $e')));
-    } finally {
-      // ✅ mounted check required — finally always runs, even after early return
-      if (mounted) setState(() => _submitting = false);
+    if (resolvedMohaffezId != null) {
+      await _loadWallets(resolvedMohaffezId!);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => context.pop(),
-                  tooltip: 'رجوع',
-                )
-              : null,
-          title: const Text('الدفع المباشر'),
-          backgroundColor: AppThemeConstants.accentGreen,
-          foregroundColor: Colors.white,
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _availableMethods.isEmpty
-                ? const Center(
-                    child: Text(
-                      'المحفظ لم يضف أرقام المحافظ الإلكترونية بعد.\nتواصل معه مباشرة.',
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      // Amount banner
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppThemeConstants.accentGreenDark, // WHY: Use theme green-dark instead of hardcoded hex.
-                              AppThemeConstants.accentGreen, // WHY: Use theme green instead of hardcoded hex.
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(children: [
-                          const Text('المبلغ المطلوب',
-                              style: TextStyle(
-                                  color: Colors.white70, fontSize: 14)),
-                          const SizedBox(height: 6),
-                          Text('${widget.amount.toStringAsFixed(0)} ج.م',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text('إلى: ${widget.mohaffezName}',
-                              style: const TextStyle(color: Colors.white70)),
-                        ]),
-                      ),
-                      const SizedBox(height: 24),
+  Future<void> _fetchSingleSessionPrice(
+      String mohaffezId, String sessionType) async {
+    try {
+      final repository = ref.read(pricingRepositoryProvider);
+      final plans = await repository.getPlansForTeacher(mohaffezId);
+      final sessionMode = SessionMode.values.firstWhere(
+        (m) => m.name == sessionType,
+        orElse: () => SessionMode.online,
+      );
+      final singlePlan = plans.firstWhere(
+        (plan) =>
+            plan.type == PlanType.single && plan.mode == sessionMode,
+        orElse: () => throw Exception('No single session plan found'),
+      );
+      if (!mounted) return;
+      setState(() => resolvedAmount = singlePlan.priceEGP);
+    } catch (e) {
+      debugPrint('Error fetching single session price: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('تعذّر جلب سعر الجلسة، تواصل مع المعلم مباشرة')),
+        );
+      }
+    }
+  }
 
-                      const Text('اختر طريقة الدفع',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
+  Future<void> _loadWallets(String mohaffezId) async {
+    final loaded =
+        await DirectPaymentService.getMohaffezWalletNumbers(mohaffezId);
+    if (!mounted) return;
+    setState(() {
+      wallets = loaded;
+      loading = false;
+    });
+  }
 
-                      // Wallet method cards
-                      ..._availableMethods.map((method) {
-                        final isSelected = _selectedMethod == method;
-                        final number = _wallets[method.value] ?? '';
-                        return GestureDetector(
-                          onTap: () => setState(() => _selectedMethod = method),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppThemeConstants.accentGreen
-                                      .withValues(alpha: 0.08)
-                                  : Colors.grey.shade50,
-                              border: Border.all(
-                                color: isSelected
-                                    ? AppThemeConstants.accentGreen
-                                    : Colors.grey.shade300,
-                                width: isSelected ? 2 : 1,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(children: [
-                              Icon(
-                                isSelected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
-                                color: isSelected
-                                    ? AppThemeConstants.accentGreen
-                                    : Colors.grey,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(method.label,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16)),
-                                    const SizedBox(height: 4),
-                                    Row(children: [
-                                      Text(number,
-                                          style: const TextStyle(
-                                              fontSize: 18,
-                                              color: AppThemeConstants.accentGreen,
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 1.2)),
-                                      const SizedBox(width: 8),
-                                      IconButton(
-                                        icon: const Icon(Icons.copy, size: 18),
-                                        onPressed: () {
-                                          Clipboard.setData(
-                                              ClipboardData(text: number));
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(const SnackBar(
-                                                  content:
-                                                      Text('تم نسخ الرقم')));
-                                        },
-                                      ),
-                                    ]),
-                                  ],
-                                ),
-                              ),
-                            ]),
-                          ),
-                        );
-                      }),
+  List<DirectPaymentMethod> get availableMethods =>
+      DirectPaymentMethod.values
+          .where((m) => (wallets[m.value] ?? '').isNotEmpty)
+          .toList();
 
-                      const SizedBox(height: 16),
+  Future<void> _confirmPayment() async {
+    if (selectedMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اختر طريقة الدفع أولاً')),
+      );
+      return;
+    }
+    if (resolvedMohaffezId == null ||
+        resolvedAmount == null ||
+        resolvedSessionType == null ||
+        resolvedTimeSlot == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('بيانات الجلسة غير مكتملة')),
+      );
+      return;
+    }
 
-                      // Instructions
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.amber.shade200),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              Icon(Icons.info_outline,
-                                  color: Colors.orange, size: 18),
-                              SizedBox(width: 6),
-                              Text('تعليمات الدفع',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.orange)),
-                            ]),
-                            SizedBox(height: 8),
-                            Text(
-                              '١. انسخ رقم المحفظة\n'
-                              '٢. افتح تطبيق الدفع واختر "تحويل"\n'
-                              '٣. ادفع المبلغ المحدد بالضبط\n'
-                              '٤. عد هنا واضغط "لقد دفعت"\n'
-                              '٥. انتظر تأكيد المحفظ (عادةً خلال دقائق)',
-                              style: TextStyle(fontSize: 13, height: 1.8),
-                            ),
-                          ],
-                        ),
-                      ),
+    setState(() => submitting = true);
 
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _noteController,
-                        decoration: InputDecoration(
-                          labelText: 'ملاحظة للمحفظ (اختياري)',
-                          hintText: 'مثال: تحويل من فودافون كاش رقم 010x',
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 80),
-                    ],
-                  ),
-        bottomNavigationBar: _availableMethods.isEmpty
+    try {
+      final result = await DirectPaymentService.studentMarkPaid(
+        requestId: widget.requestId,
+        mohaffezId: resolvedMohaffezId!,
+        mohaffezName: resolvedMohaffezName ?? '',
+        studentName: resolvedStudentName ?? '',
+        studentEmail: resolvedStudentEmail ?? '',
+        studentPhone: resolvedStudentPhone ?? '',
+        amount: resolvedAmount!,
+        sessionType: resolvedSessionType!,
+        preferredTimeSlot: resolvedTimeSlot!,
+        slotDate: resolvedSlotDate,
+        slotStart: resolvedSlotStart,
+        slotEnd: resolvedSlotEnd,
+        paymentMethod: selectedMethod!.value,
+        studentNote: noteController.text.trim().isEmpty
             ? null
-            : SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ElevatedButton.icon(
-                    onPressed: _submitting ? null : _confirmPayment,
-                    icon: _submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.check_circle, color: Colors.white),
-                    label: Text(
-                      _submitting ? 'جاري الإرسال...' : 'لقد دفعت ✓',
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.accentGreen,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-              ),
-      ),
-    );
+            : noteController.text.trim(),
+        imamAddressText: resolvedImamAddressText,
+        imamAddressLat: resolvedImamAddressLat,
+        imamAddressLng: resolvedImamAddressLng,
+        mohaffezPhone: resolvedMohaffezPhone,
+        planType: widget.planType,
+        planId: widget.planId,
+        planTitle: widget.planTitle,
+        sessionsCount: widget.sessionsCount,
+        validityDays: widget.validityDays,
+      );
+
+      if (!mounted) return;
+
+      final success = result['success'] == true;
+      if (success) {
+        // Only reset the booking flow when we came through it (Path B/C from
+        // BookingMethodScreen).  When coming from StudentRequestsScreen (Pay
+        // Now), slotContext is null so reset is a no-op — safe either way.
+        ref.read(bookingFlowProvider.notifier).reset();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ تم إرسال إشعار الدفع — بانتظار تأكيد المعلم'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.go('/home');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  result['message']?.toString() ?? 'فشل إرسال الإشعار')),
+        );
+      }
+    } on Exception catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => submitting = false);
+    }
   }
 
   @override
   void dispose() {
-    _noteController.dispose();
+    noteController.dispose();
     super.dispose();
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: _buildAppBar('الدفع المباشر'),
+          body: const Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (availableMethods.isEmpty) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: _buildAppBar('الدفع المباشر'),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined,
+                      size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'لم يُضف المعلم أرقام محافظه بعد',
+                    style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'يرجى التواصل مع المعلم مباشرة أو انتظار إضافة أرقام الدفع',
+                    style: TextStyle(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppThemeConstants.primaryAmber,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('رجوع'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: _buildAppBar('الدفع'),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSessionSummaryCard(),
+              const SizedBox(height: AppThemeConstants.spaceLg),
+
+              _buildAmountCard(),
+              const SizedBox(height: AppThemeConstants.spaceLg),
+
+              const Text(
+                'اختر طريقة الدفع',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: AppThemeConstants.spaceSm),
+              ...availableMethods.map((m) => _buildMethodTile(m)),
+              const SizedBox(height: AppThemeConstants.spaceLg),
+
+              if (selectedMethod != null) ...[
+                _buildWalletNumberCard(),
+                const SizedBox(height: AppThemeConstants.spaceLg),
+              ],
+
+              TextField(
+                controller: noteController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'ملاحظة (اختياري)',
+                  hintText: 'أضف رقم المعاملة أو أي ملاحظة للمعلم...',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.note_outlined),
+                ),
+              ),
+              const SizedBox(height: AppThemeConstants.spaceLg),
+
+              _buildInstructionsCard(),
+              const SizedBox(height: AppThemeConstants.spaceLg),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: submitting ? null : _confirmPayment,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppThemeConstants.accentGreen,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppThemeConstants.accentGreen
+                        .withValues(alpha: 0.5),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_outlined),
+                  label: Text(
+                    submitting ? 'جاري الإرسال...' : 'دفعت — أرسل الإشعار',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppThemeConstants.spaceMd),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── AppBar helper ──────────────────────────────────────────────────────────
+
+  AppBar _buildAppBar(String title) {
+    return AppBar(
+      title: Text(title),
+      backgroundColor: AppThemeConstants.primaryAmber,
+      foregroundColor: Colors.white,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios),
+        tooltip: 'رجوع',
+        onPressed: () {
+          // Use Navigator.pop when navigated via MaterialPageRoute
+          // (StudentRequestsScreen → Pay Now), or context.pop for GoRouter routes.
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
+      ),
+    );
+  }
+
+  // ── Cards ──────────────────────────────────────────────────────────────────
+
+  Widget _buildSessionSummaryCard() {
+    return Card(
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: const [
+              Icon(Icons.info_outline,
+                  color: AppThemeConstants.primaryAmber),
+              SizedBox(width: 8),
+              Text(
+                'تفاصيل الجلسة',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ]),
+            const Divider(height: 20),
+
+            if (resolvedMohaffezName != null)
+              _infoRow(Icons.person_outline, 'المحفظ',
+                  resolvedMohaffezName!),
+
+            if (resolvedSessionType != null) ...[
+              const SizedBox(height: 6),
+              _infoRow(Icons.category_outlined, 'النوع',
+                  _translateSessionType(resolvedSessionType!)),
+            ],
+
+            // LTR wrapper prevents RTL from flipping "07:00 - 07:45"
+            if (resolvedTimeSlot != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.access_time,
+                      size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 8),
+                  Text('الوقت: ',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600)),
+                  Expanded(
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(resolvedTimeSlot!,
+                          style: const TextStyle(fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            if (resolvedSlotDate != null) ...[
+              const SizedBox(height: 6),
+              _infoRow(Icons.calendar_today, 'التاريخ',
+                  '${resolvedSlotDate!.day}/${resolvedSlotDate!.month}/${resolvedSlotDate!.year}'),
+            ],
+
+            if (resolvedImamAddressText != null &&
+                resolvedImamAddressText!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              _infoRow(Icons.location_on_outlined, 'الموقع',
+                  resolvedImamAddressText!),
+            ],
+
+            // Bundle plan badge
+            if (widget.planType == 'bundle' ||
+                widget.planType == 'subscription') ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.primaryAmber
+                      .withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: AppThemeConstants.primaryAmber),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                        Icons.collections_bookmark_outlined,
+                        size: 14,
+                        color: AppThemeConstants.primaryAmber),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.planType == 'bundle'
+                          ? '${widget.planTitle ?? ''} · ${widget.sessionsCount ?? ''} جلسة'
+                          : widget.planTitle ?? '',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.primaryAmberDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAmountCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color:
+            AppThemeConstants.accentGreen.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: AppThemeConstants.accentGreen
+                .withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('المبلغ المطلوب',
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            resolvedAmount != null
+                ? '${resolvedAmount!.toStringAsFixed(0)} ج.م'
+                : '...',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: AppThemeConstants.accentGreen,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMethodTile(DirectPaymentMethod method) {
+    final isSelected = selectedMethod == method;
+    return GestureDetector(
+      onTap: () => setState(() => selectedMethod = method),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppThemeConstants.primaryAmber.withValues(alpha: 0.08)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppThemeConstants.primaryAmber
+                : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(children: [
+          Icon(
+            isSelected
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
+            color: isSelected
+                ? AppThemeConstants.primaryAmber
+                : Colors.grey,
+          ),
+          const SizedBox(width: 12),
+          Text(method.label,
+              style: TextStyle(
+                fontWeight: isSelected
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+                fontSize: 15,
+              )),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildWalletNumberCard() {
+    final walletNumber = wallets[selectedMethod!.value] ?? '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.account_balance_wallet,
+                color: Colors.blue, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              'رقم ${selectedMethod!.label}',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                  fontSize: 14),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  walletNumber,
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_outlined,
+                    color: Colors.blue),
+                tooltip: 'نسخ الرقم',
+                onPressed: () {
+                  Clipboard.setData(
+                      ClipboardData(text: walletNumber));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ تم نسخ الرقم'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstructionsCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: const [
+            Icon(Icons.info_outlined, color: Colors.amber, size: 18),
+            SizedBox(width: 6),
+            Text('تعليمات الدفع',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber,
+                    fontSize: 14)),
+          ]),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: Colors.amber),
+          const SizedBox(height: 10),
+          _instructionStep(
+            number: '1',
+            text: 'حوّل المبلغ على الرقم الظاهر أعلاه',
+            icon: Icons.send_to_mobile_outlined,
+          ),
+          const SizedBox(height: 8),
+          _instructionStep(
+            number: '2',
+            text: 'اضغط "دفعت — أرسل الإشعار" بعد إتمام التحويل',
+            icon: Icons.check_circle_outline,
+          ),
+          const SizedBox(height: 8),
+          _instructionStep(
+            number: '3',
+            text: 'سيتم تفعيل الجلسة بعد مراجعة المعلم وتأكيده للاستلام',
+            icon: Icons.schedule_outlined,
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange.shade700, size: 16),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    'لا تضغط تأكيد قبل إتمام التحويل الفعلي',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.deepOrange,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _instructionStep({
+    required String number,
+    required String text,
+    required IconData icon,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+              color: Colors.amber.shade700, shape: BoxShape.circle),
+          child: Text(number,
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(width: 8),
+        Icon(icon, size: 16, color: Colors.amber.shade700),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(text,
+              style: const TextStyle(fontSize: 13, height: 1.5)),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Text('$label: ',
+            style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w600)),
+        Expanded(
+            child: Text(value,
+                style: const TextStyle(fontSize: 13))),
+      ],
+    );
+  }
+
+  String _translateSessionType(String type) {
+    switch (type) {
+      case 'home':
+        return 'في المنزل';
+      case 'mosque':
+        return 'في المسجد';
+      case 'online':
+        return 'أونلاين';
+      default:
+        return type;
+    }
   }
 }

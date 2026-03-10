@@ -2,7 +2,7 @@
 // functions/src/index.ts
 // Main entry point - only imports and re-exports
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onUserUnsuspended = exports.onUserSuspended = exports.mohaffezReportCommissionPayment = exports.markCommissionPaid = exports.processWeeklyCommissions = exports.setAdminClaim = exports.checkVersion = exports.checkMaintenanceMode = exports.checkAppVersion = exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.unsuspendUser = exports.suspendUser = exports.setUserRole = exports.mohaffezRejectDirectPayment = exports.mohaffezConfirmDirectPayment = exports.studentMarkedDirectPayment = exports.createSessionRequest = exports.confirmFreeSession = exports.releaseExpiredSlotLocks = exports.onPaymentCreated = exports.checkExpiredPayments = exports.projectPaymentAnalytics = exports.sendSessionReminders = exports.sendPaymentDeadlineReminders = exports.onSessionCompleted = exports.onSessionCreated = exports.onSessionRequestStatusChanged = exports.onSessionRequestAccepted = exports.sendNotification = void 0;
+exports.onUserUnsuspended = exports.onUserSuspended = exports.mohaffezReportCommissionPayment = exports.markCommissionPaid = exports.processWeeklyCommissions = exports.setAdminClaim = exports.checkVersion = exports.checkMaintenanceMode = exports.checkAppVersion = exports.getBroadcastAudienceCount = exports.rejectCredential = exports.approveCredential = exports.triggerCleanupJobManually = exports.triggerCommissionJobManually = exports.sendBroadcastNotification = exports.deleteUserAccount = exports.unsuspendUser = exports.suspendUser = exports.setUserRole = exports.confirmSubscriptionSession = exports.confirmBundleDirectPayment = exports.mohaffezRejectDirectPayment = exports.mohaffezConfirmDirectPayment = exports.studentMarkedDirectPayment = exports.createSessionRequest = exports.confirmFreeSession = exports.releaseExpiredSlotLocks = exports.onPaymentCreated = exports.checkExpiredPayments = exports.projectPaymentAnalytics = exports.sendSessionReminders = exports.sendPaymentDeadlineReminders = exports.onSessionCompleted = exports.onSessionCreated = exports.onSessionRequestStatusChanged = exports.onSessionRequestAccepted = exports.sendNotification = void 0;
 // Notification functions
 var sendNotification_1 = require("./notifications/sendNotification");
 Object.defineProperty(exports, "sendNotification", { enumerable: true, get: function () { return sendNotification_1.sendNotification; } });
@@ -38,6 +38,11 @@ var directPayment_1 = require("./payments/directPayment");
 Object.defineProperty(exports, "studentMarkedDirectPayment", { enumerable: true, get: function () { return directPayment_1.studentMarkedDirectPayment; } });
 Object.defineProperty(exports, "mohaffezConfirmDirectPayment", { enumerable: true, get: function () { return directPayment_1.mohaffezConfirmDirectPayment; } });
 Object.defineProperty(exports, "mohaffezRejectDirectPayment", { enumerable: true, get: function () { return directPayment_1.mohaffezRejectDirectPayment; } });
+// Bundle and subscription payment functions
+var confirmBundleDirectPayment_1 = require("./payments/confirmBundleDirectPayment");
+Object.defineProperty(exports, "confirmBundleDirectPayment", { enumerable: true, get: function () { return confirmBundleDirectPayment_1.confirmBundleDirectPayment; } });
+var confirmSubscriptionSession_1 = require("./payments/confirmSubscriptionSession");
+Object.defineProperty(exports, "confirmSubscriptionSession", { enumerable: true, get: function () { return confirmSubscriptionSession_1.confirmSubscriptionSession; } });
 // Admin functions
 var adminActions_1 = require("./admin/adminActions");
 Object.defineProperty(exports, "setUserRole", { enumerable: true, get: function () { return adminActions_1.setUserRole; } });

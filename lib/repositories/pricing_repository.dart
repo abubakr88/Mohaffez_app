@@ -107,4 +107,18 @@ class PricingRepository {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  // Get all plans for a teacher (used for checking bundle/subscription availability)
+  Future<List<PricingPlanModel>> getPlansForTeacher(String mohaffezId) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(mohaffezId)
+        .collection('pricingPlans')
+        .where('isActive', isEqualTo: true)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => PricingPlanModel.fromFirestore(doc))
+        .toList();
+  }
 }

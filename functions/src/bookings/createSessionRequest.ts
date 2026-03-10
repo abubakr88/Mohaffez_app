@@ -44,18 +44,23 @@ export const createSessionRequest = functions.https.onCall(
       try {
         const decoded = await admin.auth().verifyIdToken(fallbackIdToken);
         studentId = decoded.uid;
-        functions.logger.warn('createSessionRequest: using fallback idToken verification', { uid: studentId });
+        functions.logger.warn(
+          'createSessionRequest: using fallback idToken verification',
+          { uid: studentId }
+        );
       } catch (e) {
-        functions.logger.error('createSessionRequest: fallback idToken verification failed', {
-          error: e instanceof Error ? e.message : String(e),
-        });
+        functions.logger.error(
+          'createSessionRequest: fallback idToken verification failed',
+          { error: e instanceof Error ? e.message : String(e) }
+        );
       }
     }
 
     if (!studentId) {
-      functions.logger.error('createSessionRequest: UNAUTHENTICATED - no context.auth and no valid fallback token', {
-        headers: JSON.stringify((context as any).rawRequest?.headers ?? {}),
-      });
+      functions.logger.error(
+        'createSessionRequest: UNAUTHENTICATED - no context.auth and no valid fallback token',
+        { headers: JSON.stringify((context as any).rawRequest?.headers ?? {}) }
+      );
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
 
@@ -90,15 +95,18 @@ export const createSessionRequest = functions.https.onCall(
       !slotStart ||
       !slotEnd
     ) {
-      functions.logger.error('createSessionRequest: missing required fields', {
-        studentId,
-        mohaffezId,
-        hasStudentName: !!studentName,
-        hasMohaffezName: !!mohaffezName,
-        sessionType,
-        preferredTimeSlot,
-        slotDate,
-      });
+      functions.logger.error(
+        'createSessionRequest: missing required fields',
+        {
+          studentId,
+          mohaffezId,
+          hasStudentName: !!studentName,
+          hasMohaffezName: !!mohaffezName,
+          sessionType,
+          preferredTimeSlot,
+          slotDate,
+        }
+      );
       throw new functions.https.HttpsError(
         'invalid-argument',
         'Missing required fields'
@@ -237,13 +245,16 @@ export const createSessionRequest = functions.https.onCall(
 
             // FIXED: BUG-5 - Warn if slot disable was skipped due to mismatch
             if (!changed) {
-              functions.logger.warn('createSessionRequest: slot disable skipped — no matching slot found', {
-                lockTimeSlot,
-                lockSessionType,
-                availableSlots: slots.map((s: any) =>
-                  `${s.startTime}-${s.endTime}:${s.sessionType}`
-                ),
-              });
+              functions.logger.warn(
+                'createSessionRequest: slot disable skipped — no matching slot found',
+                {
+                  lockTimeSlot,
+                  lockSessionType,
+                  availableSlots: slots.map(
+                    (s: any) => `${s.startTime}-${s.endTime}:${s.sessionType}`
+                  ),
+                }
+              );
               updatedSlots = null;
             }
           }
@@ -265,7 +276,11 @@ export const createSessionRequest = functions.https.onCall(
         .collection('sessionRequests')
         .where('mohaffezId', '==', mohaffezId)
         .where('status', 'in', [...LIVE_STATUSES])
-        .where('slotDate', '==', admin.firestore.Timestamp.fromDate(slotDateObj));
+        .where(
+          'slotDate',
+          '==',
+          admin.firestore.Timestamp.fromDate(slotDateObj)
+        );
 
       const conflictSnap = await transaction.get(conflictQuery);
 
@@ -301,6 +316,15 @@ export const createSessionRequest = functions.https.onCall(
       // ── 4c. Write sessionRequest ───────────────────────────────────────
       const requestRef = db.collection('sessionRequests').doc();
 
+      // BUG-1 FIX: Compute initial status based on payment method.
+      // directpayment → student pays immediately, no teacher-accept step
+      //                 needed first, so start at awaitingpayment directly.
+      // All other methods → teacher accepts first, so start at pending.
+      const initialStatus =
+        selectedPaymentMethod === 'directpayment'
+          ? STATUS.AWAITING_PAYMENT
+          : STATUS.PENDING;
+
       transaction.set(requestRef, {
         studentId,
         mohaffezId,
@@ -326,7 +350,7 @@ export const createSessionRequest = functions.https.onCall(
         requiresPaymentOnAcceptance: requiresPaymentOnAcceptance ?? false,
         selectedPaymentMethod: selectedPaymentMethod ?? 'pay_after_acceptance',
         slotLockId: slotLockId ?? null,
-        status: STATUS.PENDING,
+        status: initialStatus,           // ← BUG-1 FIX (was: STATUS.PENDING)
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -379,4 +403,3 @@ export const createSessionRequest = functions.https.onCall(
     });
   }
 );
-

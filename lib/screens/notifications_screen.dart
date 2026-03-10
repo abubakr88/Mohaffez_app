@@ -48,7 +48,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       child: Scaffold(
         body: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(paginatedNotificationsProvider(user.uid));
+            // 1. Reset paginated state cleanly via the notifier's own method
+            ref
+                .read(paginatedNotificationsProvider(user.uid).notifier)
+                .refresh();
+
+            // 2. Force the real-time first-page stream to re-emit by invalidating it
+            ref.invalidate(notificationsFirstPageProvider(user.uid));
+
+            // 3. Wait for the first page to actually arrive before hiding the spinner
+            await ref.read(notificationsFirstPageProvider(user.uid).future);
           },
           child: CustomScrollView(
             slivers: [
@@ -372,6 +381,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       case 'assignment_updated':
         // Navigate to student assignments
         context.go('/assignments');
+        break;
+
+      // BUG-10 FIX: Handle subscription_created notification
+      case 'subscription_created':
+      case 'subscriptioncreated':
+      case 'subscriptionsessionconsumed':
+        // Navigate to active subscriptions screen so student can see their bundle
+        context.push('/active-subscriptions');
         break;
 
       default:

@@ -7,6 +7,7 @@ import '../repositories/session_repository.dart';
 import '../models/request_status.dart';
 import '../models/quran_mistake_model.dart';
 import '../models/mohaffez_student_summary.dart';
+import '../models/subscription_model.dart';
 
 // ============================================================================
 // FILTER ENUM AND PROVIDER
@@ -560,6 +561,12 @@ final studentRequestsFirstPageProvider =
     return FirebaseFirestore.instance
         .collection('sessionRequests')
         .where('studentId', isEqualTo: studentId)
+        .where('status', whereIn: const [
+          'pending',
+          'awaitingpayment',
+          'awaitingdirectpaymentconfirmation',
+          'accepted',
+        ])
         .orderBy('createdAt', descending: true)
         .limit(20)
         .snapshots()
@@ -1262,4 +1269,11 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
 
 final sessionRepositoryProvider = Provider((ref) {
   return SessionRepository(FirebaseFirestore.instance);
+});
+
+/// Fetches a single subscription document by its Firestore document ID.
+/// Returns null if the document does not exist.
+final bundleByIdProvider = FutureProvider.autoDispose
+    .family<SubscriptionModel?, String>((ref, subscriptionId) async {
+  return ref.watch(sessionRepositoryProvider).getBundleById(subscriptionId);
 });

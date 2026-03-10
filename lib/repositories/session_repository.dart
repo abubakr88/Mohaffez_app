@@ -5,7 +5,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import '../models/session_model.dart';
 import '../models/session_request_model.dart';
-import '../models/request_status.dart'; // â† single source of truth for status strings
+import '../models/subscription_model.dart';
+import '../models/request_status.dart'; // ← single source of truth for status strings
 
 /// Provides a Riverpod-compatible repository instance.
 /// Usage: ref.watch(sessionRepositoryProvider)
@@ -716,5 +717,43 @@ class SessionRepository {
       );
     }
     await batch.commit();
+  }
+
+  /// Get active bundle for a student + mohaffez + sessionType combination
+  /// Returns null if no active bundle exists
+  Future<ActiveBundleInfo?> getActiveBundle({
+    required String studentId,
+    required String mohaffezId,
+    required String sessionType,
+  }) async {
+    final snapshot = await _firestore
+        .collection('subscriptions')
+        .where('studentId', isEqualTo: studentId)
+        .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('sessionType', isEqualTo: sessionType)
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    return ActiveBundleInfo.fromMap(
+      snapshot.docs.first.data(),
+      snapshot.docs.first.id,
+    );
+  }
+
+  // ============================================================================
+  // SUBSCRIPTIONS (BUG-C FIX)
+  // ============================================================================
+
+  /// Get a subscription bundle by its ID
+  Future<SubscriptionModel?> getBundleById(String subscriptionId) async {
+    final doc = await _firestore
+        .collection('subscriptions')
+        .doc(subscriptionId)
+        .get();
+    if (!doc.exists) return null;
+    return SubscriptionModel.fromFirestore(doc);
   }
 }

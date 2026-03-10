@@ -13,6 +13,7 @@ import '../providers/pricing_provider.dart';
 import '../providers/promo_code_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/booking_provider.dart';
+import '../providers/booking_flow_provider.dart' as BF;
 import '../services/pricing_service.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
@@ -40,6 +41,8 @@ class StudentPaymentScreen extends ConsumerStatefulWidget {
     this.preselectedDate,
     this.autoBookAfterPayment = false,
     this.showSubscriptionsOnly = false,
+    this.showBundlePlansOnly = false,
+    this.autoBookFirstSession = false,
     this.mohaffezAddress,
     this.mohaffezLat,
     this.mohaffezLng,
@@ -60,6 +63,8 @@ class StudentPaymentScreen extends ConsumerStatefulWidget {
   final DateTime? preselectedDate;
   final bool autoBookAfterPayment;
   final bool showSubscriptionsOnly;
+  final bool showBundlePlansOnly;
+  final bool autoBookFirstSession;
   final String? mohaffezAddress;
   final double? mohaffezLat;
   final double? mohaffezLng;
@@ -236,6 +241,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             if (widget.showSubscriptionsOnly) {
               filteredPlans = filteredPlans
                   .where((p) => p.type != PlanType.single)
+                  .toList();
+            }
+
+            // NEW: Filter for bundle plans only when showBundlePlansOnly is true
+            if (widget.showBundlePlansOnly) {
+              filteredPlans = filteredPlans
+                  .where((p) => p.type == PlanType.bundle || p.type == PlanType.subscription)
                   .toList();
             }
 
@@ -528,7 +540,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     }
 
     // ── EXISTING: Card / Paymob payment ──────────────────────────────────
-    final requiresSlot = isFreeSession && widget.requestId == null;
+    // BUG-A FIX: Allow bundle/subscription plans to proceed without slot
+    final planType = selectedPlan?.type;
+    final isBundlePlan = planType == PlanType.bundle ||
+        planType == PlanType.subscription;
+    final requiresSlot = !isFreeSession &&
+        !isBundlePlan &&    // bundles do not require a slot
+        widget.requestId == null;
     final canPay = !isProcessingPayment && (!requiresSlot || hasSelectedSlot);
 
     return SizedBox(
@@ -579,12 +597,19 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     final pricing = resolvePricing();
     final isFreeSession = pricing.finalPrice < 0.01;
 
+    // BUG-A FIX: Handle bundle/subscription direct payment
+    final planType = selectedPlan?.type;
+    final isBundlePlan = planType == PlanType.bundle ||
+        planType == PlanType.subscription;
+
     if (isFreeSession && appliedPromoCode != null) {
       await handleFreeSession(context, ref, user);
-    } else if (_selectedDPMethod == _DPMethod.direct &&
-        widget.requestId != null) {
-      _openDirectPaymentScreen(context, user, pricing);
-      return;
+    } else if (_selectedDPMethod == _DPMethod.direct) {
+      // BUG-A FIX: Allow bundles to proceed without requestId
+      if (isBundlePlan || widget.requestId != null) {
+        _openDirectPaymentScreen(context, user, pricing);
+        return;
+      }
     } else {
       await handleRegularPayment(context, ref, user, pricing);
     }
@@ -595,6 +620,67 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     dynamic user,
     PricingResult pricing,
   ) {
+    // ── BUNDLE/SUBSCRIPTION: no slot or requestId needed upfront ──────────
+    // WHY: Bundles are paid first; sessions are booked separately afterward.
+    // Only single-session plans require a slot and a requestId at this stage.
+    final planType = selectedPlan?.type;
+    final isBundlePlan = planType == PlanType.bundle ||
+        planType == PlanType.subscription;
+
+    if (isBundlePlan) {
+      // Read slot context from booking flow provider when autoBookFirstSession is true
+      Map<String, String>? slotData;
+      if (widget.autoBookFirstSession) {
+        final flow = ref.read(BF.bookingFlowProvider);
+        final slotCtx = flow.slotContext;
+        if (slotCtx != null) {
+          slotData = {
+            'slotDate': slotCtx.slotDate,
+            'slotStart': slotCtx.slotStart,
+            'slotEnd': slotCtx.slotEnd,
+            'preferredTimeSlot': slotCtx.preferredTimeSlot,
+            'sessionType': slotCtx.sessionType,
+          };
+        }
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DirectPaymentScreen(
+            requestId: null,           // no request yet
+            mohaffezId: widget.mohaffezId,
+            mohaffezName: widget.mohaffezName,
+            studentName: user.name,
+            studentEmail: user.email ?? '',
+            studentPhone: user.phoneNumber ?? '',
+            amount: pricing.finalPrice,
+            sessionType: slotData?['sessionType'] ?? lockedSessionType,
+            preferredTimeSlot: slotData?['preferredTimeSlot'] ?? '',
+            slotDate: slotData != null && slotData['slotDate']!.isNotEmpty
+                ? DateTime.tryParse(slotData['slotDate']!)
+                : null,
+            slotStart: slotData != null && slotData['slotStart']!.isNotEmpty
+                ? DateTime.tryParse(slotData['slotStart']!)
+                : null,
+            slotEnd: slotData != null && slotData['slotEnd']!.isNotEmpty
+                ? DateTime.tryParse(slotData['slotEnd']!)
+                : null,
+            imamAddressText: widget.location,
+            // pass full plan details so DirectPaymentScreen can store them
+            planId: selectedPlan!.id!,
+            planTitle: selectedPlan!.title,
+            planType: planType!.name,
+            sessionsCount: selectedPlan!.sessionsCount,
+            validityDays: selectedPlan!.validityDays,
+            autoBookFirstSession: widget.autoBookFirstSession,
+          ),
+        ),
+      );
+      return; // ← stop here; do NOT fall through to the slot guards
+    }
+    // ── end bundle bypass ─────────────────────────────────────────────────
+
     final requestId = widget.requestId;
     if (requestId == null || requestId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -635,6 +721,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           mohaffezId: widget.mohaffezId,
           mohaffezName: widget.mohaffezName,
           studentName: user.name,
+          // BUG-A FIX: Add studentEmail and studentPhone
+          studentEmail: user.email ?? '',
+          studentPhone: user.phoneNumber ?? '',
           amount: pricing.finalPrice,
           sessionType: lockedSessionType,
           preferredTimeSlot: lockedTimeSlot,
@@ -1191,7 +1280,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       if (paymentResult == null) throw Exception('فشل إنشاء سجل الدفع');
 
       final result =
-          await ref.read(bookingFlowProvider.notifier).createFreeSession(
+          await ref.read(legacyBookingFlowProvider.notifier).createFreeSession(
                 mohaffezId: widget.mohaffezId,
                 mohaffezName: widget.mohaffezName,
                 studentId: user.uid,

@@ -55,6 +55,21 @@ final paymentActionsProvider =
   );
 });
 
+// BUG-8 FIX: Stream active subscriptions for a student to display in ActiveSubscriptionsScreen.
+// WHY: Allows students to see their bundle/subscription sessions remaining.
+final activeSubscriptionsProvider = StreamProvider.autoDispose
+    .family<List<SubscriptionModel>, String>((ref, studentId) {
+  return FirebaseFirestore.instance
+      .collection('subscriptions')
+      .where('studentId', isEqualTo: studentId)
+      .where('status', isEqualTo: 'active')
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => SubscriptionModel.fromFirestore(d))
+          .toList());
+});
+
 class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
   final PaymentRepository _repository;
   // ignore: unused_field
@@ -79,11 +94,13 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
       final mergedMetadata = <String, dynamic>{
         if (basePayment.metadata != null) ...basePayment.metadata!,
         if (extraMetadata != null) ...extraMetadata,
-        'planId': plan.id,
+        // BUG-1 FIX: Include all plan fields in metadata for backend CFs
+        'planId': plan.id ?? '',
         'planTitle': plan.title,
         'planType': plan.type.name,
         'planMode': plan.mode.name,
         'sessionsCount': plan.sessionsCount,
+        'validityDays': plan.validityDays,
         'priceEGP': plan.priceEGP,
       };
 

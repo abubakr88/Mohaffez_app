@@ -224,6 +224,15 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
               onTap: () => setState(
                   () => _selectedFilter = RequestStatus.awaitingPayment),
             ),
+            const SizedBox(width: 8),
+            // BUG-B FIX: Add filter for direct payment confirmation
+            _FilterChip(
+              label: 'تأكيد الدفع المباشر',
+              icon: Icons.payments_outlined,
+              isSelected: _selectedFilter == RequestStatus.awaitingDirectPayment,
+              onTap: () => setState(
+                  () => _selectedFilter = RequestStatus.awaitingDirectPayment),
+            ),
           ],
         ),
       ),
@@ -526,7 +535,7 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class PendingRequestCard extends StatelessWidget {
+class PendingRequestCard extends ConsumerWidget {
   final Map<String, dynamic> request;
   final String requestId;
   final VoidCallback onAccept;
@@ -541,11 +550,17 @@ class PendingRequestCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final status = (request['status'] as String? ?? '').toLowerCase();
     final studentName = request['studentName'] as String? ?? 'غير معروف';
     final sessionType = request['sessionType'] as String? ?? '';
     final location = request['location'] as String? ?? '';
+
+    // BUG-C FIX: Read bundle plan fields
+    final planType = request['planType'] as String?;
+    final sessionsCount = request['sessionsCount'] as int?;
+    final planTitle = request['planTitle'] as String?;
+    final isBundlePlan = planType == 'bundle' || planType == 'subscription';
 
     DateTime? sessionDate;
     final dateField = request['sessionDate'] ?? request['slotDate'];
@@ -624,6 +639,46 @@ class PendingRequestCard extends StatelessWidget {
                 ),
               ],
             ),
+            // BUG-C FIX: Add bundle info row
+            if (isBundlePlan) ...[
+              const SizedBox(height: 6),
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppThemeConstants.primaryAmber),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.collections_bookmark_outlined,
+                        size: 14, color: AppThemeConstants.primaryAmber),
+                    const SizedBox(width: 4),
+                    Text(
+                      planType == 'bundle'
+                          ? 'حزمة ${sessionsCount ?? ''} جلسات'
+                          : 'اشتراك شهري',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.primaryAmberDark,
+                      ),
+                    ),
+                  ]),
+                ),
+                if (planTitle != null && planTitle.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      planTitle,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ]),
+            ],
+
             const SizedBox(height: 12),
 
             if (status == RequestStatus.awaitingDirectPayment) ...[
@@ -721,6 +776,9 @@ class PendingRequestCard extends StatelessWidget {
 
             const SizedBox(height: 16),
 
+            // Payment type info widget (BUG-C FIX)
+            _buildPaymentTypeInfo(ref),
+
             // Action buttons
             Row(
               children: [
@@ -803,5 +861,86 @@ class PendingRequestCard extends StatelessWidget {
     } catch (_) {
       return null;
     }
+  }
+
+  // BUG-C FIX: Widget to display payment type info (bundle vs direct)
+  Widget _buildPaymentTypeInfo(WidgetRef ref) {
+    // Get paymentType and subscriptionId from request
+    final paymentType = request['paymentType'] as String?;
+    final subscriptionId = request['subscriptionId'] as String?;
+    final planType = request['planType'] as String?; // fallback from existing code
+    
+    // Check if it's a bundle/subscription
+    final isBundleOrSubscription = paymentType == 'bundle' || 
+        paymentType == 'subscription' || 
+        planType == 'bundle' || 
+        planType == 'subscription';
+    
+    if (isBundleOrSubscription && subscriptionId != null) {
+      // Use bundleByIdProvider for reactive updates
+      final bundleAsync = ref.watch(bundleByIdProvider(subscriptionId));
+
+      return bundleAsync.when(
+        loading: () => const LinearProgressIndicator(),
+        error: (_, __) => const SizedBox.shrink(),
+        data: (bundle) {
+          if (bundle == null) return const SizedBox.shrink();
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.collections_bookmark_outlined, size: 18, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text(
+                      'نوع الحجز: باقة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('اسم الباقة: ${bundle.planTitle}'),
+                Text('الجلسات المتبقية: ${bundle.remainingSessions} / ${bundle.totalSessions}'),
+              ],
+            ),
+          );
+        },
+      );
+    }
+    
+    // Direct payment - show direct payment label
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.payment, size: 18, color: Colors.blue),
+          SizedBox(width: 8),
+          Text(
+            'نوع الحجز: دفع مباشر',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.blue,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

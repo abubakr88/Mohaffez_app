@@ -137,30 +137,39 @@ class HomeShell extends ConsumerWidget {
             statusBarIconBrightness: Brightness.light,
           ),
 
-          // ── LEADING (right in RTL) ─────────────────────────────────────
-          // Back arrow on sub-routes, hamburger on root tabs
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                  tooltip: 'رجوع',
-                  onPressed: () => context.pop(),
-                )
-              : Builder(
-                  builder: (ctx) => IconButton(
-                    icon: const Icon(
-                      Icons.menu_rounded,
-                      color: Colors.white,
-                      size: 26,
-                    ),
-                    tooltip: ArabicLabels.menu,
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
-                  ),
+      // ── LEADING (right in RTL) ─────────────────────────────────────
+      // Back arrow on sub-routes, hamburger on root tabs
+      leading: context.canPop()
+          ? IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              tooltip: 'رجوع',
+              onPressed: () {
+                // WHY: GoRouter's context.canPop() can return true even when
+                // the underlying Navigator stack is empty after context.go()
+                // resets subroutes inside a ShellRoute — causing a GoError crash.
+                // Fallback to /home keeps UX clean instead of crashing.
+                try {
+                  context.pop();
+                } catch (_) {
+                  context.go('/home');
+                }
+              },
+            )
+          : Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(
+                  Icons.menu_rounded,
+                  color: Colors.white,
+                  size: 26,
                 ),
-
+                tooltip: ArabicLabels.menu,
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+            ),
           // ── TITLE ──────────────────────────────────────────────────────
           title: Row(
             mainAxisSize: MainAxisSize.min,

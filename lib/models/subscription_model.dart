@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_model.dart'; // For TimestampConverter
+import 'user_model.dart' hide TimestampConverter; // For other exports, but use pricing_plan's TimestampConverter
+import 'pricing_plan_model.dart'; // For PlanType, PlanTypeConverter, and TimestampConverter
 
 part 'subscription_model.freezed.dart';
 part 'subscription_model.g.dart';
@@ -26,7 +27,8 @@ class SubscriptionModel with _$SubscriptionModel {
     required String mohaffezName,
     required String planId,
     required String planTitle,
-    required String planType, // 'single', 'bundle', 'subscription'
+    // BUG-6 FIX: Changed from String to PlanType enum with converter
+    @PlanTypeConverter() required PlanType planType,
     required int totalSessions,
     required int remainingSessions,
     required double totalPaid,
@@ -57,6 +59,12 @@ extension SubscriptionExtension on SubscriptionModel {
   bool get isDepleted => status == SubscriptionStatus.depleted;
   bool get hasSessionsLeft => remainingSessions > 0;
   
+  // BUG-6 FIX: Check if this is a bundle or subscription
+  bool get isBundleOrSubscription =>
+      planType == PlanType.bundle || planType == PlanType.subscription;
+  bool get isBundle => planType == PlanType.bundle;
+  bool get isSubscription => planType == PlanType.subscription;
+  
   bool get canBookSession {
     if (!isActive) return false;
     if (!hasSessionsLeft) return false;
@@ -69,4 +77,43 @@ extension SubscriptionExtension on SubscriptionModel {
   int get usedSessions => totalSessions - remainingSessions;
   double get progressPercentage =>
       totalSessions > 0 ? (usedSessions / totalSessions) * 100 : 0;
+}
+
+// Simple ActiveBundle model for getActiveBundle query (compatible with existing freezed model)
+class ActiveBundleInfo {
+  final String id;
+  final String studentId;
+  final String mohaffezId;
+  final String sessionType;
+  final String planTitle;
+  final int totalSessions;
+  final int remainingSessions;
+  final String status;
+  final DateTime? expiryDate;
+
+  const ActiveBundleInfo({
+    required this.id,
+    required this.studentId,
+    required this.mohaffezId,
+    required this.sessionType,
+    required this.planTitle,
+    required this.totalSessions,
+    required this.remainingSessions,
+    required this.status,
+    this.expiryDate,
+  });
+
+  factory ActiveBundleInfo.fromMap(Map<String, dynamic> map, String docId) {
+    return ActiveBundleInfo(
+      id: docId,
+      studentId: map['studentId'] as String? ?? '',
+      mohaffezId: map['mohaffezId'] as String? ?? '',
+      sessionType: map['sessionType'] as String? ?? '',
+      planTitle: map['planTitle'] as String? ?? '',
+      totalSessions: map['totalSessions'] as int? ?? 0,
+      remainingSessions: map['remainingSessions'] as int? ?? 0,
+      status: map['status'] as String? ?? 'active',
+      expiryDate: map['expiryDate'] as DateTime?,
+    );
+  }
 }
