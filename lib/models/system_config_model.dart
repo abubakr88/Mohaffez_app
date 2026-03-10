@@ -13,6 +13,7 @@ class SystemConfigModel {
   final int sessionReminderHours1;
   final int sessionReminderHours2;
   final int maxAdvanceBookingDays;
+  final int earlyCompletionMinutes;
   final bool maintenanceMode;
   final String maintenanceMessage;
   final List<String> maintenanceAllowedUids;
@@ -49,6 +50,7 @@ class SystemConfigModel {
     required this.sessionReminderHours1,
     required this.sessionReminderHours2,
     required this.maxAdvanceBookingDays,
+    required this.earlyCompletionMinutes,
     required this.maintenanceMode,
     required this.maintenanceMessage,
     required this.maintenanceAllowedUids,
@@ -107,6 +109,9 @@ class SystemConfigModel {
           defaults.sessionReminderHours2,
       maxAdvanceBookingDays: (data['maxAdvanceBookingDays'] as num?)?.toInt() ??
           defaults.maxAdvanceBookingDays,
+      earlyCompletionMinutes:
+          (data['earlyCompletionMinutes'] as num?)?.toInt() ??
+              defaults.earlyCompletionMinutes,
       maintenanceMode:
           data['maintenanceMode'] as bool? ?? defaults.maintenanceMode,
       maintenanceMessage:
@@ -170,6 +175,7 @@ class SystemConfigModel {
       sessionReminderHours1: 24,
       sessionReminderHours2: 1,
       maxAdvanceBookingDays: 30,
+      earlyCompletionMinutes: 30,
       maintenanceMode: false,
       maintenanceMessage: '',
       maintenanceAllowedUids: [],
@@ -209,6 +215,7 @@ class SystemConfigModel {
       'sessionReminderHours1': sessionReminderHours1,
       'sessionReminderHours2': sessionReminderHours2,
       'maxAdvanceBookingDays': maxAdvanceBookingDays,
+      'earlyCompletionMinutes': earlyCompletionMinutes,
       'maintenanceMode': maintenanceMode,
       'maintenanceMessage': maintenanceMessage,
       'maintenanceAllowedUids': maintenanceAllowedUids,

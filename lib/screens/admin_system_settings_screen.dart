@@ -138,6 +138,11 @@ class _AdminSystemSettingsScreenState
     return _sectionList([
       _numberField('slotLockDurationMinutes',
           ArabicLabels.slotLockDurationMinutes, c.slotLockDurationMinutes),
+      _numberField(
+        'earlyCompletionMinutes',
+        'مدة الإتمام المبكر للجلسة (دقائق)',
+        c.earlyCompletionMinutes,
+      ),
       _numberField('maxPendingRequestsPerStudent', 'أقصى طلبات معلقة للطالب',
           c.maxPendingRequestsPerStudent),
       _numberField('maxAdvanceBookingDays', 'أقصى حجز مسبق (أيام)',

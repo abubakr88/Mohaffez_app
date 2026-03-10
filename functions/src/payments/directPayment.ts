@@ -11,8 +11,6 @@ import {
   parseFlutterDate,
 } from "../utils/dateHelpers";
 
-const COMMISSION_RATE = 0.05;
-
 const STATUS = {
   PENDING: "pending",
   AWAITINGPAYMENT: "awaitingpayment",
@@ -125,6 +123,11 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         // ── Always: create directPaymentRequest ──────────────────────────────
         const dpRef = db.collection("directPaymentRequests").doc();
 
+        // Read commissionRate from system config
+        const configSnap = await tx.get(db.collection("systemConfig").doc("global"));
+        const commissionRate: number =
+          (configSnap.data()?.commissionRate as number) ?? 0.05;
+
         tx.set(dpRef, {
           id: dpRef.id,
           // WHY: null when Path C — mohaffez confirm flow still works because
@@ -136,8 +139,8 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           mohaffezId,
           mohaffezName,
           amount,
-          commissionAmount: (amount as number) * COMMISSION_RATE,
-          commissionRate: COMMISSION_RATE,
+          commissionAmount: (amount as number) * commissionRate,
+          commissionRate: commissionRate,
           sessionType,
           preferredTimeSlot,
           sessionDate: admin.firestore.Timestamp.fromDate(
@@ -334,7 +337,12 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
         }
 
         // ── Commission tracking ──────────────────────────────────────────────
-        const commissionAmount = (dp.amount as number) * COMMISSION_RATE;
+        // Read commissionRate from system config
+        const configSnap2 = await tx.get(db.collection("systemConfig").doc("global"));
+        const commissionRate: number =
+          (configSnap2.data()?.commissionRate as number) ?? 0.05;
+
+        const commissionAmount = (dp.amount as number) * commissionRate;
         const sessionDateObj = sessionDate.toDate();
         const weekNumber = getWeekNumber(sessionDateObj);
         const year = sessionDateObj.getFullYear();
@@ -362,7 +370,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
             totalSessions: 1,
             totalRevenue: dp.amount,
             commissionAmount,
-            commissionRate: COMMISSION_RATE,
+            commissionRate: commissionRate,
             status: "pending",
             weekStart: admin.firestore.Timestamp.fromDate(weekStart),
             weekEnd: admin.firestore.Timestamp.fromDate(weekEnd),

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import '../providers/system_config_provider.dart';
 import '../shared/constants/app_theme.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -299,7 +300,7 @@ class SessionCard extends ConsumerWidget {
   });
 
   // ✅ Check if session can be completed (30 min before → 24 hours after)
-  bool _canCompleteSession(DateTime sessionDate, String timeSlot) {
+  bool _canCompleteSession(DateTime sessionDate, String timeSlot, int earlyMinutes) {
     try {
       final now = DateTime.now();
 
@@ -318,7 +319,7 @@ class SessionCard extends ConsumerWidget {
       );
 
       // Window: 30 min before → 24 hours after
-      final canStartFrom = sessionTime.subtract(const Duration(minutes: 30));
+      final canStartFrom = sessionTime.subtract(Duration(minutes: earlyMinutes));
       final canCompleteUntil = sessionTime.add(const Duration(hours: 24));
 
       return now.isAfter(canStartFrom) && now.isBefore(canCompleteUntil);
@@ -600,6 +601,10 @@ class SessionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final earlyMinutes = ref
+        .watch(systemConfigProvider)
+        .valueOrNull
+        ?.earlyCompletionMinutes ?? 30;
     final studentName = session['studentName'] as String? ?? 'غير معروف';
     final sessionDate = session['sessionDate'] as DateTime?;
     final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
@@ -612,7 +617,7 @@ class SessionCard extends ConsumerWidget {
         session['imamAddressText'] as String? ?? session['location'] as String?;
 
     final bool canComplete =
-        sessionDate != null && _canCompleteSession(sessionDate, timeSlot);
+        sessionDate != null && _canCompleteSession(sessionDate, timeSlot, earlyMinutes);
     final bool isLate =
         sessionDate != null && _isSessionLate(sessionDate, timeSlot);
     final hoursUntilSession =
@@ -938,7 +943,7 @@ class SessionCard extends ConsumerWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'يمكن إكمال الجلسة قبل الموعد بـ 30 دقيقة',
+                          'يمكن إكمال الجلسة قبل الموعد بـ $earlyMinutes دقيقة',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.blue.shade900,
@@ -948,7 +953,8 @@ class SessionCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-              ],
+              ],git add *
+              
             ],
           ),
         ),

@@ -4,8 +4,6 @@ import { db, FieldValue } from "../utils/admin";
 import { getWeekNumber, getWeekStart, getWeekEnd, getNextMonday } from "../utils/dateHelpers";
 import { createAndSendNotification } from "../utils/notificationHelpers";
 
-const COMMISSION_RATE = 0.05;
-
 class AlreadyConfirmedError extends Error {
   constructor(public readonly existingSubscriptionId: string) {
     super("AlreadyConfirmed");
@@ -122,6 +120,8 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         );
         const maxActive: number =
           (configSnap.data()?.maxActiveSubscriptions as number) ?? 3;
+        const commissionRate: number =
+          (configSnap.data()?.commissionRate as number) ?? 0.05;
 
         // FIX 3: Resolve sessionType with explicit priority order
         const dpMetadata = (dp as Record<string, unknown>).metadata as
