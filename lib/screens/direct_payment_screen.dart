@@ -1,4 +1,5 @@
 // lib/screens/direct_payment_screen.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../models/direct_payment_model.dart';
 import '../models/pricing_plan_model.dart';
 import '../providers/booking_flow_provider.dart';
-import '../providers/booking_provider.dart';
 import '../providers/user_provider.dart';
 import '../repositories/pricing_repository.dart';
 import '../services/direct_payment_service.dart';
@@ -91,6 +91,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   double? resolvedImamAddressLng;
   String? resolvedMohaffezPhone;
 
+  // App-kill recovery — populated from sessionRequests doc when provider is empty
+  String? _hydratedPlanId;
+  String? _hydratedPlanTitle;
+  String? _hydratedPlanType;
+  int?    _hydratedSessions;
+  int?    _hydratedValidity;
+
   @override
   void initState() {
     super.initState();
@@ -101,6 +108,25 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     final flow = ref.read(bookingFlowProvider);
     final slotContext = flow.slotContext;
     final currentUser = ref.read(currentUserProvider).value;
+
+    // 🔍 DIAG Step 3: DirectPaymentScreen building, print all incoming params
+    debugPrint('🔵 [BUNDLE_FLOW] Step3_DirectPaymentScreen_BUILD: '
+        'requestId=${widget.requestId}, '
+        'mohaffezId=${widget.mohaffezId}, '
+        'mohaffezName=${widget.mohaffezName}, '
+        'planType=${widget.planType}, '
+        'planId=${widget.planId}, '
+        'planTitle=${widget.planTitle}, '
+        'sessionsCount=${widget.sessionsCount}, '
+        'validityDays=${widget.validityDays}, '
+        'amount=${widget.amount}, '
+        'sessionType=${widget.sessionType}, '
+        'slotDate=${widget.slotDate}, '
+        'slotStart=${widget.slotStart}, '
+        'slotEnd=${widget.slotEnd}, '
+        'preferredTimeSlot=${widget.preferredTimeSlot}, '
+        'slotContext_mohaffezId=${slotContext?.mohaffezId}, '
+        'slotContext_sessionType=${slotContext?.sessionType}');
 
     // ── FIX: Only guard when BOTH provider context AND widget params are absent.
     // When navigating from StudentRequestsScreen (Pay Now), mohaffezId is passed
@@ -177,8 +203,60 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       resolvedAmount = widget.amount;
     }
 
+    await _hydrateSlotFromRequestIfNeeded();
     if (resolvedMohaffezId != null) {
       await _loadWallets(resolvedMohaffezId!);
+    }
+  }
+
+  Future<void> _hydrateSlotFromRequestIfNeeded() async {
+    final rid = widget.requestId;
+    if (rid == null || rid.isEmpty) return;
+    // Skip when slot timestamps are already resolved
+    if (resolvedSlotDate != null &&
+        resolvedSlotStart != null &&
+        resolvedSlotEnd != null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('sessionRequests')
+          .doc(rid)
+          .get();
+      if (!doc.exists || !mounted) return;
+      final d = doc.data()!;
+
+      DateTime? parse(dynamic v) {
+        if (v is Timestamp) return v.toDate();
+        if (v is String) return DateTime.tryParse(v);
+        return null;
+      }
+
+      setState(() {
+        resolvedSlotDate    ??= parse(d['slotDate']);
+        resolvedSlotStart   ??= parse(d['slotStart']);
+        resolvedSlotEnd     ??= parse(d['slotEnd']);
+        resolvedTimeSlot    ??= d['preferredTimeSlot'] as String?;
+        resolvedSessionType ??= d['sessionType'] as String?;
+        _hydratedPlanId     ??= d['planId']         as String?;
+        _hydratedPlanTitle  ??= d['planTitle']      as String?;
+        _hydratedPlanType   ??= d['planType']       as String?;
+        _hydratedSessions   ??= d['sessionsCount']  as int?;
+        _hydratedValidity   ??= d['validityDays']   as int?;
+      });
+
+      if (resolvedAmount == null && resolvedMohaffezId != null) {
+        final effectivePlanType = widget.planType ?? _hydratedPlanType;
+        final effectivePlanId   = widget.planId   ?? _hydratedPlanId;
+        final isBundle = effectivePlanType == 'bundle' ||
+            effectivePlanType == 'subscription';
+        if (isBundle && effectivePlanId != null) {
+          await _fetchBundlePlanPrice(resolvedMohaffezId!, effectivePlanId);
+        } else if (!isBundle) {
+          await _fetchSingleSessionPrice(
+              resolvedMohaffezId!, resolvedSessionType ?? '');
+        }
+      }
+    } catch (e) {
+      debugPrint('DirectPaymentScreen._hydrateSlotFromRequestIfNeeded: $e');
     }
   }
 
@@ -263,11 +341,38 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       return;
     }
 
+    final requestId = widget.requestId;
+    if (requestId == null || requestId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تحديد رقم الطلب')),
+      );
+      return;
+    }
+
     setState(() => submitting = true);
+
+    // 🔍 DIAG Step 3: Confirm payment button tapped, print payload
+    debugPrint('🔵 [BUNDLE_FLOW] Step3_ConfirmPayment_TAPPED: '
+        'requestId=${widget.requestId}, '
+        'mohaffezId=$resolvedMohaffezId, '
+        'mohaffezName=$resolvedMohaffezName, '
+        'studentName=$resolvedStudentName, '
+        'amount=$resolvedAmount, '
+        'sessionType=$resolvedSessionType, '
+        'preferredTimeSlot=$resolvedTimeSlot, '
+        'slotDate=$resolvedSlotDate, '
+        'slotStart=$resolvedSlotStart, '
+        'slotEnd=$resolvedSlotEnd, '
+        'paymentMethod=${selectedMethod!.value}, '
+        'planType=${widget.planType}, '
+        'planId=${widget.planId}, '
+        'planTitle=${widget.planTitle}, '
+        'sessionsCount=${widget.sessionsCount}, '
+        'validityDays=${widget.validityDays}');
 
     try {
       final result = await DirectPaymentService.studentMarkPaid(
-        requestId: widget.requestId,
+        requestId: requestId,
         mohaffezId: resolvedMohaffezId!,
         mohaffezName: resolvedMohaffezName ?? '',
         studentName: resolvedStudentName ?? '',
@@ -287,12 +392,15 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         imamAddressLat: resolvedImamAddressLat,
         imamAddressLng: resolvedImamAddressLng,
         mohaffezPhone: resolvedMohaffezPhone,
-        planType: widget.planType,
-        planId: widget.planId,
-        planTitle: widget.planTitle,
-        sessionsCount: widget.sessionsCount,
-        validityDays: widget.validityDays,
+        planType:      widget.planType      ?? _hydratedPlanType,
+        planId:        widget.planId        ?? _hydratedPlanId,
+        planTitle:     widget.planTitle     ?? _hydratedPlanTitle,
+        sessionsCount: widget.sessionsCount ?? _hydratedSessions,
+        validityDays:  widget.validityDays  ?? _hydratedValidity,
       );
+
+      // 🔍 DIAG Step 3: CF response
+      debugPrint('✅ [BUNDLE_FLOW] Step3_CF_RESPONSE: result=$result');
 
       if (!mounted) return;
 
@@ -318,6 +426,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         );
       }
     } on Exception catch (e) {
+      // 🔍 DIAG Step 3: CF error
+      debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: error=$e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
@@ -507,7 +617,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: const [
+            const Row(children: [
               Icon(Icons.info_outline,
                   color: AppThemeConstants.primaryAmber),
               SizedBox(width: 8),
@@ -755,7 +865,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: const [
+          const Row(children: [
             Icon(Icons.info_outlined, color: Colors.amber, size: 18),
             SizedBox(width: 6),
             Text('تعليمات الدفع',

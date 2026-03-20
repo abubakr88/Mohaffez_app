@@ -98,7 +98,7 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'planId': plan.id ?? '',
         'planTitle': plan.title,
         'planType': plan.type.name,
-        'planMode': plan.mode.name,
+        'planMode': plan.mode?.name ?? 'online',
         'sessionsCount': plan.sessionsCount,
         'validityDays': plan.validityDays,
         'priceEGP': plan.priceEGP,

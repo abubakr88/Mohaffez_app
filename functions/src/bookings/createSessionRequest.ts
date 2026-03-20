@@ -335,14 +335,12 @@ export const createSessionRequest = functions.https.onCall(
       // ── 4c. Write sessionRequest ───────────────────────────────────────
       const requestRef = db.collection('sessionRequests').doc();
 
-      // NEW — Bundle/subscription requests ALWAYS start at PENDING, even when
-      // selectedPaymentMethod == 'directpayment', because the teacher must
-      // accept first (Path B teacher-first rule).
-      // Only single-session directpayment requests bypass to AWAITING_PAYMENT.
-      const initialStatus =
-        selectedPaymentMethod === 'directpayment' && !isBundlePlan
-          ? STATUS.AWAITING_PAYMENT  // ← BUG-1 FIX (single direct only)
-          : STATUS.PENDING;          // ← bundles always require teacher accept first
+      // ALL session requests start at PENDING regardless of payment method.
+      // Teacher accepts the slot first (PendingRequestsScreen) → student is notified
+      // → status transitions to AWAITINGPAYMENT → student transfers payment →
+      // studentMarkedDirectPayment → mohaffezConfirmDirectPayment → hafizSession created.
+      // This enforces the teacher-first rule for every path.
+      const initialStatus = STATUS.PENDING;
 
       transaction.set(requestRef, {
         studentId,
@@ -358,7 +356,7 @@ export const createSessionRequest = functions.https.onCall(
         imamAddressLat: imamAddressLat ?? null,
         imamAddressLng: imamAddressLng ?? null,
         mohaffezPhone: mohaffezPhone ?? null,
-        subscriptionId: subscriptionId ?? null,
+        subscriptionId: (data.subscriptionId as string) ?? null, // FIX-A1
         planId: (data.planId as string) ?? null,
         planTitle: (data.planTitle as string) ?? null,
         planType: rawPlanType,              // NEW: always written
@@ -367,7 +365,10 @@ export const createSessionRequest = functions.https.onCall(
         sessionsCount:
           typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
         validityDays: validityDays,         // NEW
-        requiresPaymentOnAcceptance: requiresPaymentOnAcceptance ?? false,
+        requiresPaymentOnAcceptance:
+          selectedPaymentMethod === 'directpayment' && !isBundlePlan
+            ? true
+            : (requiresPaymentOnAcceptance ?? false),
         selectedPaymentMethod: selectedPaymentMethod ?? 'pay_after_acceptance',
         slotLockId: slotLockId ?? null,
         status: initialStatus,

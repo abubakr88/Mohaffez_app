@@ -1,14 +1,10 @@
 // lib/screens/direct_booking_request_screen.dart
-//
-// WHY THIS SCREEN EXISTS:
-//   Path C (direct single-session booking) previously jumped straight to the
-//   payment screen, forcing the student to pay before the teacher agreed to
-//   the slot.  This screen inserts the missing "request first" step:
-//
-//   Student sends request  →  Teacher accepts (PendingRequestsScreen)
-//     →  Student gets notified  →  Student pays (StudentRequestsScreen → pay-now)
-//     →  Teacher confirms receipt (DirectPaymentConfirmationsScreen)
-//     →  Session created
+// WHY THIS SCREEN EXISTS: Path C direct single-session booking previously jumped
+// straight to the payment screen, forcing the student to pay before the teacher
+// agreed to the slot. This screen inserts the missing "request first" step:
+//   Student sends request → Teacher accepts (PendingRequestsScreen) →
+//   Student gets notified → Student pays (StudentRequestsScreen "pay-now") →
+//   Teacher confirms receipt (DirectPaymentConfirmationsScreen) → Session created
 
 import 'dart:ui' as ui;
 import 'package:cloud_functions/cloud_functions.dart';
@@ -32,23 +28,34 @@ class _DirectBookingRequestScreenState
     extends ConsumerState<DirectBookingRequestScreen> {
   bool _submitting = false;
 
-  /// True only after a successful request is sent.
-  /// Prevents dispose() from resetting the provider too early during navigation.
+  // True only after a successful request is sent.
+  // Prevents dispose from resetting the provider too early during navigation.
   bool _navigatingAway = false;
+
+  // FIX[BUNDLE-ORPHAN]: Cache the notifier reference early — before any disposal can occur.
+  // This is the canonical Riverpod pattern for using notifiers in dispose().
+  late final BookingFlowNotifier _bookingFlowNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cache the notifier reference early
+    _bookingFlowNotifier = ref.read(bookingFlowProvider.notifier);
+  }
 
   @override
   void dispose() {
     // If the user backed out without sending, reset the flow so the slot
     // isn't left in a dirty state for the next booking attempt.
     if (!_navigatingAway) {
-      ref.read(bookingFlowProvider.notifier).reset();
+      // ✅ Uses cached reference — no ref access, safe after widget disposal
+      _bookingFlowNotifier.reset();
     }
     super.dispose();
   }
 
-  // ── Send request ──────────────────────────────────────────────────────────
-
-  Future<void> _sendRequest() async {
+  // Send request
+  Future<void> sendRequest() async {
     final flow = ref.read(bookingFlowProvider);
     final slotContext = flow.slotContext;
     final currentUser = ref.read(currentUserProvider).value;
@@ -57,7 +64,7 @@ class _DirectBookingRequestScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('بيانات الجلسة غير مكتملة، يرجى المحاولة مرة أخرى'),
+            content: Text('حدث خطأ. أعد المحاولة'),
             backgroundColor: Colors.red,
           ),
         );
@@ -65,10 +72,10 @@ class _DirectBookingRequestScreenState
       return;
     }
 
-    // ✅ Capture messenger BEFORE any await
+    // Capture messenger BEFORE any await
     final messenger = ScaffoldMessenger.of(context);
-
     setState(() => _submitting = true);
+
     try {
       final result = await FirebaseFunctions.instance
           .httpsCallable(
@@ -95,9 +102,9 @@ class _DirectBookingRequestScreenState
         if (slotContext.mohaffezPhone?.isNotEmpty == true)
           'mohaffezPhone': slotContext.mohaffezPhone,
         // Tells the CF this is a direct-payment request (not free, not Paymob).
-        // The CF will create the doc with status = 'pending' so the teacher
-        // sees it in PendingRequestsScreen and can accept/reject before
-        // the student is asked to transfer money.
+        // The CF will create the doc with status 'pending' so the teacher sees it
+        // in PendingRequestsScreen and can accept/reject before the student is
+        // asked to transfer money.
         'selectedPaymentMethod': 'directpayment',
       });
 
@@ -111,7 +118,7 @@ class _DirectBookingRequestScreenState
         ref.read(bookingFlowProvider.notifier).reset();
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('✅ تم إرسال طلب الحجز — يمكنك متابعة حالته من "طلباتي"'),
+            content: Text('تم إرسال الطلب! سيتم إعلامك عندما يقبل المحفظ'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 5),
           ),
@@ -133,7 +140,7 @@ class _DirectBookingRequestScreenState
         ref.read(bookingFlowProvider.notifier).reset();
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('الطلب مُرسَل بالفعل — تحقق من قائمة طلباتك'),
+            content: Text('تم إرسال الطلب بالفعل'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -142,22 +149,21 @@ class _DirectBookingRequestScreenState
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('خطأ: ${e.message ?? e.code}'),
+          content: Text(e.message ?? e.code),
           backgroundColor: Colors.red,
         ),
       );
     } on Exception catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('$e'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
+  // Build
   @override
   Widget build(BuildContext context) {
     final flow = ref.watch(bookingFlowProvider);
@@ -170,7 +176,8 @@ class _DirectBookingRequestScreenState
           if (mounted) context.go('/home');
         });
       }
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+          body: Center(child: CircularProgressIndicator()));
     }
 
     final DateTime? slotDate = DateTime.tryParse(slotContext.slotDate);
@@ -196,8 +203,8 @@ class _DirectBookingRequestScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Session summary ──────────────────────────────────────────
-              _SummaryCard(
+              // Session summary
+              SummaryCard(
                 mohaffezName: slotContext.mohaffezName,
                 sessionType: slotContext.sessionType,
                 timeSlot: slotContext.preferredTimeSlot,
@@ -205,52 +212,42 @@ class _DirectBookingRequestScreenState
                 address: slotContext.imamAddressText,
               ),
               const SizedBox(height: 16),
-
-              // ── Payment method note ──────────────────────────────────────
-              _InfoCard(
+              // Payment method note
+              const InfoCard(
                 icon: Icons.account_balance_wallet_outlined,
                 color: Colors.teal,
                 title: 'طريقة الدفع',
-                body: 'دفع مباشر — كاش أو محفظة إلكترونية\n'
-                    'ستصلك أرقام المحفظة بعد موافقة المعلم على الموعد.',
+                body: 'ستدفع بعد قبول المحفظ للطلب. لا يُطلب منك الدفع الآن.',
               ),
               const SizedBox(height: 12),
-
-              // ── How it works ─────────────────────────────────────────────
-              _InfoCard(
+              // How it works
+              const InfoCard(
                 icon: Icons.info_outline,
                 color: AppThemeConstants.primaryAmber,
-                title: 'خطوات الحجز',
-                body: '١. ترسل الطلب الآن\n'
-                    '٢. ينظر المعلم في الطلب ويوافق على الموعد\n'
-                    '٣. تصلك إشعار بالموافقة وتفاصيل الدفع\n'
-                    '٤. تحول المبلغ وتضغط "دفعت"\n'
-                    '٥. المعلم يؤكد الاستلام وتُحجز الجلسة',
+                title: 'كيف يعمل؟',
+                body:
+                    '١. ترسل الطلب.\n٢. يقبل المحفظ.\n٣. تستلم إشعار بالقبول.\n٤. تحوّل المبلغ مباشرة.\n٥. يؤكد المحفظ الاستلام.',
               ),
               const SizedBox(height: 32),
-
-              // ── Send button ──────────────────────────────────────────────
+              // Send button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _submitting ? null : _sendRequest,
+                  onPressed: _submitting ? null : sendRequest,
                   icon: _submitting
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                              color: Colors.white, strokeWidth: 2),
                         )
                       : const Icon(Icons.send_outlined, color: Colors.white),
                   label: Text(
-                    _submitting ? 'جاري الإرسال...' : 'إرسال طلب الحجز',
+                    _submitting ? 'جاري الإرسال...' : 'إرسال الطلب',
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primaryAmber,
@@ -258,14 +255,12 @@ class _DirectBookingRequestScreenState
                         AppThemeConstants.primaryAmber.withValues(alpha: 0.5),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-
-              // ── Cancel ───────────────────────────────────────────────────
+              // Cancel
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
@@ -287,27 +282,28 @@ class _DirectBookingRequestScreenState
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SummaryCard extends StatelessWidget {
+class SummaryCard extends StatelessWidget {
   final String mohaffezName;
   final String sessionType;
   final String timeSlot;
   final String dateStr;
   final String? address;
 
-  const _SummaryCard({
+  const SummaryCard({
     required this.mohaffezName,
     required this.sessionType,
     required this.timeSlot,
     required this.dateStr,
     this.address,
+    super.key,
   });
 
-  String _translateSessionType(String type) {
+  String translateSessionType(String type) {
     switch (type) {
       case 'home':
-        return 'في المنزل';
+        return 'منزل';
       case 'mosque':
-        return 'في المسجد';
+        return 'مسجد';
       case 'online':
         return 'أونلاين';
       default:
@@ -318,50 +314,53 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              const Icon(Icons.assignment_outlined,
+            const Row(children: [
+              Icon(Icons.assignment_outlined,
                   color: AppThemeConstants.primaryAmber),
-              const SizedBox(width: 8),
-              const Text(
-                'تفاصيل الجلسة',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
+              SizedBox(width: 8),
+              Text('تفاصيل الجلسة',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
             const Divider(height: 20),
-            _row(Icons.person_outline, 'المعلم', mohaffezName),
+            _row(Icons.person_outline, 'المحفظ: ', mohaffezName),
             const SizedBox(height: 8),
-            _row(Icons.category_outlined, 'نوع الجلسة',
-                _translateSessionType(sessionType)),
+            _row(Icons.category_outlined, 'نوع الجلسة: ',
+                translateSessionType(sessionType)),
             const SizedBox(height: 8),
-            // LTR wrapper prevents RTL from flipping "08:00 - 09:00" → "09:00 - 08:00"
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.access_time, size: 16, color: Colors.grey),
-              const SizedBox(width: 8),
-              const Text('الموعد: ',
-                  style: TextStyle(color: Colors.grey, fontSize: 13)),
-              Expanded(
-                child: Directionality(
-                  textDirection: ui.TextDirection.ltr,
-                  child: Text(
-                    timeSlot,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 13),
+            // LTR wrapper prevents RTL from flipping "08:00-09:00" → "09:00-08:00"
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                const Text('الوقت: ',
+                    style: TextStyle(color: Colors.grey, fontSize: 13)),
+                Expanded(
+                  child: Directionality(
+                    textDirection: ui.TextDirection.ltr,
+                    child: Text(
+                      timeSlot,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
                   ),
                 ),
-              ),
-            ]),
+              ],
+            ),
             const SizedBox(height: 8),
-            _row(Icons.calendar_today, 'التاريخ', dateStr),
+            _row(Icons.calendar_today, 'التاريخ: ', dateStr),
             if (address != null && address!.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _row(Icons.location_on_outlined, 'الموقع', address!),
+              _row(Icons.location_on_outlined, 'العنوان: ', address!),
             ],
           ],
         ),
@@ -373,29 +372,29 @@ class _SummaryCard extends StatelessWidget {
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(icon, size: 16, color: Colors.grey),
         const SizedBox(width: 8),
-        Text('$label: ',
+        Text(label,
             style: const TextStyle(color: Colors.grey, fontSize: 13)),
         Expanded(
-          child: Text(value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, fontSize: 13)),
-        ),
+            child: Text(value,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 13))),
       ]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _InfoCard extends StatelessWidget {
+class InfoCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String title;
   final String body;
 
-  const _InfoCard({
+  const InfoCard({
     required this.icon,
     required this.color,
     required this.title,
     required this.body,
+    super.key,
   });
 
   @override
@@ -408,28 +407,29 @@ class _InfoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(body,
-                  style: const TextStyle(fontSize: 13, height: 1.7)),
-            ],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: color)),
+                const SizedBox(height: 4),
+                Text(body,
+                    style:
+                        const TextStyle(fontSize: 13, height: 1.7)),
+              ],
+            ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }

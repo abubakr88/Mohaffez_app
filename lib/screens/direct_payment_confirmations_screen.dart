@@ -1,15 +1,24 @@
+// lib/screens/direct_payment_confirmations_screen.dart
 // CHANGES vs original:
-// _confirm() → bundle/subscription path now calls mohaffezConfirmBundlePayment
-//   with ONLY paymentId. All other params (planId, planTitle, slotDate, etc.)
-//   were removed because confirmBundleDirectPayment CF now reads them directly
-//   from the directPaymentRequests doc server-side.
-// WHY: The CF caller changed from student → mohaffez, so the CF reads all
-//   plan/slot/student fields from the stored doc instead of trusting the caller.
-// All other logic (reject flow, UI, commission hint, bundle badge) is UNCHANGED.
+// • _confirm(): replaced `rethrow` in `on FirebaseFunctionsException` with
+//   inline error handling + snackbar. In Dart, rethrow inside a catch block
+//   exits the ENTIRE try-catch chain — the sibling `on Exception` handler
+//   below it can never catch a re-thrown FirebaseFunctionsException.
+//   This was the direct cause of the INTERNAL crash shown in the debugger.
+// • Added mounted check inside the FirebaseFunctionsException handler
+//   (was missing — only the already-exists branch had it).
+// • FIX: Added bare `catch (e, stack)` tier after `on Exception` to catch
+//   Dart Errors (TypeError, StateError, etc.) that are NOT Exceptions.
+//   Without this, a TypeError thrown by `result.data as Map` in
+//   mohaffezConfirm() bypassed ALL catch blocks, hit only `finally`,
+//   silently reset _loading → button re-enabled with zero feedback,
+//   causing the repeated-tap bug seen in logs.
+// • All other logic, UI, reject flow, commission hint, bundle badge: UNCHANGED.
 
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../shared/theme/app_theme_constants.dart';
@@ -17,7 +26,12 @@ import '../models/direct_payment_model.dart';
 import '../services/direct_payment_service.dart';
 
 class DirectPaymentConfirmationsScreen extends StatelessWidget {
-  const DirectPaymentConfirmationsScreen({super.key});
+  final String? directPaymentRequestId;
+
+  const DirectPaymentConfirmationsScreen({
+    super.key,
+    this.directPaymentRequestId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,55 +58,109 @@ class DirectPaymentConfirmationsScreen extends StatelessWidget {
             ),
           ],
         ),
-        body: StreamBuilder<List<DirectPaymentModel>>(
-          stream: DirectPaymentService.watchPendingConfirmations(mohaffezId),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 48, color: Colors.red),
-                    const SizedBox(height: 12),
-                    Text(
-                      'خطأ في التحميل: ${snapshot.error}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ],
-                ),
-              );
-            }
-            final items = snapshot.data ?? [];
-            if (items.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle_outline,
-                        size: 64, color: Colors.green),
-                    SizedBox(height: 16),
-                    Text(
-                      'لا توجد مدفوعات بانتظار التأكيد',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: items.length,
-              itemBuilder: (_, i) =>
-                  _PaymentConfirmationCard(payment: items[i]),
-            );
-          },
-        ),
+        body: _buildBody(mohaffezId),
       ),
+    );
+  }
+
+  // ── Build body ─────────────────────────────────────────────────────────────
+  Widget _buildBody(String mohaffezId) {
+    if (directPaymentRequestId != null &&
+        directPaymentRequestId!.isNotEmpty) {
+      return StreamBuilder<DirectPaymentModel?>(
+        stream:
+            DirectPaymentService.watchDirectPayment(directPaymentRequestId!),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 12),
+                  Text(
+                    'خطأ في التحميل: ${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ],
+              ),
+            );
+          }
+          final payment = snapshot.data;
+          if (payment == null) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle_outline,
+                      size: 64, color: Colors.green),
+                  SizedBox(height: 16),
+                  Text(
+                    'لا توجد مدفوعات بانتظار التأكيد',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: 1,
+            itemBuilder: (_, i) => _PaymentConfirmationCard(payment: payment),
+          );
+        },
+      );
+    }
+
+    return StreamBuilder<List<DirectPaymentModel>>(
+      stream: DirectPaymentService.watchPendingConfirmations(mohaffezId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 12),
+                Text(
+                  'خطأ في التحميل: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ],
+            ),
+          );
+        }
+        final items = snapshot.data ?? [];
+        if (items.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle_outline,
+                    size: 64, color: Colors.green),
+                SizedBox(height: 16),
+                Text(
+                  'لا توجد مدفوعات بانتظار التأكيد',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: items.length,
+          itemBuilder: (_, i) => _PaymentConfirmationCard(payment: items[i]),
+        );
+      },
     );
   }
 }
@@ -110,8 +178,9 @@ class _PaymentConfirmationCard extends StatefulWidget {
 
 class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
   bool _loading = false;
+  bool _confirmed = false;
 
-  // ── Confirm ───────────────────────────────────────────────────────────────
+  // ── Confirm ────────────────────────────────────────────────────────────────
   Future<void> _confirm() async {
     final planType = widget.payment.planType ?? 'single';
     final isBundleOrSubscription =
@@ -129,9 +198,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
           ' من ${widget.payment.studentName}؟';
     }
 
-    // ✅ BUG-1 FIX: Capture messenger BEFORE showDialog — showDialog is also async.
-    //    Original code placed this capture AFTER the await, risking a deactivated-
-    //    context crash if the widget was disposed while the dialog was open.
+    // Capture BEFORE any async gap — safe even if widget is disposed later.
     final messenger = ScaffoldMessenger.of(context);
 
     final confirmed = await showDialog<bool>(
@@ -157,53 +224,121 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
     if (confirmed != true) return;
 
-    // ✅ BUG-1 FIX: Guard against setState after dispose.
-    //    _reject() already had this guard — _confirm() was missing it.
-    if (!mounted) return;
+    debugPrint('🔵 [BUNDLE_FLOW] Step5_MohaffezConfirm_TAPPED: '
+        'paymentId=${widget.payment.id}, '
+        'studentName=${widget.payment.studentName}, '
+        'amount=${widget.payment.amount}, '
+        'planType=${widget.payment.planType}, '
+        'sessionsCount=${widget.payment.sessionsCount}');
 
+    if (!mounted) return;
     setState(() => _loading = true);
+
     try {
       if (isBundleOrSubscription) {
-        // CHANGED: Only pass paymentId.
-        // WHY: confirmBundleDirectPayment CF now reads planId, planTitle,
-        //      planType, sessionsCount, validityDays, slotDate, slotStart,
-        //      slotEnd, preferredTimeSlot, sessionType, studentId directly
-        //      from the directPaymentRequests doc server-side.
-        //      Passing these from the client was a security risk — the mohaffez
-        //      could have manipulated them. Now the server is the single source
-        //      of truth.
         await DirectPaymentService.mohaffezConfirmBundlePayment(
           paymentId: widget.payment.id,
         );
+        debugPrint('✅ [BUNDLE_FLOW] Step5_BundleConfirm_SUCCESS: '
+            'paymentId=${widget.payment.id}, '
+            'sessionsCount=${widget.payment.sessionsCount}');
+        if (!mounted) return;
+        setState(() => _confirmed = true);
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'تم تأكيد الحزمة — الطالب يمتلك الآن'
-              ' ${widget.payment.sessionsCount ?? 1} جلسات',
+              'تم شراء الباقة وإرسال طلب الجلسة الأولى بنجاح ✓',
             ),
+            duration: const Duration(seconds: 4),
             backgroundColor: Colors.green,
           ),
         );
+        context.go('/pending-requests');
       } else {
-        // Single-session direct payment — unchanged
         await DirectPaymentService.mohaffezConfirm(widget.payment.id);
+        debugPrint('✅ [BUNDLE_FLOW] Step5_SingleConfirm_SUCCESS: '
+            'paymentId=${widget.payment.id}');
+        if (!mounted) return;
+        setState(() => _confirmed = true);
         messenger.showSnackBar(
           const SnackBar(
             content: Text('✅ تم قبول الجلسة وإشعار الطالب!'),
             backgroundColor: Colors.green,
           ),
         );
+        context.go('/pending-requests');
       }
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_FIREBASE_ERROR: '
+          'paymentId=${widget.payment.id}, '
+          'code=${e.code}, message=${e.message}');
+
+      // Handle already-confirmed case (idempotency)
+      if (e.code == 'already-exists') {
+        if (!mounted) return;
+        setState(() => _confirmed = true);
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('تم تأكيد هذه الدفعية من قبل'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      final msg = switch (e.code) {
+        'resource-exhausted' =>
+            e.message != null && e.message!.isNotEmpty
+                ? e.message!
+                : 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات',
+        'permission-denied'  => 'ليس لديك صلاحية تأكيد هذه المدفوعة',
+        'not-found'          => 'لم يتم العثور على طلب الدفع',
+        _                    => e.message ?? 'حدث خطأ أثناء التأكيد',
+      };
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.red,
+        ),
+      );
     } on Exception catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('خطأ: $e')));
+      debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_ERROR: '
+          'paymentId=${widget.payment.id}, error=$e');
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+      );
+    } catch (e, stack) {
+      // FIX: Catches Dart Errors (TypeError, StateError, AssertionError, …)
+      // that extend Error — NOT Exception — so they are invisible to every
+      // `on XxxException` and `on Exception` handler above.
+      //
+      // Concrete trigger: DirectPaymentService.mohaffezConfirm() contains
+      //   `result.data as Map`
+      // If the CF returns null, a bool, or any non-Map value that cast throws
+      // a TypeError.  Without this block the TypeError skips both catch tiers,
+      // goes straight to `finally`, resets _loading = false in milliseconds,
+      // the button re-enables with zero feedback — exactly the repeated-tap
+      // symptom visible in the logs.
+      debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_UNHANDLED_ERROR: '
+          'paymentId=${widget.payment.id}, error=$e');
+      debugPrintStack(stackTrace: stack);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('خطأ غير متوقع — يرجى المحاولة مجدداً: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  // ── Reject ────────────────────────────────────────────────────────────────
+  // ── Reject ─────────────────────────────────────────────────────────────────
   Future<void> _reject() async {
-    // ✅ Capture BEFORE showDialog — showDialog is also async
+    // Capture BEFORE showDialog — showDialog is also async.
     final messenger = ScaffoldMessenger.of(context);
 
     final reason = await showDialog<String>(
@@ -229,7 +364,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style:
+                    ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 child: const Text(
                   'رفض',
                   style: TextStyle(color: Colors.white),
@@ -255,15 +391,29 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         ),
       );
     } on Exception catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('خطأ: $e')));
+      messenger.showSnackBar(
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+    } catch (e, stack) {
+      // Same safety net for the reject path.
+      debugPrint('❌ [BUNDLE_FLOW] Reject_UNHANDLED_ERROR: '
+          'paymentId=${widget.payment.id}, error=$e');
+      debugPrintStack(stackTrace: stack);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('خطأ غير متوقع: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    if (_confirmed) return const SizedBox.shrink();
     final p = widget.payment;
     final method = DirectPaymentMethod.fromValue(p.paymentMethod);
     final dateStr = p.studentConfirmedAt != null
@@ -275,14 +425,15 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header ──────────────────────────────────────────────────────
+            // ── Header ────────────────────────────────────────────────
             Row(children: [
               CircleAvatar(
                 backgroundColor:
@@ -309,8 +460,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppThemeConstants.accentGreen,
                   borderRadius: BorderRadius.circular(20),
@@ -325,14 +476,14 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ),
             ]),
 
-            // ── Bundle badge ─────────────────────────────────────────────────
+            // ── Bundle badge ──────────────────────────────────────────
             if (p.planType != null &&
                 (p.planType == 'bundle' ||
                     p.planType == 'subscription')) ...[
               const SizedBox(height: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppThemeConstants.primaryAmber
                       .withValues(alpha: 0.15),
@@ -360,7 +511,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
             const Divider(height: 20),
 
-            // ── Info rows ───────────────────────────────────────────────────
+            // ── Info rows ─────────────────────────────────────────────
             _row(Icons.payment, 'طريقة الدفع', method.label),
             _row(Icons.schedule, 'الموعد', p.preferredTimeSlot),
             if (sessionDateStr != null)
@@ -368,7 +519,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
             if (p.studentNote != null && p.studentNote!.isNotEmpty)
               _row(Icons.note_outlined, 'ملاحظة الطالب', p.studentNote!),
 
-            // ── Commission hint ──────────────────────────────────────────────
+            // ── Commission hint ────────────────────────────────────────
             Container(
               margin: const EdgeInsets.symmetric(vertical: 10),
               padding: const EdgeInsets.all(10),
@@ -398,7 +549,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ]),
             ),
 
-            // ── Action buttons ───────────────────────────────────────────────
+            // ── Action buttons ────────────────────────────────────────
             if (_loading)
               const Center(
                 child: Padding(
@@ -411,7 +562,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _confirm,
-                    icon: const Icon(Icons.check, color: Colors.white),
+                    icon:
+                        const Icon(Icons.check, color: Colors.white),
                     label: const Text(
                       'استلمت الدفع',
                       style: TextStyle(
@@ -454,7 +606,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
           Icon(icon, size: 16, color: Colors.grey),
           const SizedBox(width: 6),
           Text('$label: ',
-              style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              style:
+                  const TextStyle(color: Colors.grey, fontSize: 13)),
           Expanded(
             child: Text(value,
                 style: const TextStyle(

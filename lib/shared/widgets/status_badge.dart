@@ -57,7 +57,21 @@ class StatusBadge extends StatelessWidget {
           textColor: Colors.amber.shade800,
           borderColor: Colors.amber.shade300,
         );
+
+      // ── NEW ──────────────────────────────────────────────────────────────
+      case 'awaitingdirectpaymentconfirmation':
+        return _StatusConfig(
+          label: 'في انتظار تأكيد الدفع المباشر',
+          icon: Icons.payments_outlined,
+          bgColor: Colors.orange.shade50,
+          textColor: Colors.orange.shade800,
+          borderColor: Colors.orange.shade300,
+        );
+      // ─────────────────────────────────────────────────────────────────────
+
       case 'accepted':
+      // ── NEW: legacy poisoned docs — render identically to accepted ───────
+      case 'confirmed':
         return _StatusConfig(
           label: 'مؤكدة',
           icon: Icons.check_circle,
@@ -65,6 +79,7 @@ class StatusBadge extends StatelessWidget {
           textColor: Colors.green.shade700,
           borderColor: Colors.green.shade300,
         );
+
       case 'completed':
         return _StatusConfig(
           label: 'مكتملة',
@@ -73,6 +88,7 @@ class StatusBadge extends StatelessWidget {
           textColor: Colors.teal.shade700,
           borderColor: Colors.teal.shade300,
         );
+
       case 'cancelled':
         return _StatusConfig(
           label: 'ملغية',
@@ -81,6 +97,18 @@ class StatusBadge extends StatelessWidget {
           textColor: Colors.grey.shade700,
           borderColor: Colors.grey.shade400,
         );
+
+      // ── NEW ──────────────────────────────────────────────────────────────
+      case 'rejected':
+        return _StatusConfig(
+          label: 'مرفوضة',
+          icon: Icons.do_not_disturb_alt,
+          bgColor: Colors.red.shade50,
+          textColor: Colors.red.shade700,
+          borderColor: Colors.red.shade300,
+        );
+      // ─────────────────────────────────────────────────────────────────────
+
       case 'expired':
         return _StatusConfig(
           label: 'منتهية',

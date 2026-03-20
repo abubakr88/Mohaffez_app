@@ -1,6 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_model.dart' hide TimestampConverter;
 import 'pricing_plan_model.dart'; // For PlanType, PlanTypeConverter, and TimestampConverter
 
 part 'payment_model.freezed.dart';

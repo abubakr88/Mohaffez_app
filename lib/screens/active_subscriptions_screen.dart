@@ -1,266 +1,326 @@
-import 'dart:ui' as ui;
+// lib/screens/active_subscriptions_screen.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/subscription_model.dart';
-import '../providers/payment_provider.dart';
+import '../models/pricing_plan_model.dart';
+import '../providers/subscription_provider.dart';
+import '../providers/user_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 
-class ActiveSubscriptionsScreen extends ConsumerWidget {
+// Tab config
+const _kTabs = [
+  (label: 'النشطة', status: 'active'),
+  (label: 'المستنفدة', status: 'depleted'),
+  (label: 'المنتهية', status: 'expired'),
+];
+
+class ActiveSubscriptionsScreen extends ConsumerStatefulWidget {
   const ActiveSubscriptionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final studentId = FirebaseAuth.instance.currentUser?.uid;
-    if (studentId == null) {
-      return const Scaffold(
-        body: Center(child: Text('يرجى تسجيل الدخول')),
-      );
-    }
+  ConsumerState<ActiveSubscriptionsScreen> createState() =>
+      _ActiveSubscriptionsScreenState();
+}
 
-    final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
+class _ActiveSubscriptionsScreenState
+    extends ConsumerState<ActiveSubscriptionsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
 
-    return Directionality(
-      textDirection: ui.TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          leading: context.canPop()
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => context.pop(),
-                  tooltip: 'رجوع',
-                )
-              : null,
-          title: const Text('اشتراكاتي النشطة'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
-        ),
-        body: subscriptionsAsync.when(
-          data: (subscriptions) {
-            if (subscriptions.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.card_membership,
-                        size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text(
-                      'لا توجد اشتراكات نشطة',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'قم بشراء حزمة أو اشتراك لعرضها هنا',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              );
-            }
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _kTabs.length, vsync: this);
+  }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: subscriptions.length,
-              itemBuilder: (context, index) {
-                final sub = subscriptions[index];
-                return _SubscriptionCard(subscription: sub);
-              },
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 12),
-                Text('خطأ في التحميل: $error'),
-              ],
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userAsync = ref.watch(currentUserProvider);
+    return userAsync.when(
+      loading: () => const Scaffold(
+          body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
+      data: (user) {
+        if (user == null) return const SizedBox.shrink();
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            backgroundColor: AppThemeConstants.backgroundLight,
+            appBar: AppBar(
+              title: const Text('باقاتي'),
+              backgroundColor: AppThemeConstants.primaryAmber,
+              foregroundColor: AppThemeConstants.surfaceWhite,
+              elevation: 0,
+              bottom: TabBar(
+                controller: _tabController,
+                indicatorColor: AppThemeConstants.surfaceWhite,
+                labelColor: AppThemeConstants.surfaceWhite,
+                unselectedLabelColor:
+                    AppThemeConstants.surfaceWhite.withValues(alpha: 0.6),
+                tabs: _kTabs
+                    .map((t) => Tab(text: t.label))
+                    .toList(),
+              ),
+            ),
+            body: TabBarView(
+              controller: _tabController,
+              children: _kTabs
+                  .map((t) => _SubscriptionTabView(
+                        studentId: user.uid,
+                        status: t.status,
+                      ))
+                  .toList(),
             ),
           ),
-        ),
-      ),
+        );
+      },
+    );
+  }
+}
+
+class _SubscriptionTabView extends ConsumerWidget {
+  final String studentId;
+  final String status;
+  const _SubscriptionTabView(
+      {required this.studentId, required this.status});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subsAsync = ref.watch(
+      filteredSubscriptionsProvider(
+          (studentId: studentId, status: status)),
+    );
+
+    return subsAsync.when(
+      loading: () =>
+          const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('$e')),
+      data: (subs) {
+        if (subs.isEmpty) return _EmptyState(status: status);
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: subs.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (_, i) =>
+              _SubscriptionCard(sub: subs[i]),
+        );
+      },
     );
   }
 }
 
 class _SubscriptionCard extends StatelessWidget {
-  final SubscriptionModel subscription;
+  final SubscriptionModel sub;
+  const _SubscriptionCard({required this.sub});
 
-  const _SubscriptionCard({required this.subscription});
+  Color get _progressColor {
+    final p = sub.progressPercentage;
+    if (p >= 0.5) return AppThemeConstants.accentGreen;
+    if (p >= 0.2) return AppThemeConstants.warning;
+    return AppThemeConstants.error;
+  }
+
+  // FIX: Helper method to get plan type label
+  String _planTypeLabel(PlanType type) {
+    switch (type) {
+      case PlanType.bundle:
+        return 'باقة حلقات';
+      case PlanType.subscription:
+        return 'اشتراك شهري';
+      case PlanType.single:
+        return 'جلسة مفردة';
+    }
+  }
+
+  String _expiryLabel() {
+    if (sub.expiryDate == null) return 'بدون تاريخ انتهاء';
+    final days = sub.expiryDate!.difference(DateTime.now()).inDays;
+    if (days < 0) return 'منتهية الصلاحية';
+    if (days == 0) return '⚠️ تنتهي اليوم!';
+    if (days <= 14) return '⚠️ تنتهي خلال $days يوماً';
+    final d = sub.expiryDate!;
+    return '${d.day}/${d.month}/${d.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final remaining = subscription.remainingSessions;
-    final total = subscription.totalSessions;
-    final progress = total > 0 ? (total - remaining) / total : 0.0;
-    final canBook = subscription.canBookSession;
-
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      color: AppThemeConstants.surfaceWhite,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppThemeConstants.borderRadiusLg,
+        side: BorderSide(
+          color: _progressColor.withValues(alpha: 0.25),
+          width: 1.5,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: Plan title and status badge
+            // Header: avatar + name + session type
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
+                CircleAvatar(
+                  backgroundColor:
+                      AppThemeConstants.primaryAmber.withValues(alpha: 0.15),
                   child: Text(
-                    subscription.planTitle,
+                    sub.mohaffezName.isNotEmpty
+                        ? sub.mohaffezName[0]
+                        : '؟',
                     style: const TextStyle(
-                      fontSize: 18,
+                      color: AppThemeConstants.primaryAmber,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                _StatusBadge(status: subscription.status),
-              ],
-            ),
-            const SizedBox(height: 8),
-            
-            // Teacher info
-            Text(
-              'المعلم: ${subscription.mohaffezName}',
-              style: TextStyle(color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 12),
-
-            // Progress bar
-            Row(
-              children: [
+                const SizedBox(width: 12),
                 Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 12,
-                      backgroundColor: Colors.grey[200],
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        progress >= 1.0 ? Colors.red : AppThemeConstants.primaryAmber,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sub.mohaffezName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeConstants.textPrimary,
+                        ),
                       ),
-                    ),
+                      Text(
+                        '${sub.planTitle} · ${_planTypeLabel(sub.planType)}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: sub.progressPercentage,
+                backgroundColor: Colors.grey.shade200,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(_progressColor),
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
                 Text(
-                  '$remaining / $total',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  '${sub.remainingSessions} متبقي من ${sub.totalSessions}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _progressColor,
+                  ),
+                ),
+                Text(
+                  '📅 ${_expiryLabel()}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: sub.expiryDate != null &&
+                            sub.expiryDate!
+                                    .difference(DateTime.now())
+                                    .inDays <=
+                                14
+                        ? AppThemeConstants.error
+                        : Colors.grey.shade500,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            // Remaining sessions text
-            Text(
-              '$remaining جلسة${remaining == 1 ? '' : 'ات'} متبقية',
-              style: TextStyle(
-                color: remaining > 0 ? Colors.green[700] : Colors.red[700],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            
-            // Expiry date if present
-            if (subscription.expiryDate != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'تاريخ الانتهاء: ${_formatDate(subscription.expiryDate!)}',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ],
-            
-            const SizedBox(height: 12),
-
-            // Book session button
-            if (canBook)
+            // "احجز جلسة" button — only for active bundles
+            if (sub.canBookSession) ...[
+              const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Navigate to booking flow with mohaffez pre-selected
-                    context.push(
-                      '/nearby-mohaffez?mohaffezId=${subscription.mohaffezId}&subscriptionId=${subscription.id}',
-                    );
-                  },
-                  icon: const Icon(Icons.calendar_today),
+                  onPressed: () => context.push(
+                    '/mohaffez/${sub.mohaffezId}',
+                  ),
+                  icon: const Icon(Icons.book_online_outlined, size: 18),
                   label: const Text('احجز جلسة'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primaryAmber,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    foregroundColor: AppThemeConstants.surfaceWhite,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppThemeConstants.borderRadiusMd,
+                    ),
                   ),
                 ),
-              )
-            else if (subscription.isDepleted)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'تم استنفاد الجلسات',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-              )
-            else if (subscription.isExpired)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.red[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'انتهت صلاحية الاشتراك',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.red),
-                ),
               ),
+            ],
           ],
         ),
       ),
     );
   }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
 }
 
-class _StatusBadge extends StatelessWidget {
-  final SubscriptionStatus status;
-
-  const _StatusBadge({required this.status});
+class _EmptyState extends StatelessWidget {
+  final String status;
+  const _EmptyState({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    final (color, label) = switch (status) {
-      SubscriptionStatus.active => (Colors.green, 'نشط'),
-      SubscriptionStatus.depleted => (Colors.orange, 'مستنفد'),
-      SubscriptionStatus.expired => (Colors.red, 'منتهي'),
-      SubscriptionStatus.cancelled => (Colors.grey, 'ملغي'),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
+    final isActive = status == 'active';
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isActive ? Icons.card_membership_outlined : Icons.history,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isActive ? 'لا توجد باقات نشطة' : 'لا يوجد سجل',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            if (isActive) ...[
+              const SizedBox(height: 8),
+              Text(
+                'ابحث عن محفظ واحجز باقتك الأولى',
+                style: TextStyle(
+                    fontSize: 14, color: Colors.grey.shade400),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => context.go('/nearby'),
+                icon: const Icon(Icons.search),
+                label: const Text('ابحث عن محفظ'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.primaryAmber,
+                  foregroundColor: AppThemeConstants.surfaceWhite,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

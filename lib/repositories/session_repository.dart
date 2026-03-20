@@ -8,11 +8,6 @@ import '../models/session_request_model.dart';
 import '../models/subscription_model.dart';
 import '../models/request_status.dart'; // ← single source of truth for status strings
 
-/// Provides a Riverpod-compatible repository instance.
-/// Usage: ref.watch(sessionRepositoryProvider)
-// final sessionRepositoryProvider = Provider<SessionRepository>(
-//   (ref) => SessionRepository(FirebaseFirestore.instance),
-// );
 
 class SessionRepository {
   final FirebaseFirestore _firestore;
@@ -109,7 +104,7 @@ class SessionRepository {
   }
 
   // ============================================================================
-  // TEACHER PENDING REQUESTS â€” CANONICAL QUERY (single source of truth)
+  // TEACHER PENDING REQUESTS — CANONICAL QUERY (single source of truth)
   // ============================================================================
 
   /// [PRIMARY] Real-time stream of ALL pending requests for a teacher.
@@ -122,13 +117,13 @@ class SessionRepository {
   ///
   /// Required Firestore composite index:
   ///   Collection: sessionRequests
-  ///   Fields: mohaffezId ASC Â· status ASC Â· slotDate ASC
+  ///   Fields: mohaffezId ASC · status ASC · slotDate ASC
   Stream<List<SessionRequestModel>> watchPendingRequests(
       String mohaffezId) {
     return _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', whereIn: RequestStatus.teacherInbox)
+        .where('status', whereNotIn: RequestStatus.teacherInboxExcluded)
         .orderBy('slotDate', descending: false) // nearest first
         .snapshots()
         .map((snap) => snap.docs
@@ -149,7 +144,7 @@ class SessionRepository {
     final snapshot = await _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', whereIn: RequestStatus.teacherInbox)
+        .where('status', whereNotIn: RequestStatus.teacherInboxExcluded)
         .orderBy('slotDate', descending: false)
         .get();
 
@@ -161,7 +156,7 @@ class SessionRepository {
 
   /// Paginated load-more for the pending requests list.
   ///
-  /// FIX: was `.where('status', isEqualTo: 'pending')` â€” this dropped all
+  /// FIX: was `.where('status', isEqualTo: 'pending')` — this dropped all
   /// [awaitingPayment] and [awaitingDirectPayment] requests on page 2+.
   Future<({
     List<SessionRequestModel> requests,
@@ -171,10 +166,10 @@ class SessionRepository {
     required String mohaffezId,
     DocumentSnapshot? lastDocument,
   }) async {
-    Query query = _firestore
+    Query<Map<String, dynamic>> query = _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', whereIn: RequestStatus.teacherInbox) // â† FIXED
+        .where('status', whereNotIn: RequestStatus.teacherInboxExcluded)
         .orderBy('slotDate', descending: false);
 
     if (lastDocument != null) {
@@ -185,7 +180,7 @@ class SessionRepository {
     return (
       requests: snapshot.docs
           .map((doc) => SessionRequestModel.fromJson({
-                ...doc.data()! as Map<String, dynamic>,
+                ...doc.data()!,
                 'id': doc.id,
               }))
           .toList(),
@@ -226,7 +221,8 @@ class SessionRepository {
   }
 
   /// Watch a student's own requests (real-time).
-  /// Excludes [accepted] â€” once accepted it becomes a session, not a request.
+  /// Excludes [accepted] requests that already have a [sessionId] — once
+  /// accepted and a hafizSession is created they should not appear here too.
   Stream<List<SessionRequestModel>> watchStudentRequests(
       String studentId) {
     return _firestore
@@ -236,6 +232,8 @@ class SessionRepository {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs
+            // FIX: hide accepted requests that already became a hafizSession
+            // to prevent the same booking rendering twice on the home screen.
             .where((doc) =>
                 doc.data()['status'] != RequestStatus.accepted ||
                 doc.data()['sessionId'] == null)
@@ -253,9 +251,9 @@ class SessionRepository {
   /// FIX: previously stored [slotStart] in the [slotDate] field, causing the
   /// Firestore date-filter query to exclude requests where slotDate appeared to
   /// be in the past (off-by-timezone). Now stores each field correctly:
-  /// - [slotDate] = midnight DateTime of the calendar day  â† was broken
-  /// - [slotStart] = exact session start time
-  /// - [slotEnd]   = exact session end time
+  ///   - [slotDate]  = midnight DateTime of the calendar day ← was broken
+  ///   - [slotStart] = exact session start time
+  ///   - [slotEnd]   = exact session end time
   @Deprecated('Use BookingService.createSessionRequest() in '
       'booking_provider.dart which calls the Cloud Function. '
       'This method now delegates to the CF internally.')
@@ -287,11 +285,11 @@ class SessionRepository {
       'preferredTimeSlot': timeSlot,
       ...additionalData,
     });
-    return (result.data as Map)['requestId'] as String;
+    return (result.data as Map<String, dynamic>)['requestId'] as String;
   }
 
   // ============================================================================
-  // PAGINATED METHODS â€” Sessions
+  // PAGINATED METHODS — Sessions
   // ============================================================================
 
   /// Next page of accepted sessions for a mohaffez.
@@ -303,7 +301,7 @@ class SessionRepository {
     required String mohaffezId,
     DocumentSnapshot? lastDocument,
   }) async {
-    Query query = _firestore
+    Query<Map<String, dynamic>> query = _firestore
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
         .orderBy('sessionDate', descending: true);
@@ -316,7 +314,7 @@ class SessionRepository {
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
-                ...doc.data()! as Map<String, dynamic>,
+                ...doc.data()!,
                 'id': doc.id,
               }))
           .toList(),
@@ -335,7 +333,7 @@ class SessionRepository {
     required String studentId,
     DocumentSnapshot? lastDocument,
   }) async {
-    Query query = _firestore
+    Query<Map<String, dynamic>> query = _firestore
         .collection('hafizSessions')
         .where('studentId', isEqualTo: studentId)
         .orderBy('sessionDate', descending: true);
@@ -348,7 +346,7 @@ class SessionRepository {
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
-                ...doc.data()! as Map<String, dynamic>,
+                ...doc.data()!,
                 'id': doc.id,
               }))
           .toList(),
@@ -359,6 +357,8 @@ class SessionRepository {
   }
 
   /// Next page of requests for a student.
+  // ✅ FIXED: added Firestore-level status filter for consistency with
+  // watchStudentRequests, and preserved the client-side accepted+sessionId guard.
   Future<({
     List<SessionRequestModel> requests,
     DocumentSnapshot? lastDoc,
@@ -367,25 +367,30 @@ class SessionRepository {
     required String studentId,
     DocumentSnapshot? lastDocument,
   }) async {
-    Query query = _firestore
+    // BUG FIX #5: Added `.where('status', whereIn: RequestStatus.studentVisible)`
+    // The original query had no status filter at all, unlike watchStudentRequests.
+    // This meant paginated pages could surface internal-status requests that are
+    // never visible on page 1, creating an inconsistent experience.
+    Query<Map<String, dynamic>> query = _firestore
         .collection('sessionRequests')
         .where('studentId', isEqualTo: studentId)
+        .where('status', whereIn: RequestStatus.studentVisible)
         .orderBy('createdAt', descending: true);
 
-    if (lastDocument != null) {
-      query = query.startAfterDocument(lastDocument);
-    }
+    if (lastDocument != null) query = query.startAfterDocument(lastDocument);
 
     final snapshot = await query.limit(pageSize).get();
     return (
       requests: snapshot.docs
-          .map((doc) => SessionRequestModel.fromJson({
-                ...doc.data()! as Map<String, dynamic>,
-                'id': doc.id,
-              }))
+          // FIX: same guard as watchStudentRequests —
+          // hide accepted requests once a hafizSession is created.
+          .where((doc) =>
+              doc.data()['status'] != RequestStatus.accepted ||
+              doc.data()['sessionId'] == null)
+          .map((doc) => SessionRequestModel.fromJson(
+              {...doc.data()!, 'id': doc.id}))
           .toList(),
-      lastDoc:
-          snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
       hasMore: snapshot.docs.length == pageSize,
     );
   }
@@ -423,6 +428,9 @@ class SessionRepository {
   }
 
   /// All requests for a student (one-shot).
+  /// NOTE: intentionally returns all statuses — used for export/admin.
+  /// UI-facing code should use [watchStudentRequests] or
+  /// [getStudentRequestsNextPage] which apply the studentVisible filter.
   Future<List<SessionRequestModel>> getStudentRequests(
       String studentId) async {
     final snapshot = await _firestore
@@ -441,9 +449,30 @@ class SessionRepository {
   // ============================================================================
 
   /// Accept a session request and create the session atomically.
-  /// FIX: BUG #2 - Added sessionPrice parameter (was hardcoded to 0.0)
-  Future<void> acceptRequest(String requestId, {required double sessionPrice}) async {
-    final requestRef = _firestore.collection('sessionRequests').doc(requestId);
+  ///
+  /// BUG FIX #1 + #2 + #3:
+  /// The original code ALWAYS created a [hafizSession] document regardless of
+  /// [requiresPaymentOnAcceptance]. When that flag is true the Cloud Function
+  /// creates the real session after payment is confirmed, resulting in two
+  /// [hafizSession] docs for the same booking (= duplicated cards on the home
+  /// screen).
+  ///
+  /// Fixed behaviour:
+  ///   • requiresPaymentOnAcceptance == false  →  set request to [accepted],
+  ///     create session immediately with isPaid:true, set
+  ///     notificationsAlreadySent:true on both docs so the Firestore triggers
+  ///     (onSessionCreated / onSessionRequestAccepted) do not send a second
+  ///     push notification, send one inline notification.
+  ///   • requiresPaymentOnAcceptance == true   →  set request to
+  ///     [awaitingPayment] ONLY — do NOT create the session (the CF does that
+  ///     after payment). Do NOT send an inline notification (the CF trigger
+  ///     onSessionRequestAccepted handles it to avoid a double notification).
+  Future<void> acceptRequest(
+    String requestId, {
+    required double sessionPrice,
+  }) async {
+    final requestRef =
+        _firestore.collection('sessionRequests').doc(requestId);
     final requestSnap = await requestRef.get();
     if (!requestSnap.exists) {
       throw StateError('Session request not found: $requestId');
@@ -455,11 +484,13 @@ class SessionRepository {
     final studentName = requestData['studentName'] as String?;
     final mohaffezName = requestData['mohaffezName'] as String?;
     final sessionType = requestData['sessionType'] as String?;
-    final preferredTimeSlot = requestData['preferredTimeSlot'] as String?;
+    final preferredTimeSlot =
+        requestData['preferredTimeSlot'] as String?;
     final slotDate = requestData['slotDate'] as Timestamp?;
     final slotStart = requestData['slotStart'] as Timestamp?;
     final slotEnd = requestData['slotEnd'] as Timestamp?;
-    final imamAddressText = requestData['imamAddressText'] as String?;
+    final imamAddressText =
+        requestData['imamAddressText'] as String?;
     final imamAddressLat = requestData['imamAddressLat'];
     final imamAddressLng = requestData['imamAddressLng'];
     final mohaffezPhone = requestData['mohaffezPhone'] as String?;
@@ -479,7 +510,7 @@ class SessionRepository {
           'Session request missing required fields for acceptance: $requestId');
     }
 
-    final sessionRef = _firestore.collection('hafizSessions').doc();
+    // ── Availability slot disable (shared by both paths) ─────────────────────
     final dayOfWeek = slotDate.toDate().weekday;
     final availabilityQuery = await _firestore
         .collection('users')
@@ -494,9 +525,10 @@ class SessionRepository {
     if (availabilityQuery.docs.isNotEmpty) {
       final availabilityDoc = availabilityQuery.docs.first;
       final availabilityData = availabilityDoc.data();
-      final timeSlots =
-          List<Map<String, dynamic>>.from(availabilityData['timeSlots'] ?? []);
-      final normalizedPreferred = preferredTimeSlot.replaceAll(' ', '');
+      final timeSlots = List<Map<String, dynamic>>.from(
+          availabilityData['timeSlots'] ?? []);
+      final normalizedPreferred =
+          preferredTimeSlot.replaceAll(' ', '');
 
       var changed = false;
       for (var i = 0; i < timeSlots.length; i++) {
@@ -520,45 +552,97 @@ class SessionRepository {
     }
 
     final batch = _firestore.batch();
-    final deadline = DateTime.now().add(const Duration(hours: 24));
-    batch.update(requestRef, {
-      'status': RequestStatus.awaitingPayment,
-      'acceptedAt': FieldValue.serverTimestamp(),
-      'paymentDeadline': Timestamp.fromDate(deadline),
-      'reminderSent': false,
-      'paymentAmount': sessionPrice,
-      'sessionId': sessionRef.id,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
 
-    batch.set(sessionRef, {
-      'requestId': requestId,
-      'mohaffezId': mohaffezId,
-      'studentId': studentId,
-      'mohaffezName': mohaffezName,
-      'studentName': studentName,
-      'sessionType': sessionType,
-      'preferredTimeSlot': preferredTimeSlot,
-      'timeSlot': preferredTimeSlot,
-      'sessionDate': slotDate,
-      'slotStart': slotStart,
-      'slotEnd': slotEnd,
-      'location': imamAddressText ?? '',
-      'imamAddressText': imamAddressText,
-      'imamAddressLat': imamAddressLat,
-      'imamAddressLng': imamAddressLng,
-      'mohaffezPhone': mohaffezPhone,
-      'status': RequestStatus.accepted,
-      'isPaid': requiresPaymentOnAcceptance == false,
-      'sessionPrice': sessionPrice,  // FIX: BUG #2 - Use actual sessionPrice instead of hardcoded 0.0
-      'createdAt': FieldValue.serverTimestamp(),
-      'acceptedAt': FieldValue.serverTimestamp(),
-      'reminder24hSent': false,
-      'reminder1hSent': false,
-      'juzCount': 1,
-      'sessionRating': 10,
-    });
+    if (!requiresPaymentOnAcceptance) {
+      // ── PATH A: no payment required — accept immediately ─────────────────
+      // BUG FIX #2: use RequestStatus.accepted (was incorrectly awaitingPayment)
+      // BUG FIX #3: set notificationsAlreadySent:true to suppress the
+      //             onSessionRequestAccepted CF trigger sending a duplicate
+      //             push notification.
+      final sessionRef = _firestore.collection('hafizSessions').doc();
 
+      batch.update(requestRef, {
+        'status': RequestStatus.accepted,           // FIX #2
+        'acceptedAt': FieldValue.serverTimestamp(),
+        'sessionId': sessionRef.id,
+        'notificationsAlreadySent': true,           // FIX #3
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // BUG FIX #1: session is only created here, on the no-payment path.
+      // BUG FIX #3: notificationsAlreadySent:true suppresses onSessionCreated
+      //             trigger so it does not fire a second push notification.
+      batch.set(sessionRef, {
+        'requestId': requestId,
+        'mohaffezId': mohaffezId,
+        'studentId': studentId,
+        'mohaffezName': mohaffezName,
+        'studentName': studentName,
+        'sessionType': sessionType,
+        'preferredTimeSlot': preferredTimeSlot,
+        'timeSlot': preferredTimeSlot,
+        'sessionDate': slotDate,
+        'slotStart': slotStart,
+        'slotEnd': slotEnd,
+        'location': imamAddressText ?? '',
+        'imamAddressText': imamAddressText,
+        'imamAddressLat': imamAddressLat,
+        'imamAddressLng': imamAddressLng,
+        'mohaffezPhone': mohaffezPhone,
+        'status': RequestStatus.accepted,
+        'isPaid': true,                             // no payment needed = paid
+        'sessionPrice': sessionPrice,
+        'createdAt': FieldValue.serverTimestamp(),
+        'acceptedAt': FieldValue.serverTimestamp(),
+        'reminder24hSent': false,
+        'reminder1hSent': false,
+        'juzCount': 1,
+        'sessionRating': 10,
+        'notificationsAlreadySent': true,           // FIX #3
+      });
+
+      // Inline notification — safe because notificationsAlreadySent:true
+      // prevents the CF trigger from firing a duplicate.
+      final notificationRef =
+          _firestore.collection('notifications').doc();
+      batch.set(notificationRef, {
+        'userId': studentId,
+        'recipientId': studentId,
+        'senderId': mohaffezId,
+        'title': 'تم قبول طلبك',
+        'body': mohaffezName,
+        'type': 'sessionconfirmed',
+        'isRead': false,
+        'data': {
+          'sessionId': sessionRef.id,
+          'requestId': requestId,
+          'mohaffezId': mohaffezId,
+        },
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      // ── PATH B: payment required — only update the request ───────────────
+      // BUG FIX #1: do NOT create a hafizSession here. The CF creates it
+      //             atomically after the student pays, preventing duplication.
+      // BUG FIX #3: do NOT send an inline notification. The CF trigger
+      //             onSessionRequestAccepted fires on the awaitingPayment
+      //             status change and sends the "payment required" notification
+      //             to the student. A second notification here would duplicate it.
+      final deadline =
+          DateTime.now().add(const Duration(hours: 24));
+
+      batch.update(requestRef, {
+        'status': RequestStatus.awaitingPayment,
+        'acceptedAt': FieldValue.serverTimestamp(),
+        'paymentDeadline': Timestamp.fromDate(deadline),
+        'reminderSent': false,
+        'paymentAmount': sessionPrice,
+        // NOTE: sessionId intentionally omitted — no session doc exists yet.
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Disable availability slot (both paths)
     if (availabilityRef != null && updatedSlots != null) {
       batch.update(availabilityRef, {
         'timeSlots': updatedSlots,
@@ -566,32 +650,24 @@ class SessionRepository {
       });
     }
 
-    final notificationRef = _firestore.collection('notifications').doc();
-    batch.set(notificationRef, {
-      'userId': studentId,
-      'recipientId': studentId,
-      'senderId': mohaffezId,
-      'title': 'تم قبول طلبك',
-      'body': mohaffezName,
-      'type': 'sessionconfirmed',
-      'isRead': false,
-      'data': {
-        'sessionId': sessionRef.id,
-        'requestId': requestId,
-        'mohaffezId': mohaffezId,
-      },
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
     await batch.commit();
   }
 
   /// Reject a session request.
-  Future<void> rejectRequest(String requestId) async {
+  Future<void> rejectRequest(
+    String requestId, [
+    String? reason,
+  ]) async {
     await _firestore
         .collection('sessionRequests')
         .doc(requestId)
-        .update({'status': RequestStatus.rejected});
+        .update({
+      'status': RequestStatus.rejected,
+      if (reason != null && reason.isNotEmpty)
+        'rejectionReason': reason,
+      'rejectedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   /// Update session assignment fields (hifz, muraja, rating, notes).
@@ -606,12 +682,12 @@ class SessionRepository {
         .collection('hafizSessions')
         .doc(sessionId)
         .update({
-        'hifzAssignment': hifzAssignment,
-        'murajaAssignment': murajaAssignment,
-        'sessionRating': rating,
-        'sessionNotes': notes,
-        'status': 'completed',  // FIX: BUG #1 - Set status to completed when mohaffez finishes session
-        'completedAt': FieldValue.serverTimestamp(),  // FIX: BUG #1 - Track when session was completed
+      'hifzAssignment': hifzAssignment,
+      'murajaAssignment': murajaAssignment,
+      'sessionRating': rating,
+      'sessionNotes': notes,
+      'status': 'completed',                        // FIX: BUG #1
+      'completedAt': FieldValue.serverTimestamp(),  // FIX: BUG #1
     });
   }
 
@@ -627,12 +703,14 @@ class SessionRepository {
       DateTime.now().month,
       DateTime.now().day,
     );
+    // BUG FIX #4: added status filter — the original query returned completed
+    // sessions too because it only filtered by date, not by status.
     final snapshot = await _firestore
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
+        .where('status', isEqualTo: RequestStatus.accepted) // FIX #4
         .where('sessionDate',
-            isGreaterThanOrEqualTo:
-                Timestamp.fromDate(todayStart))
+            isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
         .orderBy('sessionDate')
         .limit(3)
         .get();
@@ -719,36 +797,90 @@ class SessionRepository {
     await batch.commit();
   }
 
-  /// Get active bundle for a student + mohaffez + sessionType combination
-  /// Returns null if no active bundle exists
+  // ============================================================================
+  // BUNDLE / SUBSCRIPTION
+  // ============================================================================
+
+  /// Get active bundle for a student + mohaffez combination.
+  ///
+  /// FIX: added optional [sessionType] filter so a student with both an
+  /// 'online' and a 'home' bundle for the same teacher gets the correct one.
+  /// Passing null keeps all existing callers working without changes.
   Future<ActiveBundleInfo?> getActiveBundle({
     required String studentId,
     required String mohaffezId,
-    required String sessionType,
+    String? sessionType, // FIX: optional — null = no filter (backward compat)
   }) async {
-    final snapshot = await _firestore
+    try {
+      debugPrint(
+          '🔍 getActiveBundle: studentId=$studentId mohaffezId=$mohaffezId sessionType=$sessionType');
+
+      var query = _firestore
+          .collection('subscriptions')
+          .where('studentId', isEqualTo: studentId)
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('status', isEqualTo: 'active')
+          .where('remainingSessions', isGreaterThan: 0);
+
+      // FIX: only filter by sessionType when provided
+      if (sessionType != null && sessionType.isNotEmpty) {
+        query = query.where('sessionType', isEqualTo: sessionType);
+      }
+
+      final snapshot = await query.limit(1).get();
+      debugPrint(
+          '🔍 getActiveBundle: found ${snapshot.docs.length} docs');
+
+      if (snapshot.docs.isEmpty) return null;
+      return ActiveBundleInfo.fromMap(
+        snapshot.docs.first.data(),
+        snapshot.docs.first.id,
+      );
+    } catch (e, stack) {
+      debugPrint('❌ getActiveBundle FAILED: $e');
+      debugPrintStack(stackTrace: stack);
+      rethrow;
+    }
+  }
+
+  /// Real-time stream of the active bundle for a specific
+  /// (student, mohaffez, sessionType).
+  /// Returns null if no active bundle exists.
+  Stream<ActiveBundleInfo?> watchActiveBundle({
+    required String studentId,
+    required String mohaffezId,
+    required String sessionType,
+  }) {
+    return _firestore
         .collection('subscriptions')
         .where('studentId', isEqualTo: studentId)
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('sessionType', isEqualTo: sessionType)
         .where('status', isEqualTo: 'active')
+        .where('remainingSessions', isGreaterThan: 0)
         .limit(1)
-        .get();
-
-    if (snapshot.docs.isEmpty) return null;
-
-    return ActiveBundleInfo.fromMap(
-      snapshot.docs.first.data(),
-      snapshot.docs.first.id,
-    );
+        .snapshots()
+        .map((snap) {
+          if (snap.docs.isEmpty) return null;
+          final doc = snap.docs.first;
+          final sub = SubscriptionModel.fromFirestore(doc);
+          // Guard expired subscriptions Firestore hasn't cleaned up yet
+          if (sub.expiryDate != null &&
+              sub.expiryDate!.isBefore(DateTime.now())) {
+            return null;
+          }
+          return ActiveBundleInfo.fromMap(doc.data(), doc.id);
+        })
+        .handleError((e, stack) {
+          debugPrint('watchActiveBundle error: $e');
+          debugPrintStack(stackTrace: stack);
+          return null;
+        });
   }
 
-  // ============================================================================
-  // SUBSCRIPTIONS (BUG-C FIX)
-  // ============================================================================
-
-  /// Get a subscription bundle by its ID
-  Future<SubscriptionModel?> getBundleById(String subscriptionId) async {
+  /// Get a subscription bundle by its ID.
+  Future<SubscriptionModel?> getBundleById(
+      String subscriptionId) async {
     final doc = await _firestore
         .collection('subscriptions')
         .doc(subscriptionId)

@@ -1,10 +1,22 @@
+// lib/screens/select_bundle_plan_screen.dart
+//
 // NET-NEW screen (replaces BundlePlanSelectionWrapper which navigated directly
 // to payment). Now follows the teacher-first rule:
 //   1. Student picks a plan
 //   2. createSessionRequest CF called → status "pending"
 //   3. Waiting state shown — DirectPaymentScreen is NOT opened from here
+//
+// FIX: Added `requiresPaymentOnAcceptance: true` to the CF payload.
+//   Without this flag the Firestore doc stored false (the default), so
+//   SessionRepository.acceptRequest() took PATH A (immediate session creation)
+//   instead of PATH B (status → awaitingPayment). The result was that the
+//   teacher's accept action created a hafizSession without any payment ever
+//   being collected.
+//
+// FIX: Safe result.data parsing — guard `is Map` before casting to avoid
+//   TypeError (a Dart Error, not Exception) that would silently swallow the
+//   success response and leave _submitting = true forever.
 
-import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -44,14 +56,13 @@ class SelectBundlePlanScreen extends ConsumerStatefulWidget {
 
 class _SelectBundlePlanScreenState
     extends ConsumerState<SelectBundlePlanScreen> {
-  // State
   List<PricingPlanModel> _plans = [];
   PricingPlanModel? _selectedPlan;
   bool _loadingPlans = true;
   bool _submitting = false;
-  bool _requestSent = false;   // true after CF returns success
+  bool _requestSent = false; // true after CF returns success
   String? _error;
-  String? _createdRequestId;
+  String? _sentRequestId;
 
   @override
   void initState() {
@@ -63,7 +74,15 @@ class _SelectBundlePlanScreenState
 
   Future<void> _loadPlans() async {
     final flow = ref.read(bookingFlowProvider);
-    final mohaffezId = flow.slotContext?.mohaffezId ?? '';
+    final slotContext = flow.slotContext;
+    final mohaffezId = slotContext?.mohaffezId ?? '';
+
+    debugPrint('🔵 [BUNDLE_FLOW] Step2_SelectBundlePlan_BUILD: '
+        'mohaffezId=$mohaffezId, '
+        'sessionType=${slotContext?.sessionType}, '
+        'slotDate=${slotContext?.slotDate}, '
+        'preferredTimeSlot=${slotContext?.preferredTimeSlot}');
+
     if (mohaffezId.isEmpty) {
       setState(() {
         _error = 'لم يتم تحديد المحفظ';
@@ -71,6 +90,7 @@ class _SelectBundlePlanScreenState
       });
       return;
     }
+
     try {
       final snap = await FirebaseFirestore.instance
           .collection('users')
@@ -84,6 +104,9 @@ class _SelectBundlePlanScreenState
       final plans = snap.docs
           .map((d) => PricingPlanModel.fromJson({...d.data(), 'id': d.id}))
           .toList();
+
+      debugPrint('✅ [BUNDLE_FLOW] Step2_PlansLoaded: count=${plans.length}, '
+          'plans=${plans.map((p) => 'id=${p.id}, title=${p.title}, type=${p.type.name}, sessions=${p.sessionsCount}, price=${p.priceEGP}').toList()}');
 
       if (mounted) {
         setState(() {
@@ -107,22 +130,23 @@ class _SelectBundlePlanScreenState
     final plan = _selectedPlan;
     if (plan == null) return;
 
-    final flow      = ref.read(bookingFlowProvider);
-    final user      = ref.read(currentUserProvider).value;
-    final studentId = ref.read(currentUserIdProvider);
+    final flow = ref.read(bookingFlowProvider);
+    final user = ref.read(currentUserProvider).value;
 
-    // Guard: ensure booking context is loaded
     final slotCtx = flow.slotContext;
-    if (slotCtx?.mohaffezId == null ||
-        slotCtx?.mohaffezName == null ||
-        slotCtx?.slotDate == null ||
-        slotCtx?.slotStart == null ||
-        slotCtx?.slotEnd == null ||
-        slotCtx?.preferredTimeSlot == null ||
-        slotCtx?.sessionType == null ||
-        studentId == null ||
+
+    // Guard: ensure all booking context fields are present before calling CF.
+    if (slotCtx == null ||
+        slotCtx.mohaffezId.isEmpty ||
+        slotCtx.mohaffezName.isEmpty ||
+        slotCtx.slotDate.isEmpty ||
+        slotCtx.slotStart.isEmpty ||
+        slotCtx.slotEnd.isEmpty ||
+        slotCtx.preferredTimeSlot.isEmpty ||
+        slotCtx.sessionType.isEmpty ||
         user == null) {
-      setState(() => _error = 'بيانات الحجز غير مكتملة، يرجى العودة والمحاولة مجدداً');
+      setState(() =>
+          _error = 'بيانات الحجز غير مكتملة، يرجى العودة والمحاولة مجدداً');
       return;
     }
 
@@ -132,58 +156,92 @@ class _SelectBundlePlanScreenState
     });
 
     try {
-      final callable = FirebaseFunctions.instance
-          .httpsCallable('createSessionRequest');
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('createSessionRequest');
+
+      debugPrint('🔵 [BUNDLE_FLOW] Step3_SendRequest: '
+          'mohaffezId=${slotCtx.mohaffezId}, '
+          'planType=${plan.type.name}, '
+          'planId=${plan.id}, '
+          'sessionsCount=${plan.sessionsCount}, '
+          'requiresPaymentOnAcceptance=true');
 
       final result = await callable.call({
-        'mohaffezId':            slotCtx?.mohaffezId ?? '',
-        'mohaffezName':          slotCtx?.mohaffezName ?? '',
-        'studentName':           user.name ?? '',
-        'sessionType':           slotCtx?.sessionType ?? '',
-        'preferredTimeSlot':     slotCtx?.preferredTimeSlot ?? '',
-        'slotDate':              slotCtx?.slotDate ?? '',
-        'slotStart':             slotCtx?.slotStart ?? '',
-        'slotEnd':               slotCtx?.slotEnd ?? '',
-        if (slotCtx?.imamAddressText != null)
-          'imamAddressText':     slotCtx?.imamAddressText,
-        if (slotCtx?.imamAddressLat != null)
-          'imamAddressLat':      slotCtx?.imamAddressLat,
-        if (slotCtx?.imamAddressLng != null)
-          'imamAddressLng':      slotCtx?.imamAddressLng,
-        if (slotCtx?.mohaffezPhone != null)
-          'mohaffezPhone':       slotCtx?.mohaffezPhone,
+        'mohaffezId': slotCtx.mohaffezId,
+        'mohaffezName': slotCtx.mohaffezName,
+        'studentName': user.name ?? '',
+        'sessionType': slotCtx.sessionType,
+        'preferredTimeSlot': slotCtx.preferredTimeSlot,
+        'slotDate': slotCtx.slotDate,
+        'slotStart': slotCtx.slotStart,
+        'slotEnd': slotCtx.slotEnd,
+        if (slotCtx.imamAddressText != null)
+          'imamAddressText': slotCtx.imamAddressText,
+        if (slotCtx.imamAddressLat != null)
+          'imamAddressLat': slotCtx.imamAddressLat,
+        if (slotCtx.imamAddressLng != null)
+          'imamAddressLng': slotCtx.imamAddressLng,
+        if (slotCtx.mohaffezPhone != null)
+          'mohaffezPhone': slotCtx.mohaffezPhone,
         'selectedPaymentMethod': 'directpayment',
-        // ── plan fields ──────────────────────────────────────────────────
-        'planType':              plan.type.name,   // 'bundle' | 'subscription'
-        'planId':                plan.id,
-        'planTitle':             plan.title,
-        'sessionsCount':         plan.sessionsCount,
-        'validityDays':          plan.validityDays,
-        'paymentAmount':         plan.priceEGP,
+        // ── plan fields ───────────────────────────────────────────────
+        'planType': plan.type.name, // 'bundle' | 'subscription'
+        'planId': plan.id,
+        'planTitle': plan.title,
+        'sessionsCount': plan.sessionsCount,
+        'validityDays': plan.validityDays,
+        'paymentAmount': plan.priceEGP,
+        // FIX: This flag tells SessionRepository.acceptRequest() to take
+        // PATH B (status → awaitingPayment) instead of PATH A (immediate
+        // session creation). Without it the teacher's accept creates a
+        // hafizSession with no payment collected.
+        'requiresPaymentOnAcceptance': true,
       });
 
-      final requestId = (result.data as Map<String, dynamic>)['requestId']
-          as String?;
+      // FIX: Safe result.data parsing.
+      // A hard `as Map<String, dynamic>` cast throws TypeError (a Dart Error,
+      // not Exception) if the CF returns null or a non-Map value, which
+      // bypasses both on-Exception catch blocks and leaves _submitting = true
+      // forever. Guard with `is Map` first.
+      String? requestId;
+      if (result.data is Map) {
+        requestId =
+            (result.data as Map<String, dynamic>)['requestId'] as String?;
+      }
+
+      debugPrint('✅ [BUNDLE_FLOW] Step3_RequestCreated: requestId=$requestId');
 
       if (mounted) {
         setState(() {
-          _submitting   = false;
-          _requestSent  = true;
-          _createdRequestId = requestId;
+          _submitting = false;
+          _requestSent = true;
+          _sentRequestId = requestId;
         });
       }
     } on FirebaseFunctionsException catch (e) {
+      debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: code=${e.code}, message=${e.message}');
       if (mounted) {
         setState(() {
           _submitting = false;
           _error = e.message ?? 'حدث خطأ أثناء إرسال الطلب';
         });
       }
-    } catch (e) {
+    } on Exception catch (e) {
+      debugPrint('❌ [BUNDLE_FLOW] Step3_ERROR: $e');
       if (mounted) {
         setState(() {
           _submitting = false;
-          _error = 'حدث خطأ غير متوقع: $e';
+          _error = 'حدث خطأ: $e';
+        });
+      }
+    } catch (e, stack) {
+      // Catches Dart Errors (TypeError, etc.) — not caught by on Exception.
+      debugPrint('❌ [BUNDLE_FLOW] Step3_UNHANDLED_ERROR: $e');
+      debugPrintStack(stackTrace: stack);
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _error = 'حدث خطأ غير متوقع — يرجى المحاولة مجدداً';
         });
       }
     }
@@ -193,7 +251,6 @@ class _SelectBundlePlanScreenState
 
   @override
   Widget build(BuildContext context) {
-    // Show waiting state after successful request submission
     if (_requestSent) return _buildWaitingState();
 
     return Directionality(
@@ -235,12 +292,21 @@ class _SelectBundlePlanScreenState
 
   Widget _buildPlanCard(PricingPlanModel plan) {
     final isSelected = _selectedPlan?.id == plan.id;
-    final color      = _badgeFg(plan.type.name);
-    final priceStr   = NumberFormat('#,##0', 'ar').format(plan.priceEGP);
+    final color = _badgeFg(plan.type.name);
+    final priceStr = NumberFormat('#,##0', 'ar').format(plan.priceEGP);
     final hasValidity = plan.validityDays != null && plan.validityDays! > 0;
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedPlan = plan),
+      onTap: () {
+        debugPrint('🔵 [BUNDLE_FLOW] Step2_PlanSelected: '
+            'planId=${plan.id}, '
+            'planTitle=${plan.title}, '
+            'planType=${plan.type.name}, '
+            'sessionsCount=${plan.sessionsCount}, '
+            'priceEGP=${plan.priceEGP}, '
+            'validityDays=${plan.validityDays}');
+        setState(() => _selectedPlan = plan);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 12),
@@ -295,7 +361,6 @@ class _SelectBundlePlanScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Plan type badge + title
                     Row(
                       children: [
                         _PlanTypeBadge(planType: plan.type.name),
@@ -314,7 +379,6 @@ class _SelectBundlePlanScreenState
                     ),
                     const SizedBox(height: 8),
 
-                    // Sessions count chip
                     Row(
                       children: [
                         _InfoChip(
@@ -334,7 +398,6 @@ class _SelectBundlePlanScreenState
                     ),
                     const SizedBox(height: 8),
 
-                    // Price
                     Text(
                       '$priceStr ج.م',
                       style: TextStyle(
@@ -375,8 +438,9 @@ class _SelectBundlePlanScreenState
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed:
-                    (_selectedPlan == null || _submitting) ? null : _sendRequest,
+                onPressed: (_selectedPlan == null || _submitting)
+                    ? null
+                    : _sendRequest,
                 icon: _submitting
                     ? const SizedBox(
                         width: 18,
@@ -429,8 +493,8 @@ class _SelectBundlePlanScreenState
                   decoration: BoxDecoration(
                     color: Colors.amber.shade50,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                        color: Colors.amber.shade300, width: 2),
+                    border:
+                        Border.all(color: Colors.amber.shade300, width: 2),
                   ),
                   child: Icon(
                     Icons.hourglass_top_rounded,
@@ -441,10 +505,7 @@ class _SelectBundlePlanScreenState
                 const SizedBox(height: 24),
                 const Text(
                   'تم إرسال طلبك بنجاح!',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -492,9 +553,8 @@ class _SelectBundlePlanScreenState
                 ],
                 const SizedBox(height: 32),
                 OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).popUntil(
-                    (route) => route.isFirst,
-                  ),
+                  onPressed: () =>
+                      Navigator.of(context).popUntil((route) => route.isFirst),
                   icon: const Icon(Icons.home_outlined),
                   label: const Text('العودة إلى الرئيسية'),
                   style: OutlinedButton.styleFrom(
@@ -601,8 +661,7 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: color),
           const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(fontSize: 12, color: color)),
+          Text(label, style: TextStyle(fontSize: 12, color: color)),
         ],
       ),
     );

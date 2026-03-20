@@ -258,7 +258,7 @@ class PricingPlanCard extends ConsumerWidget {
                 ),
                 child: Text(
                   plan.description!,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
                     color: AppThemeConstants.accentGreen,
                     fontWeight: FontWeight.bold,

@@ -11,6 +11,14 @@
 // sessionType resolution, subscription/session/request creation, 9j update of 
 // pre-existing sessionRequest, idempotency, notifications) is PRESERVED 100%.
 
+// WHY: slot-lock-fix - With the new slot-lock-fix in studentMarkedDirectPayment,
+// dp.sessionRequestId is now ALWAYS set for bundle purchases (Path B). The sessionRequest
+// is created atomically with the slotLock when student marks payment.
+// CHANGES:
+// 1. Step 9f: Only create new sessionRequest if dp.sessionRequestId is NULL (backwards compat)
+// 2. Step 9h: UPDATE existing sessionRequest instead of creating new one when dp.sessionRequestId exists
+// 3. NEW Step 9k: DELETE slotLocks/{slotLockId} after confirmation
+
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
@@ -34,6 +42,25 @@ export const confirmBundleDirectPayment = functions.https.onCall(
       throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
     }
     const mohaffezId = context.auth.uid; // CHANGED: was studentId = context.auth.uid
+
+    // FIX BUG-NEW-3: Verify caller is a mohaffez
+    const callerDoc = await db.collection('users').doc(mohaffezId).get();
+    
+    // DEBUG: Add diagnostic logs to expose actual values
+    functions.logger.info('[DEBUG] confirmBundleDirectPayment callerUid:', mohaffezId);
+    functions.logger.info('[DEBUG] confirmBundleDirectPayment paymentId received:', data?.paymentId);
+    functions.logger.info('[DEBUG] confirmBundleDirectPayment all data keys:', data ? Object.keys(data) : []);
+    functions.logger.info('[DEBUG] confirmBundleDirectPayment callerDoc exists:', callerDoc.exists);
+    functions.logger.info('[DEBUG] confirmBundleDirectPayment caller role:', callerDoc.data()?.role);
+    
+    // FIX: Make role check case-insensitive to handle variations like 'Mohaffez', 'mohaffez', etc.
+    const callerRole = callerDoc.data()?.role?.toLowerCase();
+    if (!callerDoc.exists || (callerRole !== 'mohaffez' && callerRole !== 'teacher')) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'Caller must be a mohaffez'
+      );
+    }
 
     // 2. Extract params — only paymentId from caller
     //    WHY: everything else is read from the dp doc to prevent payload injection
@@ -131,6 +158,45 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         };
       }
 
+      // ── Step 8.5: Atomic claim — prevents concurrent triple-execution ──
+      let claimedSubscriptionId: string | null = null;
+
+      type ClaimResult = 'claimed' | 'already-confirmed' | 'already-confirming';
+
+      const claimResult: ClaimResult = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(dpRef);
+        if (!snap.exists) {
+          throw new functions.https.HttpsError('not-found', 'directPaymentRequest not found');
+        }
+        const d = snap.data()!;
+
+        if (d.status === 'confirmed' && d.subscriptionId) {
+          claimedSubscriptionId = d.subscriptionId as string;
+          return 'already-confirmed';
+        }
+
+        if (d.status === 'confirming') {
+          return 'already-confirming';
+        }
+
+        tx.update(dpRef, {
+          status: 'confirming',
+          confirmingStartedAt: FieldValue.serverTimestamp(),
+        });
+        return 'claimed';
+      });
+
+      if (claimResult === 'already-confirmed') {
+        functions.logger.info('confirmBundleDirectPayment: idempotent (already-confirmed)', { paymentId });
+        return { success: true, subscriptionId: claimedSubscriptionId!, message: 'Already confirmed' };
+      }
+
+      if (claimResult === 'already-confirming') {
+        functions.logger.info('confirmBundleDirectPayment: idempotent (already-confirming)', { paymentId });
+        return { success: true, message: 'Confirmation already in progress' };
+      }
+      // claimResult === 'claimed' → fall through to main transaction (Step 9)
+
       // 9. Main transaction
       const result = await db.runTransaction(async (transaction) => {
         // Re-read dpRef inside transaction for consistency
@@ -145,12 +211,16 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           throw new AlreadyConfirmedError(dpTx.subscriptionId as string);
         }
 
+        // Guard: only proceed if we own the 'confirming' status
+        if (dpTx.status !== 'confirming') {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            `Unexpected status '${dpTx.status}' — expected 'confirming'`,
+          );
+        }
+
         // 9a. Read system config for maxActiveSubscriptions + commissionRate
-        const configSnap = await transaction.get(
-          db.collection('systemConfig').doc('global')
-        );
-        const maxActive: number =
-          (configSnap.data()?.maxActiveSubscriptions as number) ?? 3;
+        const PER_SESSION_TYPE_LIMIT = 1; // one active bundle per studentId+mohaffezId+sessionType
         // commissionRate retained for future per-bundle commission tracking parity
         // const commissionRate: number =
         //   (configSnap.data()?.commissionRate as number) ?? 0.05;
@@ -191,10 +261,35 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             .where('sessionType', '==', resolvedSessionType)
             .where('status', '==', 'active')
         );
-        if (activeSubsSnap.size >= maxActive) {
+        if (activeSubsSnap.size >= PER_SESSION_TYPE_LIMIT) {
           throw new functions.https.HttpsError(
             'resource-exhausted',
-            'لديك عدد كافٍ من الاشتراكات النشطة مع هذا المحفظ'
+            'لديك باقة نشطة بالفعل لهذا النوع من الجلسات'
+          );
+        }
+
+        // FIX: slot-lock-fix - NEW: Read existing sessionRequest if dp.sessionRequestId exists
+        // This sessionRequest was created by studentMarkedDirectPayment for bundle purchases.
+        // We need to get slotLockId to delete it after confirmation.
+        let existingSlotLockId: string | null = null;
+        if (dpTx.sessionRequestId) {
+          const existingReqRef = db.collection('sessionRequests').doc(dpTx.sessionRequestId as string);
+          const existingReqSnap = await transaction.get(existingReqRef);
+          if (existingReqSnap.exists) {
+            const existingReqData = existingReqSnap.data();
+            existingSlotLockId = typeof existingReqData?.slotLockId === 'string' ? existingReqData.slotLockId : null;
+          }
+        }
+
+        // Step 9h-b pre-read: must happen before any writes (Firestore transaction rule)
+        const originalSessionRequestId = dpTx.originalSessionRequestId as string | undefined;
+        let originalReqSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+        if (
+          originalSessionRequestId &&
+          originalSessionRequestId !== (dpTx.sessionRequestId as string | undefined)
+        ) {
+          originalReqSnap = await transaction.get(
+            db.collection('sessionRequests').doc(originalSessionRequestId)
           );
         }
 
@@ -211,11 +306,14 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         const transactionTag = `bundle-${paymentId}`;
 
         // 9f. Document refs
+        // FIX: slot-lock-fix - Only create new sessionRequest if dp.sessionRequestId is null
+        // (backwards compatibility for non-slot-lock flows)
         const subscriptionRef = db.collection('subscriptions').doc();
         const sessionRef = isSlotCoupled
           ? db.collection('hafizSessions').doc()
           : null;
-        const newRequestRef = isSlotCoupled
+        // Only create new requestRef if there's no existing sessionRequest (dp.sessionRequestId is null)
+        const newRequestRef = isSlotCoupled && !dpTx.sessionRequestId
           ? db.collection('sessionRequests').doc()
           : null;
 
@@ -249,19 +347,18 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         });
 
         // 9h. Slot-coupled: create first hafizSession + linked sessionRequest
+        // FIX: slot-lock-fix - If dp.sessionRequestId exists, UPDATE that request instead of creating new one
         let createdSessionId: string | null = null;
         let createdRequestId: string | null = null;
 
         if (
           isSlotCoupled &&
           sessionRef &&
-          newRequestRef &&
           slotDateTs &&
           slotStartTs &&
           slotEndTs
         ) {
           createdSessionId = sessionRef.id;
-          createdRequestId = newRequestRef.id;
 
           transaction.set(sessionRef, {
             studentId,
@@ -278,7 +375,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             paymentType: 'bundle',
             subscriptionId: subscriptionRef.id,
             paymentTransactionId: transactionTag,
-            requestId: newRequestRef.id,
+            requestId: dpTx.sessionRequestId ?? newRequestRef?.id ?? null,
             mohaffezPhone: mohaffezPhone ?? null,
             imamAddressText: imamAddressText ?? null,
             imamAddressLat: imamAddressLat ?? null,
@@ -294,24 +391,72 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             notificationsAlreadySent: true,
           });
 
-          transaction.set(newRequestRef, {
-            studentId,
-            studentName: dp.studentName,
-            mohaffezId,
-            mohaffezName: dp.mohaffezName,
-            sessionType: resolvedSessionType,
-            preferredTimeSlot,
-            slotDate: slotDateTs,
-            slotStart: slotStartTs,
-            slotEnd: slotEndTs,
-            status: 'accepted',
-            paymentType: 'bundle',
-            subscriptionId: subscriptionRef.id,
-            sessionId: sessionRef.id,
-            paymentId,
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
+          // FIX: slot-lock-fix - If dp.sessionRequestId exists, UPDATE the existing request
+          // Otherwise, create a new one (backwards compatibility)
+          if (dpTx.sessionRequestId) {
+            // Update existing sessionRequest created by studentMarkedDirectPayment
+            createdRequestId = dpTx.sessionRequestId as string;
+            transaction.update(
+              db.collection('sessionRequests').doc(dpTx.sessionRequestId as string),
+              {
+                status: 'accepted',
+                isPaid: true,
+                paidAt: FieldValue.serverTimestamp(),
+                subscriptionId: subscriptionRef.id,
+                sessionId: sessionRef.id,
+                paymentId,
+                directPaymentConfirmedAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+              }
+            );
+          } else if (newRequestRef) {
+            // Create new sessionRequest (backwards compatibility)
+            createdRequestId = newRequestRef.id;
+            transaction.set(newRequestRef, {
+              studentId,
+              studentName: dp.studentName,
+              mohaffezId,
+              mohaffezName: dp.mohaffezName,
+              sessionType: resolvedSessionType,
+              preferredTimeSlot,
+              slotDate: slotDateTs,
+              slotStart: slotStartTs,
+              slotEnd: slotEndTs,
+              status: 'accepted',
+              paymentType: 'bundle',
+              subscriptionId: subscriptionRef.id,
+              sessionId: sessionRef.id,
+              paymentId,
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        // Step 9h-b: resolve original sessionRequest (pre-read above, just write here)
+        if (originalReqSnap && originalReqSnap.exists) {
+          const originalReqData = originalReqSnap.data();
+          const previousStatus = originalReqData?.status as string | undefined;
+          const resolvableStatuses = [
+            'awaitingdirectpaymentconfirmation',
+            'awaitingPayment',
+            'pending',
+          ];
+          if (previousStatus && resolvableStatuses.includes(previousStatus)) {
+            transaction.update(originalReqSnap.ref, {
+              status: 'accepted',
+              isPaid: true,
+              paidAt: FieldValue.serverTimestamp(),
+              subscriptionId: subscriptionRef.id,
+              paymentId,
+              directPaymentConfirmedAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            functions.logger.info('confirmBundleDirectPayment original request resolved', {
+              originalSessionRequestId,
+              previousStatus,
+            });
+          }
         }
 
         // 9i. Confirm the directPaymentRequest
@@ -322,22 +467,17 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 9j. Update the ORIGINAL bundle booking sessionRequest (created by
-        //     createSessionRequest CF). dp.sessionRequestId links back to it.
-        //     WHY: marks the teacher-facing request as fully resolved so it
-        //     disappears from MohaffezRequestsScreen pending list.
-        if (dp.sessionRequestId) {
-          transaction.update(
-            db.collection('sessionRequests').doc(dp.sessionRequestId as string),
-            {
-              status: 'accepted',
-              isPaid: true,
-              paidAt: FieldValue.serverTimestamp(),
-              subscriptionId: subscriptionRef.id,
-              directPaymentConfirmedAt: FieldValue.serverTimestamp(),
-              updatedAt: FieldValue.serverTimestamp(),
-            }
-          );
+        // FIX double-write-2: DELETED step 9j - it was updating the same
+        // sessionRequests/{sessionRequestId} document that step 9h already updated.
+        // This caused "Transaction: modified document more than once" error.
+        // Step 9h already contains all fields needed (status, isPaid, paidAt,
+        // subscriptionId, sessionId, paymentId, directPaymentConfirmedAt, updatedAt).
+
+        // FIX: slot-lock-fix - NEW Step 9k: Delete the slotLock after confirmation
+        // This releases the slot so it's no longer reserved. The slot is now confirmed
+        // and a hafizSession exists, so no lock is needed.
+        if (existingSlotLockId) {
+          transaction.delete(db.collection('slotLocks').doc(existingSlotLockId));
         }
 
         functions.logger.info('confirmBundleDirectPayment Subscription created', {

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onSessionRequestStatusChanged = exports.onSessionCompleted = exports.onPaymentCompleted = exports.onSessionCreated = exports.onSessionRequestAccepted = void 0;
 const functions = require("firebase-functions");
+const admin_1 = require("../utils/admin");
 const notificationHelpers_1 = require("../utils/notificationHelpers");
 const SessionEventStore_1 = require("../services/SessionEventStore");
 const events_types_1 = require("../types/events.types");
@@ -10,7 +11,7 @@ const asNumber = (value, fallback = 0) => typeof value === 'number' ? value : fa
 const asBoolean = (value, fallback = false) => typeof value === 'boolean' ? value : fallback;
 /**
  * Firestore trigger: Send notifications when session request status changes
- * Handles: payment_required, accepted, and free session flows
+ * Handles: payment_required, bundle_awaiting_payment, accepted, and free session flows
  */
 exports.onSessionRequestAccepted = functions.firestore
     .document('sessionRequests/{requestId}')
@@ -35,7 +36,7 @@ exports.onSessionRequestAccepted = functions.firestore
     const mohaffezId = asString(after.mohaffezId);
     const requestId = context.params.requestId;
     // ============================================
-    // NEW: Check if this is a free session
+    // Check if this is a free session
     // ============================================
     const isPaid = asBoolean(after.isPaid, false);
     const paymentAmount = asNumber(after.paymentAmount, 0);
@@ -46,48 +47,52 @@ exports.onSessionRequestAccepted = functions.firestore
         promoCode.length > 0;
     try {
         // ============================================
-        // CASE 1: Awaiting Payment (regular flow)
+        // CASE 1: Awaiting Payment
+        // ── UPDATED: differentiate bundle vs single ─
         // ============================================
         if (afterStatus === 'awaitingpayment') {
+            // Distinguish bundle / subscription from a plain single-session request
+            const planType = asString(after.planType);
+            const isBundlePlan = planType === 'bundle' || planType === 'subscription';
             await (0, notificationHelpers_1.createAndSendNotification)({
                 userId: studentId,
                 senderId: mohaffezId,
-                title: 'جلسة مقبولة!',
-                body: `${mohaffezName} قبل طلبك. يُرجى الدفع خلال الموعد المحدد.`,
-                type: 'payment_required',
+                title: isBundlePlan
+                    ? 'وافق المحفظ على طلب الباقة ✅'
+                    : 'جلسة مقبولة!',
+                body: isBundlePlan
+                    ? `${mohaffezName} وافق على طلبك — يمكنك الآن إتمام الدفع.`
+                    : `${mohaffezName} قبل طلبك. يُرجى الدفع خلال الموعد المحدد.`,
+                // Separate type so Flutter notification handler routes correctly:
+                //   'bundle_awaiting_payment' → /booking/direct-payment (with plan context)
+                //   'payment_required'        → StudentPaymentScreen (single session)
+                type: isBundlePlan ? 'bundle_awaiting_payment' : 'payment_required',
                 isRead: false,
-                data: {
-                    requestId,
+                data: Object.assign({ requestId,
                     mohaffezId,
-                    mohaffezName,
-                    sessionType: after.sessionType,
-                    sessionDate: after.slotDate,
-                    preferredTimeSlot: after.preferredTimeSlot,
-                    paymentDeadline: after.paymentDeadline,
-                    location: (_a = after.imamAddressText) !== null && _a !== void 0 ? _a : after.location,
-                },
+                    mohaffezName, sessionType: asString(after.sessionType), sessionDate: after.slotDate, preferredTimeSlot: asString(after.preferredTimeSlot), paymentDeadline: after.paymentDeadline, location: (_a = after.imamAddressText) !== null && _a !== void 0 ? _a : after.location }, (isBundlePlan
+                    ? Object.assign({ planType, planId: asString(after.planId), planTitle: asString(after.planTitle), sessionsCount: String(asNumber(after.sessionsCount, 1)) }, (typeof after.validityDays === 'number'
+                        ? { validityDays: String(after.validityDays) }
+                        : {})) : {})),
                 highPriority: true,
             });
-            functions.logger.info('Payment required notification sent', {
-                requestId,
-                studentId,
-            });
+            functions.logger.info(isBundlePlan
+                ? 'Bundle awaiting payment notification sent'
+                : 'Payment required notification sent', { requestId, studentId, isBundlePlan });
             return;
         }
         // ============================================
         // CASE 2: Accepted (with free session detection)
         // ============================================
         if (afterStatus === 'accepted') {
-            // Guard: confirmFreeSession already sent notifications atomically
-            // FIX-3: Use runtime-safe boolean coercion for duplicate-notification guard
+            // Guard: confirmFreeSession / confirmBundleDirectPayment already sent
+            // notifications atomically — skip to avoid duplicates.
+            // FIX-3: Use runtime-safe boolean coercion
             const alreadySent = asBoolean(after['notificationsAlreadySent'], false);
             if (alreadySent === true) {
-                functions.logger.info('Skipping duplicate notification: already sent by confirmFreeSession', {
-                    requestId: context.params.requestId,
-                });
+                functions.logger.info('Skipping duplicate notification: already sent by CF', { requestId: context.params.requestId });
                 return;
             }
-            // Determine notification content based on free/paid status
             const notificationTitle = isFreeSession
                 ? '🎉 جلسة مجانية مؤكدة!'
                 : '✅ قبلت الجلسة! 🎉';
@@ -97,7 +102,7 @@ exports.onSessionRequestAccepted = functions.firestore
             const notificationType = isFreeSession
                 ? 'session_accepted_free'
                 : 'session_accepted';
-            // Send notification to student
+            // Notify student
             await (0, notificationHelpers_1.createAndSendNotification)({
                 userId: studentId,
                 senderId: mohaffezId,
@@ -118,7 +123,7 @@ exports.onSessionRequestAccepted = functions.firestore
                 },
                 highPriority: true,
             });
-            // NEW: Send notification to mohaffez as well
+            // Notify mohaffez
             if (mohaffezId) {
                 const studentName = asString(after.studentName, 'الطالب');
                 await (0, notificationHelpers_1.createAndSendNotification)({
@@ -151,7 +156,7 @@ exports.onSessionRequestAccepted = functions.firestore
             });
         }
         // ============================================
-        // CASE 3: Rejected (optional)
+        // CASE 3: Rejected
         // ============================================
         if (afterStatus === 'rejected') {
             await (0, notificationHelpers_1.createAndSendNotification)({
@@ -175,10 +180,9 @@ exports.onSessionRequestAccepted = functions.firestore
             });
         }
         // ============================================
-        // CASE 4: Cancelled (optional)
+        // CASE 4: Cancelled
         // ============================================
         if (afterStatus === 'cancelled') {
-            // Notify mohaffez if student cancelled
             if (mohaffezId) {
                 const studentName = asString(after.studentName, 'الطالب');
                 await (0, notificationHelpers_1.createAndSendNotification)({
@@ -216,8 +220,8 @@ exports.onSessionRequestAccepted = functions.firestore
     }
 });
 /**
- * NEW: Firestore trigger for session creation
- * Logs session creation events and sends additional notifications if needed
+ * Firestore trigger for session creation
+ * Logs session creation events; skips if notifications already sent by CF.
  */
 exports.onSessionCreated = functions.firestore
     .document('hafizSessions/{sessionId}')
@@ -230,12 +234,9 @@ exports.onSessionCreated = functions.firestore
     // FIXED: BUG-3
     const alreadySent = asBoolean(data['notificationsAlreadySent'], false);
     if (alreadySent) {
-        functions.logger.info('onSessionCreated: skipping — notifications already sent', {
-            sessionId: context.params.sessionId,
-        });
+        functions.logger.info('onSessionCreated: skipping — notifications already sent', { sessionId: context.params.sessionId });
         return;
     }
-    // Append creation event
     try {
         await sessionEventStore.appendEvent({
             eventType: events_types_1.SessionEventType.SESSION_CREATED,
@@ -264,8 +265,8 @@ exports.onSessionCreated = functions.firestore
     }
 });
 /**
- * NEW: Firestore trigger for payment completion
- * Detects when a payment is completed and logs the event
+ * Firestore trigger for payment completion
+ * Detects when a payment is completed and logs the event.
  */
 exports.onPaymentCompleted = functions.firestore
     .document('payments/{paymentId}')
@@ -274,7 +275,6 @@ exports.onPaymentCompleted = functions.firestore
     const after = change.after.data();
     const beforeStatus = asString(before.status);
     const afterStatus = asString(after.status);
-    // Only trigger on status change to 'completed'
     if (beforeStatus === afterStatus || afterStatus !== 'completed') {
         return;
     }
@@ -292,9 +292,8 @@ exports.onPaymentCompleted = functions.firestore
     });
 });
 /**
- * FIX: BUG #3 - Firestore trigger for assignment update notification
- * Fires when hifzAssignment is set (non-empty) and status changes to "completed"
- * Sends notification to student about their new assignment
+ * FIX: BUG #3 - Firestore trigger for session completion
+ * Fires when status changes to "completed". Sends student notification.
  */
 exports.onSessionCompleted = functions.firestore
     .document('hafizSessions/{sessionId}')
@@ -333,21 +332,44 @@ exports.onSessionCompleted = functions.firestore
     }
     catch (error) {
         functions.logger.error('Failed to append session completed event', {
-            sessionId, error,
+            sessionId,
+            error,
         });
     }
     // Only send notifications when status becomes 'completed'
     if (afterStatus !== 'completed')
         return;
+    // ── Increment student completed-session counter ──────────────────
+    if (studentId) {
+        try {
+            await admin_1.db
+                .collection('users')
+                .doc(studentId)
+                .update({
+                completedSessionsCount: admin_1.FieldValue.increment(1),
+                updatedAt: admin_1.FieldValue.serverTimestamp(),
+            });
+            functions.logger.info('Student session counter incremented', {
+                sessionId,
+                studentId,
+            });
+        }
+        catch (counterError) {
+            // Non-blocking: log but never fail the trigger
+            functions.logger.error('Failed to increment student session counter', { sessionId, studentId, error: counterError });
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────
     if (!studentId) {
-        functions.logger.warn('Missing studentId in completed session', { sessionId });
+        functions.logger.warn('Missing studentId in completed session', {
+            sessionId,
+        });
         return;
     }
     const mohaffezName = asString(after.mohaffezName, '');
     const hifzAssignment = asString(after.hifzAssignment, '');
     const hasAssignment = hifzAssignment.trim().length > 0;
     try {
-        // Always notify student session was completed
         await (0, notificationHelpers_1.createAndSendNotification)({
             userId: studentId,
             senderId: mohaffezId,
@@ -368,12 +390,18 @@ exports.onSessionCompleted = functions.firestore
             },
         });
         functions.logger.info('Session completed notification sent', {
-            sessionId, studentId, mohaffezId, hasAssignment,
+            sessionId,
+            studentId,
+            mohaffezId,
+            hasAssignment,
         });
     }
     catch (error) {
         functions.logger.error('Error sending session completed notification', {
-            sessionId, studentId, mohaffezId, error,
+            sessionId,
+            studentId,
+            mohaffezId,
+            error,
         });
     }
 });
@@ -386,13 +414,11 @@ exports.onSessionRequestStatusChanged = functions.firestore
     const after = change.after.data();
     const fromStatus = (_a = before.status) !== null && _a !== void 0 ? _a : '';
     const toStatus = (_b = after.status) !== null && _b !== void 0 ? _b : '';
-    // Only run when status actually changed
     if (fromStatus === toStatus)
         return;
     const requestId = context.params.requestId;
     const studentId = (_c = after.studentId) !== null && _c !== void 0 ? _c : '';
     const mohaffezId = (_d = after.mohaffezId) !== null && _d !== void 0 ? _d : '';
-    // Map status string -> enum value
     const eventTypeMap = {
         awaitingpayment: events_types_1.SessionRequestEventType.AWAITING_PAYMENT,
         awaitingdirectpaymentconfirmation: events_types_1.SessionRequestEventType.AWAITING_DIRECT,
@@ -403,16 +429,9 @@ exports.onSessionRequestStatusChanged = functions.firestore
     };
     const eventType = eventTypeMap[toStatus];
     if (!eventType) {
-        functions.logger.warn('onSessionRequestStatusChanged: unknown toStatus', {
-            requestId, fromStatus, toStatus,
-        });
+        functions.logger.warn('onSessionRequestStatusChanged: unknown toStatus', { requestId, fromStatus, toStatus });
         return;
     }
-    // Determine actorId heuristically:
-    //   accepted/awaitingdirect = mohaffez acted
-    //   cancelled/expired       = could be system or student
-    //   awaitingpayment         = mohaffez accepted initially
-    //   rejected                = mohaffez acted
     const actorId = ['accepted', 'rejected', 'awaitingdirectpaymentconfirmation'].includes(toStatus)
         ? mohaffezId
         : toStatus === 'expired'
@@ -440,7 +459,10 @@ exports.onSessionRequestStatusChanged = functions.firestore
     }
     catch (error) {
         functions.logger.error('Failed to append session request event', {
-            requestId, fromStatus, toStatus, error,
+            requestId,
+            fromStatus,
+            toStatus,
+            error,
         });
     }
 });

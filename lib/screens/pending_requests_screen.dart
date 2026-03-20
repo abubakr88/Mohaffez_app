@@ -1,19 +1,28 @@
-// screens/pending_requests_screen.dart
+// lib/screens/pending_requests_screen.dart
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // FIX-CSS
 
 import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
+import '../shared/widgets/request_payment_type_badge.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../models/request_status.dart';
 import '../utils/arabic_labels.dart';
 import 'direct_payment_confirmations_screen.dart';
+
+// FIX Bug 1: import BookingPaymentMethod so we can reference
+// BookingPaymentMethod.subscriptionCredit.value ('subscription_credit')
+// instead of the hard-coded typo 'subscriptioncredit'.
+import '../providers/booking_provider.dart';
 
 class PendingRequestsScreen extends ConsumerStatefulWidget {
   const PendingRequestsScreen({super.key});
@@ -23,10 +32,12 @@ class PendingRequestsScreen extends ConsumerStatefulWidget {
       _PendingRequestsScreenState();
 }
 
-class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
+class _PendingRequestsScreenState
+    extends ConsumerState<PendingRequestsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  String _selectedFilter = 'all'; // 'all', 'pending', 'awaiting_payment'
+  String _selectedFilter = 'all';
+  bool _isLoadingAccept = false;
 
   @override
   void dispose() {
@@ -49,10 +60,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       child: Scaffold(
         body: CustomScrollView(
           slivers: [
-            // App Bar with Counter
             _buildAppBar(user.uid),
-
-            // Search Bar
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -71,9 +79,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                             icon: const Icon(Icons.clear),
                             onPressed: () {
                               _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
+                              setState(() => _searchQuery = '');
                             },
                           )
                         : null,
@@ -86,19 +92,15 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                 ),
               ),
             ),
-
-            // Filter Chips
-            SliverToBoxAdapter(
-              child: _buildFilterChips(),
-            ),
-
-            // Requests List
+            SliverToBoxAdapter(child: _buildFilterChips()),
             _buildRequestsList(user.uid),
           ],
         ),
       ),
     );
   }
+
+  // ─── App Bar ─────────────────────────────────────────────────────────────
 
   Widget _buildAppBar(String mohaffezId) {
     return SliverAppBar(
@@ -164,8 +166,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                       ),
                       Consumer(
                         builder: (context, ref, _) {
-                          final count = ref
-                              .watch(pendingRequestsCountProvider(mohaffezId));
+                          final count = ref.watch(
+                              pendingRequestsCountProvider(mohaffezId));
                           return Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
@@ -194,6 +196,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       ),
     );
   }
+
+  // ─── Filter Chips ─────────────────────────────────────────────────────────
 
   Widget _buildFilterChips() {
     return Container(
@@ -225,19 +229,21 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                   () => _selectedFilter = RequestStatus.awaitingPayment),
             ),
             const SizedBox(width: 8),
-            // BUG-B FIX: Add filter for direct payment confirmation
             _FilterChip(
               label: 'تأكيد الدفع المباشر',
               icon: Icons.payments_outlined,
-              isSelected: _selectedFilter == RequestStatus.awaitingDirectPayment,
-              onTap: () => setState(
-                  () => _selectedFilter = RequestStatus.awaitingDirectPayment),
+              isSelected:
+                  _selectedFilter == RequestStatus.awaitingDirectPayment,
+              onTap: () => setState(() =>
+                  _selectedFilter = RequestStatus.awaitingDirectPayment),
             ),
           ],
         ),
       ),
     );
   }
+
+  // ─── Requests List ────────────────────────────────────────────────────────
 
   Widget _buildRequestsList(String mohaffezId) {
     final requestsAsync =
@@ -251,24 +257,28 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
                   .invalidate(pendingRequestsFirstPageProvider(mohaffezId)))),
       data: (allRequests) {
         var filtered = allRequests;
-        // Apply status filter
+
         if (_selectedFilter != 'all') {
           filtered = filtered.where((r) {
-            final status = (r['status'] as String? ?? '').toLowerCase();
+            final status =
+                (r['status'] as String? ?? '').toLowerCase();
             if (_selectedFilter == RequestStatus.awaitingPayment) {
+              // "في انتظار الدفع" chip shows both payment-waiting states
               return status == RequestStatus.awaitingPayment ||
                   status == RequestStatus.awaitingDirectPayment;
             }
             return status == _selectedFilter;
           }).toList();
         }
-        // Apply search filter
+
         if (_searchQuery.isNotEmpty) {
           filtered = filtered.where((r) {
-            final name = (r['studentName'] as String? ?? '').toLowerCase();
+            final name =
+                (r['studentName'] as String? ?? '').toLowerCase();
             return name.contains(_searchQuery);
           }).toList();
         }
+
         if (filtered.isEmpty) {
           return const SliverFillRemaining(
             child: EmptyState(
@@ -279,6 +289,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
             ),
           );
         }
+
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: SliverList(
@@ -301,33 +312,60 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
     );
   }
 
+  // ─── Accept Handler ───────────────────────────────────────────────────────
+
   Future<void> _handleAccept(
       String requestId, Map<String, dynamic> data) async {
+    // Loading guard - prevents double-tap
+    if (_isLoadingAccept) return;
+    setState(() => _isLoadingAccept = true);
+
     final status = (data['status'] as String? ?? '').toLowerCase();
 
-    if (status == RequestStatus.awaitingDirectPayment) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('في انتظار تأكيد الدفع المباشر'),
-          content: const Text(
-            'هذا الطلب بانتظار تأكيد الدفع المباشر من شاشة "تأكيد المدفوعات".',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(ArabicLabels.ok),
-            ),
-          ],
-        ),
-      );
+    // FIX Bug 1: was 'subscriptioncredit' — never matched the stored value
+    // 'subscription_credit'. Referencing the enum's .value is now the
+    // single source of truth and will stay correct if the enum changes.
+    final selectedPaymentMethod =
+        data['selectedPaymentMethod'] as String? ?? '';
+    final subscriptionId = data['subscriptionId'] as String?;
+    final planType = data['planType'] as String? ?? '';
+
+    // Path A: bundle session uses existing subscription credit
+    // Check selectedPaymentMethod OR planType for bundle/subscription
+    final bool isSubscriptionCredit =
+        (selectedPaymentMethod == BookingPaymentMethod.subscriptionCredit.value ||
+         planType == 'bundle' ||
+         planType == 'subscription') &&
+        subscriptionId != null;
+
+    if (isSubscriptionCredit) {
+      // FIX: removed subscriptionId parameter — CF reads it from Firestore.
+      await _confirmSubscriptionSession(data);
+      if (mounted) setState(() => _isLoadingAccept = false);
       return;
     }
 
-    // Check if payment is required
-    if (status == RequestStatus.awaitingPayment ||
-        status == RequestStatus.awaitingDirectPayment) {
-      // Show dialog that payment is pending
+    // awaitingDirectPayment: navigate to the confirmations screen.
+    if (status == RequestStatus.awaitingDirectPayment) {
+      final directPaymentRequestId = data['directPaymentRequestId'] as String?;
+      if (!mounted) return;
+      if (directPaymentRequestId != null && directPaymentRequestId.isNotEmpty) {
+        context.push(
+          '/mohaffez/requests/confirm?directPaymentRequestId=$directPaymentRequestId',
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لم يتم العثور على معرف طلب الدفع'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // awaitingPayment: student hasn't transferred yet — different message.
+    if (status == RequestStatus.awaitingPayment) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -346,7 +384,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       return;
     }
 
-    // Show confirmation dialog for pending requests
+    // Standard pending → confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -373,7 +411,6 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
     if (confirmed != true) return;
 
     try {
-      // ✅ USE PROVIDER: Handles subscription credits, payment deadlines, notifications
       await ref
           .read(sessionActionsProvider.notifier)
           .acceptRequestAndCreateSession(requestId);
@@ -388,15 +425,18 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isLoadingAccept = false);
     }
   }
+
+  // ─── Reject Handler ───────────────────────────────────────────────────────
 
   Future<void> _handleReject(String requestId) async {
     final reasonController = TextEditingController();
@@ -429,9 +469,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text(ArabicLabels.reject),
           ),
         ],
@@ -445,7 +483,6 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           ? 'لم يذكر سبب'
           : reasonController.text.trim();
 
-      // ✅ USE PROVIDER: Handles slot lock release and notifications
       await ref
           .read(sessionActionsProvider.notifier)
           .rejectRequest(requestId, reason);
@@ -460,7 +497,6 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ: ${e.toString()}'),
@@ -469,7 +505,109 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       );
     }
   }
+
+  // ─── Subscription Session Confirm ─────────────────────────────────────────
+  //
+  // FIX: CF now reads ALL session/subscription fields from Firestore.
+  // The caller sends only 3 fields:
+  //   1. requestId    → CF looks up the sessionRequest doc
+  //   2. mohaffezId   → must equal context.auth.uid (permission check)
+  //   3. mohaffezName → used in session doc + student notification
+  //
+  // REMOVED: subscriptionId parameter (CF reads it from the request doc).
+  // REMOVED: slotDate/slotStart/slotEnd ISO conversions (CF reads Timestamps).
+  // REMOVED: studentId, sessionType, amount, address fields (all from Firestore).
+  // FIXED:   mohaffezId now uses currentUser.uid, not request['mohaffezId'],
+  //          so the CF permission check (context.auth.uid !== data.mohaffezId)
+  //          can never fail due to a stale/mismatched Firestore value.
+  Future<void> _confirmSubscriptionSession(
+    Map<String, dynamic> request,
+  ) async {
+    // Get the currently authenticated mohaffez UID from the auth provider —
+    // never from the Firestore request doc to avoid permission-denied mismatches.
+    final currentUser = ref.read(currentUserProvider).value;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: المستخدم غير مصادق عليه'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) =>
+            const Center(child: CircularProgressIndicator()),
+      );
+
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'confirmSubscriptionSession',
+        options:
+            HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      );
+
+      // FIX: 3 fields only. The CF reads everything else from Firestore.
+      // Previously 14+ fields were sent including Timestamp→ISO conversions
+      // that the CF re-parsed with parseFlutterDate, causing the crash.
+      final result = await callable.call({
+        'requestId':    request['id'] as String,
+        'mohaffezId':   currentUser.uid,
+        'mohaffezName': request['mohaffezName'] as String? ?? '',
+      });
+
+      final data = Map<String, dynamic>.from(result.data as Map);
+      if (data['success'] == true) {
+        if (mounted) Navigator.of(context).pop(); // dismiss loading dialog
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم قبول الجلسة بنجاح'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          ref.invalidate(
+            pendingRequestsFirstPageProvider(
+                request['mohaffezId'] as String),
+          );
+          context.go('/home');
+        }
+      } else {
+        throw Exception(data['message'] ?? 'فشل تأكيد الجلسة');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'خطأ في تأكيد الجلسة'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filter Chip Widget
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _FilterChip extends StatelessWidget {
   final String label;
@@ -490,7 +628,8 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppThemeConstants.primaryAmber : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -514,18 +653,19 @@ class _FilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
-            ),
+            Icon(icon,
+                size: 18,
+                color:
+                    isSelected ? Colors.white : Colors.grey.shade700),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                fontWeight:
+                    isSelected ? FontWeight.bold : FontWeight.normal,
+                color:
+                    isSelected ? Colors.white : Colors.grey.shade700,
               ),
             ),
           ],
@@ -534,6 +674,10 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending Request Card
+// ─────────────────────────────────────────────────────────────────────────────
 
 class PendingRequestCard extends ConsumerWidget {
   final Map<String, dynamic> request;
@@ -556,11 +700,11 @@ class PendingRequestCard extends ConsumerWidget {
     final sessionType = request['sessionType'] as String? ?? '';
     final location = request['location'] as String? ?? '';
 
-    // BUG-C FIX: Read bundle plan fields
     final planType = request['planType'] as String?;
     final sessionsCount = request['sessionsCount'] as int?;
     final planTitle = request['planTitle'] as String?;
-    final isBundlePlan = planType == 'bundle' || planType == 'subscription';
+    final isBundlePlan =
+        planType == 'bundle' || planType == 'subscription';
 
     DateTime? sessionDate;
     final dateField = request['sessionDate'] ?? request['slotDate'];
@@ -570,8 +714,12 @@ class PendingRequestCard extends ConsumerWidget {
         request['timeSlot'] as String? ??
         '';
 
-    final isAwaitingPayment = status == RequestStatus.awaitingPayment ||
+    final isAwaitingPayment = status == RequestStatus.awaitingPayment;
+    final isAwaitingDirectConfirm =
         status == RequestStatus.awaitingDirectPayment;
+    final isAnyPaymentState =
+        isAwaitingPayment || isAwaitingDirectConfirm;
+    final isConfirmed = status == RequestStatus.confirmed;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -579,9 +727,14 @@ class PendingRequestCard extends ConsumerWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color:
-              isAwaitingPayment ? Colors.orange.shade200 : Colors.grey.shade200,
-          width: isAwaitingPayment ? 2 : 1,
+          color: isConfirmed
+              ? Colors.green.shade200
+              : isAwaitingDirectConfirm
+                  ? Colors.blue.shade200
+                  : isAwaitingPayment
+                      ? Colors.orange.shade200
+                      : Colors.grey.shade200,
+          width: isConfirmed || isAnyPaymentState ? 2 : 1,
         ),
       ),
       child: Padding(
@@ -589,7 +742,7 @@ class PendingRequestCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with status badge
+            // ── Header with status badge ──────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -597,41 +750,72 @@ class PendingRequestCard extends ConsumerWidget {
                   child: Text(
                     studentName,
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isAwaitingPayment
-                        ? Colors.orange.withValues(alpha: 0.1)
-                        : Colors.grey.withValues(alpha: 0.1),
+                    color: isConfirmed
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : isAwaitingDirectConfirm
+                            ? Colors.blue.withValues(alpha: 0.1)
+                            : isAwaitingPayment
+                                ? Colors.orange.withValues(alpha: 0.1)
+                                : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isAwaitingPayment ? Colors.orange : Colors.grey,
+                      color: isConfirmed
+                          ? Colors.green
+                          : isAwaitingDirectConfirm
+                              ? Colors.blue
+                              : isAwaitingPayment
+                                  ? Colors.orange
+                                  : Colors.grey,
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isAwaitingPayment ? Icons.payment : Icons.pending,
+                        isConfirmed
+                            ? Icons.check_circle
+                            : isAwaitingDirectConfirm
+                                ? Icons.payments_outlined
+                                : isAwaitingPayment
+                                    ? Icons.payment
+                                    : Icons.pending,
                         size: 16,
-                        color: isAwaitingPayment ? Colors.orange : Colors.grey,
+                        color: isConfirmed
+                            ? Colors.green
+                            : isAwaitingDirectConfirm
+                                ? Colors.blue
+                                : isAwaitingPayment
+                                    ? Colors.orange
+                                    : Colors.grey,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isAwaitingPayment ? 'في انتظار الدفع' : 'قيد المراجعة',
+                        isConfirmed
+                            ? 'تم القبول'
+                            : isAwaitingDirectConfirm
+                                ? 'في انتظار تأكيد الدفع المباشر'
+                                : isAwaitingPayment
+                                    ? 'في انتظار الدفع'
+                                    : 'قيد المراجعة',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color:
-                              isAwaitingPayment ? Colors.orange : Colors.grey,
+                          color: isConfirmed
+                              ? Colors.green
+                              : isAwaitingDirectConfirm
+                                  ? Colors.blue
+                                  : isAwaitingPayment
+                                      ? Colors.orange
+                                      : Colors.grey,
                         ),
                       ),
                     ],
@@ -639,13 +823,15 @@ class PendingRequestCard extends ConsumerWidget {
                 ),
               ],
             ),
-            // Bundle/Subscription info row (replaces BUG-C FIX)
+
+            // ── Bundle/Subscription info row ──────────────────────────
             if (isBundlePlan) ...[
               const SizedBox(height: 6),
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: planType == 'subscription'
                           ? Colors.purple.shade50
@@ -694,9 +880,8 @@ class PendingRequestCard extends ConsumerWidget {
                         Text(
                           '${sessionsCount ?? 0} جلسة',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade700,
-                          ),
+                              fontSize: 11,
+                              color: Colors.grey.shade700),
                         ),
                       ],
                     ),
@@ -707,7 +892,8 @@ class PendingRequestCard extends ConsumerWidget {
 
             const SizedBox(height: 12),
 
-            if (status == RequestStatus.awaitingDirectPayment) ...[
+            // ── Direct-pay notice + quick-navigate button ─────────────
+            if (isAwaitingDirectConfirm) ...[
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
@@ -718,12 +904,14 @@ class PendingRequestCard extends ConsumerWidget {
                   border: Border.all(color: Colors.blue.shade300),
                 ),
                 child: const Row(children: [
-                  Icon(Icons.payments_outlined, color: Colors.blue, size: 18),
+                  Icon(Icons.payments_outlined,
+                      color: Colors.blue, size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'الطالب أرسل إشعار دفع مباشر — اذهب لـ "تأكيد المدفوعات" لقبوله أو رفضه',
-                      style: TextStyle(fontSize: 13, color: Colors.blue),
+                      'الطالب أرسل إشعار دفع مباشر — اذهب لـ \"تأكيد المدفوعات\" لقبوله أو رفضه',
+                      style:
+                          TextStyle(fontSize: 13, color: Colors.blue),
                     ),
                   ),
                 ]),
@@ -732,17 +920,25 @@ class PendingRequestCard extends ConsumerWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const DirectPaymentConfirmationsScreen(),
-                    ),
-                  ),
+                  onPressed: () {
+                    final dpId =
+                        request['directPaymentRequestId'] as String?;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            DirectPaymentConfirmationsScreen(
+                          directPaymentRequestId: dpId,
+                        ),
+                      ),
+                    );
+                  },
                   icon: const Icon(Icons.check_circle_outline,
                       color: Colors.white),
                   label: const Text('تأكيد الدفع المباشر',
                       style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade600,
                     shape: RoundedRectangleBorder(
@@ -752,7 +948,7 @@ class PendingRequestCard extends ConsumerWidget {
               ),
             ],
 
-            // Session details
+            // ── Session details ────────────────────────────────────────
             _buildDetailRow(
               ArabicLabels.type,
               ArabicLabels.getSessionTypeLabel(sessionType),
@@ -767,18 +963,14 @@ class PendingRequestCard extends ConsumerWidget {
             const SizedBox(height: 8),
 
             if (timeSlot.isNotEmpty)
-              _buildDetailRow(
-                ArabicLabels.time,
-                timeSlot,
-              ),
+              _buildDetailRow(ArabicLabels.time, timeSlot),
             const SizedBox(height: 8),
 
             if (location.isNotEmpty)
-              _buildDetailRow(
-                ArabicLabels.location,
-                location,
-              ),
-            if (request['paymentAmount'] != null) ...[
+              _buildDetailRow(ArabicLabels.location, location),
+
+            if (request['paymentAmount'] != null &&
+                (request['paymentAmount'] as num) > 0) ...[
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -802,10 +994,14 @@ class PendingRequestCard extends ConsumerWidget {
 
             const SizedBox(height: 16),
 
-            // Payment type info widget (BUG-C FIX)
             _buildPaymentTypeInfo(ref),
 
-            // Action buttons
+            const SizedBox(height: 8),
+            RequestPaymentTypeBadge(
+              requestData: request,
+            ),
+
+            // ── Action buttons ─────────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -817,8 +1013,7 @@ class PendingRequestCard extends ConsumerWidget {
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -827,20 +1022,23 @@ class PendingRequestCard extends ConsumerWidget {
                   child: ElevatedButton.icon(
                     onPressed: onAccept,
                     icon: Icon(
-                      isAwaitingPayment ? Icons.info_outline : Icons.check,
+                      isAnyPaymentState
+                          ? Icons.info_outline
+                          : Icons.check,
                       size: 18,
                     ),
                     label: Text(
-                      isAwaitingPayment ? 'التفاصيل' : ArabicLabels.accept,
+                      isAnyPaymentState ? 'التفاصيل' : ArabicLabels.accept,
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isAwaitingPayment
-                          ? Colors.orange
-                          : AppTheme.accentGreen,
+                      backgroundColor: isAwaitingDirectConfirm
+                          ? Colors.blue
+                          : isAwaitingPayment
+                              ? Colors.orange
+                              : AppTheme.accentGreen,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -857,11 +1055,9 @@ class PendingRequestCard extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontSize: 14),
-          ),
+          child: Text(value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 14)),
         ),
         const SizedBox(width: 8),
         Text(
@@ -869,10 +1065,9 @@ class PendingRequestCard extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-          ),
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey),
         ),
       ],
     );
@@ -881,71 +1076,89 @@ class PendingRequestCard extends ConsumerWidget {
   DateTime? _asDateTime(dynamic value) {
     if (value is DateTime) return value;
     try {
-      final dynamic dynamicValue = value;
-      final maybeDate = dynamicValue?.toDate();
+      final maybeDate = (value as dynamic)?.toDate();
       return maybeDate is DateTime ? maybeDate : null;
     } catch (_) {
       return null;
     }
   }
 
-  // BUG-C FIX: Widget to display payment type info (bundle vs direct)
   Widget _buildPaymentTypeInfo(WidgetRef ref) {
-    // Get paymentType and subscriptionId from request
     final paymentType = request['paymentType'] as String?;
     final subscriptionId = request['subscriptionId'] as String?;
-    final planType = request['planType'] as String?; // fallback from existing code
-    
-    // Check if it's a bundle/subscription
-    final isBundleOrSubscription = paymentType == 'bundle' || 
-        paymentType == 'subscription' || 
-        planType == 'bundle' || 
-        planType == 'subscription';
-    
-    if (isBundleOrSubscription && subscriptionId != null) {
-      // Use bundleByIdProvider for reactive updates
-      final bundleAsync = ref.watch(bundleByIdProvider(subscriptionId));
+    final planType = request['planType'] as String?;
 
-      return bundleAsync.when(
-        loading: () => const LinearProgressIndicator(),
-        error: (_, __) => const SizedBox.shrink(),
-        data: (bundle) {
-          if (bundle == null) return const SizedBox.shrink();
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.collections_bookmark_outlined, size: 18, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text(
-                      'نوع الحجز: باقة',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text('اسم الباقة: ${bundle.planTitle}'),
-                Text('الجلسات المتبقية: ${bundle.remainingSessions} / ${bundle.totalSessions}'),
-              ],
-            ),
-          );
-        },
-      );
+    final isBundleOrSubscription = paymentType == 'bundle' ||
+        paymentType == 'subscription' ||
+        planType == 'bundle' ||
+        planType == 'subscription';
+
+    if (isBundleOrSubscription) {
+      if (subscriptionId != null) {
+        final bundleAsync = ref.watch(bundleByIdProvider(subscriptionId));
+        return bundleAsync.when(
+          loading: () => const LinearProgressIndicator(),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (bundle) {
+            if (bundle == null) return const SizedBox.shrink();
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.collections_bookmark_outlined,
+                          size: 18, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text('نوع الحجز: باقة',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text('اسم الباقة: ${bundle.planTitle}'),
+                  Text(
+                      'الجلسات المتبقية: ${bundle.remainingSessions} / ${bundle.totalSessions}'),
+                ],
+              ),
+            );
+          },
+        );
+      } else {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.amber.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amber.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.card_membership,
+                  size: 18, color: Colors.amber.shade800),
+              const SizedBox(width: 8),
+              Text(
+                'نوع الحجز: باقة — في انتظار تأكيد الدفع المباشر',
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.amber.shade800),
+              ),
+            ],
+          ),
+        );
+      }
     }
-    
-    // Direct payment - show direct payment label
+
+    // Single direct payment (not a bundle)
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
@@ -961,9 +1174,7 @@ class PendingRequestCard extends ConsumerWidget {
           Text(
             'نوع الحجز: دفع مباشر',
             style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.blue,
-            ),
+                fontWeight: FontWeight.w600, color: Colors.blue),
           ),
         ],
       ),

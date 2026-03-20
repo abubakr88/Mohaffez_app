@@ -39,10 +39,10 @@ extension BookingPaymentMethodValue on BookingPaymentMethod {
         return 'free_session';
       case BookingPaymentMethod.directPayment:
         // ── FIX: CF checks selectedPaymentMethod === 'directpayment'
-        //    (no underscore). The previous value 'direct_payment' never
-        //    matched, so createSessionRequest always wrote status: 'pending'
-        //    instead of 'awaitingpayment', forcing the orphan-recovery path
-        //    on every single direct-payment booking.
+        // (no underscore). The previous value 'direct_payment' never
+        // matched, so createSessionRequest always wrote status: 'pending'
+        // instead of 'awaitingpayment', forcing the orphan-recovery path
+        // on every single direct-payment booking.
         return 'directpayment'; // ← was: 'direct_payment'
     }
   }
@@ -257,8 +257,10 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
 
       return result;
     } catch (e, stack) {
-      if (kDebugMode) debugPrint('❌ [createSessionRequest] Unexpected error: $e');
-      if (kDebugMode) debugPrintStack(stackTrace: stack);
+      if (kDebugMode) {
+        debugPrint('❌ [createSessionRequest] Unexpected error: $e');
+        debugPrintStack(stackTrace: stack);
+      }
       state = state.copyWith(
         isSubmitting: false,
         isSuccess: false,
@@ -316,8 +318,8 @@ class BookingService {
       if (kDebugMode) {
         debugPrint(
             '❌ [$flowLabel] Failed to refresh Firebase ID token: $e');
+        debugPrintStack(stackTrace: stack);
       }
-      if (kDebugMode) debugPrintStack(stackTrace: stack);
       return 'تعذر التحقق من تسجيل الدخول. تحقق من الاتصال ثم حاول مرة أخرى';
     }
   }
@@ -629,7 +631,9 @@ class BookingService {
               e.message ?? 'لا يمكن إتمام الحجز. الرجاء المحاولة مرة أخرى';
           break;
         case 'resource-exhausted':
-          errorMessage = 'هذا الموعد محجوز بالفعل. الرجاء اختيار موعد آخر';
+          errorMessage = (e.message != null && e.message!.isNotEmpty)
+              ? e.message!
+              : 'هذا الموعد محجوز بالفعل. الرجاء اختيار موعد آخر';
           break;
         case 'deadline-exceeded':
           errorMessage = 'انتهت مهلة الطلب. حاول مرة أخرى';
@@ -792,7 +796,7 @@ class BookingService {
             final availSnap = await transaction.get(availRef);
             if (availSnap.exists) {
               final availData =
-                  availSnap.data() as Map<String, dynamic>?;
+                  availSnap.data();
               if (availData != null) {
                 final updated = _computeRestoredSlots(
                     availData, timeSlot, sessionType);
@@ -837,22 +841,27 @@ class BookingService {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   // ── BUG-5 FIX: Also strip en-dash (U+2013) and em-dash (U+2014) to match
-  //    the Cloud Function normalizeTimeSlot() behaviour. Without this, a slot
-  //    whose display label contains an en-dash could fail the equality check
-  //    during lock release or slot restore, leaving the slot disabled.
+  // the Cloud Function normalizeTimeSlot() behaviour. Without this, a slot
+  // whose display label contains an en-dash could fail the equality check
+  // during lock release or slot restore, leaving the slot disabled.
   String _normalizeTimeSlot(String raw) => raw
       .replaceAll(' ', '')
       .replaceAll('\u2013', '-') // en-dash → hyphen
       .replaceAll('\u2014', '-'); // em-dash → hyphen
 
-  Future<DocumentReference?> _findAvailabilityRefTransaction({
+  // FIX Bug 1: Was using `slotDateObj.weekday == 7 ? 7 : slotDateObj.weekday + 1`
+  // which shifted Mon→2, Tue→3 ... Sat→7, Sun→7 — making Sunday and Saturday
+  // indistinguishable and shifting every other day by +1.
+  // Every other place in the codebase (SessionRepository, SessionActionsNotifier)
+  // uses `.weekday` directly. This mismatch meant student cancellations silently
+  // failed to restore the availability slot for any day Mon–Sat.
+  Future<DocumentReference<Map<String, dynamic>>?> _findAvailabilityRefTransaction({
     required Transaction transaction,
     required String mohaffezId,
     required Timestamp slotDate,
   }) async {
     final slotDateObj = slotDate.toDate();
-    final dayOfWeek =
-        slotDateObj.weekday == 7 ? 7 : slotDateObj.weekday + 1;
+    final dayOfWeek = slotDateObj.weekday; // FIX: was weekday == 7 ? 7 : weekday + 1
 
     final availQuery = _firestore
         .collection('users')
@@ -871,9 +880,8 @@ class BookingService {
     String timeSlot,
     String sessionType,
   ) {
-    final timeSlots =
-        List<Map<String, dynamic>>.from(
-            availabilityData['timeSlots'] ?? []);
+    final timeSlots = List<Map<String, dynamic>>.from(
+        availabilityData['timeSlots'] ?? []);
     final normalizedSelected = _normalizeTimeSlot(timeSlot);
     var restored = false;
     for (final slot in timeSlots) {
@@ -909,7 +917,7 @@ class BookingService {
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) {
               final data = doc.data();
-              return <String, dynamic>{...data, 'id': doc.id};
+              return {...data, 'id': doc.id};
             }).toList());
   }
 

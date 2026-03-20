@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../models/direct_payment_model.dart';
@@ -40,20 +41,17 @@ class DirectPaymentService {
   // WHY: Called when student claims to have paid via direct payment method.
   // BUG-12 FIX: Now forwards bundle plan info (planType, planId, sessionsCount, validityDays)
   // to backend CF so mohaffez knows this is a bundle payment.
-  // BUG-A FIX: Made requestId and slot fields nullable for bundle purchases
+  // BUG-A FIX: Slot fields nullable for bundle purchases
   static Future<Map<String, dynamic>> studentMarkPaid({
-    // BUG-A FIX: Made nullable for bundle purchases
-    String? requestId,
+    required String requestId,
     required String mohaffezId,
     required String mohaffezName,
     required String studentName,
-    // BUG-A FIX: Added studentEmail and studentPhone
     String studentEmail = '',
     String studentPhone = '',
     required double amount,
     required String sessionType,
     required String preferredTimeSlot,
-    // BUG-A FIX: Made nullable for bundle purchases
     DateTime? slotDate,
     DateTime? slotStart,
     DateTime? slotEnd,
@@ -63,14 +61,19 @@ class DirectPaymentService {
     double? imamAddressLat,
     double? imamAddressLng,
     String? mohaffezPhone,
-    // BUG-12 FIX: Bundle plan fields
-    // BUG-A FIX: Added planTitle
     String? planType,
     String? planId,
     String? planTitle,
     int? sessionsCount,
     int? validityDays,
   }) async {
+    assert(requestId.isNotEmpty, 'requestId must not be empty');
+    if (kDebugMode) {
+      debugPrint('🔵 [DirectPaymentService] studentMarkPaid: '
+          'requestId=$requestId, mohaffezId=$mohaffezId, '
+          'planType=$planType, planId=$planId, sessionsCount=$sessionsCount');
+    }
+
     try {
       final result = await _functions
           .httpsCallable(
@@ -78,39 +81,48 @@ class DirectPaymentService {
             options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
           )
           .call({
-        if (requestId != null)   'requestId': requestId,
-        'mohaffezId':         mohaffezId,
-        'mohaffezName':       mohaffezName,
-        'studentName':        studentName,
-        if (studentEmail.isNotEmpty) 'studentEmail': studentEmail,
-        if (studentPhone.isNotEmpty) 'studentPhone': studentPhone,
-        'amount':             amount,
-        'sessionType':        sessionType,
-        'preferredTimeSlot':  preferredTimeSlot,
-        if (slotDate != null)         'slotDate': slotDate!.toIso8601String(),
-        if (slotStart != null)        'slotStart': slotStart!.toIso8601String(),
-        if (slotEnd != null)          'slotEnd': slotEnd!.toIso8601String(),
-        'paymentMethod':      paymentMethod,
-        if (studentNote != null)    'studentNote':    studentNote,
-        if (imamAddressText != null) 'imamAddressText': imamAddressText,
-        if (imamAddressLat != null)  'imamAddressLat':  imamAddressLat,
-        if (imamAddressLng != null)  'imamAddressLng':  imamAddressLng,
-        if (mohaffezPhone != null)   'mohaffezPhone':   mohaffezPhone,
-        // BUG-12 FIX: Forward bundle plan fields to backend
-        if (planType != null)       'planType': planType,
-        if (planId != null)          'planId': planId,
-        if (planTitle != null)        'planTitle': planTitle,
-        if (sessionsCount != null)   'sessionsCount': sessionsCount,
-        if (validityDays != null)     'validityDays': validityDays,
+        'requestId':                 requestId,
+        'mohaffezId':                 mohaffezId,
+        'mohaffezName':               mohaffezName,
+        'studentName':                studentName,
+        if (studentEmail.isNotEmpty)  'studentEmail': studentEmail,
+        if (studentPhone.isNotEmpty)  'studentPhone': studentPhone,
+        'amount':                     amount,
+        'sessionType':                sessionType,
+        'preferredTimeSlot':          preferredTimeSlot,
+        if (slotDate != null)         'slotDate': slotDate.toIso8601String(),
+        if (slotStart != null)        'slotStart': slotStart.toIso8601String(),
+        if (slotEnd != null)          'slotEnd': slotEnd.toIso8601String(),
+        'paymentMethod':              paymentMethod,
+        if (studentNote != null)      'studentNote':    studentNote,
+        if (imamAddressText != null)  'imamAddressText': imamAddressText,
+        if (imamAddressLat != null)   'imamAddressLat':  imamAddressLat,
+        if (imamAddressLng != null)   'imamAddressLng':  imamAddressLng,
+        if (mohaffezPhone != null)    'mohaffezPhone':   mohaffezPhone,
+        if (planType != null)         'planType':        planType,
+        if (planId != null)           'planId':          planId,
+        if (planTitle != null)        'planTitle':       planTitle,
+        if (sessionsCount != null)    'sessionsCount':   sessionsCount,
+        if (validityDays != null)     'validityDays':    validityDays,
       });
+
+      if (kDebugMode) {
+        debugPrint('✅ [DirectPaymentService] studentMarkPaid returned: '
+            '${result.data}');
+      }
+
       return Map<String, dynamic>.from(result.data as Map);
     } on FirebaseFunctionsException catch (e) {
-      // Idempotent success — already submitted
+      if (kDebugMode) {
+        debugPrint('❌ [DirectPaymentService] studentMarkPaid error: '
+            'code=${e.code}, message=${e.message}');
+      }
+      // Idempotent — already submitted, treat as success
       if (e.code == 'already-exists') {
         try {
           final msg = e.message ?? '{}';
           final parsed = Map<String, dynamic>.from(
-            (msg.startsWith('{')) ? _parseJson(msg) : {'success': true},
+            msg.startsWith('{') ? _parseJson(msg) : {'success': true},
           );
           return parsed;
         } catch (_) {
@@ -121,18 +133,28 @@ class DirectPaymentService {
     }
   }
 
-  // ── Mohaffez: confirm payment received ───────────────────────────────────
+  // ── Mohaffez: confirm single-session payment received ────────────────────
+// lib/services/directpaymentservice.dart
+
   static Future<Map<String, dynamic>> mohaffezConfirm(
       String directPaymentRequestId) async {
     try {
-      final result = await _functions
+      final result = await FirebaseFunctions.instance  // ✅ no underscore
           .httpsCallable(
             'mohaffezConfirmDirectPayment',
             options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
           )
-          .call({'directPaymentRequestId': directPaymentRequestId});
-      return Map<String, dynamic>.from(result.data as Map);
+          .call(directPaymentRequestId);
+
+      if (result.data is Map) {
+        return Map<String, dynamic>.from(result.data as Map);
+      }
+      return {'success': true};
+
     } on FirebaseFunctionsException catch (e) {
+      if (kDebugMode) {
+        debugPrint('DirectPaymentService mohaffezConfirm: code=${e.code}, message=${e.message}');
+      }
       if (e.code == 'already-exists') {
         return {'success': true, 'message': e.message};
       }
@@ -140,14 +162,29 @@ class DirectPaymentService {
     }
   }
 
-    // WHY: Called when mohaffez confirms a bundle/subscription payment.
-    // BUG-2+3 FIX: Creates a subscription instead of a single session.
+
+  // ── Mohaffez: confirm bundle/subscription payment ────────────────────────
+  // WHY: CF reads ALL plan/slot/student fields directly from the
+  // directPaymentRequests doc — the client only passes the paymentId.
+  // This prevents the mohaffez from manipulating plan data on confirmation.
   static Future<void> mohaffezConfirmBundlePayment({
     required String paymentId,
   }) async {
-    final callable = FirebaseFunctions.instance
-        .httpsCallable('confirmBundleDirectPayment');
-    await callable.call({'paymentId': paymentId});
+    try {
+      await _functions
+          .httpsCallable(
+            'confirmBundleDirectPayment',
+            options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+          )
+          .call({'paymentId': paymentId});
+    } on FirebaseFunctionsException catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ [DirectPaymentService] mohaffezConfirmBundlePayment: '
+            'code=${e.code}, message=${e.message}');
+      }
+      if (e.code == 'already-exists') return; // idempotent — already confirmed
+      rethrow;
+    }
   }
 
   // ── Mohaffez: reject payment ─────────────────────────────────────────────
@@ -169,7 +206,7 @@ class DirectPaymentService {
     }
   }
 
-  // ── Stream pending confirmations for mohaffez ────────────────────────────
+  // ── Stream: pending confirmations for mohaffez ───────────────────────────
   static Stream<List<DirectPaymentModel>> watchPendingConfirmations(
       String mohaffezId) {
     return _db
@@ -183,7 +220,17 @@ class DirectPaymentService {
             s.docs.map((d) => DirectPaymentModel.fromFirestore(d)).toList());
   }
 
-  // ── Stream weekly commission summaries for mohaffez ──────────────────────
+  // ── Stream: single direct payment request by ID ──────────────────────────
+  static Stream<DirectPaymentModel?> watchDirectPayment(
+      String directPaymentRequestId) {
+    return _db
+        .collection('directPaymentRequests')
+        .doc(directPaymentRequestId)
+        .snapshots()
+        .map((s) => s.exists ? DirectPaymentModel.fromFirestore(s) : null);
+  }
+
+  // ── Stream: weekly commission summaries for mohaffez ─────────────────────
   static Stream<List<WeeklyCommissionSummary>> watchCommissions(
       String mohaffezId) {
     return _db
@@ -197,7 +244,7 @@ class DirectPaymentService {
             .toList());
   }
 
-  // ── Stream ALL commission summaries (admin view) ─────────────────────────
+  // ── Stream: ALL commission summaries (admin view) ─────────────────────────
   static Stream<List<WeeklyCommissionSummary>> watchAllCommissions() {
     return _db
         .collection('weeklyCommissionSummaries')
@@ -209,18 +256,15 @@ class DirectPaymentService {
             .toList());
   }
 
-  // ── Fetch admin wallet numbers ─────────────────────────────────────────────
+  // ── Fetch admin wallet numbers ────────────────────────────────────────────
   static Future<Map<String, String?>> getAdminWalletNumbers() async {
-    final doc = await _db
-        .collection('systemConfig')
-        .doc('global')
-        .get();
+    final doc = await _db.collection('systemConfig').doc('global').get();
     final data = doc.data() ?? {};
     final wallets = data['adminWallets'] as Map<String, dynamic>? ?? {};
     return {
-      'instapay': wallets['instapay'] as String?,
+      'instapay':     wallets['instapay']     as String?,
       'vodafonecash': wallets['vodafonecash'] as String?,
-      'orangemoney': wallets['orangemoney'] as String?,
+      'orangemoney':  wallets['orangemoney']  as String?,
     };
   }
 
@@ -232,35 +276,34 @@ class DirectPaymentService {
     required double amount,
     String? note,
   }) async {
-    final batch = FirebaseFirestore.instance.batch();
+    final batch = _db.batch();
 
     // 1. Update summary status → awaiting_confirmation
-    final summaryRef = FirebaseFirestore.instance
-        .collection('weeklyCommissionSummaries')
-        .doc(summaryId);
+    final summaryRef =
+        _db.collection('weeklyCommissionSummaries').doc(summaryId);
     batch.update(summaryRef, {
-      'status': 'awaiting_confirmation',
+      'status':           'awaiting_confirmation',
       'paymentClaimedAt': FieldValue.serverTimestamp(),
       'paymentClaimedBy': mohaffezId,
-      'paymentNote': note,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'paymentNote':      note,
+      'updatedAt':        FieldValue.serverTimestamp(),
     });
 
-    // 2. Send notification to admin
-    final notifRef = FirebaseFirestore.instance.collection('notifications').doc();
+    // 2. Notify admin
+    final notifRef = _db.collection('notifications').doc();
     batch.set(notifRef, {
-      'type': 'commission_payment_claimed',
-      'userId': 'admin',
-      'senderId': mohaffezId,
-      'title': 'طلب تأكيد عمولة',
-      'body': '$mohaffezName أرسل دفعة بقيمة ${amount.toStringAsFixed(2)} ج.م',
-      'isRead': false,
-      'highPriority': true,
+      'type':          'commission_payment_claimed',
+      'userId':        'admin',
+      'senderId':      mohaffezId,
+      'title':         'طلب تأكيد عمولة',
+      'body':          '$mohaffezName أرسل دفعة بقيمة ${amount.toStringAsFixed(2)} ج.م',
+      'isRead':        false,
+      'highPriority':  true,
       'data': {
         'weeklyCommissionSummaryId': summaryId,
-        'mohaffezId': mohaffezId,
-        'amount': amount.toString(),
-        'note': note,
+        'mohaffezId':                mohaffezId,
+        'amount':                    amount.toString(),
+        'note':                      note,
       },
       'createdAt': FieldValue.serverTimestamp(),
     });
@@ -269,8 +312,8 @@ class DirectPaymentService {
   }
 
   // ── Simple JSON parser for error messages ────────────────────────────────
+  // Minimal: handles {"success":true,"message":"..."} only
   static Map<String, dynamic> _parseJson(String s) {
-    // Minimal: handles {"success":true,"message":"..."} only
     final result = <String, dynamic>{};
     final clean = s.replaceAll('{', '').replaceAll('}', '').trim();
     for (final pair in clean.split(',')) {
@@ -280,11 +323,8 @@ class DirectPaymentService {
         final val = kv.sublist(1).join(':').trim().replaceAll('"', '');
         if (val == 'true') {
           result[key] = true;
-        } else if (val == 'false') {
-          result[key] = false;
-        } else {
-          result[key] = val;
-        }
+        } else if (val == 'false') result[key] = false;
+        else                     result[key] = val;
       }
     }
     return result;

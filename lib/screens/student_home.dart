@@ -1,15 +1,21 @@
-// FILE: lib/screens/student_home.dart
+// lib/screens/student_home.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+
+import '../models/subscription_model.dart';
+import '../providers/payment_provider.dart';
+import '../providers/session_provider_paginated.dart';
+import '../providers/user_provider.dart';
+import '../services/app_version_service.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../providers/user_provider.dart';
-import '../providers/session_provider_paginated.dart';
-import '../services/app_version_service.dart';
 
+// ============================================================
+// ROOT ENTRY POINT
+// ============================================================
 class StudentHome extends ConsumerStatefulWidget {
   const StudentHome({super.key});
 
@@ -22,21 +28,18 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        AppVersionService.checkOnStartup(context);
-      }
+      if (mounted) AppVersionService.checkOnStartup(context);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
-
     return userAsync.when(
       data: (user) {
         if (user == null) {
           return const Scaffold(
-            body: Center(child: Text('لم يتم العثور على بيانات المستخدم')),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
         return StudentHomeContent(studentId: user.uid);
@@ -53,9 +56,11 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
   }
 }
 
+// ============================================================
+// MAIN CONTENT
+// ============================================================
 class StudentHomeContent extends ConsumerWidget {
   final String studentId;
-
   const StudentHomeContent({super.key, required this.studentId});
 
   @override
@@ -65,10 +70,13 @@ class StudentHomeContent extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: AppThemeConstants.backgroundLight,
         body: RefreshIndicator(
+          displacement: 20,
+          color: AppThemeConstants.primaryAmber,
           onRefresh: () async {
             ref.invalidate(currentUserProvider);
             ref.invalidate(studentSessionsFirstPageProvider(studentId));
             ref.invalidate(studentRequestsFirstPageProvider(studentId));
+            ref.invalidate(activeSubscriptionsProvider(studentId));
             await ref
                 .read(studentSessionsFirstPageProvider(studentId).future)
                 .catchError((_) => <Map<String, dynamic>>[]);
@@ -76,31 +84,21 @@ class StudentHomeContent extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // Modern App Bar
               _buildAppBar(context, ref),
-
-              // Content
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // Welcome Message Card
                     _buildWelcomeCard(ref),
                     const SizedBox(height: 20),
-
-                    // Quick Stats
                     QuickStatsSection(studentId: studentId),
-
                     Spacing.vLg,
-
-                    // Quick Actions - UPDATED WITH CLEAR SEPARATION
+                    // ── NEW: Bundle strip (hidden when empty) ──────────────
+                    BundleStripSection(studentId: studentId),
+                    // ── Quick Actions ──────────────────────────────────────
                     QuickActionsSection(studentId: studentId),
-
                     Spacing.vLg,
-
-                    // Recent Assignments Preview
                     RecentAssignmentsSection(studentId: studentId),
-
                     const SizedBox(height: 32),
                   ]),
                 ),
@@ -112,14 +110,30 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
+  // ── APP BAR ─────────────────────────────────────────────────
   Widget _buildAppBar(BuildContext context, WidgetRef ref) {
+    final now = DateTime.now();
+    final dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    final monthNames = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    ];
+    final dateLabel =
+        '${dayNames[now.weekday % 7]}، ${now.day} ${monthNames[now.month - 1]}';
+
     return SliverAppBar(
       expandedHeight: 180,
       floating: false,
       pinned: true,
       elevation: 0,
       backgroundColor: AppThemeConstants.primaryAmber,
+      automaticallyImplyLeading: false,
+      systemOverlayStyle: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
       flexibleSpace: FlexibleSpaceBar(
+        collapseMode: CollapseMode.pin,
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -133,68 +147,98 @@ class StudentHomeContent extends ConsumerWidget {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
-                child: Column(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  // Logo row
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppThemeConstants.surfaceWhite
-                              .withValues(alpha: 0.2),
+                          color: Colors.white.withValues(alpha: 0.25),
                           borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
-                        child: const Icon(
-                          Icons.waving_hand,
-                          size: 28,
-                          color: AppThemeConstants.surfaceWhite,
+                        child: Image.asset(
+                          'assets/images/icon.png',
+                          height: 30,
+                          width: 30,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.school,
+                            color: Colors.white,
+                            size: 30,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Expanded(
+                      const SizedBox(width: 10),
+                      const Text(
+                        'المحفظ',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Date badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                         child: Text(
-                          'مرحباً بك',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: AppThemeConstants.surfaceWhite,
+                          dateLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final user = ref.watch(currentUserProvider).value;
-                      return Text(
-                        user?.name ?? 'طالب',
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: AppThemeConstants.surfaceWhite,
+                  const SizedBox(height: 16),
+                  // Decorative Quran verse hint
+                  Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                      );
-                    },
-                  ),
-                  Spacing.vSm,
-                  Text(
-                    DateFormat('EEEE، d MMMM yyyy', 'ar')
-                        .format(DateTime.now()),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'حافظوا على القرآن الكريم',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            'تتبّع جلساتك ومهامك بسهولة',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
-              ),
               ),
             ),
           ),
@@ -203,99 +247,149 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
+  // ── WELCOME CARD ─────────────────────────────────────────────
   Widget _buildWelcomeCard(WidgetRef ref) {
-    final now = DateTime.now();
-    final hour = now.hour;
-
-    String greeting;
-    IconData greetingIcon;
-
-    if (hour < 12) {
-      greeting = 'صباح الخير';
-      greetingIcon = Icons.wb_sunny;
-    } else if (hour < 17) {
-      greeting = 'مساء الخير';
-      greetingIcon = Icons.wb_cloudy;
+    final hour = DateTime.now().hour;
+    final String greeting;
+    final IconData greetIcon;
+    if (hour >= 5 && hour < 12) {
+      greeting = 'صباح الخير 🌤';
+      greetIcon = Icons.wb_sunny_outlined;
+    } else if (hour >= 12 && hour < 17) {
+      greeting = 'مساء الخير ☀️';
+      greetIcon = Icons.wb_twilight_outlined;
+    } else if (hour >= 17 && hour < 21) {
+      greeting = 'مساء النور 🌆';
+      greetIcon = Icons.nights_stay_outlined;
     } else {
-      greeting = 'مساء الخير';
-      greetingIcon = Icons.nights_stay;
+      greeting = 'تصبح على خير 🌙';
+      greetIcon = Icons.bedtime_outlined;
     }
 
-    return Card(
-      elevation: 0,
-      color: AppThemeConstants.surfaceWhite,
-      shape: const RoundedRectangleBorder(
-        borderRadius: AppThemeConstants.borderRadiusLg,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
-                borderRadius: AppThemeConstants.borderRadiusMd,
+    return Consumer(
+      builder: (context, ref, _) {
+        final user = ref.watch(currentUserProvider).value;
+        final firstName = user?.name.split(' ').first ?? 'الطالب';
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppThemeConstants.surfaceWhite,
+            borderRadius: AppThemeConstants.borderRadiusXl,
+            boxShadow: [
+              BoxShadow(
+                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(
-                greetingIcon,
-                size: 28,
-                color: AppThemeConstants.accentGreen,
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppThemeConstants.primaryAmber,
+                      AppThemeConstants.primaryAmberLight,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: AppThemeConstants.borderRadiusMd,
+                ),
+                child: Icon(greetIcon, color: Colors.white, size: 26),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    greeting,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      greeting,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      firstName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'استمر في رحلتك مع القرآن الكريم ✨',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Avatar circle
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      AppThemeConstants.primaryAmber,
+                      AppThemeConstants.primaryAmberLight,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    firstName.isNotEmpty ? firstName[0] : '؟',
                     style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppThemeConstants.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'ابدأ يومك بحفظ القرآن الكريم',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-// ========================================
+// ============================================================
 // QUICK STATS SECTION
-// ========================================
+// ============================================================
 class QuickStatsSection extends ConsumerWidget {
   final String studentId;
-
   const QuickStatsSection({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync =
-        ref.watch(studentSessionsFirstPageProvider(studentId));
-    final requestsAsync =
-        ref.watch(studentRequestsFirstPageProvider(studentId));
+    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
+    final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'إحصائياتك',
+          'نظرة سريعة',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppThemeConstants.textPrimary,
           ),
@@ -305,34 +399,33 @@ class QuickStatsSection extends ConsumerWidget {
           children: [
             Expanded(
               child: StatCard(
-                icon: Icons.event_available,
-                title: 'جلساتي',
+                icon: Icons.event_available_rounded,
+                title: 'الجلسات المكتملة',
                 value: sessionsAsync.when(
                   data: (sessions) => sessions
-                      .where((s) => (s['status']) == 'accepted')
+                      .where((s) {
+                        final st = (s['status'] as String?)?.toLowerCase();
+                        return st == 'accepted' || st == 'completed';
+                      })
                       .length
                       .toString(),
                   loading: () => '...',
                   error: (_, __) => '0',
                 ),
                 color: AppThemeConstants.accentGreen,
-                onTap: () {
-                  // Navigate to My Sessions screen (NEW)
-                  context.go('/my-sessions');
-                },
+                onTap: () => context.go('/my-sessions'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: StatCard(
-                icon: Icons.pending_actions,
-                title: 'الطلبات المعلقة',
+                icon: Icons.pending_actions_rounded,
+                title: 'الطلبات النشطة',
                 value: requestsAsync.when(
                   data: (requests) => requests
                       .where((r) {
-                        final status = (r['status'] as String?)?.toLowerCase();
-                        return status == 'pending' ||
-                            status == 'awaitingpayment';
+                        final st = (r['status'] as String?)?.toLowerCase();
+                        return st == 'pending' || st == 'awaitingpayment';
                       })
                       .length
                       .toString(),
@@ -340,9 +433,7 @@ class QuickStatsSection extends ConsumerWidget {
                   error: (_, __) => '0',
                 ),
                 color: Colors.orange,
-                onTap: () {
-                  context.go('/requests');
-                },
+                onTap: () => context.go('/requests'),
               ),
             ),
           ],
@@ -352,96 +443,279 @@ class QuickStatsSection extends ConsumerWidget {
   }
 }
 
-class StatCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final Color color;
-  final VoidCallback onTap;
+// ============================================================
+// BUNDLE STRIP SECTION  ── NEW ──
+// ============================================================
+class BundleStripSection extends ConsumerWidget {
+  final String studentId;
+  const BundleStripSection({super.key, required this.studentId});
 
-  const StatCard({super.key, 
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.color,
-    required this.onTap,
-  });
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subsAsync = ref.watch(activeSubscriptionsProvider(studentId));
+
+    return subsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (subs) {
+        if (subs.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Section Header ──────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color:
+                            AppThemeConstants.primaryAmber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.collections_bookmark_rounded,
+                        size: 16,
+                        color: AppThemeConstants.primaryAmber,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'باقاتك النشطة',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Count chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppThemeConstants.primaryAmber,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${subs.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () => context.push('/active-subscriptions'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppThemeConstants.primaryAmber,
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('عرض الكل',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      SizedBox(width: 2),
+                      Icon(Icons.arrow_back_ios_new_rounded, size: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // ── Horizontal scroll list ──────────────────────────
+            SizedBox(
+              height: 148,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(left: 2, right: 2, bottom: 4),
+                itemCount: subs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (_, i) => BundleStripCard(sub: subs[i]),
+              ),
+            ),
+            Spacing.vLg,
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ── Individual bundle card ─────────────────────────────────────
+class BundleStripCard extends StatelessWidget {
+  final SubscriptionModel sub;
+  const BundleStripCard({super.key, required this.sub});
+
+  Color get _progressColor {
+    final p = sub.progressPercentage;
+    if (p >= 0.5) return AppThemeConstants.accentGreen;
+    if (p >= 0.2) return const Color(0xFFFFA000);
+    return AppThemeConstants.error;
+  }
+
+  bool get _isUrgent => sub.remainingSessions <= 2;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: AppThemeConstants.surfaceWhite,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppThemeConstants.borderRadiusLg,
-        side: BorderSide(
-          color: color.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppThemeConstants.borderRadiusLg,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: AppThemeConstants.borderRadiusMd,
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 28,
-                      color: color,
-                    ),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: Colors.grey.shade400,
-                  ),
-                ],
-              ),
-              Spacing.vMd,
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+    return GestureDetector(
+      onTap: () => context.push('/active-subscriptions'),
+      child: Container(
+        width: 190,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.surfaceWhite,
+          borderRadius: AppThemeConstants.borderRadiusLg,
+          border: Border.all(
+            color: _isUrgent
+                ? AppThemeConstants.error.withValues(alpha: 0.5)
+                : _progressColor.withValues(alpha: 0.25),
+            width: _isUrgent ? 1.5 : 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: _progressColor.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header ──────────────────────────────────────────
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor:
+                      AppThemeConstants.primaryAmber.withValues(alpha: 0.15),
+                  child: Text(
+                    sub.mohaffezName.isNotEmpty ? sub.mohaffezName[0] : '؟',
+                    style: const TextStyle(
+                      color: AppThemeConstants.primaryAmber,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    sub.mohaffezName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeConstants.textPrimary,
+                    ),
+                  ),
+                ),
+                if (_isUrgent)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '⚠️',
+                      style: TextStyle(
+                          fontSize: 10, color: AppThemeConstants.error),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            // Plan title
+            Text(
+              sub.planTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            ),
+            const Spacer(),
+            // ── Progress bar ─────────────────────────────────────
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: sub.progressPercentage,
+                backgroundColor: Colors.grey.shade200,
+                valueColor: AlwaysStoppedAnimation<Color>(_progressColor),
+                minHeight: 6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // ── Sessions counter ─────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${sub.remainingSessions}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _progressColor,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '/${sub.totalSessions} جلسة',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Quick "book now" button
+                if (sub.canBookSession)
+                  GestureDetector(
+                    onTap: () =>
+                        context.push('/mohaffez/${sub.mohaffezId}'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppThemeConstants.primaryAmber,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'احجز',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ========================================
-// QUICK ACTIONS SECTION - UPDATED
-// ========================================
+// ============================================================
+// QUICK ACTIONS SECTION
+// ============================================================
 class QuickActionsSection extends StatelessWidget {
   final String studentId;
-
   const QuickActionsSection({super.key, required this.studentId});
 
   @override
@@ -452,7 +726,7 @@ class QuickActionsSection extends StatelessWidget {
         const Text(
           'الإجراءات السريعة',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppThemeConstants.textPrimary,
           ),
@@ -466,9 +740,8 @@ class QuickActionsSection extends StatelessWidget {
           crossAxisSpacing: 12,
           childAspectRatio: 1.5,
           children: [
-            // SEARCH FOR NEARBY MOHAFFEZ
             ActionCard(
-              icon: Icons.search,
+              icon: Icons.search_rounded,
               title: 'ابحث عن محفظ',
               gradient: const LinearGradient(
                 colors: [
@@ -478,14 +751,10 @@ class QuickActionsSection extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              onTap: () {
-                context.go('/nearby');
-              },
+              onTap: () => context.go('/nearby'),
             ),
-
-            // MY SESSIONS (NEW - Dedicated Screen)
             ActionCard(
-              icon: Icons.event_available,
+              icon: Icons.event_available_rounded,
               title: 'جلساتي',
               gradient: const LinearGradient(
                 colors: [
@@ -495,45 +764,27 @@ class QuickActionsSection extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              onTap: () {
-                // Navigate to dedicated My Sessions screen
-                context.go('/my-sessions');
-              },
+              onTap: () => context.go('/my-sessions'),
             ),
-
-            // MY ASSIGNMENTS (Existing - But clearer purpose)
             ActionCard(
-              icon: Icons.assignment,
+              icon: Icons.assignment_rounded,
               title: 'واجباتي',
               gradient: LinearGradient(
-                colors: [
-                  Colors.blue,
-                  Colors.blue.shade300,
-                ],
+                colors: [Colors.blue.shade600, Colors.blue.shade400],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              onTap: () {
-                context.go('/assignments');
-              },
+              onTap: () => context.go('/assignments'),
             ),
-
-            // MY SCHEDULE (NEW - Calendar View)
             ActionCard(
-              icon: Icons.calendar_today,
+              icon: Icons.calendar_month_rounded,
               title: 'الجدول الزمني',
               gradient: LinearGradient(
-                colors: [
-                  Colors.purple,
-                  Colors.purple.shade300,
-                ],
+                colors: [Colors.purple.shade600, Colors.purple.shade400],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              onTap: () {
-                // Navigate to dedicated Schedule screen
-                context.go('/my-schedule');
-              },
+              onTap: () => context.go('/my-schedule'),
             ),
           ],
         ),
@@ -542,66 +793,11 @@ class QuickActionsSection extends StatelessWidget {
   }
 }
 
-class ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Gradient gradient;
-  final VoidCallback onTap;
-
-  const ActionCard({super.key, 
-    required this.icon,
-    required this.title,
-    required this.gradient,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: const RoundedRectangleBorder(
-        borderRadius: AppThemeConstants.borderRadiusLg,
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppThemeConstants.borderRadiusLg,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: gradient,
-            borderRadius: AppThemeConstants.borderRadiusLg,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 40,
-                color: AppThemeConstants.surfaceWhite,
-              ),
-              Spacing.vSm,
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppThemeConstants.surfaceWhite,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ========================================
+// ============================================================
 // RECENT ASSIGNMENTS SECTION
-// ========================================
+// ============================================================
 class RecentAssignmentsSection extends ConsumerWidget {
   final String studentId;
-
   const RecentAssignmentsSection({super.key, required this.studentId});
 
   @override
@@ -618,17 +814,18 @@ class RecentAssignmentsSection extends ConsumerWidget {
             const Text(
               'آخر الواجبات',
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: AppThemeConstants.textPrimary,
               ),
             ),
             TextButton.icon(
-              onPressed: () {
-                context.go('/assignments');
-              },
-              icon: const Icon(Icons.arrow_forward, size: 18),
+              onPressed: () => context.go('/assignments'),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
               label: const Text('عرض الكل'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppThemeConstants.primaryAmber,
+              ),
             ),
           ],
         ),
@@ -643,26 +840,28 @@ class RecentAssignmentsSection extends ConsumerWidget {
                 .toList();
 
             if (assignments.isEmpty) {
-              return Card(
-                elevation: 0,
-                color: Colors.amber.shade50,
-                shape: const RoundedRectangleBorder(
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
                   borderRadius: AppThemeConstants.borderRadiusLg,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.amber.shade700),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'لا توجد واجبات جديدة حالياً',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
+                  border: Border.all(
+                    color: Colors.amber.shade200,
+                    width: 1,
                   ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        color: Colors.amber.shade700),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'لا توجد واجبات جديدة حالياً',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
@@ -672,82 +871,95 @@ class RecentAssignmentsSection extends ConsumerWidget {
                 final mohaffezName =
                     (session['mohaffezName'] as String?) ?? 'محفظ';
                 final hifz = (session['hifzAssignment'] as String?) ?? '';
-                final muraja = (session['murajaAssignment'] as String?) ?? '';
+                final muraja =
+                    (session['murajaAssignment'] as String?) ?? '';
                 final sessionDate = session['sessionDate'] as DateTime?;
 
-                return Card(
+                return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 0,
-                  color: AppThemeConstants.surfaceWhite,
-                  shape: RoundedRectangleBorder(
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.surfaceWhite,
                     borderRadius: AppThemeConstants.borderRadiusLg,
-                    side: BorderSide(
+                    border: Border.all(
                       color: Colors.grey.shade200,
                       width: 1,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: AppThemeConstants.borderRadiusLg,
+                    child: InkWell(
+                      onTap: () => context.go('/assignments'),
+                      borderRadius: AppThemeConstants.borderRadiusLg,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppThemeConstants.accentGreen
-                                    .withValues(alpha: 0.1),
-                                borderRadius: AppThemeConstants.borderRadiusSm,
-                              ),
-                              child: const Icon(
-                                Icons.person,
-                                size: 18,
-                                color: AppThemeConstants.accentGreen,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                mohaffezName,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            if (sessionDate != null)
-                              Flexible(
-                                child: Text(
-                                  '${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppThemeConstants.accentGreen
+                                        .withValues(alpha: 0.1),
+                                    borderRadius:
+                                        AppThemeConstants.borderRadiusSm,
+                                  ),
+                                  child: const Icon(
+                                    Icons.person_rounded,
+                                    size: 18,
+                                    color: AppThemeConstants.accentGreen,
                                   ),
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    mohaffezName,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppThemeConstants.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (sessionDate != null)
+                                  Text(
+                                    '${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              const Divider(height: 1),
+                              const SizedBox(height: 12),
+                              if (hifz.isNotEmpty)
+                                AssignmentRow(
+                                  label: 'حفظ',
+                                  text: hifz,
+                                  color: Colors.green.shade700,
+                                ),
+                              if (muraja.isNotEmpty)
+                                AssignmentRow(
+                                  label: 'مراجعة',
+                                  text: muraja,
+                                  color: Colors.blue.shade700,
+                                ),
+                            ],
                           ],
                         ),
-                        if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          const Divider(height: 1),
-                          const SizedBox(height: 12),
-                          if (hifz.isNotEmpty)
-                            AssignmentRow(
-                              label: 'حفظ',
-                              text: hifz,
-                              color: Colors.green,
-                            ),
-                          if (muraja.isNotEmpty)
-                            AssignmentRow(
-                              label: 'مراجعة',
-                              text: muraja,
-                              color: Colors.blue,
-                            ),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -760,27 +972,164 @@ class RecentAssignmentsSection extends ConsumerWidget {
               child: CircularProgressIndicator(),
             ),
           ),
-          error: (e, _) => Card(
-            elevation: 0,
-            color: Colors.red.shade50,
-            shape: const RoundedRectangleBorder(
+          error: (e, _) => Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
               borderRadius: AppThemeConstants.borderRadiusLg,
+              border: Border.all(color: Colors.red.shade200),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red.shade700),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text('حدث خطأ أثناء تحميل البيانات'),
-                  ),
-                ],
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade700),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('حدث خطأ أثناء تحميل البيانات'),
+                ),
+              ],
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+// ============================================================
+// SHARED HELPER WIDGETS
+// ============================================================
+class StatCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+  final VoidCallback onTap;
+
+  const StatCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppThemeConstants.surfaceWhite,
+      borderRadius: AppThemeConstants.borderRadiusLg,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppThemeConstants.borderRadiusLg,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: AppThemeConstants.borderRadiusLg,
+            border: Border.all(
+              color: color.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: AppThemeConstants.borderRadiusMd,
+                    ),
+                    child: Icon(icon, size: 24, color: color),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: Colors.grey.shade400,
+                  ),
+                ],
+              ),
+              Spacing.vMd,
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Gradient gradient;
+  final VoidCallback onTap;
+
+  const ActionCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      borderRadius: AppThemeConstants.borderRadiusLg,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppThemeConstants.borderRadiusLg,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: gradient,
+            borderRadius: AppThemeConstants.borderRadiusLg,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 36, color: Colors.white),
+              Spacing.vSm,
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -790,7 +1139,8 @@ class AssignmentRow extends StatelessWidget {
   final String text;
   final Color color;
 
-  const AssignmentRow({super.key, 
+  const AssignmentRow({
+    super.key,
     required this.label,
     required this.text,
     required this.color,
@@ -804,7 +1154,8 @@ class AssignmentRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
@@ -826,10 +1177,7 @@ class AssignmentRow extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 14,
-                height: 1.4,
-              ),
+              style: const TextStyle(fontSize: 13, height: 1.4),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

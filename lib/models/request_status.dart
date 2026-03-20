@@ -7,6 +7,7 @@ abstract class RequestStatus {
   static const String awaitingPayment = 'awaitingpayment';          // lowercase!
   static const String awaitingDirectPayment = 'awaitingdirectpaymentconfirmation';
   static const String accepted = 'accepted';
+  static const String confirmed = 'confirmed';  // non-canonical, for legacy poisoned docs
   static const String rejected = 'rejected';
   static const String cancelled = 'cancelled';
 
@@ -15,6 +16,16 @@ abstract class RequestStatus {
     pending,
     awaitingPayment,
     awaitingDirectPayment,
+  ];
+
+  /// All statuses NOT visible to the teacher in the pending inbox (i.e., completed/closed states)
+  /// This is used with whereNotIn query for defensive handling of legacy poisoned docs
+  static const List<String> teacherInboxExcluded = [
+    accepted,
+    confirmed,
+    rejected,
+    cancelled,
+    'expired',
   ];
 
   /// All statuses visible to the student in their requests list

@@ -19,7 +19,7 @@ enum UpcomingFilter {
   thisMonth,
 }
 
-final upcomingSessionsFilterProvider = StateProvider((ref) {
+final upcomingSessionsFilterProvider = StateProvider<UpcomingFilter>((ref) {
   return UpcomingFilter.all;
 });
 
@@ -59,31 +59,35 @@ final acceptedStudentSessionsProvider =
         .orderBy('sessionDate', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'mohaffezName': data['mohaffezName'] as String? ?? '',
-          'location': data['location'] as String? ??
-              data['imamAddressText'] as String? ??
-              '',
-          'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-              data['timeSlot'] as String? ??
-              '08:00',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
-          'hifzAssignment': data['hifzAssignment'] as String?,
-          'murajaAssignment': data['murajaAssignment'] as String?,
-          'sessionRating': data['sessionRating'] as int? ?? 0,
-          'sessionNotes': data['sessionNotes'] as String?,
-          'status': data['status'] as String? ?? 'accepted',
-          'createdAt': data['createdAt'] as Timestamp?,
-          'mohaffezId': data['mohaffezId'] as String? ?? '',
-          'studentId': data['studentId'] as String? ?? '',
-          'studentName': data['studentName'] as String? ?? '',
-          'isPaid': data['isPaid'] as bool? ?? false,
-        };
-      }).toList();
+      final seen = <String>{};
+      return snapshot.docs
+          .where((doc) => seen.add(doc.id))
+          .map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'mohaffezName': data['mohaffezName'] as String? ?? '',
+              'location': data['location'] as String? ??
+                  data['imamAddressText'] as String? ??
+                  '',
+              'sessionType': data['sessionType'] as String? ?? '',
+              'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+                  data['timeSlot'] as String? ??
+                  '08:00',
+              'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+              'hifzAssignment': data['hifzAssignment'] as String?,
+              'murajaAssignment': data['murajaAssignment'] as String?,
+              'sessionRating': data['sessionRating'] as int? ?? 0,
+              'sessionNotes': data['sessionNotes'] as String?,
+              'status': data['status'] as String? ?? 'accepted',
+              'createdAt': data['createdAt'] as Timestamp?,
+              'mohaffezId': data['mohaffezId'] as String? ?? '',
+              'studentId': data['studentId'] as String? ?? '',
+              'studentName': data['studentName'] as String? ?? '',
+              'isPaid': data['isPaid'] as bool? ?? false,
+            };
+          })
+          .toList();
     });
   },
 );
@@ -173,11 +177,15 @@ final filteredUpcomingSessionsProvider =
         switch (filter) {
           case UpcomingFilter.all:
             return sessions;
+          // BUG FIX #4: Use start-of-next-period as exclusive upper bound.
+          // The original used DateTime(..., 23, 59, 59) which silently drops
+          // sessions scheduled in the last millisecond of the period.
           case UpcomingFilter.today:
-            final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+            final startOfTomorrow =
+                DateTime(now.year, now.month, now.day + 1);
             return sessions.where((session) {
               final date = session['sessionDate'] as DateTime?;
-              return date != null && date.isBefore(endOfDay);
+              return date != null && date.isBefore(startOfTomorrow);
             }).toList();
           case UpcomingFilter.thisWeek:
             final endOfWeek = now.add(const Duration(days: 7));
@@ -186,10 +194,12 @@ final filteredUpcomingSessionsProvider =
               return date != null && date.isBefore(endOfWeek);
             }).toList();
           case UpcomingFilter.thisMonth:
-            final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+            // BUG FIX #4: Use start of next month as exclusive bound.
+            final startOfNextMonth =
+                DateTime(now.year, now.month + 1, 1);
             return sessions.where((session) {
               final date = session['sessionDate'] as DateTime?;
-              return date != null && date.isBefore(endOfMonth);
+              return date != null && date.isBefore(startOfNextMonth);
             }).toList();
         }
       },
@@ -294,7 +304,7 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
     if (state.isLoadingMore || !state.hasMore) return;
     state = state.copyWith(isLoadingMore: true, error: null);
     try {
-      Query query = FirebaseFirestore.instance
+      Query<Map<String, dynamic>> query = FirebaseFirestore.instance
           .collection('hafizSessions')
           .where('mohaffezId', isEqualTo: mohaffezId)
           .where('status', isEqualTo: 'completed')
@@ -312,7 +322,7 @@ class CompletedSessionsNotifier extends StateNotifier<CompletedSessionsState> {
       }
 
       final newSessions = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         return {
           'id': doc.id,
           'studentName': data['studentName'] as String? ?? '',
@@ -423,7 +433,7 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
     if (state.isLoadingMore || !state.hasMore) return;
     state = state.copyWith(isLoadingMore: true, error: null);
     try {
-      Query query = FirebaseFirestore.instance
+      Query<Map<String, dynamic>> query = FirebaseFirestore.instance
           .collection('hafizSessions')
           .where('studentId', isEqualTo: studentId)
           .orderBy('sessionDate', descending: true)
@@ -440,7 +450,7 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
       }
 
       final newSessions = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         return {
           'id': doc.id,
           'mohaffezName': data['mohaffezName'] as String? ?? '',
@@ -555,49 +565,47 @@ final studentSessionsFirstPageProvider =
   },
 );
 
+// FIX Bug 1: Was hardcoding 4 statuses and missing 'rejected' and 'cancelled'.
+// Students could never see their rejected or cancelled requests.
+// Now uses RequestStatus.studentVisible as the single source of truth.
+// ─── studentRequestsFirstPageProvider ── FIXED ─────────────────
 final studentRequestsFirstPageProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, studentId) {
-    return FirebaseFirestore.instance
-        .collection('sessionRequests')
-        .where('studentId', isEqualTo: studentId)
-        .where('status', whereIn: const [
-          'pending',
-          'awaitingpayment',
-          'awaitingdirectpaymentconfirmation',
-          'accepted',
-        ])
-        .orderBy('createdAt', descending: true)
-        .limit(20)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'mohaffezName': data['mohaffezName'] as String? ?? '',
-          'mohaffezId': data['mohaffezId'] as String?,
-          'sessionType': data['sessionType'] as String? ?? '',
-          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-              data['timeSlot'] as String? ??
-              '08:00',
-          'status': data['status'] as String? ?? 'pending',
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
-          'slotDate': data['slotDate'] as Timestamp?,
-          'paymentDeadline': data['paymentDeadline'] as Timestamp?,
-          'reminderSent': data['reminderSent'] as bool? ?? false,
-          'slotLockId': data['slotLockId'] as String?,
-          'imamAddressText': data['imamAddressText'] as String?,
-          'location': data['location'] as String?,
-          'rejectionReason': data['rejectionReason'] as String?,
-          'isPaid': data['isPaid'] as bool? ?? false,
-          'requiresPaymentOnAcceptance':
-              data['requiresPaymentOnAcceptance'] as bool? ?? false,
-        };
-      }).toList();
-    });
-  },
-);
+    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, studentId) {
+  return FirebaseFirestore.instance
+      .collection('sessionRequests')
+      .where('studentId', isEqualTo: studentId)
+      .where('status', whereIn: RequestStatus.studentVisible)
+      .orderBy('createdAt', descending: true)
+      .limit(20)
+      .snapshots()
+      .map((snapshot) => snapshot.docs
+          // ✅ FIX: same guard as watchStudentRequests —
+          //    hide accepted requests that already have a hafizSession
+          .where((doc) =>
+              doc.data()['status'] != RequestStatus.accepted ||
+              doc.data()['sessionId'] == null)
+          .map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'mohaffezName': data['mohaffezName'] as String? ?? '',
+              'mohaffezId': data['mohaffezId'] as String?,
+              'sessionType': data['sessionType'] as String? ?? '',
+              'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+                  data['timeSlot'] as String? ?? '08:00',
+              'status': data['status'] as String? ?? 'pending',
+              'createdAt': data['createdAt'] as Timestamp?,
+              'slotDate': data['slotDate'] as Timestamp?,
+              'paymentDeadline': data['paymentDeadline'] as Timestamp?,
+              'reminderSent': data['reminderSent'] as bool? ?? false,
+              'sessionId': data['sessionId'] as String?,
+              'planType': data['planType'] as String?,
+              'planTitle': data['planTitle'] as String?,
+              'sessionsCount': data['sessionsCount'],
+              'directPaymentRequestId': data['directPaymentRequestId'] as String?,
+            };
+          }).toList());
+});
 
 // ============================================================================
 // SESSION ACTIONS
@@ -641,24 +649,19 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     if (requestId.trim().isEmpty) {
       throw ArgumentError('Request ID cannot be empty');
     }
-
     debugPrint('🎯 Accepting request: $requestId');
     state = const AsyncValue.loading();
     try {
       final requestSnap =
           await _firestore.collection('sessionRequests').doc(requestId).get();
-      if (!requestSnap.exists) {
-        throw Exception('Request not found');
-      }
-      final requestData = requestSnap.data() ?? <String, dynamic>{};
+      if (!requestSnap.exists) throw Exception('Request not found');
+      final requestData = requestSnap.data() ?? {};
       final sessionPrice = (requestData['paymentAmount'] as num?)?.toDouble() ??
           (requestData['sessionPrice'] as num?)?.toDouble() ??
           0.0;
-
       await _ref
           .read(sessionRepositoryProvider)
           .acceptRequest(requestId, sessionPrice: sessionPrice);
-
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       debugPrint('❌ Error accepting request: $e');
@@ -667,36 +670,31 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  // FIX: Bug C - removed dead code _removeBookedSlotFromAvailability (unused after Bug B fix)
-  // FIX: Bug B - removed dead code _consumeSubscriptionCredit (unused after atomic refactor)
-  // FIX: Bug B - removed dead code _sendPaymentRequestNotification (unused after atomic refactor)
-  // FIX: Bug B - removed dead code _createSessionFromRequest (unused after atomic refactor)
-  // FIX: Bug B - removed dead code _sendAcceptanceNotification (unused after atomic refactor)
-
-  // BUG-FIX-B: Move all document reads inside the transaction to avoid TOCTOU race
   Future<void> rejectRequest(String requestId, String? reason) async {
     try {
       debugPrint('🚫 Rejecting request: $requestId');
 
-      // Declare notification data variables BEFORE the transaction
       String? notifyStudentId;
       String? notifyMohaffezName;
 
       await _firestore.runTransaction((transaction) async {
-        // ── READ phase (inside transaction for consistency) ──────────────────────
-        final requestRef = _firestore.collection('sessionRequests').doc(requestId);
-        final requestSnap = await transaction.get(requestRef);
+        // ══════════════════════════════════════════════════════════
+        // ── READS PHASE — all reads must come before any write ────
+        // ══════════════════════════════════════════════════════════
 
+        // READ 1: sessionRequest
+        final requestRef =
+            _firestore.collection('sessionRequests').doc(requestId);
+        final requestSnap = await transaction.get(requestRef);
         if (!requestSnap.exists) throw Exception('Request not found');
 
         final requestData = requestSnap.data()!;
         final status = requestData['status'] as String? ?? '';
 
-        // Idempotency guard (inside transaction)
         if (status == 'rejected') return;
-
-        // Safety guard (inside transaction)
-        if (status == 'accepted' || status == 'cancelled' || status == 'completed') {
+        if (status == 'accepted' ||
+            status == 'cancelled' ||
+            status == 'completed') {
           throw Exception('Cannot reject request with status: $status');
         }
 
@@ -708,26 +706,11 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         final sessionType = requestData['sessionType'] as String?;
         final slotLockId = requestData['slotLockId'] as String?;
 
-        // Capture notification data INSIDE the transaction
         notifyStudentId = requestData['studentId'] as String?;
         notifyMohaffezName = requestData['mohaffezName'] as String?;
 
-        // ── WRITE phase ───────────────────────────────────────────────────────────
-        transaction.update(requestRef, {
-          'status': RequestStatus.rejected,
-          'rejectionReason': reason,
-          'rejectedAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        // Release slot lock and re-enable availability slot atomically
-        if (slotLockId != null && slotLockId.trim().isNotEmpty) {
-          final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
-          transaction.delete(lockRef);
-        }
-
-        // Find and restore availability slot inside transaction
-        DocumentReference? availRef;
+        // READ 2: find availability doc ref (regular query, not tracked by tx)
+        DocumentReference<Map<String, dynamic>>? availRef;
         if (mohaffezId != null && slotDate != null) {
           availRef = await _findAvailabilityRefTransaction(
             transaction: transaction,
@@ -736,30 +719,54 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
           );
         }
 
-        if (availRef != null && timeSlot != null && sessionType != null) {
-          final availSnap = await transaction.get(availRef);
-          if (availSnap.exists) {
-            final availData = availSnap.data() as Map<String, dynamic>?;
-            if (availData != null) {
-              final updatedSlots = _computeRestoredSlots(availData, timeSlot, sessionType);
-              if (updatedSlots != null) {
-                transaction.update(availRef, {
-                  'timeSlots': updatedSlots,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                });
-              }
+        // READ 3: availability document (transaction.get — MUST be before writes)
+        DocumentSnapshot<Map<String, dynamic>>? availSnap;
+        if (availRef != null) {
+          availSnap = await transaction.get(availRef);
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // ── WRITES PHASE ──────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════
+
+        // WRITE 1: update sessionRequest status
+        transaction.update(requestRef, {
+          'status': RequestStatus.rejected,
+          'rejectionReason': reason,
+          'rejectedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // WRITE 2: release slot lock
+        if (slotLockId != null && slotLockId.trim().isNotEmpty) {
+          final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
+          transaction.delete(lockRef);
+        }
+
+        // WRITE 3: restore availability slot
+        if (availRef != null &&
+            availSnap != null &&
+            availSnap.exists &&
+            timeSlot != null &&
+            sessionType != null) {
+          final availData = availSnap.data();
+          if (availData != null) {
+            final updatedSlots =
+                _computeRestoredSlots(availData, timeSlot, sessionType);
+            if (updatedSlots != null) {
+              transaction.update(availRef, {
+                'timeSlots': updatedSlots,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
             }
           }
         }
 
-        // Log subscription credit not consumed (if applicable) inside transaction
         if (subscriptionId != null) {
           debugPrint('💳 Subscription credit NOT consumed (request rejected)');
         }
       });
 
-      // Notification using data captured from transaction (no re-read needed)
-      // FIXED: Wrap in try/catch with failedOperations fallback
       if (notifyStudentId != null) {
         try {
           await _sendRejectionNotification(
@@ -768,7 +775,6 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
             reason: reason,
           );
         } catch (e) {
-          // Enqueue for background retry — mirrors the cancellation flow
           try {
             await _firestore.collection('failedOperations').add({
               'operationType': 'rejection-notification',
@@ -780,8 +786,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
               'status': 'pending-retry',
             });
           } catch (enqueueError) {
-            // Best-effort: log but do not rethrow — rejection itself succeeded
-            debugPrint('rejectRequest: failed to enqueue notification retry: $enqueueError');
+            debugPrint(
+                'rejectRequest: failed to enqueue notification retry: $enqueueError');
           }
         }
       }
@@ -819,97 +825,116 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     if (sessionId.trim().isEmpty) {
       throw ArgumentError('Session ID cannot be empty');
     }
-
     state = const AsyncValue.loading();
     try {
       String? notifyStudentId;
       String? notifyMohaffezId;
 
       await _firestore.runTransaction((transaction) async {
-        // ── READ phase (inside transaction) ──────────────────────────────
-        final sessionRef = _firestore.collection('hafizSessions').doc(sessionId);
+        // ══════════════════════════════════════════════════════════
+        // ── READS PHASE ───────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════
+
+        // READ 1: hafizSession
+        final sessionRef =
+            _firestore.collection('hafizSessions').doc(sessionId);
         final sessionSnap = await transaction.get(sessionRef);
-        if (!sessionSnap.exists) {
-          throw Exception('Session not found');
-        }
+        if (!sessionSnap.exists) throw Exception('Session not found');
 
         final data = sessionSnap.data()!;
         final status = data['status'] as String? ?? '';
 
-        // Idempotency: if already cancelled, return early
-        if (status == 'cancelled') {
-          return;
-        }
-
-        // Guard: cannot cancel a completed session
+        if (status == 'cancelled') return;
         if (status == 'completed') {
           throw Exception('Cannot cancel a completed session');
         }
 
         notifyStudentId = data['studentId'] as String?;
         notifyMohaffezId = data['mohaffezId'] as String?;
-        
+
         final requestId = data['requestId'] as String?;
         final slotLockId = data['slotLockId'] as String?;
-        final timeSlot = data['timeSlot'] as String? ?? data['preferredTimeSlot'] as String?;
+        final timeSlot = data['timeSlot'] as String? ??
+            data['preferredTimeSlot'] as String?;
         final sessionType = data['sessionType'] as String?;
         final mohaffezId = data['mohaffezId'] as String?;
-        final availDocId = data['availabilityDocId'] as String?;
 
-        // ── WRITE phase ──────────────────────────────────────────────────
+        // READ 2: linked sessionRequest (MUST be before any write)
+        DocumentReference<Map<String, dynamic>>? reqRef;
+        DocumentSnapshot<Map<String, dynamic>>? reqSnap;
+        if (requestId != null && requestId.trim().isNotEmpty) {
+          reqRef = _firestore.collection('sessionRequests').doc(requestId);
+          reqSnap = await transaction.get(reqRef);
+        }
+
+        // READ 3: availability document (MUST be before any write)
+        // BUG FIX #1: The original code required `availDocId` from
+        // data['availabilityDocId'], which is NEVER written to the session
+        // doc by acceptRequest — so the slot was silently never restored.
+        // Fix: use _findAvailabilityRefTransaction with sessionDate,
+        // matching the same pattern used in rejectRequest.
+        DocumentReference<Map<String, dynamic>>? availRef;
+        DocumentSnapshot<Map<String, dynamic>>? availSnap;
+        if (mohaffezId != null && timeSlot != null && sessionType != null) {
+          final sessionDateTs = data['sessionDate'] as Timestamp?;
+          if (sessionDateTs != null) {
+            availRef = await _findAvailabilityRefTransaction(
+              transaction: transaction,
+              mohaffezId: mohaffezId,
+              slotDate: sessionDateTs,
+            );
+            if (availRef != null) {
+              availSnap = await transaction.get(availRef);
+            }
+          }
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // ── WRITES PHASE ──────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════
+
+        // WRITE 1: cancel session
         transaction.update(sessionRef, {
           'status': 'cancelled',
           'cancelledAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-        // Also update the linked sessionRequest if present
-        if (requestId != null && requestId.trim().isNotEmpty) {
-          final reqRef = _firestore.collection('sessionRequests').doc(requestId);
-          final reqSnap = await transaction.get(reqRef);
-          if (reqSnap.exists) {
-            transaction.update(reqRef, {
-              'status': 'cancelled',
-              'cancelledAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
+        // WRITE 2: cancel linked sessionRequest
+        if (reqRef != null && reqSnap != null && reqSnap.exists) {
+          transaction.update(reqRef, {
+            'status': 'cancelled',
+            'cancelledAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
         }
 
-        // Release slot lock inside same transaction
+        // WRITE 3: release slot lock (if one exists)
         if (slotLockId != null && slotLockId.trim().isNotEmpty) {
           final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
           transaction.delete(lockRef);
+        }
 
-          // Re-enable availability slot
-          if (mohaffezId != null && availDocId != null &&
-              timeSlot != null && sessionType != null) {
-            final availRef = _firestore
-                .collection('users').doc(mohaffezId)
-                .collection('availability').doc(availDocId);
-            final availSnap = await transaction.get(availRef);
-            if (availSnap.exists) {
-              final rawSlots = availSnap.data()!['timeSlots'];
-              if (rawSlots is List) {
-                final updatedSlots = rawSlots.map((slot) {
-                  final s = Map<String, dynamic>.from(slot as Map);
-                  final st = '${s["startTime"]}-${s["endTime"]}';
-                  if (st == timeSlot && s['sessionType'] == sessionType) {
-                    return {...s, 'enabled': true, 'lockId': null};
-                  }
-                  return s;
-                }).toList();
-                transaction.update(availRef, {
-                  'timeSlots': updatedSlots,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                });
-              }
+        // WRITE 4: restore availability slot
+        if (availRef != null &&
+            availSnap != null &&
+            availSnap.exists &&
+            timeSlot != null &&
+            sessionType != null) {
+          final availData = availSnap.data();
+          if (availData != null) {
+            final updatedSlots =
+                _computeRestoredSlots(availData, timeSlot, sessionType);
+            if (updatedSlots != null) {
+              transaction.update(availRef, {
+                'timeSlots': updatedSlots,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
             }
           }
         }
       });
 
-      // Post-transaction: send notifications (outside is fine — session already cancelled)
       if (notifyStudentId != null && notifyMohaffezId != null) {
         await sendCancellationNotifications(
           studentId: notifyStudentId!,
@@ -929,35 +954,40 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     if (requestId.trim().isEmpty) {
       throw ArgumentError('Request ID cannot be empty');
     }
-
     state = const AsyncValue.loading();
     try {
       String? notifyMohaffezId;
       String? notifyStudentId;
+      // BUG FIX #2: extract the real sessionId so sendCancellationNotifications
+      // receives the hafizSession ID, not the request ID. Fall back to requestId
+      // only when no session has been created yet (pre-payment cancellation).
+      String? linkedSessionId;
 
       await _firestore.runTransaction((transaction) async {
-        // ── READ phase (inside transaction) ──────────────────────────────
-        final requestRef = _firestore.collection('sessionRequests').doc(requestId);
+        // ══════════════════════════════════════════════════════════
+        // ── READS PHASE ───────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════
+
+        // READ 1: sessionRequest
+        final requestRef =
+            _firestore.collection('sessionRequests').doc(requestId);
         final requestSnap = await transaction.get(requestRef);
-        if (!requestSnap.exists) {
-          throw Exception('Request not found');
-        }
+        if (!requestSnap.exists) throw Exception('Request not found');
 
         final requestData = requestSnap.data()!;
-        final status = requestData['status'] as String? ?? RequestStatus.pending;
+        final status =
+            requestData['status'] as String? ?? RequestStatus.pending;
 
-        // Idempotency: if already cancelled, return early
-        if (status == RequestStatus.cancelled) {
-          return;
-        }
-
-        // Guard: cannot cancel a completed session/request
+        if (status == RequestStatus.cancelled) return;
         if (status == 'completed') {
           throw Exception('Cannot cancel completed session');
         }
 
         notifyStudentId = requestData['studentId'] as String?;
         notifyMohaffezId = requestData['mohaffezId'] as String?;
+        // BUG FIX #2: read sessionId from the request document
+        linkedSessionId = requestData['sessionId'] as String?;
+
         final mohaffezId = requestData['mohaffezId'] as String?;
         final slotDate = requestData['slotDate'] as Timestamp?;
         final timeSlot = requestData['preferredTimeSlot'] as String? ??
@@ -965,54 +995,74 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         final sessionType = requestData['sessionType'] as String?;
         final slotLockId = requestData['slotLockId'] as String?;
 
-        // ── WRITE phase ──────────────────────────────────────────────────
+        // READ 2: find availability ref (regular query — not tracked by tx)
+        DocumentReference<Map<String, dynamic>>? availRef;
+        if (slotLockId != null &&
+            slotLockId.trim().isNotEmpty &&
+            mohaffezId != null &&
+            slotDate != null &&
+            timeSlot != null &&
+            sessionType != null) {
+          availRef = await _findAvailabilityRefTransaction(
+            transaction: transaction,
+            mohaffezId: mohaffezId,
+            slotDate: slotDate,
+          );
+        }
+
+        // READ 3: availability document (transaction.get — MUST be before writes)
+        DocumentSnapshot<Map<String, dynamic>>? availSnap;
+        if (availRef != null) {
+          availSnap = await transaction.get(availRef);
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // ── WRITES PHASE ──────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════
+
+        // WRITE 1: cancel request
         transaction.update(requestRef, {
           'status': RequestStatus.cancelled,
           'cancelledAt': FieldValue.serverTimestamp(),
           'cancelledBy': 'student',
         });
 
-        // Release slot lock and restore slot inside same transaction
+        // WRITE 2: release slot lock
         if (slotLockId != null && slotLockId.trim().isNotEmpty) {
           final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
           transaction.delete(lockRef);
+        }
 
-          // Always attempt slot restoration when slotLockId exists
-          if (mohaffezId != null && slotDate != null &&
-              timeSlot != null && sessionType != null) {
-            final availRef = await _findAvailabilityRefTransaction(
-              transaction: transaction,
-              mohaffezId: mohaffezId,
-              slotDate: slotDate,
-            );
-            if (availRef != null) {
-              final availSnap = await transaction.get(availRef);
-              if (availSnap.exists) {
-                final availData = availSnap.data() as Map<String, dynamic>?;
-                if (availData != null) {
-                  final rawSlots = availData['timeSlots'];
-                  if (rawSlots is List) {
-                    final updatedSlots = _computeRestoredSlots(availData, timeSlot, sessionType);
-                    if (updatedSlots != null) {
-                      transaction.update(availRef, {
-                        'timeSlots': updatedSlots,
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      });
-                    }
-                  }
-                }
+        // WRITE 3: restore availability slot
+        if (availRef != null &&
+            availSnap != null &&
+            availSnap.exists &&
+            timeSlot != null &&
+            sessionType != null) {
+          final availData = availSnap.data();
+          if (availData != null) {
+            final rawSlots = availData['timeSlots'];
+            if (rawSlots is List) {
+              final updatedSlots =
+                  _computeRestoredSlots(availData, timeSlot, sessionType);
+              if (updatedSlots != null) {
+                transaction.update(availRef, {
+                  'timeSlots': updatedSlots,
+                  'updatedAt': FieldValue.serverTimestamp(),
+                });
               }
             }
           }
         }
       });
 
-      // Post-transaction: send notifications (outside is fine — request already cancelled)
       if (notifyMohaffezId != null && notifyStudentId != null) {
         await sendCancellationNotifications(
           studentId: notifyStudentId!,
           mohaffezId: notifyMohaffezId!,
-          sessionId: requestId,
+          // BUG FIX #2: use the real session ID; fall back to requestId
+          // only if no session was created yet (pending-state cancellation).
+          sessionId: linkedSessionId ?? requestId,
         );
       }
 
@@ -1023,21 +1073,19 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  // Helper method for finding availability reference inside transaction
-  Future<DocumentReference?> _findAvailabilityRefTransaction({
+  Future<DocumentReference<Map<String, dynamic>>?> _findAvailabilityRefTransaction({
     required Transaction transaction,
     required String mohaffezId,
     required Timestamp slotDate,
   }) async {
     final slotDateObj = slotDate.toDate();
     final dayOfWeek = slotDateObj.weekday;
-    
     final availQuery = _firestore
-        .collection('users').doc(mohaffezId)
+        .collection('users')
+        .doc(mohaffezId)
         .collection('availability')
         .where('dayOfWeek', isEqualTo: dayOfWeek)
         .limit(1);
-    
     final availSnap = await availQuery.get();
     if (availSnap.docs.isEmpty) return null;
     return availSnap.docs.first.reference;
@@ -1076,9 +1124,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       });
     } catch (e, stack) {
       debugPrint(
-        'sendCancellationNotifications failed for session $sessionId: $e\n$stack'
-      );
-      // Enqueue for retry in failedOperations
+          'sendCancellationNotifications failed for session $sessionId: $e\n$stack');
       try {
         await _firestore.collection('failedOperations').add({
           'operationType': 'cancellation-notification',
@@ -1088,7 +1134,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
           'retryCount': 0,
           'status': 'pending-retry',
         });
-      } catch (_) {} // best-effort enqueue
+      } catch (_) {}
     }
   }
 
@@ -1217,9 +1263,14 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
     .family<List<MohaffezStudentSummary>, String>((ref, mohaffezId) async {
   if (mohaffezId.isEmpty) return [];
 
+  // BUG FIX #3: Added status filter — the original query had no status filter,
+  // so students from cancelled or rejected sessions appeared as active students
+  // in the teacher's student list. Only sessions that actually happened or are
+  // upcoming (accepted/completed) should contribute a student entry.
   final snapshot = await FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('mohaffezId', isEqualTo: mohaffezId)
+      .where('status', whereIn: ['accepted', 'completed']) // FIX #3
       .limit(300)
       .get()
       .timeout(const Duration(seconds: 15));
@@ -1267,7 +1318,7 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
       .toList();
 });
 
-final sessionRepositoryProvider = Provider((ref) {
+final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
   return SessionRepository(FirebaseFirestore.instance);
 });
 
@@ -1277,3 +1328,18 @@ final bundleByIdProvider = FutureProvider.autoDispose
     .family<SubscriptionModel?, String>((ref, subscriptionId) async {
   return ref.watch(sessionRepositoryProvider).getBundleById(subscriptionId);
 });
+
+// FIX Bug 2: Added missing activeBundleProvider.
+// watchActiveBundle() exists in SessionRepository but had no Riverpod
+// provider — any widget calling activeBundleProvider would throw
+// ProviderNotFoundException at runtime.
+final activeBundleProvider = StreamProvider.autoDispose
+    .family<ActiveBundleInfo?, ({String studentId, String mohaffezId, String sessionType})>(
+  (ref, args) {
+    return ref.watch(sessionRepositoryProvider).watchActiveBundle(
+          studentId: args.studentId,
+          mohaffezId: args.mohaffezId,
+          sessionType: args.sessionType,
+        );
+  },
+);

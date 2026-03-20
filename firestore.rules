@@ -169,7 +169,7 @@ service cloud.firestore {
                       (request.resource.data.status == 'accepted' &&
                        resource.data.status in ['pending', 'awaitingpayment'] &&
                        onlyUpdating([
-                         'status', 'acceptedAt', 'updatedAt', 'sessionId'
+                         'status', 'acceptedAt', 'updatedAt', 'sessionId', 'notificationsAlreadySent'
                        ]))
 
                       ||
@@ -527,9 +527,10 @@ service cloud.firestore {
 
     match /failedOperations/{operationId} {
       allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow create: if isAuthenticated();   // ← allow client retry logging
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
-
     match /systemConfig/{configId} {
       allow read: if true;
       allow write: if isAdmin();

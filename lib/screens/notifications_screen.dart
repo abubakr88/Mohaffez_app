@@ -391,6 +391,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         context.push('/active-subscriptions');
         break;
 
+      // FIX: Handle direct payment pending confirmation notification
+      case 'directpaymentpending':
+        {
+          final Map<String, dynamic> data =
+              notification.data ?? <String, dynamic>{};
+          final directPaymentRequestId = data['directPaymentRequestId'] as String?;
+          
+          if (directPaymentRequestId != null && directPaymentRequestId.isNotEmpty) {
+            // Navigate directly to the specific direct payment request
+            context.push('/mohaffez/requests/confirm?directPaymentRequestId=$directPaymentRequestId');
+          } else {
+            // Fallback: navigate to all pending confirmations
+            context.push('/mohaffez/requests/confirm');
+          }
+          break;
+        }
+
       default:
         // No specific action
         break;

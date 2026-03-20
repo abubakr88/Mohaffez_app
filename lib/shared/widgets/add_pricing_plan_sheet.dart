@@ -45,7 +45,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
     
     if (plan != null) {
       _selectedType = plan.type;
-      _selectedMode = plan.mode;
+      _selectedMode = plan.mode ?? SessionMode.online;
       _sessionsCount = plan.sessionsCount;
       _validityDays = plan.validityDays;
       _sessionsPerWeek = plan.sessionsPerWeek;

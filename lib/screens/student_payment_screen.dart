@@ -790,7 +790,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             Expanded(
               child: Text(
                 isLockedRequest ? 'طلب محجوز — أكمل الدفع' : 'تفاصيل الجلسة',
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppThemeConstants.textPrimary), // WHY: Replace direct blue shade text with themed primary text.
@@ -825,7 +825,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(children: [
-                Icon(Icons.info_outline,
+                const Icon(Icons.info_outline,
                     size: 20, color: AppThemeConstants.primaryAmberDark), // WHY: Replace direct amber shade with themed amber dark.
                 const SizedBox(width: 8),
                 Expanded(
@@ -834,7 +834,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                         ? 'اختر خطة الدفع واستكمل العملية.'
                         : 'اختر الخطة المناسبة لإتمام الحجز.',
                     style:
-                        TextStyle(fontSize: 12, color: AppThemeConstants.primaryAmberDark), // WHY: Replace direct amber shade with themed amber dark.
+                        const TextStyle(fontSize: 12, color: AppThemeConstants.primaryAmberDark), // WHY: Replace direct amber shade with themed amber dark.
                   ),
                 ),
               ]),

@@ -22,10 +22,10 @@ enum DirectPaymentMethod {
   // and the keys saved by saveMohaffezWalletNumbers()
   String get value => switch (this) {
         DirectPaymentMethod.instapay     => 'instapay',
-        DirectPaymentMethod.vodafoneCash => 'vodafone_cash',
-        DirectPaymentMethod.orangeMoney  => 'orange_money',
-        DirectPaymentMethod.etisalatCash => 'etisalat_cash',
-        DirectPaymentMethod.wePay        => 'we_pay',
+        DirectPaymentMethod.vodafoneCash => 'vodafonecash',
+        DirectPaymentMethod.orangeMoney  => 'orangemoney',
+        DirectPaymentMethod.etisalatCash => 'etisalatcash',
+        DirectPaymentMethod.wePay        => 'wepay',
       };
 
   static DirectPaymentMethod fromValue(String v) =>
@@ -37,7 +37,8 @@ enum DirectPaymentMethod {
 
 class DirectPaymentModel {
   final String id;
-  final String sessionRequestId;
+  // FIX BUG-NEW-2
+  final String? sessionRequestId;
   final String studentId;
   final String studentName;
   final String mohaffezId;
@@ -68,7 +69,8 @@ class DirectPaymentModel {
 
   const DirectPaymentModel({
     required this.id,
-    required this.sessionRequestId,
+    // FIX BUG-NEW-2
+    this.sessionRequestId,
     required this.studentId,
     required this.studentName,
     required this.mohaffezId,
@@ -138,7 +140,8 @@ class DirectPaymentModel {
 
     return DirectPaymentModel(
       id:                  doc.id,
-      sessionRequestId:    d['sessionRequestId']   ?? '',
+      // FIX BUG-NEW-2
+      sessionRequestId:    d['sessionRequestId']   as String?,
       studentId:           d['studentId']          ?? '',
       studentName:         d['studentName']        ?? '',
       mohaffezId:          d['mohaffezId']         ?? '',

@@ -199,7 +199,21 @@ async function createSubscriptionFromPayment(payment, transactionId, paymentUpda
     const planType = parseString(metadata['planType'], 'single');
     const sessionsCount = parseNumber(metadata['sessionsCount'], 1);
     const validityDays = typeof metadata['validityDays'] === 'number' ? metadata['validityDays'] : undefined;
+    const sessionType = parseString(metadata['sessionType'], '');
     return admin_1.db.runTransaction(async (transaction) => {
+        const PER_SESSION_TYPE_LIMIT = 1; // hard limit: one active bundle per studentId+mohaffezId+sessionType
+        const studentId = payment.studentId;
+        const mohaffezId = payment.mohaffezId;
+        // CONSTRAINT: one active bundle per studentId+mohaffezId+sessionType
+        const activeSubsQuery = admin_1.db.collection('subscriptions')
+            .where('studentId', '==', studentId)
+            .where('mohaffezId', '==', mohaffezId)
+            .where('sessionType', '==', sessionType)
+            .where('status', '==', 'active');
+        const activeSubs = await transaction.get(activeSubsQuery);
+        if (activeSubs.size >= PER_SESSION_TYPE_LIMIT) {
+            throw new functions.https.HttpsError('resource-exhausted', 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات');
+        }
         const subscriptionRef = admin_1.db.collection('subscriptions').doc();
         let expiryDate = null;
         if (validityDays && validityDays > 0) {

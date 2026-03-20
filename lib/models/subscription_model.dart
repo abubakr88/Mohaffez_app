@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_model.dart' hide TimestampConverter; // For other exports, but use pricing_plan's TimestampConverter
+// For other exports, but use pricing_plan's TimestampConverter
 import 'pricing_plan_model.dart'; // For PlanType, PlanTypeConverter, and TimestampConverter
 
 part 'subscription_model.freezed.dart';
@@ -113,7 +113,9 @@ class ActiveBundleInfo {
       totalSessions: map['totalSessions'] as int? ?? 0,
       remainingSessions: map['remainingSessions'] as int? ?? 0,
       status: map['status'] as String? ?? 'active',
-      expiryDate: map['expiryDate'] as DateTime?,
-    );
+      expiryDate: map['expiryDate'] is Timestamp
+          ? (map['expiryDate'] as Timestamp).toDate()
+          : null,
+          );
   }
 }

@@ -41,8 +41,11 @@ export function getWeekEnd(date: Date): Date {
 }
 
 export function getNextMonday(date: Date): Date {
+  // FIX BUG-NEW-1
   const d = new Date(date);
-  d.setDate(d.getDate() + 1);
+  const day = d.getDay();                      // 0=Sun … 6=Sat
+  const daysToMonday = day === 0 ? 1 : (8 - day) % 7 || 7;
+  d.setDate(d.getDate() + daysToMonday);
   d.setHours(12, 0, 0, 0);
   return d;
 }

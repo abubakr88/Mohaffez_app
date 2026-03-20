@@ -1,8 +1,8 @@
+// lib/models/session_request_model.dart
 // CHANGES vs original:
-// Added 5 plan fields: planType, planId, planTitle, sessionsCount, validityDays
-// Added convenience getter: isBundle
-// fromMap + toMap updated with safe defaults (backward-compatible with old docs)
-// All existing fields, constructors, copyWith are preserved 100%
+// • Added rejectionReason + rejectedAt fields
+// • fromMap, toMap, copyWith updated accordingly
+// • All existing fields 100% preserved
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -34,21 +34,32 @@ class SessionRequestModel {
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
 
-  // ── NEW plan fields ───────────────────────────────────────────────────────
+  // ── NEW: rejection fields ──────────────────────────────────────────────────
+  /// The reason the mohaffez rejected this request. Populated by rejectRequest().
+  final String? rejectionReason;
+
+  /// Server timestamp set when the request was rejected.
+  final Timestamp? rejectedAt;
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // ── Plan fields ───────────────────────────────────────────────────────────
   /// "single" | "bundle" | "subscription"
   final String planType;
 
-  /// empty string for single-session requests
+  /// Empty string for single-session requests.
   final String planId;
 
-  /// human-readable plan name; empty for single
+  /// Human-readable plan name; empty for single.
   final String planTitle;
 
-  /// always 1 for single-session requests
+  /// Always 1 for single-session requests.
   final int sessionsCount;
 
-  /// null when the plan has no expiry (or for single sessions)
+  /// null when the plan has no expiry (or for single sessions).
   final int? validityDays;
+
+  /// Direct payment request ID for pending confirmations.
+  final String? directPaymentRequestId;
   // ──────────────────────────────────────────────────────────────────────────
 
   const SessionRequestModel({
@@ -78,16 +89,23 @@ class SessionRequestModel {
     this.isPaid,
     this.createdAt,
     this.updatedAt,
+    // rejection fields
+    this.rejectionReason,
+    this.rejectedAt,
     // plan fields — safe defaults keep old Firestore docs working seamlessly
     this.planType = 'single',
     this.planId = '',
     this.planTitle = '',
     this.sessionsCount = 1,
     this.validityDays,
+    this.directPaymentRequestId,
   });
 
-  /// true when this request is for a bundle or subscription purchase
+  /// true when this request is for a bundle or subscription purchase.
   bool get isBundle => planType == 'bundle' || planType == 'subscription';
+
+  /// true when this request was rejected by the mohaffez.
+  bool get isRejected => status == 'rejected';
 
   factory SessionRequestModel.fromJson(Map<String, dynamic> json) =>
       SessionRequestModel.fromMap(json, json['id'] as String? ?? '');
@@ -129,12 +147,16 @@ class SessionRequestModel {
       isPaid: map['isPaid'] as bool?,
       createdAt: map['createdAt'] as Timestamp?,
       updatedAt: map['updatedAt'] as Timestamp?,
-      // NEW plan fields — defaults handle old docs that lack these fields
+      // FIX: deserialize rejection fields
+      rejectionReason: map['rejectionReason'] as String?,
+      rejectedAt: map['rejectedAt'] as Timestamp?,
+      // plan fields — defaults handle old docs that lack these fields
       planType: map['planType'] as String? ?? 'single',
       planId: map['planId'] as String? ?? '',
       planTitle: map['planTitle'] as String? ?? '',
       sessionsCount: (map['sessionsCount'] as num?)?.toInt() ?? 1,
       validityDays: (map['validityDays'] as num?)?.toInt(),
+      directPaymentRequestId: map['directPaymentRequestId'] as String?,
     );
   }
 
@@ -165,12 +187,17 @@ class SessionRequestModel {
         if (isPaid != null) 'isPaid': isPaid,
         if (createdAt != null) 'createdAt': createdAt,
         if (updatedAt != null) 'updatedAt': updatedAt,
+        // FIX: always persist rejection fields when present
+        if (rejectionReason != null) 'rejectionReason': rejectionReason,
+        if (rejectedAt != null) 'rejectedAt': rejectedAt,
         // plan fields always written so Firestore queries can filter on them
         'planType': planType,
         'planId': planId,
         'planTitle': planTitle,
         'sessionsCount': sessionsCount,
         'validityDays': validityDays,
+        if (directPaymentRequestId != null)
+          'directPaymentRequestId': directPaymentRequestId,
       };
 
   SessionRequestModel copyWith({
@@ -181,6 +208,9 @@ class SessionRequestModel {
     bool? isPaid,
     String? cancellationReason,
     String? cancelledBy,
+    // FIX: rejection fields now copyable
+    String? rejectionReason,
+    Timestamp? rejectedAt,
   }) =>
       SessionRequestModel(
         id: id,
@@ -210,11 +240,14 @@ class SessionRequestModel {
         isPaid: isPaid ?? this.isPaid,
         createdAt: createdAt,
         updatedAt: updatedAt,
-        // plan fields always carried through copyWith unchanged
+        rejectionReason: rejectionReason ?? this.rejectionReason,
+        rejectedAt: rejectedAt ?? this.rejectedAt,
+        // plan fields always carried through unchanged
         planType: planType,
         planId: planId,
         planTitle: planTitle,
         sessionsCount: sessionsCount,
         validityDays: validityDays,
+        directPaymentRequestId: directPaymentRequestId,
       );
 }

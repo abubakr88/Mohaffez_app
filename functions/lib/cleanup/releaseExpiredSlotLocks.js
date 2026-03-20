@@ -4,6 +4,9 @@ exports.releaseExpiredSlotLocks = void 0;
 exports.releaseExpiredSlotLocksNow = releaseExpiredSlotLocksNow;
 const functions = require("firebase-functions");
 const admin_1 = require("../utils/admin");
+// WHY: slot-lock-fix - Added sessionRequestId to lock data and added logic to update
+// linked sessionRequest to "expired" status when slot lock expires.
+// This handles the case where student marks payment but mohaffez never confirms.
 function normalizeTimeSlot(raw) {
     // FIXED: BUG-5 - strip both hyphens AND en-dashes
     return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
@@ -24,7 +27,13 @@ async function releaseExpiredSlotLocksNow() {
         const availabilityDocId = typeof lock.availabilityDocId === 'string' ? lock.availabilityDocId : null;
         const timeSlot = typeof lock.timeSlot === 'string' ? lock.timeSlot : null;
         const sessionType = typeof lock.sessionType === 'string' ? lock.sessionType : null;
-        if (!mohaffezId || !availabilityDocId || !timeSlot || !sessionType) {
+        // FIX: slot-lock-fix - Get sessionRequestId from lock to update its status
+        const sessionRequestId = typeof lock.sessionRequestId === 'string' ? lock.sessionRequestId : null;
+        // FIX lock-expiry-3: Only bail out completely when mohaffezId is missing
+        // (truly corrupt lock). Path B locks (created by studentMarkedDirectPayment
+        // for bundle purchases) don't have availabilityDocId - that's valid, not an error.
+        // We must still run the transaction to expire the linked sessionRequest.
+        if (!mohaffezId) {
             await lockDoc.ref.update({
                 released: true,
                 releasedAt: admin_1.FieldValue.serverTimestamp(),
@@ -32,56 +41,78 @@ async function releaseExpiredSlotLocksNow() {
             });
             return;
         }
-        const availabilityRef = admin_1.db
-            .collection('users')
-            .doc(mohaffezId)
-            .collection('availability')
-            .doc(availabilityDocId);
+        // FIX lock-expiry-3: Path B (buy-bundle) locks don't have availabilityDocId.
+        // availabilityDocId may be absent but that's valid - we still need to expire
+        // the linked sessionRequest.
+        const hasAvailabilityInfo = !!(availabilityDocId && timeSlot && sessionType);
         try {
             await admin_1.db.runTransaction(async (transaction) => {
                 var _a;
-                const availabilityDoc = await transaction.get(availabilityRef);
-                if (!availabilityDoc.exists) {
-                    transaction.update(lockDoc.ref, {
-                        released: true,
-                        releasedAt: admin_1.FieldValue.serverTimestamp(),
-                        releaseReason: 'missing_availability_doc',
-                    });
-                    return;
-                }
-                const data = (_a = availabilityDoc.data()) !== null && _a !== void 0 ? _a : {};
-                const slots = Array.isArray(data.timeSlots)
-                    ? data.timeSlots
-                    : [];
-                let changed = false;
-                const selectedSlot = normalizeTimeSlot(timeSlot);
-                const updatedSlots = slots.map((slot) => {
-                    const start = typeof slot.startTime === 'string' ? slot.startTime : '';
-                    const end = typeof slot.endTime === 'string' ? slot.endTime : '';
-                    const slotTime = normalizeTimeSlot(`${start}-${end}`);
-                    if (slotTime === selectedSlot &&
-                        slot.sessionType === sessionType &&
-                        slot.lockId === lockDoc.id) {
-                        changed = true;
-                        const updatedSlot = Object.assign({}, slot);
-                        delete updatedSlot.lockedBy;
-                        delete updatedSlot.lockId;
-                        delete updatedSlot.lockedAt;
-                        return updatedSlot;
+                // FIX lock-expiry-3: Only re-enable availability slot when availability
+                // info is present (Path A / createSessionRequest flow). Path B (buy-bundle)
+                // locks don't have availabilityDocId.
+                if (hasAvailabilityInfo) {
+                    const availabilityRef = admin_1.db
+                        .collection('users')
+                        .doc(mohaffezId)
+                        .collection('availability')
+                        .doc(availabilityDocId);
+                    const availabilityDoc = await transaction.get(availabilityRef);
+                    if (availabilityDoc.exists) {
+                        const data = (_a = availabilityDoc.data()) !== null && _a !== void 0 ? _a : {};
+                        const slots = Array.isArray(data.timeSlots)
+                            ? data.timeSlots
+                            : [];
+                        let changed = false;
+                        const selectedSlot = normalizeTimeSlot(timeSlot);
+                        const updatedSlots = slots.map((slot) => {
+                            const start = typeof slot.startTime === 'string' ? slot.startTime : '';
+                            const end = typeof slot.endTime === 'string' ? slot.endTime : '';
+                            const slotTime = normalizeTimeSlot(`${start}-${end}`);
+                            if (slotTime === selectedSlot &&
+                                slot.sessionType === sessionType &&
+                                slot.lockId === lockDoc.id) {
+                                changed = true;
+                                const updatedSlot = Object.assign({}, slot);
+                                delete updatedSlot.lockedBy;
+                                delete updatedSlot.lockId;
+                                delete updatedSlot.lockedAt;
+                                return updatedSlot;
+                            }
+                            return slot;
+                        });
+                        if (changed) {
+                            transaction.update(availabilityRef, {
+                                timeSlots: updatedSlots,
+                                updatedAt: admin_1.FieldValue.serverTimestamp(),
+                            });
+                        }
                     }
-                    return slot;
-                });
-                if (changed) {
-                    transaction.update(availabilityRef, {
-                        timeSlots: updatedSlots,
-                        updatedAt: admin_1.FieldValue.serverTimestamp(),
-                    });
                 }
+                // FIX lock-expiry-3: Always release the lock (not conditional on changed)
                 transaction.update(lockDoc.ref, {
                     released: true,
                     releasedAt: admin_1.FieldValue.serverTimestamp(),
-                    releaseReason: changed ? 'expired' : 'already_released',
+                    releaseReason: hasAvailabilityInfo ? 'expired' : 'expired_no_availability',
                 });
+                // FIX lock-expiry-3: ALWAYS expire the linked sessionRequest
+                // Path B locks (buy-bundle) have sessionRequestId, Path A locks may not.
+                // The sessionRequest should be expired when lock expires, regardless of
+                // whether availabilityDocId was present.
+                if (sessionRequestId) {
+                    const sessionReqRef = admin_1.db.collection('sessionRequests').doc(sessionRequestId);
+                    const reqSnap = await transaction.get(sessionReqRef);
+                    if (reqSnap.exists) {
+                        const reqData = reqSnap.data();
+                        // Only update if status is awaitingdirectpaymentconfirmation (not already accepted)
+                        if ((reqData === null || reqData === void 0 ? void 0 : reqData.status) === 'awaitingdirectpaymentconfirmation') {
+                            transaction.update(sessionReqRef, {
+                                status: 'expired',
+                                updatedAt: admin_1.FieldValue.serverTimestamp(),
+                            });
+                        }
+                    }
+                }
             });
         }
         catch (error) {

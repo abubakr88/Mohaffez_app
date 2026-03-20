@@ -1,37 +1,32 @@
-// lib/screens/booking_method_screen.dart
+// lib/screens/booking/booking_method_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../models/subscription_model.dart';
 import '../models/pricing_plan_model.dart';
+import '../models/subscription_model.dart';        // ← ADD THIS BACK
 import '../providers/booking_flow_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/pricing_provider.dart';
 
-// Provider for active bundle
-final activeBundleProvider =
-    FutureProvider.family<ActiveBundleInfo?, (String, String, String)>(
-  (ref, params) async {
-    final (studentId, mohaffezId, sessionType) = params;
-    final repository = ref.read(sessionRepositoryProvider);
-    return repository.getActiveBundle(
-      studentId: studentId,
-      mohaffezId: mohaffezId,
-      sessionType: sessionType,
-    );
-  },
-);
+// ─── Providers ────────────────────────────────────────────────────────────────
 
-// Provider for teacher plans
+// BUG FIX #1: Removed duplicate local activeBundleProvider definition.
+// It conflicted with the one in session_provider_paginated.dart (named-record
+// params vs positional tuple). The canonical version lives there; we just
+// import and use it below with the named-record syntax.
+
+// FIX 4: ref.watch instead of ref.read — consistent with provider best practice
 final teacherPlansProvider =
-    FutureProvider.family<List<PricingPlanModel>, String>(
+    FutureProvider.autoDispose.family<List<PricingPlanModel>, String>(
   (ref, mohaffezId) async {
-    final repository = ref.read(pricingRepositoryProvider);
+    final repository = ref.watch(pricingRepositoryProvider);
     return repository.getPlansForTeacher(mohaffezId);
   },
 );
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 class BookingMethodScreen extends ConsumerStatefulWidget {
   const BookingMethodScreen({super.key});
@@ -51,37 +46,56 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
   // intentionally call reset() after a successful booking.
   bool _navigatingAway = false;
 
+  late final BookingFlowNotifier _bookingNotifier;
+
   @override
   void initState() {
     super.initState();
+    _bookingNotifier = ref.read(bookingFlowProvider.notifier);
   }
 
   @override
   void dispose() {
-    // Only reset if the user backed out without selecting any option.
-    // If a path was committed, the destination screen owns the reset on success.
     if (_committedPath == null) {
-      ref.read(bookingFlowProvider.notifier).reset();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _bookingNotifier.reset();
+      });
     }
     super.dispose();
   }
 
-  // ─── Option tap handlers ────────────────────────────────────────────────────
+  // ─── Option tap handlers ──────────────────────────────────────────────────
 
   void _onUseExistingBundle() {
     _committedPath = BookingPath.useExistingBundle;
     ref
         .read(bookingFlowProvider.notifier)
         .setBookingPath(BookingPath.useExistingBundle);
-    context.pushReplacement('/booking/confirm-bundle-session');
+    // BUG FIX #1: push instead of pushReplacement.
+    // pushReplacement removed this screen from the stack, which disposed the
+    // autoDispose bookingFlowProvider and wiped slotContext — causing the
+    // null guard in build() to fire and redirect to /home.
+    // push keeps this screen alive in the stack, preserving provider state.
+    context.push('/booking/confirm-bundle-session');
   }
 
   void _onBuyNewBundle() {
+    final flow = ref.read(bookingFlowProvider);
+    final slotContext = flow.slotContext;
+    debugPrint('🔵 [BUNDLE_FLOW] Step1_BuyNewBundle: tapped, slotContext='
+        'mohaffezId=${slotContext?.mohaffezId}, '
+        'sessionType=${slotContext?.sessionType}, '
+        'slotDate=${slotContext?.slotDate}, '
+        'slotStart=${slotContext?.slotStart}, '
+        'slotEnd=${slotContext?.slotEnd}, '
+        'preferredTimeSlot=${slotContext?.preferredTimeSlot}');
+
     _committedPath = BookingPath.buyNewBundle;
     ref
         .read(bookingFlowProvider.notifier)
         .setBookingPath(BookingPath.buyNewBundle);
-    context.pushReplacement('/booking/select-bundle-plan');
+    // BUG FIX #1: push instead of pushReplacement (same reason as above).
+    context.push('/booking/select-bundle-plan');
   }
 
   void _onNewDirectRequest() {
@@ -90,11 +104,12 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         .read(bookingFlowProvider.notifier)
         .setBookingPath(BookingPath.newDirectRequest);
     setState(() => _navigatingAway = true);
-    context.pushReplacement('/booking/direct-request'); // ← new route
+    // BUG FIX #1: push instead of pushReplacement (same reason as above).
+    context.push('/booking/direct-request');
   }
 
-  // ─── Build ──────────────────────────────────────────────────────────────────
-  
+  // ─── Build ────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final flow = ref.watch(bookingFlowProvider);
@@ -120,12 +135,34 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
       );
     }
 
+    // BUG FIX #2: Use named-record params to match the canonical
+    // activeBundleProvider defined in session_provider_paginated.dart.
+    // The old positional tuple (studentId, mohaffezId, sessionType) caused
+    // a type mismatch and a duplicate-provider naming conflict.
     final activeBundleAsync = ref.watch(
       activeBundleProvider((
-        studentId,
-        slotContext.mohaffezId,
-        slotContext.sessionType,
+        studentId: studentId,
+        mohaffezId: slotContext.mohaffezId,
+        sessionType: slotContext.sessionType,
       )),
+    );
+
+    activeBundleAsync.when(
+      data: (activeBundle) {
+        if (activeBundle != null) {
+          debugPrint('✅ [BUNDLE_FLOW] Step6_ActiveBundle: found, '
+              'id=${activeBundle.id}, '
+              'remainingSessions=${activeBundle.remainingSessions}, '
+              'totalSessions=${activeBundle.totalSessions}, '
+              'sessionType=${activeBundle.sessionType}, '
+              'planTitle=${activeBundle.planTitle}, '
+              'status=${activeBundle.status}');
+        } else {
+          debugPrint('⚠️ [BUNDLE_FLOW] Step6_ActiveBundle: no active bundle');
+        }
+      },
+      loading: () => debugPrint('🔵 [BUNDLE_FLOW] Step6_ActiveBundle: loading...'),
+      error: (e, st) => debugPrint('❌ [BUNDLE_FLOW] Step6_ActiveBundle ERROR: $e'),
     );
 
     final teacherPlansAsync = ref.watch(
@@ -159,7 +196,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     );
   }
 
-  // ─── Options list ────────────────────────────────────────────────────────────
+  // ─── Options list ─────────────────────────────────────────────────────────
 
   Widget _buildOptionsList(
     BuildContext context,
@@ -174,19 +211,19 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
-        // ── Option 1: Use existing bundle ─────────────────────────────────────
+        // ── Option 1: Use existing bundle ──────────────────────────────────
         _BookingOptionCard(
           icon: Icons.card_membership,
           title: 'استخدام باقة حالية',
           subtitle: activeBundle != null
               ? 'متبقي ${activeBundle.remainingSessions} جلسة من ${activeBundle.totalSessions}'
-              : 'لا توجد باقة نشطة',
+              : 'لا توجد باقة نشطة لهذا النوع',
           isEnabled: activeBundle != null,
           onTap: activeBundle != null ? _onUseExistingBundle : null,
         ),
         const SizedBox(height: 12),
 
-        // ── Option 2: Buy new bundle ──────────────────────────────────────────
+        // ── Option 2: Buy new bundle ────────────────────────────────────
         _BookingOptionCard(
           icon: Icons.add_shopping_cart,
           title: 'شراء باقة جديدة',
@@ -196,7 +233,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         ),
         const SizedBox(height: 12),
 
-        // ── Option 3: Direct single-session request ───────────────────────────
+        // ── Option 3: Direct single-session request ─────────────────────
         _BookingOptionCard(
           icon: Icons.payment,
           title: 'إرسال طلب حجز جديد',
@@ -206,7 +243,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         ),
         const SizedBox(height: 24),
 
-        // ── Cancel ────────────────────────────────────────────────────────────
+        // ── Cancel ──────────────────────────────────────────────────────
         TextButton(
           onPressed: () => context.pop(),
           child: const Text(
@@ -219,9 +256,13 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     );
   }
 
-  // ─── Error state ─────────────────────────────────────────────────────────────
+  // ─── Error state ──────────────────────────────────────────────────────────
 
   Widget _buildErrorWidget(String message) {
+    final flow = ref.read(bookingFlowProvider);
+    final slotContext = flow.slotContext;
+    final studentId = ref.read(currentUserProvider).value?.uid;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -238,8 +279,17 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () {
-                ref.invalidate(activeBundleProvider);
-                ref.invalidate(teacherPlansProvider);
+                if (studentId != null && slotContext != null) {
+                  // BUG FIX #2: named-record params to match canonical provider
+                  ref.invalidate(activeBundleProvider((
+                    studentId: studentId,
+                    mohaffezId: slotContext.mohaffezId,
+                    sessionType: slotContext.sessionType,
+                  )));
+                  // BUG FIX #3: invalidate only this teacher's plan cache,
+                  // not every cached instance of the family provider.
+                  ref.invalidate(teacherPlansProvider(slotContext.mohaffezId));
+                }
               },
               icon: const Icon(Icons.refresh),
               label: const Text('إعادة المحاولة'),
@@ -251,7 +301,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
   }
 }
 
-// ─── Option card widget ────────────────────────────────────────────────────────
+// ─── Option card widget ───────────────────────────────────────────────────────
 
 class _BookingOptionCard extends StatelessWidget {
   final IconData icon;

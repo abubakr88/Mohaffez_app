@@ -54,8 +54,14 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   /// Returns true only when the student still needs to initiate payment.
   /// NOTE: 'awaitingdirectpaymentconfirmation' is intentionally excluded —
   /// the student already sent the payment, so no "Pay Now" button is needed.
+  /// FIX: Subscription-credit requests NEVER require student payment action
   bool _requiresPayment(Map<String, dynamic> request) {
     final status = (request['status'] as String? ?? '').toLowerCase();
+    final selectedPaymentMethod = request['selectedPaymentMethod'] as String? ?? '';
+
+    // Subscription-credit requests NEVER require student payment action
+    if (selectedPaymentMethod == 'subscriptioncredit') return false;
+
     return status == 'awaitingpayment' ||
         status == 'awaiting_payment' ||
         status == 'awaitingdirectpayment';
@@ -639,7 +645,9 @@ class _RequestCard extends StatelessWidget {
     final preferredTimeSlot = request['preferredTimeSlot'] as String? ??
         request['timeSlot'] as String? ??
         '08:00';
-    final createdAt = request['createdAt'] as DateTime?;
+    final createdAt = request['createdAt'] is Timestamp
+        ? (request['createdAt'] as Timestamp).toDate()
+        : request['createdAt'] as DateTime?;
     final slotDate = request['slotDate'] is Timestamp
         ? (request['slotDate'] as Timestamp).toDate()
         : request['slotDate'] as DateTime?;

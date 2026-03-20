@@ -12,6 +12,7 @@ const STATUS = {
   CANCELLED: 'cancelled',
 } as const;
 
+
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface BookingConfirmationResult  { sessionId: string; }
@@ -295,9 +296,7 @@ export async function createSubscriptionFromPayment(
   const sessionType   = parseString(metadata['sessionType'],   '');
 
   return db.runTransaction(async (transaction) => {
-    // BUG-5 FIX: Check maxActiveSubscriptions before creating subscription
-    const configDoc = await transaction.get(db.collection('systemConfig').doc('global'));
-    const maxActive: number = (configDoc.data()?.maxActiveSubscriptions as number) ?? 3;
+    const PER_SESSION_TYPE_LIMIT = 1; // hard limit: one active bundle per studentId+mohaffezId+sessionType
 
     const studentId = payment.studentId;
     const mohaffezId = payment.mohaffezId;
@@ -310,10 +309,10 @@ export async function createSubscriptionFromPayment(
       .where('status', '==', 'active');
     const activeSubs = await transaction.get(activeSubsQuery);
 
-    if (activeSubs.size >= maxActive) {
+    if (activeSubs.size >= PER_SESSION_TYPE_LIMIT) {
       throw new functions.https.HttpsError(
         'resource-exhausted',
-        `لا يمكن إنشاء أكثر من ${maxActive} اشتراكات نشطة مع نفس المعلم`
+        'لديك باقة نشطة بالفعل لهذا النوع من الجلسات'
       );
     }
 

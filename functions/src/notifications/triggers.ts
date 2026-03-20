@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import { SessionEventStore } from '../services/SessionEventStore';
 import { SessionRequestEventType, SessionEventType } from '../types/events.types';
@@ -400,6 +401,31 @@ export const onSessionCompleted = functions.firestore
 
     // Only send notifications when status becomes 'completed'
     if (afterStatus !== 'completed') return;
+
+    // ── Increment student completed-session counter ──────────────────
+    if (studentId) {
+      try {
+        await db
+          .collection('users')
+          .doc(studentId)
+          .update({
+            completedSessionsCount: FieldValue.increment(1),
+            updatedAt:              FieldValue.serverTimestamp(),
+          });
+        functions.logger.info('Student session counter incremented', {
+          sessionId,
+          studentId,
+        });
+      } catch (counterError) {
+        // Non-blocking: log but never fail the trigger
+        functions.logger.error(
+          'Failed to increment student session counter',
+          { sessionId, studentId, error: counterError }
+        );
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────
+
     if (!studentId) {
       functions.logger.warn('Missing studentId in completed session', {
         sessionId,

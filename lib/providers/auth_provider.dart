@@ -22,7 +22,7 @@ final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges().asyncMap((firebaseUser) async {
     if (firebaseUser != null) {
       try {
-        await firebaseUser.getIdToken(false).timeout(const Duration(seconds: 5));
+        await firebaseUser.getIdToken(false).timeout(const Duration(seconds: 10));
       } catch (e) {
         debugPrint('authStateProvider: token refresh failed, using cached: $e');
         // Non-fatal: fall back silently, stream still resolves with the user

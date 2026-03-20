@@ -62,10 +62,8 @@ import '../screens/active_subscriptions_screen.dart'; // BUG-8: Active subscript
 import '../screens/direct_payment_screen.dart'; // Path C: Direct payment route
 import '../screens/booking_method_screen.dart'; // Booking method screen
 import '../screens/confirm_bundle_session_screen.dart'; // Path A: Confirm bundle session
-import '../screens/student/booking_confirmation_screen.dart'; // Booking confirmation
-import '../providers/booking_flow_provider.dart';
 import '../screens/direct_booking_request_screen.dart'; // Path C — Request First
-import '../screens/select_bundle_plan_screen.dart';
+import '../screens/direct_payment_confirmations_screen.dart'; // Direct payment confirmations
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -246,7 +244,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/booking/direct-payment',
             name: 'booking-direct-payment',
-            builder: (context, state) => DirectPaymentScreen(),
+            builder: (context, state) => const DirectPaymentScreen(),
           ),
           // ── Path C — Request First (direct payment, teacher must accept first) ──────
           GoRoute(
@@ -378,6 +376,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/pending-requests',
             name: 'pending-requests',
             builder: (context, state) => const PendingRequestsScreen(),
+          ),
+          GoRoute(
+            path: '/mohaffez/requests/confirm',
+            name: 'mohaffez-confirm-payment',
+            builder: (context, state) {
+              final directPaymentRequestId =
+                  state.uri.queryParameters['directPaymentRequestId'];
+              return DirectPaymentConfirmationsScreen(
+                directPaymentRequestId: directPaymentRequestId,
+              );
+            },
           ),
           GoRoute(
             path: '/completed-sessions',

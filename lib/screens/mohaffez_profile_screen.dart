@@ -10,7 +10,6 @@ import '../shared/constants/app_theme.dart';
 import '../shared/widgets/skeleton_card.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../providers/mohaffez_profile_providers.dart';
-import '../providers/user_provider.dart';
 import '../providers/pricing_provider.dart';
 import '../models/pricing_plan_model.dart';
 import '../models/slot_context.dart';
@@ -42,8 +41,6 @@ class _MohaffezProfileScreenState
 
   // ─── Navigation helper ────────────────────────────────────────────────────
 
-  /// Validates slot selection, builds SlotContext, and navigates to the
-  /// booking method screen. Used by all three entry points on this page.
   void _navigateToBookingMethod() {
     if (selectedTimeSlot == null || selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -63,9 +60,6 @@ class _MohaffezProfileScreenState
 
   // ─── SlotContext builder ──────────────────────────────────────────────────
 
-  /// Safely parses HH:mm time strings and builds a [SlotContext].
-  /// Uses [int.tryParse] with fallback to 0 to avoid RangeError on
-  /// malformed or missing time data.
   SlotContext _buildSlotContext(Map<String, dynamic>? profileValue) {
     final startRaw =
         selectedTimeSlot!['startTime'] as String? ?? '0:0';
@@ -113,8 +107,13 @@ class _MohaffezProfileScreenState
       slotStart: slotStart.toIso8601String(),
       slotEnd: slotEnd.toIso8601String(),
       imamAddressText: profileValue?['addressText'] as String?,
-      imamAddressLat: profileValue?['addressLat'] as double?,
-      imamAddressLng: profileValue?['addressLng'] as double?,
+      // FIX Bug 2: Firestore stores coordinates as num, not double.
+      // Direct cast 'as double?' throws TypeError at runtime.
+      // Use (as num?)?.toDouble() which safely handles both int and double.
+      imamAddressLat:
+          (profileValue?['addressLat'] as num?)?.toDouble(),
+      imamAddressLng:
+          (profileValue?['addressLng'] as num?)?.toDouble(),
     );
   }
 
@@ -169,124 +168,130 @@ class _MohaffezProfileScreenState
               ],
             ),
           ),
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () =>
+              const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const Icon(Icons.error_outline,
+                    size: 64, color: Colors.red),
                 const SizedBox(height: 16),
                 Text('خطأ في تحميل البيانات: $e'),
               ],
             ),
           ),
         ),
-        bottomNavigationBar: selectedTimeSlot != null && selectedDate != null
-            ? SafeArea(
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Selected booking summary
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentGreen.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color:
-                                AppTheme.accentGreen.withValues(alpha: 0.3),
+        bottomNavigationBar:
+            selectedTimeSlot != null && selectedDate != null
+                ? SafeArea(
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, -2),
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentGreen
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppTheme.accentGreen
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Column(
                               children: [
-                                const Icon(Icons.calendar_today,
-                                    color: AppTheme.accentGreen, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'التاريخ: ${DateFormat('EEEE، dd MMMM yyyy', 'ar').format(selectedDate!)}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
+                                Row(
+                                  children: [
+                                    const Icon(Icons.calendar_today,
+                                        color: AppTheme.accentGreen,
+                                        size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'التاريخ: ${DateFormat('EEEE، dd MMMM yyyy', 'ar').format(selectedDate!)}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.access_time,
+                                        color: AppTheme.accentGreen,
+                                        size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'الوقت: ${selectedTimeSlot!['startTime']} - ${selectedTimeSlot!['endTime']}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.close,
+                                          size: 20),
+                                      onPressed: () {
+                                        setState(() {
+                                          selectedTimeSlot = null;
+                                          selectedDate = null;
+                                          selectedDayOfWeek = null;
+                                        });
+                                      },
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(Icons.access_time,
-                                    color: AppTheme.accentGreen, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'الوقت: ${selectedTimeSlot!['startTime']} - ${selectedTimeSlot!['endTime']}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton.icon(
+                              onPressed: _navigateToBookingMethod,
+                              icon: const Icon(Icons.send),
+                              label: const Text(
+                                'إرسال طلب الحجز',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, size: 20),
-                                  onPressed: () {
-                                    setState(() {
-                                      selectedTimeSlot = null;
-                                      selectedDate = null;
-                                      selectedDayOfWeek = null;
-                                    });
-                                  },
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.accentGreen,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: _navigateToBookingMethod,
-                          icon: const Icon(Icons.send),
-                          label: const Text(
-                            'إرسال طلب الحجز',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.accentGreen,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              )
-            : null,
+                    ),
+                  )
+                : null,
       ),
     );
   }
@@ -352,7 +357,8 @@ class _MohaffezProfileScreenState
                     children: [
                       const Text(
                         'الأسعار تبدأ من',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                            color: Colors.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -366,7 +372,8 @@ class _MohaffezProfileScreenState
                       ),
                       const Text(
                         'لكل جلسة',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                        style: TextStyle(
+                            color: Colors.white70, fontSize: 14),
                       ),
                     ],
                   ),
@@ -429,6 +436,7 @@ class _MohaffezProfileScreenState
         decoration: BoxDecoration(
           color: AppThemeConstants.accentGreen.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
+        // ─── continuing _buildTrustBadgesSection ──────────────────────────
           border: Border.all(
               color: AppThemeConstants.accentGreen.withValues(alpha: 0.3)),
         ),
@@ -438,8 +446,7 @@ class _MohaffezProfileScreenState
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildTrustItem(Icons.lock, 'دفع آمن', 'تشفير 256-bit'),
-                _buildTrustItem(
-                    Icons.verified_user, 'معتمد', 'موثق ومضمون'),
+                _buildTrustItem(Icons.verified_user, 'معتمد', 'موثق ومضمون'),
                 _buildTrustItem(Icons.replay, 'استرجاع', 'خلال ساعتين'),
               ],
             ),
@@ -476,7 +483,7 @@ class _MohaffezProfileScreenState
         const SizedBox(height: 6),
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.bold,
             color: AppThemeConstants.accentGreen,
@@ -517,6 +524,98 @@ class _MohaffezProfileScreenState
 
   // ─── Pricing section ──────────────────────────────────────────────────────
 
+  Widget _buildReadOnlyPlanCard(PricingPlanModel plan) {
+    final isBundle =
+        plan.type == PlanType.bundle || plan.type == PlanType.subscription;
+    final badgeColor =
+        isBundle ? Colors.purple.shade700 : Colors.amber.shade800;
+    final badgeBg = isBundle ? Colors.purple.shade50 : Colors.amber.shade50;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text(isBundle ? 'باقة' : 'جلسة واحدة',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: badgeColor)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(plan.title,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.bold))),
+            Text('${plan.priceEGP.toStringAsFixed(0)} جنيه',
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeConstants.accentGreen)),
+          ]),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            _profileChip(
+                '${plan.sessionsCount} جلسة', Icons.event_available),
+            if (plan.validityDays != null && plan.validityDays! > 0)
+              _profileChip('${plan.validityDays} يوم', Icons.schedule),
+            if (isBundle)
+              _profileChip(
+                '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} جنيه/جلسة',
+                Icons.payments_outlined,
+              ),
+          ]),
+          if (plan.description != null && plan.description!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(plan.description!,
+                style:
+                    TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _profileChip(String label, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 13, color: AppThemeConstants.primaryAmber),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color:
+                    AppThemeConstants.primaryAmber.withValues(alpha: 0.9))),
+      ]),
+    );
+  }
+
   Widget _buildPricingSection(
       AsyncValue<List<PricingPlanModel>> plansAsync) {
     return plansAsync.when(
@@ -542,8 +641,7 @@ class _MohaffezProfileScreenState
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color:
-                    AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                     color: AppThemeConstants.primaryAmber
@@ -576,42 +674,35 @@ class _MohaffezProfileScreenState
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 'خطط التسعير المتاحة',
-                style:
-                    TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 140,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: relevantPlans.length,
-                itemBuilder: (context, index) {
-                  return _buildPricingCard(relevantPlans[index]);
-                },
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.35)),
               ),
+              child: const Row(children: [
+                Icon(Icons.info_outline,
+                    size: 16, color: AppThemeConstants.primaryAmber),
+                SizedBox(width: 8),
+                Expanded(
+                    child: Text(
+                  'اختر موعدًا أولاً لحجز باقة أو جلسة',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppThemeConstants.primaryAmber),
+                )),
+              ]),
             ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: const SizedBox.shrink()
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-              child: Text(
-                'اختر موعدًا أولاً لحجز باقة أو جلسة',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 13,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
+            ...relevantPlans.map((plan) => _buildReadOnlyPlanCard(plan)),
           ],
         );
       },
@@ -623,92 +714,90 @@ class _MohaffezProfileScreenState
   Widget _buildPricingCard(PricingPlanModel plan) {
     final pricePerSession = plan.priceEGP / plan.sessionsCount;
     return Container(
-        width: 180,
-        margin: const EdgeInsets.only(left: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryAmber.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+      width: 180,
+      margin: const EdgeInsets.only(left: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              plan.title,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryAmber.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            plan.title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
-            const SizedBox(height: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${plan.priceEGP.toStringAsFixed(0)} ج',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              if (plan.sessionsCount > 1)
                 Text(
-                  '${plan.priceEGP.toStringAsFixed(0)} ج',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                  '${pricePerSession.toStringAsFixed(0)} ج/جلسة',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
-                if (plan.sessionsCount > 1)
-                  Text(
-                    '${pricePerSession.toStringAsFixed(0)} ج/جلسة',
-                    style: TextStyle(
+            ],
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.event_available, size: 12, color: Colors.white),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    '${plan.sessionsCount} جلسة',
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                ),
               ],
             ),
-            const Spacer(),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.event_available,
-                      size: 12, color: Colors.white),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      '${plan.sessionsCount} جلسة',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
   }
 
   // ─── AppBar ───────────────────────────────────────────────────────────────
@@ -908,8 +997,7 @@ class _MohaffezProfileScreenState
                   height: 140,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: creds.length,
                     itemBuilder: (context, index) {
                       final cred = creds[index];
@@ -921,8 +1009,7 @@ class _MohaffezProfileScreenState
                           color: Colors.purple.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color:
-                                  Colors.purple.withValues(alpha: 0.3)),
+                              color: Colors.purple.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -949,8 +1036,7 @@ class _MohaffezProfileScreenState
                             Row(
                               children: [
                                 Icon(Icons.business,
-                                    size: 16,
-                                    color: Colors.grey.shade600),
+                                    size: 16, color: Colors.grey.shade600),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
@@ -970,8 +1056,7 @@ class _MohaffezProfileScreenState
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color:
-                                    Colors.green.withValues(alpha: 0.1),
+                                color: Colors.green.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
@@ -1156,8 +1241,7 @@ class _MohaffezProfileScreenState
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 15,
-                              color: Colors.grey.shade600),
+                              fontSize: 15, color: Colors.grey.shade600),
                         ),
                       ),
                     ],
@@ -1216,14 +1300,20 @@ class _MohaffezProfileScreenState
                       return false;
                     }
                     if (isToday) {
+                      // FIX Bug 1: was int.parse() — throws FormatException on
+                      // malformed time strings. Use int.tryParse with fallback.
                       final parts =
-                          (ts['startTime'] as String).split(':');
+                          (ts['startTime'] as String? ?? '0:0').split(':');
+                      final hour =
+                          int.tryParse(parts.elementAtOrNull(0) ?? '') ?? 0;
+                      final minute =
+                          int.tryParse(parts.elementAtOrNull(1) ?? '') ?? 0;
                       final slotTime = DateTime(
                         today.year,
                         today.month,
                         today.day,
-                        int.parse(parts[0]),
-                        int.parse(parts[1]),
+                        hour,
+                        minute,
                       );
                       return slotTime.isAfter(now);
                     }
@@ -1243,8 +1333,7 @@ class _MohaffezProfileScreenState
                         Row(
                           children: [
                             const Icon(Icons.calendar_today,
-                                size: 18,
-                                color: AppTheme.accentGreen),
+                                size: 18, color: AppTheme.accentGreen),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1264,8 +1353,9 @@ class _MohaffezProfileScreenState
                           spacing: 8,
                           runSpacing: 8,
                           children: enabledSlots.map((ts) {
-                            final isSelected = selectedTimeSlot == ts &&
-                                selectedDayOfWeek == dayOfWeek;
+                            final isSelected =
+                                selectedTimeSlot == ts &&
+                                    selectedDayOfWeek == dayOfWeek;
                             return GestureDetector(
                               onTap: () {
                                 setState(() {
@@ -1281,8 +1371,7 @@ class _MohaffezProfileScreenState
                                   color: isSelected
                                       ? AppTheme.accentGreen
                                       : Colors.green.shade50,
-                                  borderRadius:
-                                      BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: isSelected
                                         ? AppTheme.accentGreen
@@ -1314,8 +1403,7 @@ class _MohaffezProfileScreenState
                                     if (isSelected) ...[
                                       const SizedBox(width: 4),
                                       const Icon(Icons.check_circle,
-                                          size: 16,
-                                          color: Colors.white),
+                                          size: 16, color: Colors.white),
                                     ],
                                   ],
                                 ),

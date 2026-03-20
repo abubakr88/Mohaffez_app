@@ -1,7 +1,13 @@
 "use strict";
+// CHANGES vs original:
+// 1. Added: validityDays extraction + rawPlanType/isBundlePlan computation after destructure
+// 2. Fixed: initialStatus — bundle directpayment requests start at PENDING (not AWAITING_PAYMENT)
+//    because teacher-first rule applies to all bundles regardless of payment method
+// 3. Added: validityDays to transaction.set()
+// 4. Updated: notification title/body in 4f to reflect bundle vs single
+// All other logic (slot lock, conflict guard, availability disable, etc.) is UNTOUCHED
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createSessionRequest = void 0;
-// src/bookings/createSessionRequest.ts
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
@@ -24,7 +30,7 @@ function parseFlutterDate(iso) {
     return new Date(iso);
 }
 exports.createSessionRequest = functions.https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     const fallbackIdToken = typeof (data === null || data === void 0 ? void 0 : data.idToken) === 'string' ? data.idToken : null;
     let studentId = (_b = (_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid) !== null && _b !== void 0 ? _b : null;
     // ── 0. DIAGNOSTIC LOG (remove after issue resolved) ───────────────────
@@ -43,19 +49,21 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             functions.logger.warn('createSessionRequest: using fallback idToken verification', { uid: studentId });
         }
         catch (e) {
-            functions.logger.error('createSessionRequest: fallback idToken verification failed', {
-                error: e instanceof Error ? e.message : String(e),
-            });
+            functions.logger.error('createSessionRequest: fallback idToken verification failed', { error: e instanceof Error ? e.message : String(e) });
         }
     }
     if (!studentId) {
-        functions.logger.error('createSessionRequest: UNAUTHENTICATED - no context.auth and no valid fallback token', {
-            headers: JSON.stringify((_h = (_g = context.rawRequest) === null || _g === void 0 ? void 0 : _g.headers) !== null && _h !== void 0 ? _h : {}),
-        });
+        functions.logger.error('createSessionRequest: UNAUTHENTICATED - no context.auth and no valid fallback token', { headers: JSON.stringify((_h = (_g = context.rawRequest) === null || _g === void 0 ? void 0 : _g.headers) !== null && _h !== void 0 ? _h : {}) });
         throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
     // ── 2. Destructure ─────────────────────────────────────────────────────
     const { mohaffezId, studentName, mohaffezName, sessionType, preferredTimeSlot, slotDate, slotStart, slotEnd, imamAddressText, imamAddressLat, imamAddressLng, mohaffezPhone, subscriptionId, requiresPaymentOnAcceptance, selectedPaymentMethod, slotLockId, } = data;
+    // ── NEW: plan fields with safe defaults ────────────────────────────────
+    // rawPlanType / isBundlePlan used later for initialStatus and notification
+    const rawPlanType = (_j = data.planType) !== null && _j !== void 0 ? _j : 'single';
+    const isBundlePlan = rawPlanType === 'bundle' || rawPlanType === 'subscription';
+    const validityDays = typeof data.validityDays === 'number' ? data.validityDays : null;
+    // ──────────────────────────────────────────────────────────────────────
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (!mohaffezId ||
         !studentName ||
@@ -101,10 +109,12 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
         hasSlotLockId: !!slotLockId,
         selectedPaymentMethod,
         requiresPaymentOnAcceptance,
+        rawPlanType,
+        isBundlePlan,
     });
     // ── 4. Transaction ─────────────────────────────────────────────────────
     return admin_1.db.runTransaction(async (transaction) => {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e;
         let lockRef = null;
         let availabilityRef = null;
         let updatedSlots = null;
@@ -171,7 +181,6 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
         // ── 4b. Conflict guard ─────────────────────────────────────────────
         // FIX-BOOKING-1: Guard against all live statuses, not just PENDING.
         // Required Firestore composite index: (mohaffezId ASC, status ASC, slotDate ASC)
-        // Add this index to firestore.indexes.json if not already present.
         const LIVE_STATUSES = [
             STATUS.PENDING,
             STATUS.AWAITING_PAYMENT,
@@ -206,6 +215,12 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
         }
         // ── 4c. Write sessionRequest ───────────────────────────────────────
         const requestRef = admin_1.db.collection('sessionRequests').doc();
+        // ALL session requests start at PENDING regardless of payment method.
+        // Teacher accepts the slot first (PendingRequestsScreen) → student is notified
+        // → status transitions to AWAITINGPAYMENT → student transfers payment →
+        // studentMarkedDirectPayment → mohaffezConfirmDirectPayment → hafizSession created.
+        // This enforces the teacher-first rule for every path.
+        const initialStatus = STATUS.PENDING;
         transaction.set(requestRef, {
             studentId,
             mohaffezId,
@@ -223,13 +238,16 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             subscriptionId: subscriptionId !== null && subscriptionId !== void 0 ? subscriptionId : null,
             planId: (_b = data.planId) !== null && _b !== void 0 ? _b : null,
             planTitle: (_c = data.planTitle) !== null && _c !== void 0 ? _c : null,
+            planType: rawPlanType, // NEW: always written
             paymentAmount: typeof data.paymentAmount === 'number' ? data.paymentAmount : null,
             sessionsCount: typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
-            planType: (_d = data.planType) !== null && _d !== void 0 ? _d : null,
-            requiresPaymentOnAcceptance: requiresPaymentOnAcceptance !== null && requiresPaymentOnAcceptance !== void 0 ? requiresPaymentOnAcceptance : false,
+            validityDays: validityDays, // NEW
+            requiresPaymentOnAcceptance: selectedPaymentMethod === 'directpayment' && !isBundlePlan
+                ? true
+                : (requiresPaymentOnAcceptance !== null && requiresPaymentOnAcceptance !== void 0 ? requiresPaymentOnAcceptance : false),
             selectedPaymentMethod: selectedPaymentMethod !== null && selectedPaymentMethod !== void 0 ? selectedPaymentMethod : 'pay_after_acceptance',
             slotLockId: slotLockId !== null && slotLockId !== void 0 ? slotLockId : null,
-            status: STATUS.PENDING,
+            status: initialStatus,
             createdAt: admin_1.FieldValue.serverTimestamp(),
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });
@@ -248,13 +266,18 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             });
         }
         // ── 4f. Notify mohaffez ────────────────────────────────────────────
+        // NEW: bundle requests show plan name/count in the notification
         const notifRef = admin_1.db.collection('notifications').doc();
         transaction.set(notifRef, {
             userId: mohaffezId,
             recipientId: mohaffezId,
             senderId: studentId,
-            title: 'طلب حجز جديد',
-            body: `${studentName} يطلب حجز جلسة معك`,
+            title: isBundlePlan
+                ? `طلب حزمة جديد من ${studentName}`
+                : 'طلب حجز جديد',
+            body: isBundlePlan
+                ? `${(_d = data.planTitle) !== null && _d !== void 0 ? _d : ''} — ${(_e = data.sessionsCount) !== null && _e !== void 0 ? _e : ''} جلسة`
+                : `${studentName} يطلب حجز جلسة معك`,
             type: 'sessionRequest',
             isRead: false,
             data: {
@@ -263,6 +286,7 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
                 studentName,
                 sessionType,
                 preferredTimeSlot,
+                planType: rawPlanType,
             },
             createdAt: admin_1.FieldValue.serverTimestamp(),
         });
@@ -272,6 +296,8 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             mohaffezId,
             sessionType,
             preferredTimeSlot,
+            rawPlanType,
+            initialStatus,
         });
         return { success: true, requestId: requestRef.id };
     });

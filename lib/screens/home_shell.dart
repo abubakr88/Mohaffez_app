@@ -1,17 +1,23 @@
+// lib/screens/home_shell.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../shared/widgets/offline_banner.dart';
-import '../shared/constants/app_theme.dart';
-import '../providers/user_provider.dart';
-import '../providers/auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../providers/navigation_provider.dart';
 import '../providers/notification_provider_paginated.dart';
+import '../providers/payment_provider.dart';
 import '../providers/system_config_provider.dart';
+import '../providers/user_provider.dart';
+import '../shared/constants/app_theme.dart';
+import '../shared/widgets/offline_banner.dart';
 import '../utils/arabic_labels.dart';
 import 'direct_payment_confirmations_screen.dart';
 
+// ============================================================
+// HOME SHELL
+// ============================================================
 class HomeShell extends ConsumerWidget {
   final Widget child;
   const HomeShell({super.key, required this.child});
@@ -20,7 +26,6 @@ class HomeShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
 
-    // Handle loading and error states properly instead of null-checking value
     return userAsync.when(
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -50,29 +55,36 @@ class HomeShell extends ConsumerWidget {
           );
         }
 
-        final currentIndex  = ref.watch(bottomNavIndexProvider);
-        final isMohaffez    = user.role == 'mohaffez';
-        final isAdmin       = user.role == 'admin';
+        final currentIndex = ref.watch(bottomNavIndexProvider);
+        final isMohaffez = user.role == 'mohaffez';
+        final isAdmin = user.role == 'admin';
         final isDevModeActive = ref.watch(isDevModeActiveProvider);
 
-        // Read unread count once here — shared by AppBar badge AND BottomNav badge
+        // Shared: unread notification count (AppBar + BottomNav badge)
         final unreadCount = ref
             .watch(unreadNotificationsCountProvider(user.uid))
             .value ?? 0;
 
+        // Student only: active bundle count for home tab badge
+        final bundleCount = (!isMohaffez && !isAdmin)
+            ? (ref.watch(activeSubscriptionsProvider(user.uid)).value?.length ?? 0)
+            : 0;
+
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
-            appBar: _buildAppBar(
-              context, ref,
+            appBar: buildAppBar(
+              context,
+              ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
               currentIndex: currentIndex,
               userId: user.uid,
               unreadCount: unreadCount,
             ),
-            drawer: _buildDrawer(
-              context, ref,
+            drawer: buildDrawer(
+              context,
+              ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
               isDevModeActive: isDevModeActive,
@@ -84,636 +96,857 @@ class HomeShell extends ConsumerWidget {
                 Expanded(child: child),
               ],
             ),
-            bottomNavigationBar: _buildBottomNavBar(
-              context, ref,
+            bottomNavigationBar: buildBottomNavBar(
+              context,
+              ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
               currentIndex: currentIndex,
               unreadCount: unreadCount,
+              bundleCount: bundleCount,
             ),
           ),
         );
       },
     );
   }
+}
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // APP BAR
-  // ════════════════════════════════════════════════════════════════════════════
-
-  PreferredSizeWidget _buildAppBar(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool isMohaffez,
-    required bool isAdmin,
-    required int currentIndex,
-    required String userId,
-    required int unreadCount,
-  }) {
-    return PreferredSize(
-      preferredSize: const Size.fromHeight(60),
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 6,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-
-          // Keep status bar icons white over the amber gradient
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-          ),
-
-      // ── LEADING (right in RTL) ─────────────────────────────────────
-      // Back arrow on sub-routes, hamburger on root tabs
-      leading: context.canPop()
-          ? IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-              tooltip: 'رجوع',
-              onPressed: () {
-                // WHY: GoRouter's context.canPop() can return true even when
-                // the underlying Navigator stack is empty after context.go()
-                // resets subroutes inside a ShellRoute — causing a GoError crash.
-                // Fallback to /home keeps UX clean instead of crashing.
-                try {
-                  context.pop();
-                } catch (_) {
-                  context.go('/home');
-                }
-              },
-            )
-          : Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(
-                  Icons.menu_rounded,
-                  color: Colors.white,
-                  size: 26,
-                ),
-                tooltip: ArabicLabels.menu,
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
-              ),
-            ),
-          // ── TITLE ──────────────────────────────────────────────────────
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/icon.png',
-                  height: 30,
-                  width: 30,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.school,
-                    color: AppTheme.primaryAmber,
-                    size: 30,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                _getScreenTitle(isMohaffez, isAdmin, currentIndex),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-
-          // ── ACTIONS (left in RTL) ──────────────────────────────────────
-          // Notification bell only. No refresh button.
-          actions: [
-            if (!isAdmin)
-              _buildNotificationBell(
-                context, ref,
-                isMohaffez: isMohaffez,
-                userId: userId,
-                unreadCount: unreadCount,
-              ),
-            const SizedBox(width: 4),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _getScreenTitle(bool isMohaffez, bool isAdmin, int currentIndex) {
-    if (isMohaffez) {
-      const titles = [
-        ArabicLabels.home,
-        ArabicLabels.notifications,
-        ArabicLabels.profile,
-      ];
-      return currentIndex < titles.length ? titles[currentIndex] : 'محفظ';
-    } else if (isAdmin) {
-      const titles = ['لوحة التحكم', 'المستخدمون', 'المدفوعات', 'الإعدادات'];
-      return currentIndex < titles.length ? titles[currentIndex] : 'لوحة التحكم';
-    } else {
-      const titles = [
-        ArabicLabels.home,
-        ArabicLabels.search,
-        ArabicLabels.notifications,
-        ArabicLabels.profile,
-      ];
-      return currentIndex < titles.length ? titles[currentIndex] : 'محفظ';
-    }
-  }
-
-  Widget _buildNotificationBell(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool isMohaffez,
-    required String userId,
-    required int unreadCount,
-  }) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          icon: Icon(
-            unreadCount > 0
-                ? Icons.notifications_active_rounded
-                : Icons.notifications_outlined,
-            color: Colors.white,
-            size: 26,
-          ),
-          tooltip: ArabicLabels.notifications,
-          onPressed: () {
-            ref
-                .read(bottomNavIndexProvider.notifier)
-                .setIndex(isMohaffez ? 1 : 2);
-            context.go('/notifications');
-          },
-        ),
-        if (unreadCount > 0)
-          Positioned(
-            right: 6,
-            top: 6,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: Colors.red.shade600,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-              child: Text(
-                unreadCount > 99 ? '99+' : '$unreadCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // DRAWER
-  // ════════════════════════════════════════════════════════════════════════════
-
-  Widget _buildDrawer(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool isMohaffez,
-    required bool isAdmin,
-    required bool isDevModeActive,
-    required dynamic user,
-  }) {
-    return Drawer(
-      // Rounded corners on the open edge (left in RTL)
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          bottomLeft: Radius.circular(20),
-        ),
-      ),
-      child: Column(
-        children: [
-          _buildDrawerHeader(user, isMohaffez: isMohaffez, isAdmin: isAdmin),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(top: 8, bottom: 16),
-              children: [
-
-                // ── Common ────────────────────────────────────────────────
-                _drawerTile(context,
-                  title: ArabicLabels.profile,
-                  icon: Icons.person_rounded,
-                  route: '/profile',
-                ),
-
-                // ── Admin ─────────────────────────────────────────────────
-                if (isAdmin) ...[
-                  _drawerSectionLabel('إدارة النظام'),
-                  _drawerTile(context, title: 'لوحة التحكم',        icon: Icons.dashboard_rounded,      route: '/admin-home'),
-                  _drawerTile(context, title: 'إدارة المستخدمين',   icon: Icons.people_alt_rounded,     route: '/admin/users'),
-                  _drawerTile(context, title: 'مراجعة الشهادات',    icon: Icons.verified_rounded,       route: '/admin/credentials'),
-                  _drawerTile(context, title: 'العمليات الفاشلة',   icon: Icons.warning_amber_rounded,  route: '/admin/failed-ops',        color: Colors.orange),
-                  _drawerTile(context, title: 'أكواد الخصم',        icon: Icons.discount_rounded,       route: '/admin/promo-codes'),
-                  _drawerTile(context, title: 'القفلات النشطة',     icon: Icons.lock_clock_rounded,     route: '/admin/slot-locks'),
-                  _drawerTile(context, title: 'أحداث الدفع',        icon: Icons.payment_rounded,        route: '/admin/payment-events'),
-                  _drawerTile(context, title: 'العمولات',           icon: Icons.analytics_rounded,      route: '/admin/commissions'),
-                  _drawerTile(context, title: 'إشعارات جماعية',     icon: Icons.campaign_rounded,       route: '/admin/broadcast'),
-                  _drawerTile(context, title: 'إعدادات النظام',     icon: Icons.settings_rounded,       route: '/admin/settings'),
-                  if (isDevModeActive)
-                    _drawerTile(context, title: 'DEV MODE',          icon: Icons.bug_report_rounded,     route: '/admin/dev-mode',           color: Colors.red),
-                ],
-
-                // ── Mohaffez ──────────────────────────────────────────────
-                if (isMohaffez) ...[
-                  _drawerSectionLabel('إدارة الحساب'),
-                  _drawerTile(context, title: 'الشهادات والمؤهلات', icon: Icons.verified_user_rounded,  route: '/credentials',             color: Colors.purple),
-                  _drawerTile(context, title: 'إدارة الأوقات',      icon: Icons.schedule_rounded,       route: '/availability',            color: Colors.blue),
-                  // Direct payment — pushes a new route, not go()
-                  _drawerCustomTile(
-                    context,
-                    title: 'مدفوعات بانتظار التأكيد',
-                    icon: Icons.payments_rounded,
-                    color: Colors.orange,
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const DirectPaymentConfirmationsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-
-                // ── General ───────────────────────────────────────────────
-                _drawerSectionLabel('عام'),
-                _drawerTile(context, title: ArabicLabels.settings, icon: Icons.settings_rounded,   route: '/settings'),
-                _drawerTile(context, title: ArabicLabels.privacy,  icon: Icons.privacy_tip_rounded, route: '/privacy-settings'),
-
-                const Divider(height: 24, indent: 16, endIndent: 16),
-
-                // ── Logout ────────────────────────────────────────────────
-                _drawerCustomTile(
-                  context,
-                  title: 'تسجيل الخروج',
-                  icon: Icons.logout_rounded,
-                  color: Colors.red,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showLogoutDialog(context, ref);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerHeader(
-    dynamic user, {
-    required bool isMohaffez,
-    required bool isAdmin,
-  }) {
-    final roleLabel = isAdmin ? 'مشرف' : isMohaffez ? 'محفظ' : 'طالب';
-    final roleColor = isAdmin
-        ? Colors.red.shade700
-        : isMohaffez
-            ? Colors.purple.shade600
-            : Colors.blue.shade600;
-
-    return DrawerHeader(
-      margin: EdgeInsets.zero,
+// ============================================================
+// APP BAR
+// ============================================================
+PreferredSizeWidget buildAppBar(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required bool isAdmin,
+  required int currentIndex,
+  required String userId,
+  required int unreadCount,
+}) {
+  return PreferredSize(
+    preferredSize: const Size.fromHeight(60),
+    child: Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.white,
-                child: Text(
-                  user.name.isNotEmpty ? user.name[0].toUpperCase() : 'م',
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryAmber,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      user.email,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Role badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: roleColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              roleLabel,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 6,
+            offset: Offset(0, 2),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _drawerSectionLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey.shade500,
-          letterSpacing: 1.0,
+      child: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
         ),
+        leading: context.canPop()
+            ? IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+                tooltip: 'رجوع',
+                onPressed: () {
+                  // WHY: GoRouter's context.canPop can return true even on
+                  // empty stacks inside a ShellRoute → fallback to /home.
+                  try {
+                    context.pop();
+                  } catch (_) {
+                    context.go('/home');
+                  }
+                },
+              )
+            : Builder(
+                builder: (ctx) => IconButton(
+                  icon: const Icon(
+                    Icons.menu_rounded,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                  tooltip: ArabicLabels.menu,
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Image.asset(
+                'assets/images/icon.png',
+                height: 24,
+                width: 24,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.school,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              getScreenTitle(isMohaffez, isAdmin, currentIndex),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        titleSpacing: 0,
+        actions: [
+          if (!isAdmin)
+            buildNotificationBell(
+              context,
+              ref,
+              isMohaffez: isMohaffez,
+              userId: userId,
+              unreadCount: unreadCount,
+            ),
+          const SizedBox(width: 4),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _drawerTile(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required String route,
-    Color? color,
-  }) {
-    return _drawerCustomTile(
-      context,
-      title: title,
-      icon: icon,
-      color: color,
-      onTap: () {
-        Navigator.pop(context);
-        context.go(route);
+// ── Screen title helper ───────────────────────────────────────
+String getScreenTitle(bool isMohaffez, bool isAdmin, int currentIndex) {
+  if (isMohaffez) {
+    const titles = [
+      ArabicLabels.home,
+      ArabicLabels.notifications,
+      ArabicLabels.profile,
+    ];
+    return currentIndex < titles.length ? titles[currentIndex] : ArabicLabels.home;
+  } else if (isAdmin) {
+    const titles = ['لوحة التحكم', 'الإشعارات', 'الملف الشخصي'];
+    return currentIndex < titles.length ? titles[currentIndex] : 'لوحة التحكم';
+  } else {
+    const titles = [
+      ArabicLabels.home,
+      ArabicLabels.search,
+      ArabicLabels.notifications,
+      ArabicLabels.profile,
+    ];
+    return currentIndex < titles.length ? titles[currentIndex] : ArabicLabels.home;
+  }
+}
+
+// ── Notification bell with badge ─────────────────────────────
+Widget buildNotificationBell(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required String userId,
+  required int unreadCount,
+}) {
+  return Stack(
+    clipBehavior: Clip.none,
+    children: [
+      IconButton(
+        icon: Icon(
+          unreadCount > 0
+              ? Icons.notifications_active_rounded
+              : Icons.notifications_outlined,
+          color: Colors.white,
+          size: 26,
+        ),
+        tooltip: ArabicLabels.notifications,
+        onPressed: () {
+          ref
+              .read(bottomNavIndexProvider.notifier)
+              .setIndex(isMohaffez ? 1 : 2);
+          context.go('/notifications');
+        },
+      ),
+      if (unreadCount > 0)
+        Positioned(
+          right: 6,
+          top: 6,
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: Colors.red.shade600,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+            constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+            child: Text(
+              unreadCount > 99 ? '99+' : '$unreadCount',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+// ============================================================
+// BOTTOM NAVIGATION BAR
+// ============================================================
+Widget buildBottomNavBar(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required bool isAdmin,
+  required int currentIndex,
+  required int unreadCount,
+  int bundleCount = 0,
+}) {
+  // ── Shared styling ──────────────────────────────────────────
+  const selectedColor = AppTheme.primaryAmber;
+  const unselectedColor = Colors.grey;
+
+  // ── Notification badge item builder ────────────────────────
+  BottomNavigationBarItem notifItem() => BottomNavigationBarItem(
+        icon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.notifications_outlined),
+            if (unreadCount > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade600,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  constraints:
+                      const BoxConstraints(minWidth: 14, minHeight: 14),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        activeIcon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.notifications_rounded),
+            if (unreadCount > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade600,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  constraints:
+                      const BoxConstraints(minWidth: 14, minHeight: 14),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        label: ArabicLabels.notifications,
+      );
+
+  // ── Student ─────────────────────────────────────────────────
+  if (!isMohaffez && !isAdmin) {
+    return BottomNavigationBar(
+      currentIndex: currentIndex,
+      selectedItemColor: selectedColor,
+      unselectedItemColor: unselectedColor,
+      type: BottomNavigationBarType.fixed,
+      selectedLabelStyle: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelStyle: const TextStyle(fontSize: 11),
+      elevation: 12,
+      onTap: (index) {
+        ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+        switch (index) {
+          case 0:
+            context.go('/home');
+          case 1:
+            context.go('/nearby');
+          case 2:
+            context.go('/notifications');
+          case 3:
+            context.go('/profile');
+        }
       },
-    );
-  }
-
-  Widget _drawerCustomTile(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    final tileColor = color ?? AppTheme.primaryAmber;
-    return ListTile(
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      leading: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: tileColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: tileColor, size: 19),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-
-  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+      items: [
+        // HOME — with bundle badge
+        BottomNavigationBarItem(
+          icon: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Icon(Icons.logout_rounded, color: Colors.red),
-              SizedBox(width: 8),
-              Text('تسجيل الخروج'),
+              const Icon(Icons.home_outlined),
+              if (bundleCount > 0)
+                Positioned(
+                  right: -6,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryAmber,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1),
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 14, minHeight: 14),
+                    child: Text(
+                      bundleCount > 9 ? '9+' : '$bundleCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
             ],
           ),
-          content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(ArabicLabels.cancel),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await ref.read(authNotifierProvider.notifier).logout();
-                if (context.mounted) context.go('/login');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+          activeIcon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.home_rounded),
+              if (bundleCount > 0)
+                Positioned(
+                  right: -6,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryAmber,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1),
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 14, minHeight: 14),
+                    child: Text(
+                      bundleCount > 9 ? '9+' : '$bundleCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          label: ArabicLabels.home,
+        ),
+        // SEARCH / NEARBY
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.search_outlined),
+          activeIcon: Icon(Icons.search_rounded),
+          label: ArabicLabels.search,
+        ),
+        // NOTIFICATIONS
+        notifItem(),
+        // PROFILE
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline_rounded),
+          activeIcon: Icon(Icons.person_rounded),
+          label: ArabicLabels.profile,
+        ),
+      ],
+    );
+  }
+
+  // ── Mohaffez ────────────────────────────────────────────────
+  if (isMohaffez) {
+    return BottomNavigationBar(
+      currentIndex: currentIndex,
+      selectedItemColor: selectedColor,
+      unselectedItemColor: unselectedColor,
+      type: BottomNavigationBarType.fixed,
+      selectedLabelStyle: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelStyle: const TextStyle(fontSize: 11),
+      elevation: 12,
+      onTap: (index) {
+        ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+        switch (index) {
+          case 0:
+            context.go('/mohaffez-home');
+          case 1:
+            context.go('/notifications');
+          case 2:
+            context.go('/profile');
+        }
+      },
+      items: [
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home_rounded),
+          label: ArabicLabels.home,
+        ),
+        notifItem(),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline_rounded),
+          activeIcon: Icon(Icons.person_rounded),
+          label: ArabicLabels.profile,
+        ),
+      ],
+    );
+  }
+
+  // ── Admin ───────────────────────────────────────────────────
+  return BottomNavigationBar(
+    currentIndex: currentIndex,
+    selectedItemColor: selectedColor,
+    unselectedItemColor: unselectedColor,
+    type: BottomNavigationBarType.fixed,
+    selectedLabelStyle: const TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+    ),
+    unselectedLabelStyle: const TextStyle(fontSize: 11),
+    elevation: 12,
+    onTap: (index) {
+      ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+      switch (index) {
+        case 0:
+          context.go('/admin-home');
+        case 1:
+          context.go('/notifications');
+        case 2:
+          context.go('/profile');
+      }
+    },
+    items: [
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.dashboard_outlined),
+        activeIcon: Icon(Icons.dashboard_rounded),
+        label: 'لوحة التحكم',
+      ),
+      notifItem(),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.person_outline_rounded),
+        activeIcon: Icon(Icons.person_rounded),
+        label: ArabicLabels.profile,
+      ),
+    ],
+  );
+}
+
+// ============================================================
+// DRAWER
+// ============================================================
+Widget buildDrawer(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required bool isAdmin,
+  required bool isDevModeActive,
+  required dynamic user,
+}) {
+  return Drawer(
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(20),
+        bottomLeft: Radius.circular(20),
+      ),
+    ),
+    child: Column(
+      children: [
+        buildDrawerHeader(user, isMohaffez: isMohaffez, isAdmin: isAdmin),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.only(top: 8, bottom: 16),
+            children: [
+              // ── Common ──────────────────────────────────────
+              drawerTile(
+                context,
+                title: ArabicLabels.profile,
+                icon: Icons.person_rounded,
+                route: 'profile',
               ),
-              icon: const Icon(Icons.logout_rounded, size: 16),
-              label: const Text('تسجيل الخروج'),
+              drawerTile(
+                context,
+                title: 'الإعدادات',
+                icon: Icons.settings_rounded,
+                route: 'settings',
+              ),
+              drawerTile(
+                context,
+                title: 'إعدادات الخصوصية',
+                icon: Icons.privacy_tip_rounded,
+                route: 'privacy-settings',
+              ),
+
+              // ── Admin ────────────────────────────────────────
+              if (isAdmin) ...[
+                drawerSectionLabel('إدارة النظام'),
+                drawerTile(context,
+                    title: 'لوحة التحكم',
+                    icon: Icons.dashboard_rounded,
+                    route: 'admin-home'),
+                drawerTile(context,
+                    title: 'المستخدمون',
+                    icon: Icons.people_alt_rounded,
+                    route: 'adminusers'),
+                drawerTile(context,
+                    title: 'الاعتمادات',
+                    icon: Icons.verified_rounded,
+                    route: 'admincredentials'),
+                drawerTile(context,
+                    title: 'العمليات الفاشلة',
+                    icon: Icons.warning_amber_rounded,
+                    route: 'adminfailed-ops',
+                    color: Colors.orange),
+                drawerTile(context,
+                    title: 'أكواد الخصم',
+                    icon: Icons.discount_rounded,
+                    route: 'adminpromo-codes'),
+                drawerTile(context,
+                    title: 'قفل المواعيد',
+                    icon: Icons.lock_clock_rounded,
+                    route: 'adminslot-locks'),
+                drawerTile(context,
+                    title: 'أحداث الدفع',
+                    icon: Icons.payment_rounded,
+                    route: 'adminpayment-events'),
+                drawerTile(context,
+                    title: 'العمولات',
+                    icon: Icons.analytics_rounded,
+                    route: 'admincommissions'),
+                drawerTile(context,
+                    title: 'الإشعارات الجماعية',
+                    icon: Icons.campaign_rounded,
+                    route: 'adminbroadcast'),
+                drawerTile(context,
+                    title: 'إعدادات النظام',
+                    icon: Icons.settings_rounded,
+                    route: 'adminsettings'),
+                if (isDevModeActive)
+                  drawerTile(context,
+                      title: 'وضع المطوّر',
+                      icon: Icons.bug_report_rounded,
+                      route: 'admindev-mode',
+                      color: Colors.red),
+              ],
+
+              // ── Mohaffez ─────────────────────────────────────
+              if (isMohaffez) ...[
+                drawerSectionLabel('أدوات المحفظ'),
+                drawerTile(context,
+                    title: 'بيانات الاعتماد',
+                    icon: Icons.verified_user_rounded,
+                    route: 'credentials',
+                    color: Colors.purple),
+                drawerTile(context,
+                    title: 'إدارة الجدول',
+                    icon: Icons.schedule_rounded,
+                    route: 'availability',
+                    color: Colors.blue),
+                drawerTile(context,
+                    title: 'إدارة الأسعار',
+                    icon: Icons.price_change_rounded,
+                    route: 'pricing-management',
+                    color: Colors.teal),
+                drawerTile(context,
+                    title: 'إعدادات المحفظة',
+                    icon: Icons.account_balance_wallet_rounded,
+                    route: 'wallet-settings',
+                    color: Colors.green),
+                drawerCustomTile(
+                  context,
+                  title: 'تأكيد المدفوعات',
+                  icon: Icons.payments_rounded,
+                  color: Colors.orange,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const DirectPaymentConfirmationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+
+              // ── Student extras ───────────────────────────────
+              if (!isMohaffez && !isAdmin) ...[
+                drawerSectionLabel('باقاتي'),
+                drawerCustomTile(
+                  context,
+                  title: 'باقاتي النشطة',
+                  icon: Icons.collections_bookmark_rounded,
+                  color: AppTheme.primaryAmber,
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/active-subscriptions');
+                  },
+                ),
+                drawerTile(context,
+                    title: 'طلباتي',
+                    icon: Icons.pending_actions_rounded,
+                    route: 'requests',
+                    color: Colors.orange),
+              ],
+
+              const Divider(height: 24),
+
+              // ── Logout ───────────────────────────────────────
+              ListTile(
+                leading: const Icon(Icons.logout_rounded, color: Colors.red),
+                title: const Text(
+                  'تسجيل الخروج',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await FirebaseAuth.instance.signOut();
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Drawer header ─────────────────────────────────────────────
+Widget buildDrawerHeader(
+  dynamic user, {
+  required bool isMohaffez,
+  required bool isAdmin,
+}) {
+  final name = (user?.name as String?) ?? 'المستخدم';
+  final email = (user?.email as String?) ?? '';
+  final roleLabel = isAdmin
+      ? 'مدير النظام'
+      : isMohaffez
+          ? 'محفظ معتمد'
+          : 'طالب';
+
+  return Container(
+    width: double.infinity,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(20),
+      ),
+    ),
+    child: SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  name.isNotEmpty ? name[0] : '؟',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            if (email.isNotEmpty)
+              Text(
+                email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 12,
+                ),
+              ),
+            const SizedBox(height: 8),
+            // Role chip
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                roleLabel,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // BOTTOM NAV BAR
-  // ════════════════════════════════════════════════════════════════════════════
-
-  Widget _buildBottomNavBar(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool isMohaffez,
-    required bool isAdmin,
-    required int currentIndex,
-    required int unreadCount,
-  }) {
-    if (isAdmin) {
-      return _styledBottomNav(
-        currentIndex: currentIndex,
-        onTap: (i) {
-          ref.read(bottomNavIndexProvider.notifier).setIndex(i);
-          const routes = [
-            '/admin-home',
-            '/admin/users',
-            '/admin/payment-events',
-            '/admin/settings',
-          ];
-          if (i < routes.length) context.go(routes[i]);
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded),   label: 'لوحة التحكم'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_alt_rounded),  label: 'المستخدمون'),
-          BottomNavigationBarItem(icon: Icon(Icons.payment_rounded),     label: 'المدفوعات'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings_rounded),    label: 'الإعدادات'),
-        ],
-      );
-    } else if (isMohaffez) {
-      return _styledBottomNav(
-        currentIndex: currentIndex,
-        onTap: (i) {
-          ref.read(bottomNavIndexProvider.notifier).setIndex(i);
-          const routes = ['/mohaffez-home', '/notifications', '/profile'];
-          if (i < routes.length) context.go(routes[i]);
-        },
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.home_rounded),   label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: _badgedBellIcon(unreadCount),      label: 'الإشعارات'),
-          const BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'الملف الشخصي'),
-        ],
-      );
-    } else {
-      return _styledBottomNav(
-        currentIndex: currentIndex,
-        onTap: (i) {
-          ref.read(bottomNavIndexProvider.notifier).setIndex(i);
-          const routes = ['/home', '/nearby', '/notifications', '/profile'];
-          if (i < routes.length) context.go(routes[i]);
-        },
-        items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.home_rounded),   label: 'الرئيسية'),
-          const BottomNavigationBarItem(icon: Icon(Icons.search_rounded), label: 'البحث'),
-          BottomNavigationBarItem(icon: _badgedBellIcon(unreadCount),      label: 'الإشعارات'),
-          const BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'الملف الشخصي'),
-        ],
-      );
-    }
-  }
-
-  /// Bell icon with a Material 3 Badge for the BottomNavigationBar
-  Widget _badgedBellIcon(int unreadCount) {
-    return Badge(
-      isLabelVisible: unreadCount > 0,
-      label: Text(
-        unreadCount > 99 ? '99+' : '$unreadCount',
-        style: const TextStyle(fontSize: 9),
-      ),
-      child: Icon(
-        unreadCount > 0
-            ? Icons.notifications_active_rounded
-            : Icons.notifications_outlined,
-      ),
-    );
-  }
-
-  Widget _styledBottomNav({
-    required int currentIndex,
-    required void Function(int) onTap,
-    required List<BottomNavigationBarItem> items,
-  }) {
-    return Container(
+// ============================================================
+// DRAWER TILE HELPERS
+// ============================================================
+Widget drawerTile(
+  BuildContext context, {
+  required String title,
+  required IconData icon,
+  required String route,
+  Color? color,
+}) {
+  final tileColor = color ?? Colors.grey.shade700;
+  return ListTile(
+    leading: Container(
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: tileColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: BottomNavigationBar(
-        currentIndex: currentIndex,
-        onTap: onTap,
-        selectedItemColor: AppTheme.primaryAmber,
-        unselectedItemColor: Colors.grey.shade500,
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0, // shadow handled by Container above
-        selectedLabelStyle: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 11,
-        ),
-        unselectedLabelStyle: const TextStyle(fontSize: 11),
-        items: items,
+      child: Icon(icon, size: 20, color: tileColor),
+    ),
+    title: Text(
+      title,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: Colors.grey.shade800,
       ),
-    );
-  }
+    ),
+    trailing: Icon(
+      Icons.arrow_back_ios_new_rounded,
+      size: 14,
+      color: Colors.grey.shade400,
+    ),
+    onTap: () {
+      Navigator.pop(context);
+      context.go('/$route');
+    },
+  );
+}
+
+Widget drawerCustomTile(
+  BuildContext context, {
+  required String title,
+  required IconData icon,
+  Color? color,
+  required VoidCallback onTap,
+}) {
+  final tileColor = color ?? Colors.grey.shade700;
+  return ListTile(
+    leading: Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: tileColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, size: 20, color: tileColor),
+    ),
+    title: Text(
+      title,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: Colors.grey.shade800,
+      ),
+    ),
+    trailing: Icon(
+      Icons.arrow_back_ios_new_rounded,
+      size: 14,
+      color: Colors.grey.shade400,
+    ),
+    onTap: onTap,
+  );
+}
+
+Widget drawerSectionLabel(String label) {
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+    child: Text(
+      label,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey.shade500,
+        letterSpacing: 0.8,
+      ),
+    ),
+  );
 }

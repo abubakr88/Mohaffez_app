@@ -17,6 +17,7 @@ class BookingFlowState {
   final int? selectedPlanSessions;
   final int? selectedPlanValidityDays;
   final BookingPath? bookingPath;
+  final String? directPaymentRequestId;
 
   const BookingFlowState({
     this.slotContext,
@@ -26,6 +27,7 @@ class BookingFlowState {
     this.selectedPlanSessions,
     this.selectedPlanValidityDays,
     this.bookingPath,
+    this.directPaymentRequestId,
   });
 
   BookingFlowState copyWith({
@@ -36,6 +38,7 @@ class BookingFlowState {
     int? selectedPlanSessions,
     int? selectedPlanValidityDays,
     BookingPath? bookingPath,
+    String? directPaymentRequestId,
     bool clearSlotContext = false,
     bool clearSelectedPlan = false,
     bool clearBookingPath = false,
@@ -48,6 +51,7 @@ class BookingFlowState {
       selectedPlanSessions: clearSelectedPlan ? null : (selectedPlanSessions ?? this.selectedPlanSessions),
       selectedPlanValidityDays: clearSelectedPlan ? null : (selectedPlanValidityDays ?? this.selectedPlanValidityDays),
       bookingPath: clearBookingPath ? null : (bookingPath ?? this.bookingPath),
+      directPaymentRequestId: directPaymentRequestId ?? this.directPaymentRequestId,
     );
   }
 }
@@ -81,6 +85,13 @@ class BookingFlowNotifier extends StateNotifier<BookingFlowState> {
 
   void reset() {
     state = const BookingFlowState();
+  }
+
+  void clearIfAbandoned() {
+    // Only reset if payment has not been initiated yet.
+    if (state.directPaymentRequestId == null) {
+      state = const BookingFlowState();
+    }
   }
 }
 

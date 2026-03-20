@@ -16,11 +16,13 @@ import '../services/app_version_service.dart';
 class MohaffezHome extends ConsumerStatefulWidget {
   const MohaffezHome({super.key});
 
-  @override
+  @override 
   ConsumerState<MohaffezHome> createState() => _MohaffezHomeState();
 }
 
 class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
+  bool _hasNavigated = false;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +31,12 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
         AppVersionService.checkOnStartup(context);
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _hasNavigated = false;
   }
 
   @override
