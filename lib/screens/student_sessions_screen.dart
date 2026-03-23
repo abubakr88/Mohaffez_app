@@ -2,10 +2,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
+
+DateTime? _toDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is Timestamp) return value.toDate();
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
 
 class StudentSessionsScreen extends ConsumerStatefulWidget {
   const StudentSessionsScreen({super.key});
@@ -209,12 +218,12 @@ class _StudentSessionsScreenState
     }).toList();
 
     final upcoming = all.where((s) {
-      final d = s['sessionDate'] as DateTime?;
+      final d = _toDateTime(s['sessionDate']);
       return d != null && !d.isBefore(todayStart);
     }).length;
 
     final completed = all.where((s) {
-      final d = s['sessionDate'] as DateTime?;
+      final d = _toDateTime(s['sessionDate']);
       return d != null && d.isBefore(todayStart);
     }).length;
 
@@ -276,12 +285,12 @@ class _StudentSessionsScreenState
       if (f == 'all') return all.length;
       if (f == 'upcoming') {
         return all.where((s) {
-          final d = s['sessionDate'] as DateTime?;
+          final d = _toDateTime(s['sessionDate']);
           return d != null && !d.isBefore(todayStart);
         }).length;
       }
       return all.where((s) {
-        final d = s['sessionDate'] as DateTime?;
+        final d = _toDateTime(s['sessionDate']);
         return d != null && d.isBefore(todayStart);
       }).length;
     }
@@ -398,33 +407,33 @@ class _StudentSessionsScreenState
     if (_selectedFilter == 'upcoming') {
       filtered = filtered
           .where((s) {
-            final d = s['sessionDate'] as DateTime?;
+            final d = _toDateTime(s['sessionDate']);
             return d != null && !d.isBefore(todayStart);
           })
           .toList()
         ..sort((a, b) {
-          final da = a['sessionDate'] as DateTime?;
-          final db = b['sessionDate'] as DateTime?;
+          final da = _toDateTime(a['sessionDate']);
+          final db = _toDateTime(b['sessionDate']);
           if (da == null || db == null) return 0;
           return da.compareTo(db);
         });
     } else if (_selectedFilter == 'completed') {
       filtered = filtered
           .where((s) {
-            final d = s['sessionDate'] as DateTime?;
+            final d = _toDateTime(s['sessionDate']);
             return d != null && d.isBefore(todayStart);
           })
           .toList()
         ..sort((a, b) {
-          final da = a['sessionDate'] as DateTime?;
-          final db = b['sessionDate'] as DateTime?;
+          final da = _toDateTime(a['sessionDate']);
+          final db = _toDateTime(b['sessionDate']);
           if (da == null || db == null) return 0;
           return db.compareTo(da);
         });
     } else {
       filtered.sort((a, b) {
-        final da = a['sessionDate'] as DateTime?;
-        final db = b['sessionDate'] as DateTime?;
+        final da = _toDateTime(a['sessionDate']);
+        final db = _toDateTime(b['sessionDate']);
         if (da == null || db == null) return 0;
         return db.compareTo(da);
       });
@@ -580,7 +589,7 @@ class _SessionCard extends StatelessWidget {
     final sessionType = (session['sessionType'] as String?) ?? 'home';
     final location = (session['imamAddressText'] as String?) ?? '';
     final timeSlot = (session['preferredTimeSlot'] as String?) ?? '';
-    final sessionDate = session['sessionDate'] as DateTime?;
+    final sessionDate = _toDateTime(session['sessionDate']);
     final hifz = (session['hifzAssignment'] as String?) ?? '';
     final muraja = (session['murajaAssignment'] as String?) ?? '';
 
@@ -593,7 +602,7 @@ class _SessionCard extends StatelessWidget {
         sessionDate.month == now.month &&
         sessionDate.day == now.day;
 
-    final daysUntil = (isUpcoming && !isToday && sessionDate != null)
+    final daysUntil = (isUpcoming && !isToday)
         ? sessionDate.difference(todayStart).inDays
         : null;
 

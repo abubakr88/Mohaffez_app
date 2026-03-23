@@ -141,14 +141,17 @@ async function consumeSubscriptionAndCreateSession(subscriptionId, payment, tran
             ? await readAvailabilityInTransaction(transaction, slotInfo)
             : null;
         // ── VALIDATE ──────────────────────────────────────────────────────────────
-        if (!subSnap.exists)
-            throw new Error('Subscription not found');
+        if (!subSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'الاشتراك غير موجود');
+        }
         const subscription = subSnap.data();
         const remainingSessions = parseNumber(subscription['remainingSessions'], 0);
-        if (remainingSessions <= 0)
-            throw new Error('No sessions remaining');
-        if (requestRef && requestSnap && !requestSnap.exists)
-            throw new Error('Session request not found for subscription consumption');
+        if (remainingSessions <= 0) {
+            throw new functions.https.HttpsError('failed-precondition', 'لا توجد جلسات متبقية في هذا الاشتراك');
+        }
+        if (requestRef && requestSnap && !requestSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'طلب الجلسة غير موجود');
+        }
         // ── WRITES ────────────────────────────────────────────────────────────────
         const newRemaining = remainingSessions - 1;
         const status = newRemaining === 0 ? 'depleted' : parseString(subscription['status'], 'active');

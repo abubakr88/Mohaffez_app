@@ -523,8 +523,6 @@ class _PendingRequestsScreenState
   Future<void> _confirmSubscriptionSession(
     Map<String, dynamic> request,
   ) async {
-    // Get the currently authenticated mohaffez UID from the auth provider —
-    // never from the Firestore request doc to avoid permission-denied mismatches.
     final currentUser = ref.read(currentUserProvider).value;
     if (currentUser == null) {
       if (mounted) {
@@ -552,9 +550,6 @@ class _PendingRequestsScreenState
             HttpsCallableOptions(timeout: const Duration(seconds: 30)),
       );
 
-      // FIX: 3 fields only. The CF reads everything else from Firestore.
-      // Previously 14+ fields were sent including Timestamp→ISO conversions
-      // that the CF re-parsed with parseFlutterDate, causing the crash.
       final result = await callable.call({
         'requestId':    request['id'] as String,
         'mohaffezId':   currentUser.uid,
@@ -562,45 +557,65 @@ class _PendingRequestsScreenState
       });
 
       final data = Map<String, dynamic>.from(result.data as Map);
+      
+      // IMPORTANT: Check mounted BEFORE any navigation
+      if (!mounted) return;
+      
+      // Pop the loading dialog first
+      Navigator.of(context).pop();
+
       if (data['success'] == true) {
-        if (mounted) Navigator.of(context).pop(); // dismiss loading dialog
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم قبول الجلسة بنجاح'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-          ref.invalidate(
-            pendingRequestsFirstPageProvider(
-                request['mohaffezId'] as String),
-          );
-          context.go('/home');
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم قبول الجلسة بنجاح'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        ref.invalidate(
+          pendingRequestsFirstPageProvider(
+              request['mohaffezId'] as String),
+        );
+        context.go('/home');
       } else {
-        throw Exception(data['message'] ?? 'فشل تأكيد الجلسة');
+        // Error from CF - show error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['message'] ?? 'فشل تأكيد الجلسة'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } on FirebaseFunctionsException catch (e) {
-      if (mounted) Navigator.of(context).pop();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message ?? 'خطأ في تأكيد الجلسة'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      // Check mounted at the start of error handling
+      if (!mounted) return;
+      
+      // Safe pop - check if we can pop first
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
       }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'خطأ في تأكيد الجلسة'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } catch (e) {
-      if (mounted) Navigator.of(context).pop();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      // Check mounted at the start of error handling
+      if (!mounted) return;
+      
+      // Safe pop - check if we can pop first
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
       }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }

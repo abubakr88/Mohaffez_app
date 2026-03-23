@@ -4,11 +4,14 @@
 //    because teacher-first rule applies to all bundles regardless of payment method
 // 3. Added: validityDays to transaction.set()
 // 4. Updated: notification title/body in 4f to reflect bundle vs single
+// FIX-TS6133: subscriptionId destructured variable now used in both diagnostic log
+//             and transaction.set() — eliminates TS6133 'declared but never read' error.
 // All other logic (slot lock, conflict guard, availability disable, etc.) is UNTOUCHED
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
+
 
 const STATUS = {
   PENDING: 'pending',
@@ -19,10 +22,12 @@ const STATUS = {
   CANCELLED: 'cancelled',
 } as const;
 
+
 function normalizeTimeSlot(raw: string): string {
   // FIXED: BUG-5 - strip both hyphens AND en-dashes
   return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
 }
+
 
 function parseFlutterDate(iso: string): Date {
   if (!iso.endsWith('Z') && !/[+\-]\d{2}:\d{2}$/.test(iso)) {
@@ -31,11 +36,13 @@ function parseFlutterDate(iso: string): Date {
   return new Date(iso);
 }
 
+
 export const createSessionRequest = functions.https.onCall(
   async (data, context) => {
     const fallbackIdToken =
       typeof data?.idToken === 'string' ? data.idToken : null;
     let studentId: string | null = context.auth?.uid ?? null;
+
 
     // ── 0. DIAGNOSTIC LOG (remove after issue resolved) ───────────────────
     functions.logger.info('createSessionRequest invoked', {
@@ -45,6 +52,7 @@ export const createSessionRequest = functions.https.onCall(
       rawAuthHeader: !!(context as any).rawRequest?.headers?.authorization,
       hasFallbackIdToken: !!fallbackIdToken,
     });
+
 
     // ── 1. Auth ────────────────────────────────────────────────────────────
     if (!studentId && fallbackIdToken) {
@@ -63,6 +71,7 @@ export const createSessionRequest = functions.https.onCall(
       }
     }
 
+
     if (!studentId) {
       functions.logger.error(
         'createSessionRequest: UNAUTHENTICATED - no context.auth and no valid fallback token',
@@ -70,6 +79,7 @@ export const createSessionRequest = functions.https.onCall(
       );
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
+
 
     // ── 2. Destructure ─────────────────────────────────────────────────────
     const {
@@ -85,11 +95,12 @@ export const createSessionRequest = functions.https.onCall(
       imamAddressLat,
       imamAddressLng,
       mohaffezPhone,
-      subscriptionId,
+      subscriptionId,          // FIX-TS6133: now consumed below (log + Firestore write)
       requiresPaymentOnAcceptance,
       selectedPaymentMethod,
       slotLockId,
     } = data;
+
 
     // ── NEW: plan fields with safe defaults ────────────────────────────────
     // rawPlanType / isBundlePlan used later for initialStatus and notification
@@ -100,6 +111,7 @@ export const createSessionRequest = functions.https.onCall(
     const validityDays: number | null =
       typeof data.validityDays === 'number' ? data.validityDays : null;
     // ──────────────────────────────────────────────────────────────────────
+
 
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (
@@ -130,9 +142,11 @@ export const createSessionRequest = functions.https.onCall(
       );
     }
 
+
     const slotDateObj = parseFlutterDate(slotDate);
     const slotStartObj = parseFlutterDate(slotStart);
     const slotEndObj = parseFlutterDate(slotEnd);
+
 
     if (
       isNaN(slotDateObj.getTime()) ||
@@ -150,12 +164,14 @@ export const createSessionRequest = functions.https.onCall(
       );
     }
 
+
     if (data.studentId && data.studentId !== studentId) {
       throw new functions.https.HttpsError(
         'permission-denied',
         'studentId in payload does not match authenticated user'
       );
     }
+
 
     functions.logger.info('createSessionRequest: validation passed', {
       studentId,
@@ -170,16 +186,19 @@ export const createSessionRequest = functions.https.onCall(
       isBundlePlan,
     });
 
+
     // ── 4. Transaction ─────────────────────────────────────────────────────
     return db.runTransaction(async (transaction) => {
       let lockRef: FirebaseFirestore.DocumentReference | null = null;
       let availabilityRef: FirebaseFirestore.DocumentReference | null = null;
       let updatedSlots: Record<string, unknown>[] | null = null;
 
+
       // ── 4a. Validate slot lock ─────────────────────────────────────────
       if (slotLockId) {
         lockRef = db.collection('slotLocks').doc(slotLockId);
         const lockSnap = await transaction.get(lockRef);
+
 
         if (!lockSnap.exists) {
           throw new functions.https.HttpsError(
@@ -188,7 +207,9 @@ export const createSessionRequest = functions.https.onCall(
           );
         }
 
+
         const lock = lockSnap.data()!;
+
 
         if (lock.released === true) {
           throw new functions.https.HttpsError(
@@ -196,6 +217,7 @@ export const createSessionRequest = functions.https.onCall(
             'تم تحرير هذا الموعد بالفعل'
           );
         }
+
 
         const now = new Date();
         if (lock.expiresAt && lock.expiresAt.toDate() < now) {
@@ -205,12 +227,14 @@ export const createSessionRequest = functions.https.onCall(
           );
         }
 
+
         if (lock.mohaffezId !== mohaffezId) {
           throw new functions.https.HttpsError(
             'invalid-argument',
             'الموعد المحجوز لا ينتمي لهذا المحفظ'
           );
         }
+
 
         const availabilityDocId =
           typeof lock.availabilityDocId === 'string'
@@ -221,12 +245,14 @@ export const createSessionRequest = functions.https.onCall(
         const lockSessionType =
           typeof lock.sessionType === 'string' ? lock.sessionType : null;
 
+
         if (availabilityDocId && lockTimeSlot && lockSessionType) {
           availabilityRef = db
             .collection('users')
             .doc(mohaffezId)
             .collection('availability')
             .doc(availabilityDocId);
+
 
           const availabilitySnap = await transaction.get(availabilityRef);
           if (availabilitySnap.exists) {
@@ -237,8 +263,10 @@ export const createSessionRequest = functions.https.onCall(
               ? (availabilityData.timeSlots as Record<string, unknown>[])
               : [];
 
+
             const selectedSlot = normalizeTimeSlot(lockTimeSlot);
             let changed = false;
+
 
             updatedSlots = slots.map((slot) => {
               const start =
@@ -262,6 +290,7 @@ export const createSessionRequest = functions.https.onCall(
               return slot;
             });
 
+
             // FIXED: BUG-5 - Warn if slot disable was skipped due to mismatch
             if (!changed) {
               functions.logger.warn(
@@ -281,6 +310,7 @@ export const createSessionRequest = functions.https.onCall(
         }
       }
 
+
       // ── 4b. Conflict guard ─────────────────────────────────────────────
       // FIX-BOOKING-1: Guard against all live statuses, not just PENDING.
       // Required Firestore composite index: (mohaffezId ASC, status ASC, slotDate ASC)
@@ -290,6 +320,7 @@ export const createSessionRequest = functions.https.onCall(
         STATUS.AWAITING_DIRECT,
         STATUS.ACCEPTED,
       ] as const;
+
 
       const conflictQuery = db
         .collection('sessionRequests')
@@ -301,7 +332,9 @@ export const createSessionRequest = functions.https.onCall(
           admin.firestore.Timestamp.fromDate(slotDateObj)
         );
 
+
       const conflictSnap = await transaction.get(conflictQuery);
+
 
       const normalizedSlot = normalizeTimeSlot(preferredTimeSlot);
       const duplicate = conflictSnap.docs.find((doc) => {
@@ -311,6 +344,7 @@ export const createSessionRequest = functions.https.onCall(
           d.sessionType === sessionType
         );
       });
+
 
       if (duplicate) {
         if (duplicate.data().studentId === studentId) {
@@ -332,8 +366,17 @@ export const createSessionRequest = functions.https.onCall(
         );
       }
 
+
       // ── 4c. Write sessionRequest ───────────────────────────────────────
       const requestRef = db.collection('sessionRequests').doc();
+
+
+      // FIX-TS6133: use destructured `subscriptionId` variable (not data.subscriptionId)
+      functions.logger.info('createSessionRequest saving fields', {
+        selectedPaymentMethod,
+        subscriptionId: subscriptionId ?? 'MISSING',
+      });
+
 
       // ALL session requests start at PENDING regardless of payment method.
       // Teacher accepts the slot first (PendingRequestsScreen) → student is notified
@@ -341,6 +384,7 @@ export const createSessionRequest = functions.https.onCall(
       // studentMarkedDirectPayment → mohaffezConfirmDirectPayment → hafizSession created.
       // This enforces the teacher-first rule for every path.
       const initialStatus = STATUS.PENDING;
+
 
       transaction.set(requestRef, {
         studentId,
@@ -356,15 +400,15 @@ export const createSessionRequest = functions.https.onCall(
         imamAddressLat: imamAddressLat ?? null,
         imamAddressLng: imamAddressLng ?? null,
         mohaffezPhone: mohaffezPhone ?? null,
-        subscriptionId: (data.subscriptionId as string) ?? null, // FIX-A1
+        subscriptionId: subscriptionId ?? null,   // FIX-TS6133: was (data.subscriptionId as string) ?? null
         planId: (data.planId as string) ?? null,
         planTitle: (data.planTitle as string) ?? null,
-        planType: rawPlanType,              // NEW: always written
+        planType: rawPlanType,
         paymentAmount:
           typeof data.paymentAmount === 'number' ? data.paymentAmount : null,
         sessionsCount:
           typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
-        validityDays: validityDays,         // NEW
+        validityDays: validityDays,
         requiresPaymentOnAcceptance:
           selectedPaymentMethod === 'directpayment' && !isBundlePlan
             ? true
@@ -376,6 +420,7 @@ export const createSessionRequest = functions.https.onCall(
         updatedAt: FieldValue.serverTimestamp(),
       });
 
+
       // ── 4d. Release slot lock ──────────────────────────────────────────
       if (lockRef) {
         transaction.update(lockRef, {
@@ -384,6 +429,7 @@ export const createSessionRequest = functions.https.onCall(
         });
       }
 
+
       // ── 4e. Disable availability slot ─────────────────────────────────
       if (availabilityRef && updatedSlots) {
         transaction.update(availabilityRef, {
@@ -391,6 +437,7 @@ export const createSessionRequest = functions.https.onCall(
           updatedAt: FieldValue.serverTimestamp(),
         });
       }
+
 
       // ── 4f. Notify mohaffez ────────────────────────────────────────────
       // NEW: bundle requests show plan name/count in the notification
@@ -418,6 +465,7 @@ export const createSessionRequest = functions.https.onCall(
         createdAt: FieldValue.serverTimestamp(),
       });
 
+
       functions.logger.info('Session request created successfully', {
         requestId: requestRef.id,
         studentId,
@@ -427,6 +475,7 @@ export const createSessionRequest = functions.https.onCall(
         rawPlanType,
         initialStatus,
       });
+
 
       return { success: true, requestId: requestRef.id };
     });

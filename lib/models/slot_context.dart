@@ -12,6 +12,7 @@ class SlotContext {
   final double? imamAddressLat;
   final double? imamAddressLng;
   final String? imamAddressText;
+  final String? slotLockId;
 
   const SlotContext({
     required this.mohaffezId,
@@ -25,6 +26,7 @@ class SlotContext {
     this.imamAddressLat,
     this.imamAddressLng,
     this.imamAddressText,
+    this.slotLockId,
   });
 
   SlotContext copyWith({
@@ -39,6 +41,7 @@ class SlotContext {
     double? imamAddressLat,
     double? imamAddressLng,
     String? imamAddressText,
+    String? slotLockId,
   }) {
     return SlotContext(
       mohaffezId: mohaffezId ?? this.mohaffezId,
@@ -52,6 +55,7 @@ class SlotContext {
       imamAddressLat: imamAddressLat ?? this.imamAddressLat,
       imamAddressLng: imamAddressLng ?? this.imamAddressLng,
       imamAddressText: imamAddressText ?? this.imamAddressText,
+      slotLockId: slotLockId ?? this.slotLockId,
     );
   }
 
@@ -68,6 +72,7 @@ class SlotContext {
       'imamAddressLat': imamAddressLat,
       'imamAddressLng': imamAddressLng,
       'imamAddressText': imamAddressText,
+      if (slotLockId != null) 'slotLockId': slotLockId,
     };
   }
 }

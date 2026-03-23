@@ -506,7 +506,7 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
   }
 }
 
-final paginatedStudentSessionsProvider = StateNotifierProvider.family<
+final paginatedStudentSessionsProvider = StateNotifierProvider.autoDispose.family<
     StudentSessionsNotifier, StudentSessionsState, String>(
   (ref, studentId) {
     return StudentSessionsNotifier(studentId);
@@ -514,54 +514,21 @@ final paginatedStudentSessionsProvider = StateNotifierProvider.family<
 );
 
 final studentSessionsFirstPageProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, studentId) async {
-    final snapshot = await FirebaseFirestore.instance
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
+  (ref, studentId) {
+    return FirebaseFirestore.instance
         .collection('hafizSessions')
         .where('studentId', isEqualTo: studentId)
         .orderBy('sessionDate', descending: true)
         .limit(20)
-        .get();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final notifier = ref.read(
-          paginatedStudentSessionsProvider(studentId).notifier,
-        );
-        notifier.refresh();
-      } catch (_) {
-        // Provider disposed before frame — safe to ignore
-      }
-    });
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return {
-        'id': doc.id,
-        'mohaffezName': data['mohaffezName'] as String? ?? '',
-        'location': data['location'] as String? ??
-            data['imamAddressText'] as String? ??
-            '',
-        'sessionType': data['sessionType'] as String? ?? '',
-        'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-            data['timeSlot'] as String? ??
-            '08:00',
-        'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
-        'hifzAssignment': data['hifzAssignment'] as String?,
-        'murajaAssignment': data['murajaAssignment'] as String?,
-        'previousHifzCompleted': data['previousHifzCompleted'] as bool?,
-        'previousHifzRating': data['previousHifzRating'] as int? ?? 0,
-        'previousMurajaCompleted': data['previousMurajaCompleted'] as bool?,
-        'previousMurajaRating': data['previousMurajaRating'] as int? ?? 0,
-        'performanceNotes': data['performanceNotes'] as String?,
-        'sessionRating': data['sessionRating'] as int? ?? 0,
-        'sessionNotes': data['sessionNotes'] as String?,
-        'status': data['status'] as String? ?? 'pending',
-        'isLateCompletion': data['isLateCompletion'] as bool? ?? false,
-        'mistakes': data['mistakes'],
-        'mistakesCount': data['mistakesCount'] as int? ?? 0,
-      };
-    }).toList();
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              return <String, dynamic>{
+                'id': doc.id,
+                ...data,
+              };
+            }).toList());
   },
 );
 

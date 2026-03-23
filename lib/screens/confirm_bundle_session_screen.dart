@@ -108,6 +108,7 @@ class _ConfirmBundleSessionScreenState
         imamAddressText: r.imamAddressText,
         imamAddressLat: r.imamAddressLat,
         imamAddressLng: r.imamAddressLng,
+        slotLockId: r.slotLockId,
       );
 
       // 7. Inject into provider so the rest of the screen works
@@ -164,8 +165,9 @@ class _ConfirmBundleSessionScreenState
       // A stale or inconsistent subscription doc could have remainingSessions == 0,
       // which would display "-1 من X" in the UI and allow a doomed booking attempt.
       if (sub.remainingSessions <= 0) {
+        if (!mounted) return;
         setState(() {
-          _subscriptionError = 'لا توجد جلسات متبقية في هذه الباقة';
+          _subscriptionError = 'لا توجد جلسات متبقية في هذه الباقة.';
           _loadingSubscription = false;
         });
         return;
@@ -194,7 +196,7 @@ class _ConfirmBundleSessionScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('لا توجد جلسات متبقية في هذه الباقة.'),
+            content: Text('لا توجد جلسات متبقية. يرجى تجديد الباقة.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -202,7 +204,17 @@ class _ConfirmBundleSessionScreenState
       return;
     }
 
-    if (slotContext == null || currentUser == null || sub == null) return;
+    if (slotContext == null || currentUser == null || sub == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('حدث خطأ. يرجى المحاولة مرة أخرى.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -228,6 +240,7 @@ class _ConfirmBundleSessionScreenState
         imamAddressLng: slotContext.imamAddressLng,
         mohaffezPhone: slotContext.mohaffezPhone,
         subscriptionId: sub.id,
+        slotLockId: slotContext.slotLockId,
         // INTENTIONALLY false: no new payment needed — student already owns
         // this bundle. PendingRequestsScreen.handleAccept() detects
         // selectedPaymentMethod == 'subscriptionCredit' and routes to

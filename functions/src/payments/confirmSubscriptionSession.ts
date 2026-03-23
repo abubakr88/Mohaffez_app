@@ -1,66 +1,24 @@
 // functions/src/payments/confirmSubscriptionSession.ts
-// FIX #4:    sessionType uniqueness — subscription.sessionType must match requested sessionType
-// FIX TOCTOU: requestRef + subRef reads parallelised; re-validated atomically inside
-//             consumeSubscriptionAndCreateSession's own transaction
-// FIX:       HttpsErrors re-thrown directly — never wrapped as 'internal'
-// FIX:       parseFlutterDate used for all slot timestamps (avoids local-timezone shift)
-// FIX:       Deterministic transactionId (removes Date.now() suffix → idempotency-safe)
-// BUG #3:    maxActiveSubscriptions + commission tracking preserved
-// ─────────────────────────────────────────────────────────────────────────────
-// BUG-FIX-1: slotDate/slotStart/slotEnd are stored as Firestore Timestamps in
-//            Firestore (not strings). parseFlutterDate(x as string) was called
-//            on a Timestamp object → TypeError: iso.endsWith is not a function.
-//            Fixed via toDate() helper that accepts Timestamp | string | Date.
-// BUG-FIX-2: Steps 3-5 (Firestore read + validation + slot parsing) were
-//            OUTSIDE the try/catch block, so any throw there became an
-//            uncaught 400 with no error log. All logic now lives inside try.
-// BUG-FIX-3: amount validation used typeof amount !== 'number' which rejects
-//            amount=0 (valid for subscription-credit sessions) and also
-//            rejects undefined (legacy requests without paymentAmount field).
-//            Fixed: default to 0 when field is absent; 0 is explicitly allowed.
-
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
-import { getWeekNumber, getWeekStart, getWeekEnd, getNextMonday } from '../utils/dateHelpers';
+import { getWeekNumber, getWeekStart, getWeekEnd, getNextMonday, parseFlutterDate } from '../utils/dateHelpers';
 import { consumeSubscriptionAndCreateSession, SlotInfo } from './handlers';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import { PaymentDocument } from '../types/payment.types';
 
-
 const COMMISSION_RATE = 0.05;
 
-
 const STATUS = {
-  PENDING:          'pending',
+  PENDING: 'pending',
   AWAITING_PAYMENT: 'awaitingpayment',
-  AWAITING_DIRECT:  'awaitingdirectpaymentconfirmation',
-  ACCEPTED:         'accepted',
-  REJECTED:         'rejected',
-  CANCELLED:        'cancelled',
+  AWAITING_DIRECT: 'awaitingdirectpaymentconfirmation',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  CANCELLED: 'cancelled',
 } as const;
 
-
-// ---------------------------------------------------------------------------
-// FIX: Parse Flutter ISO strings that have no timezone suffix as UTC.
-// new Date('2026-03-08T10:00:00') is interpreted as LOCAL time on Node.js,
-// which shifts the stored Timestamp by the server's UTC offset.
-// ---------------------------------------------------------------------------
-function parseFlutterDate(iso: string): Date {
-  if (!iso.endsWith('Z') && !/[+\-]\d{2}:\d{2}$/.test(iso)) {
-    return new Date(iso + 'Z');
-  }
-  return new Date(iso);
-}
-
-
-// ---------------------------------------------------------------------------
-// BUG-FIX-1: Normalise Firestore Timestamp | ISO string | Date → Date.
-// Firestore stores slotDate/slotStart/slotEnd as Timestamp objects.
-// The old code cast them with `as string` and then called parseFlutterDate,
-// which crashed with "iso.endsWith is not a function".
-// ---------------------------------------------------------------------------
 function toDate(value: unknown, fieldName: string): Date {
   if (value instanceof admin.firestore.Timestamp) {
     return value.toDate();
@@ -77,10 +35,6 @@ function toDate(value: unknown, fieldName: string): Date {
   );
 }
 
-
-// ---------------------------------------------------------------------------
-// Main callable
-// ---------------------------------------------------------------------------
 export const confirmSubscriptionSession = functions.https.onCall(
   async (data, context) => {
     functions.logger.info('confirmSubscriptionSession: Starting', {
@@ -88,8 +42,6 @@ export const confirmSubscriptionSession = functions.https.onCall(
     });
 
     // ── 1. Auth ─────────────────────────────────────────────────────────────
-    // These two checks are intentionally OUTSIDE the try so that
-    // auth/permission errors still surface as proper HttpsErrors.
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
@@ -106,27 +58,17 @@ export const confirmSubscriptionSession = functions.https.onCall(
       );
     }
 
-    // BUG-FIX-2: All remaining logic (including every Firestore read,
-    // field extraction, timestamp parsing, and business logic) is now
-    // INSIDE the try/catch so that any unexpected error is logged properly
-    // and returned as a typed HttpsError instead of a silent 400.
-
-    // Declare these here so they are accessible in the catch block for logging.
+    // Declare variables for logging
     let requestId: string | undefined;
     let subscriptionId: string | undefined;
 
     try {
       // ── 3. Extract minimal caller params ──────────────────────────────────
-      // NOTE: Only basic identity info is accepted from the caller.
-      // All session/subscription fields are read from Firestore to prevent
-      // payload injection attacks.
-      requestId   = data.requestId   as string;
-      const mohaffezName = data.mohaffezName as string;
-
-      if (!requestId || !mohaffezName) {
+      requestId = data.requestId as string;
+      if (!requestId) {
         throw new functions.https.HttpsError(
           'invalid-argument',
-          'requestId و mohaffezName مطلوبان'
+          'requestId مطلوب'
         );
       }
 
@@ -139,6 +81,15 @@ export const confirmSubscriptionSession = functions.https.onCall(
       }
 
       const requestData = requestDoc.data()!;
+
+      // ── 5. Read mohaffezName from the request document (not from client) ──
+      const mohaffezName = requestData.mohaffezName as string;
+      if (!mohaffezName) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'بيانات الطلب غير مكتملة (mohaffezName مفقود)'
+        );
+      }
 
       // subscriptionId must come from Firestore — never from caller payload.
       subscriptionId = requestData.subscriptionId as string | undefined;
@@ -159,15 +110,11 @@ export const confirmSubscriptionSession = functions.https.onCall(
       const imamAddressLng    = (requestData.imamAddressLng   as number  | null)  ?? null;
       const mohaffezPhone     = (requestData.mohaffezPhone    as string  | null)  ?? null;
 
-      // BUG-FIX-3: Subscription-credit sessions legitimately have amount = 0.
-      // Legacy requests may not have the paymentAmount field at all (undefined).
-      // The old code `amount == null || typeof amount !== 'number'` rejected both
-      // cases. Now we default to 0 when the field is absent.
       const rawAmount = requestData.paymentAmount;
       const amount: number =
         rawAmount != null && typeof rawAmount === 'number' ? rawAmount : 0;
 
-      // ── 5. Validate required string fields ────────────────────────────────
+      // ── 6. Validate required string fields ────────────────────────────────
       if (!studentId || !studentName || !sessionType || !preferredTimeSlot) {
         throw new functions.https.HttpsError(
           'invalid-argument',
@@ -175,22 +122,18 @@ export const confirmSubscriptionSession = functions.https.onCall(
         );
       }
 
-      // ── 6. Parse slot timestamps ──────────────────────────────────────────
-      // BUG-FIX-1: Use toDate() which handles Firestore Timestamp OR ISO string.
-      // The old code passed `slotDate as string` directly to parseFlutterDate,
-      // crashing with "iso.endsWith is not a function" when the value is a
-      // Firestore Timestamp (which is always the case for docs written by the app).
+      // ── 7. Parse slot timestamps ──────────────────────────────────────────
       const sessionDateTs = admin.firestore.Timestamp.fromDate(
-        toDate(requestData.slotDate,  'slotDate')
+        toDate(requestData.slotDate, 'slotDate')
       );
       const slotStartTs = admin.firestore.Timestamp.fromDate(
         toDate(requestData.slotStart, 'slotStart')
       );
       const slotEndTs = admin.firestore.Timestamp.fromDate(
-        toDate(requestData.slotEnd,   'slotEnd')
+        toDate(requestData.slotEnd, 'slotEnd')
       );
 
-      // Diagnostic log — confirms the fix is working in production.
+      // Diagnostic log
       functions.logger.info('confirmSubscriptionSession: slot fields resolved', {
         requestId,
         subscriptionId,
@@ -203,15 +146,11 @@ export const confirmSubscriptionSession = functions.https.onCall(
         amount,
       });
 
-      // ── 7. Build refs ─────────────────────────────────────────────────────
+      // ── 8. Build refs ─────────────────────────────────────────────────────
       const subRef = db.collection('subscriptions').doc(subscriptionId);
-
-      // Deterministic transactionId — removes Date.now() so retries are idempotent.
       const transactionId = `direct_sub_${subscriptionId}_${requestId}`;
 
-      // ── 8. Parallel pre-validation reads (non-transactional fast-failure) ─
-      // Critical invariants are re-checked atomically inside
-      // consumeSubscriptionAndCreateSession's own Firestore transaction.
+      // ── 9. Parallel pre-validation reads (non-transactional fast-failure) ─
       const [requestSnap, subSnap] = await Promise.all([
         requestRef.get(),
         subRef.get(),
@@ -227,7 +166,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
       const freshRequestData = requestSnap.data()!;
       const subscription     = subSnap.data()!;
 
-      // ── 9. Idempotency guard ───────────────────────────────────────────────
+      // ── 10. Idempotency guard ───────────────────────────────────────────────
       if (freshRequestData.status === STATUS.ACCEPTED && freshRequestData.sessionId) {
         functions.logger.info('confirmSubscriptionSession: idempotent', {
           requestId,
@@ -240,9 +179,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         };
       }
 
-      // ── 10. Status check ──────────────────────────────────────────────────
-      // FIX: Also accept 'pending' status for subscription-credit requests
-      // that were created with selectedPaymentMethod: 'subscriptioncredit'.
+      // ── 11. Status check ──────────────────────────────────────────────────
       const ALLOWED_STATUSES: string[] = [
         STATUS.PENDING,
         STATUS.AWAITING_PAYMENT,
@@ -257,7 +194,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         );
       }
 
-      // ── 11. Ownership check ───────────────────────────────────────────────
+      // ── 12. Ownership check ───────────────────────────────────────────────
       if (
         subscription.studentId  !== studentId ||
         subscription.mohaffezId !== mohaffezId
@@ -268,14 +205,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         );
       }
 
-      // ── 12. FIX #4: sessionType uniqueness check ──────────────────────────
-      // A student must use a bundle/subscription that was created for the SAME
-      // sessionType. Without this, an 'online' bundle could be used to book a
-      // 'home' or 'mosque' session, bypassing the per-type uniqueness constraint.
-      //
-      // subscription.sessionType may be absent on legacy docs (created before
-      // FIX #3 was deployed). In that case we skip the check to preserve
-      // backward compatibility — new subscriptions always store sessionType.
+      // ── 13. sessionType uniqueness check ──────────────────────────────────
       if (
         subscription.sessionType &&
         (subscription.sessionType as string) !== sessionType
@@ -288,7 +218,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         );
       }
 
-      // ── 13. Remaining sessions check ──────────────────────────────────────
+      // ── 14. Remaining sessions check ──────────────────────────────────────
       const remainingSessions = (subscription.remainingSessions as number) ?? 0;
       if (remainingSessions <= 0) {
         throw new functions.https.HttpsError(
@@ -297,7 +227,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         );
       }
 
-      // ── 14. Build sessionDetails for hafizSessions document ───────────────
+      // ── 15. Build sessionDetails for hafizSessions document ───────────────
       const sessionDetails = {
         requestId,
         mohaffezId,
@@ -322,11 +252,10 @@ export const confirmSubscriptionSession = functions.https.onCall(
         reminder1hSent:   false,
         juzCount:         1,
         sessionRating:    10,
-        // Prevents the Firestore trigger from sending a duplicate notification.
         notificationsAlreadySent: true,
       };
 
-      // ── 15. Build synthetic PaymentDocument ───────────────────────────────
+      // ── 16. Build synthetic PaymentDocument ───────────────────────────────
       const syntheticPayment: PaymentDocument = {
         studentId,
         studentName,
@@ -341,7 +270,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         },
       };
 
-      // ── 16. Build SlotInfo ─────────────────────────────────────────────────
+      // ── 17. Build SlotInfo ─────────────────────────────────────────────────
       const slotInfo: SlotInfo = {
         mohaffezId,
         slotDate:    sessionDateTs,
@@ -349,7 +278,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         sessionType,
       };
 
-      // ── 17. Consume subscription + create session (atomic inside handler) ─
+      // ── 18. Consume subscription + create session (atomic inside handler) ─
       const result = await consumeSubscriptionAndCreateSession(
         subscriptionId,
         syntheticPayment,
@@ -364,7 +293,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         remainingSessions: result.remainingSessions,
       });
 
-      // ── 18. Commission tracking (separate transaction) ────────────────────
+      // ── 19. Commission tracking (separate transaction) ────────────────────
       const now              = new Date();
       const weekNumber       = getWeekNumber(now);
       const weekStart        = getWeekStart(now);
@@ -426,7 +355,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         commissionAmount,
       });
 
-      // ── 19. Notification to student ───────────────────────────────────────
+      // ── 20. Notification to student ───────────────────────────────────────
       await createAndSendNotification({
         userId:       studentId,
         senderId:     mohaffezId,
@@ -448,7 +377,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         remainingSessions: result.remainingSessions,
       });
 
-      // ── 20. Return success ────────────────────────────────────────────────
+      // ── 21. Return success ────────────────────────────────────────────────
       return {
         success:           true,
         sessionId:         result.sessionId,
@@ -476,7 +405,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         requestId,
         subscriptionId,
         error:  message,
-        stack,                // ← stack trace now logged for debugging
+        stack,
       });
       throw new functions.https.HttpsError('internal', message);
     }

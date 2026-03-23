@@ -5,6 +5,8 @@
 //    because teacher-first rule applies to all bundles regardless of payment method
 // 3. Added: validityDays to transaction.set()
 // 4. Updated: notification title/body in 4f to reflect bundle vs single
+// FIX-TS6133: subscriptionId destructured variable now used in both diagnostic log
+//             and transaction.set() — eliminates TS6133 'declared but never read' error.
 // All other logic (slot lock, conflict guard, availability disable, etc.) is UNTOUCHED
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createSessionRequest = void 0;
@@ -57,7 +59,8 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
     // ── 2. Destructure ─────────────────────────────────────────────────────
-    const { mohaffezId, studentName, mohaffezName, sessionType, preferredTimeSlot, slotDate, slotStart, slotEnd, imamAddressText, imamAddressLat, imamAddressLng, mohaffezPhone, subscriptionId, requiresPaymentOnAcceptance, selectedPaymentMethod, slotLockId, } = data;
+    const { mohaffezId, studentName, mohaffezName, sessionType, preferredTimeSlot, slotDate, slotStart, slotEnd, imamAddressText, imamAddressLat, imamAddressLng, mohaffezPhone, subscriptionId, // FIX-TS6133: now consumed below (log + Firestore write)
+    requiresPaymentOnAcceptance, selectedPaymentMethod, slotLockId, } = data;
     // ── NEW: plan fields with safe defaults ────────────────────────────────
     // rawPlanType / isBundlePlan used later for initialStatus and notification
     const rawPlanType = (_j = data.planType) !== null && _j !== void 0 ? _j : 'single';
@@ -215,6 +218,11 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
         }
         // ── 4c. Write sessionRequest ───────────────────────────────────────
         const requestRef = admin_1.db.collection('sessionRequests').doc();
+        // FIX-TS6133: use destructured `subscriptionId` variable (not data.subscriptionId)
+        functions.logger.info('createSessionRequest saving fields', {
+            selectedPaymentMethod,
+            subscriptionId: subscriptionId !== null && subscriptionId !== void 0 ? subscriptionId : 'MISSING',
+        });
         // ALL session requests start at PENDING regardless of payment method.
         // Teacher accepts the slot first (PendingRequestsScreen) → student is notified
         // → status transitions to AWAITINGPAYMENT → student transfers payment →
@@ -235,13 +243,13 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             imamAddressLat: imamAddressLat !== null && imamAddressLat !== void 0 ? imamAddressLat : null,
             imamAddressLng: imamAddressLng !== null && imamAddressLng !== void 0 ? imamAddressLng : null,
             mohaffezPhone: mohaffezPhone !== null && mohaffezPhone !== void 0 ? mohaffezPhone : null,
-            subscriptionId: subscriptionId !== null && subscriptionId !== void 0 ? subscriptionId : null,
+            subscriptionId: subscriptionId !== null && subscriptionId !== void 0 ? subscriptionId : null, // FIX-TS6133: was (data.subscriptionId as string) ?? null
             planId: (_b = data.planId) !== null && _b !== void 0 ? _b : null,
             planTitle: (_c = data.planTitle) !== null && _c !== void 0 ? _c : null,
-            planType: rawPlanType, // NEW: always written
+            planType: rawPlanType,
             paymentAmount: typeof data.paymentAmount === 'number' ? data.paymentAmount : null,
             sessionsCount: typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
-            validityDays: validityDays, // NEW
+            validityDays: validityDays,
             requiresPaymentOnAcceptance: selectedPaymentMethod === 'directpayment' && !isBundlePlan
                 ? true
                 : (requiresPaymentOnAcceptance !== null && requiresPaymentOnAcceptance !== void 0 ? requiresPaymentOnAcceptance : false),
