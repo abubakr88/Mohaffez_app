@@ -253,7 +253,10 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
             backgroundColor: Colors.green,
           ),
         );
-        context.go('/pending-requests');
+        // Defer navigation to avoid Navigator lock during dialog dismissal
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.go('/pending-requests');
+        });
       } else {
         await DirectPaymentService.mohaffezConfirm(widget.payment.id);
         debugPrint('✅ [BUNDLE_FLOW] Step5_SingleConfirm_SUCCESS: '
@@ -266,7 +269,10 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
             backgroundColor: Colors.green,
           ),
         );
-        context.go('/pending-requests');
+        // Defer navigation to avoid Navigator lock during dialog dismissal
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.go('/pending-requests');
+        });
       }
     } on FirebaseFunctionsException catch (e) {
       debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_FIREBASE_ERROR: '
