@@ -128,7 +128,7 @@ class _AdminPaymentEventsScreenState
                   tooltip: 'رجوع',
                 )
               : null,
-          title: '????? ?????',
+          title: 'أحداث المدفوعات',
         ),
         body: Column(
           children: [

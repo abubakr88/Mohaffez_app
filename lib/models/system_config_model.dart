@@ -33,6 +33,9 @@ class SystemConfigModel {
   final bool autoApproveMohaffez;
   final bool allowUnverifiedBooking;
   final int maxCredentialFiles;
+  final double examPassingScore;
+  final int examMaxRetries;
+  final int examRetryCooldownDays;
   final DateTime? updatedAt;
   final String updatedBy;
   final Map<String, String?> adminWallets;
@@ -70,6 +73,9 @@ class SystemConfigModel {
     required this.autoApproveMohaffez,
     required this.allowUnverifiedBooking,
     required this.maxCredentialFiles,
+    required this.examPassingScore,
+    required this.examMaxRetries,
+    required this.examRetryCooldownDays,
     required this.updatedAt,
     required this.updatedBy,
     required this.adminWallets,
@@ -151,6 +157,12 @@ class SystemConfigModel {
           defaults.allowUnverifiedBooking,
       maxCredentialFiles: (data['maxCredentialFiles'] as num?)?.toInt() ??
           defaults.maxCredentialFiles,
+      examPassingScore: (data['examPassingScore'] as num?)?.toDouble() ??
+          defaults.examPassingScore,
+      examMaxRetries: (data['examMaxRetries'] as num?)?.toInt() ??
+          defaults.examMaxRetries,
+      examRetryCooldownDays: (data['examRetryCooldownDays'] as num?)?.toInt() ??
+          defaults.examRetryCooldownDays,
       updatedAt:
           updatedAt is Timestamp ? updatedAt.toDate() : defaults.updatedAt,
       updatedBy: data['updatedBy'] as String? ?? defaults.updatedBy,
@@ -195,6 +207,9 @@ class SystemConfigModel {
       autoApproveMohaffez: false,
       allowUnverifiedBooking: false,
       maxCredentialFiles: 5,
+      examPassingScore: 70.0,
+      examMaxRetries: 3,
+      examRetryCooldownDays: 3,
       updatedAt: null,
       updatedBy: '',
       adminWallets: {},
@@ -235,6 +250,9 @@ class SystemConfigModel {
       'autoApproveMohaffez': autoApproveMohaffez,
       'allowUnverifiedBooking': allowUnverifiedBooking,
       'maxCredentialFiles': maxCredentialFiles,
+      'examPassingScore': examPassingScore,
+      'examMaxRetries': examMaxRetries,
+      'examRetryCooldownDays': examRetryCooldownDays,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'updatedBy': updatedBy,
       'adminWallets': adminWallets,

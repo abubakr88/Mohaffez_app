@@ -180,7 +180,7 @@ class SessionRepository {
     return (
       requests: snapshot.docs
           .map((doc) => SessionRequestModel.fromJson({
-                ...doc.data()!,
+                ...doc.data(),
                 'id': doc.id,
               }))
           .toList(),
@@ -314,7 +314,7 @@ class SessionRepository {
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
-                ...doc.data()!,
+                ...doc.data(),
                 'id': doc.id,
               }))
           .toList(),
@@ -346,7 +346,7 @@ class SessionRepository {
     return (
       sessions: snapshot.docs
           .map((doc) => SessionModel.fromJson({
-                ...doc.data()!,
+                ...doc.data(),
                 'id': doc.id,
               }))
           .toList(),
@@ -388,7 +388,7 @@ class SessionRepository {
               doc.data()['status'] != RequestStatus.accepted ||
               doc.data()['sessionId'] == null)
           .map((doc) => SessionRequestModel.fromJson(
-              {...doc.data()!, 'id': doc.id}))
+              {...doc.data(), 'id': doc.id}))
           .toList(),
       lastDoc: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
       hasMore: snapshot.docs.length == pageSize,

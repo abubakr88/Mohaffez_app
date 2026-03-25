@@ -27,8 +27,9 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
     final actions = ref.read(adminActionsProvider.notifier);
 
     Future<void> run(Future<void> Function() op) async {
-      final st = ref.read(adminActionsProvider);
+      await op();
       if (!context.mounted) return;
+      final st = ref.read(adminActionsProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor:

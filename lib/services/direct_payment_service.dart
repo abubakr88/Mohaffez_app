@@ -323,8 +323,11 @@ class DirectPaymentService {
         final val = kv.sublist(1).join(':').trim().replaceAll('"', '');
         if (val == 'true') {
           result[key] = true;
-        } else if (val == 'false') result[key] = false;
-        else                     result[key] = val;
+        } else if (val == 'false') {
+          result[key] = false;
+        } else {
+          result[key] = val;
+        }
       }
     }
     return result;

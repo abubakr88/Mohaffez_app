@@ -229,7 +229,7 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> releaseAllExpiredLocks() async {
-    await _callFunction('releaseExpiredSlotLocks', const {});
+    await _callFunction('triggerCleanupJobManually', const {});
   }
 }
 

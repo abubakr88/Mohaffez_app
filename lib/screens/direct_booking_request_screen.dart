@@ -87,7 +87,7 @@ class _DirectBookingRequestScreenState
           .call({
         'mohaffezId': slotContext.mohaffezId,
         'mohaffezName': slotContext.mohaffezName,
-        'studentName': currentUser.name ?? '',
+        'studentName': currentUser.name,
         'sessionType': slotContext.sessionType,
         'preferredTimeSlot': slotContext.preferredTimeSlot,
         'slotDate': slotContext.slotDate,

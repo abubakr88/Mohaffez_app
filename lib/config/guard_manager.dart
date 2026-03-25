@@ -13,6 +13,7 @@ import '../providers/user_provider.dart';
 import 'route_guard.dart';
 import 'guards/timeout_guard.dart';
 import 'guards/auth_guard.dart';
+import 'guards/setup_guard.dart';
 import 'guards/role_guard.dart';
 
 /// Manages and executes route guards in priority order.
@@ -20,6 +21,7 @@ class GuardManager {
   static final List<RouteGuard> _guards = <RouteGuard>[
     TimeoutGuard(),
     AuthGuard(),
+    SetupGuard(),
     RoleGuard(),
   ]..sort((a, b) => a.priority.compareTo(b.priority));
 

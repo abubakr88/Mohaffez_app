@@ -1,9 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/subscription_model.dart';
 import '../../providers/session_provider_paginated.dart';
-import '../../repositories/session_repository.dart';
 
 /// Shows a payment-type info card on the teacher's session request detail screen.
 /// - Bundle/subscription request → green card with planTitle + remainingSessions/totalSessions

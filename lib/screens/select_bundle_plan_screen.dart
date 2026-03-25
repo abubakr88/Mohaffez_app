@@ -62,7 +62,6 @@ class _SelectBundlePlanScreenState
   bool _submitting = false;
   bool _requestSent = false; // true after CF returns success
   String? _error;
-  String? _sentRequestId;
 
   @override
   void initState() {
@@ -169,7 +168,7 @@ class _SelectBundlePlanScreenState
       final result = await callable.call({
         'mohaffezId': slotCtx.mohaffezId,
         'mohaffezName': slotCtx.mohaffezName,
-        'studentName': user.name ?? '',
+        'studentName': user.name,
         'sessionType': slotCtx.sessionType,
         'preferredTimeSlot': slotCtx.preferredTimeSlot,
         'slotDate': slotCtx.slotDate,
@@ -215,7 +214,6 @@ class _SelectBundlePlanScreenState
         setState(() {
           _submitting = false;
           _requestSent = true;
-          _sentRequestId = requestId;
         });
       }
     } on FirebaseFunctionsException catch (e) {

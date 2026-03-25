@@ -215,7 +215,9 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     // Skip when slot timestamps are already resolved
     if (resolvedSlotDate != null &&
         resolvedSlotStart != null &&
-        resolvedSlotEnd != null) return;
+        resolvedSlotEnd != null) {
+      return;
+    }
     try {
       final doc = await FirebaseFirestore.instance
           .collection('sessionRequests')

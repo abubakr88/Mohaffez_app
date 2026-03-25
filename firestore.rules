@@ -20,8 +20,8 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // WHY: Prefer custom claim to avoid Firestore reads during rule evaluation.
       return isAuthenticated() && (
+        request.auth.token.admin == true ||
         request.auth.token.role == 'admin' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
@@ -29,7 +29,6 @@ service cloud.firestore {
     }
 
     function isSuspended() {
-      // WHY: Block sensitive create flows when caller has an active suspension doc.
       return isAuthenticated() &&
              exists(/databases/$(database)/documents/userSuspensions/$(request.auth.uid));
     }
@@ -45,17 +44,26 @@ service cloud.firestore {
                     request.auth.uid == userId &&
                     request.resource.data.uid == userId;
 
+      // User self-update: profile fields + setup account fields
       allow update: if isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['followerCount', 'followingCount', 'fcmToken',
-                    'fcmTokenUpdatedAt', 'photoUrl', 'bio',
-                    'phoneNumber', 'addressText', 'addressLat',
-                    'addressLng', 'specialization', 'name',
-                    'privacySettings', 'updatedAt']);
+          .hasOnly([
+            // ── Original profile fields ──
+            'followerCount', 'followingCount', 'fcmToken',
+            'fcmTokenUpdatedAt', 'photoUrl', 'bio',
+            'phoneNumber', 'addressText', 'addressLat',
+            'addressLng', 'specialization', 'name',
+            'privacySettings', 'updatedAt',
+            // ── Setup account fields (one-time setup wizard) ──
+            'setupCompleted', 'dateOfBirth', 'city',
+            'examScore', 'examTakenAt',
+            'examQuestionCount', 'examCorrectCount',
+            'examPassed', 'examRetryCount', 'examNextRetryAt'
+          ]);
 
       allow delete: if isOwner(userId);
 
-      // Credentials
+      // ── Credentials subcollection ──
       match /credentials/{credentialId} {
         allow read: if isAdmin() || (isAuthenticated() && (
           resource == null ||
@@ -73,7 +81,7 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
 
-      // Availability schedules
+      // ── Availability schedules ──
       match /availability/{availabilityId} {
         allow read: if isAuthenticated();
 
@@ -82,27 +90,26 @@ service cloud.firestore {
                       request.resource.data.dayOfWeek >= 1 &&
                       request.resource.data.dayOfWeek <= 7;
 
-        allow update: if isOwner(userId)   // existing: mohaffez updates own availability
+        allow update: if isOwner(userId)
                       ||
-                      // NEW: student restoring a slot when cancelling their request
                       (isAuthenticated() &&
                       onlyUpdating(['timeSlots', 'updatedAt']));
         allow delete: if isOwner(userId);
       }
 
-      // Unavailable dates
+      // ── Unavailable dates ──
       match /unavailableDates/{dateId} {
         allow read: if isAuthenticated();
         allow write: if isOwner(userId);
       }
 
-      // Privacy settings
+      // ── Privacy settings ──
       match /settings/{settingId} {
         allow read: if isOwner(userId);
         allow write: if isOwner(userId);
       }
 
-      // Pricing plans
+      // ── Pricing plans ──
       match /pricingPlans/{planId} {
         allow read: if isAuthenticated();
 
@@ -116,6 +123,14 @@ service cloud.firestore {
                       request.resource.data.mohaffezId == userId;
 
         allow delete: if isOwner(userId);
+      }
+
+      // ── Exam results (setup account — one-time skill evaluation) ──
+      match /examResults/{resultId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId);
+        allow update: if false;
+        allow delete: if false;
       }
     }
 
@@ -132,6 +147,19 @@ service cloud.firestore {
     }
 
     // ============================================
+    // EXAM QUESTION BANK (Setup Account Feature)
+    // ============================================
+
+    match /examQuestions/{questionId} {
+      // Any authenticated user can read (needed during setup wizard)
+      allow read: if isAuthenticated();
+      // Only admin can manage questions
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
     // SESSION REQUESTS (Booking Flow)
     // ============================================
 
@@ -145,14 +173,11 @@ service cloud.firestore {
                      !isSuspended() &&
                      request.auth.uid == request.resource.data.studentId;
 
-      // ─── Mohaffez-only transitions ───────────────────────────────────────
-
+      // ─── Mohaffez-only transitions ───
       allow update: if isAuthenticated() &&
                     request.auth.uid == resource.data.mohaffezId &&
                     (
                       // pending → awaitingpayment
-                      // FIX: Added 'paymentAmount' (Bug 5 — sessionPrice written by acceptRequest)
-                      //      Added 'sessionId'     (hafizSession pre-created in same batch)
                       (request.resource.data.status == 'awaitingpayment' &&
                        resource.data.status == 'pending' &&
                        onlyUpdating([
@@ -163,9 +188,7 @@ service cloud.firestore {
 
                       ||
 
-                      // pending | awaitingpayment → accepted (free / subscription, client-side)
-                      // Cloud Functions (Admin SDK) bypass this rule; kept for edge-case
-                      // direct acceptance flows.
+                      // pending | awaitingpayment → accepted
                       (request.resource.data.status == 'accepted' &&
                        resource.data.status in ['pending', 'awaitingpayment'] &&
                        onlyUpdating([
@@ -191,8 +214,7 @@ service cloud.firestore {
                        ]))
                     );
 
-      // ─── Student cancel rule ─────────────────────────────────────────────
-
+      // ─── Student cancel rule ───
       allow update: if isAuthenticated() &&
                     request.auth.uid == resource.data.studentId &&
                     request.resource.data.status == 'cancelled' &&
@@ -206,8 +228,6 @@ service cloud.firestore {
                       'cancellationReason', 'updatedAt'
                     ]);
 
-      // FIX: Added 'expired' to allow students to dismiss expired requests
-      //      from their UI (cosmetic clean-up, not a state-machine transition).
       allow delete: if isAuthenticated() &&
                      request.auth.uid == resource.data.studentId &&
                      resource.data.status in [
@@ -229,12 +249,10 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         !isSuspended() &&
         (
-          // Mohaffez pre-creates the session atomically with the accept
           (request.auth.uid == request.resource.data.mohaffezId &&
            request.resource.data.mohaffezId is string &&
            request.resource.data.studentId is string)
           ||
-          // Student-side creation after verified payment
           (request.auth.uid == request.resource.data.studentId &&
            request.resource.data.requestId is string &&
            request.resource.data.status == 'accepted' &&
@@ -247,16 +265,11 @@ service cloud.firestore {
         );
 
       allow update: if isAuthenticated() && (
-        // Mohaffez can update any field on their own sessions
         (request.auth.uid == resource.data.mohaffezId)
         ||
-        // Student can only update their own feedback fields
         (request.auth.uid == resource.data.studentId &&
          onlyUpdating(['studentFeedback', 'studentNotes', 'studentRating', 'updatedAt']))
         ||
-        // NOTE: reminder flags are written by Cloud Functions (Admin SDK) which
-        // bypass rules entirely. This catch-all rule exists only for any future
-        // server-token-authenticated path. Consider removing if unused.
         (isAuthenticated() &&
          onlyUpdating([
            'reminder24hSent', 'reminder24hSentAt',
@@ -290,20 +303,16 @@ service cloud.firestore {
                     request.resource.data.mohaffezId is string;
 
       allow update: if isAuthenticated() && (
-        // Student updates gateway order ID while payment is in-flight
         (request.auth.uid == resource.data.studentId &&
          resource.data.status in ['pending', 'processing'] &&
          onlyUpdating(['updatedAt', 'gatewayOrderId']))
         ||
-        // Mohaffez marks cash payment complete
         (request.auth.uid == resource.data.mohaffezId &&
          resource.data.method == 'cash' &&
          resource.data.status == 'pending' &&
          request.resource.data.status == 'completed' &&
          onlyUpdating(['status', 'completedAt', 'paidAt', 'updatedAt']))
         ||
-        // Cloud Function / webhook gateway updates (Admin SDK bypasses, but
-        // this covers any server-token-based update path)
         (onlyUpdating([
           'status', 'completedAt', 'updatedAt', 'paidAt',
           'gatewayTransactionId', 'transactionReference',
@@ -334,25 +343,61 @@ service cloud.firestore {
                     request.resource.data.mohaffezId is string;
 
       allow update: if isAuthenticated() && (
-        // Consume one session
         (request.resource.data.remainingSessions == resource.data.remainingSessions - 1 &&
          resource.data.remainingSessions > 0 &&
          request.resource.data.status in ['active', 'expired', 'depleted'] &&
          onlyUpdating(['remainingSessions', 'lastUsedAt', 'status', 'updatedAt']))
         ||
-        // Student cancels subscription
         (request.auth.uid == resource.data.studentId &&
          resource.data.status == 'active' &&
          request.resource.data.status == 'cancelled' &&
          onlyUpdating(['status', 'cancelledAt', 'updatedAt']))
         ||
-        // Subscription expiry (scheduler / Cloud Function)
         (resource.data.status == 'active' &&
          request.resource.data.status == 'expired' &&
          onlyUpdating(['status', 'expiredAt', 'updatedAt']))
       );
 
       allow delete: if false;
+    }
+
+    // ============================================
+    // DIRECT PAYMENT
+    // ============================================
+
+    match /directPaymentRequests/{id} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+      allow write: if false;  // All writes via Cloud Functions (Admin SDK)
+    }
+
+    // ============================================
+    // COMMISSIONS
+    // ============================================
+
+    match /weeklyCommissionSummaries/{id} {
+      allow read: if isAdmin() || (isAuthenticated() && (
+        resource == null || request.auth.uid == resource.data.mohaffezId
+      ));
+      allow write: if false;
+    }
+
+    match /commissions/{id} {
+      allow read: if isAdmin() || (isAuthenticated() && (
+        resource == null || request.auth.uid == resource.data.mohaffezId
+      ));
+      allow write: if false;
+    }
+
+    // weeklyCommissions — legacy/alternate commission collection used by directPayment handler
+    match /weeklyCommissions/{id} {
+      allow read: if isAdmin() || (isAuthenticated() && (
+        resource == null || request.auth.uid == resource.data.mohaffezId
+      ));
+      allow write: if false;
     }
 
     // ============================================
@@ -386,7 +431,7 @@ service cloud.firestore {
     }
 
     // ============================================
-    // PROMO CODES
+    // PROMO CODES (both casing variants)
     // ============================================
 
     match /promocodes/{promoCode} {
@@ -403,33 +448,6 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
                     onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']);
       allow delete: if isAdmin();
-    }
-
-    // ============================================
-    // DIRECT PAYMENT
-    // ============================================
-
-    match /directPaymentRequests/{id} {
-      allow read: if isAuthenticated() && (
-        resource == null ||
-        request.auth.uid == resource.data.studentId ||
-        request.auth.uid == resource.data.mohaffezId
-      );
-      allow write: if false;  // All writes via Cloud Functions (Admin SDK)
-    }
-
-    match /weeklyCommissionSummaries/{id} {
-      allow read: if isAdmin() || (isAuthenticated() && (
-        resource == null || request.auth.uid == resource.data.mohaffezId
-      ));
-      allow write: if false;
-    }
-
-    match /commissions/{id} {
-      allow read: if isAdmin() || (isAuthenticated() && (
-        resource == null || request.auth.uid == resource.data.mohaffezId
-      ));
-      allow write: if false;
     }
 
     // ============================================
@@ -527,17 +545,17 @@ service cloud.firestore {
 
     match /failedOperations/{operationId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated();   // ← allow client retry logging
+      allow create: if isAuthenticated();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
+
     match /systemConfig/{configId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
     match /userSuspensions/{suspensionId} {
-      // WHY: Split write permissions by operation for explicit, predictable enforcement.
       allow read: if isAdmin() || isOwner(suspensionId);
       allow create: if isAdmin();
       allow update: if isAdmin();
@@ -556,7 +574,7 @@ service cloud.firestore {
 
     match /adminAuditLog/{logId} {
       allow read: if isAdmin();
-      allow write: if false;
+      allow write: if false;  // Only Cloud Functions (Admin SDK) write audit logs
     }
 
     match /appVersions/{versionId} {
@@ -565,7 +583,7 @@ service cloud.firestore {
     }
 
     // ============================================
-    // CATCH-ALL
+    // CATCH-ALL — Deny everything not explicitly matched
     // ============================================
 
     match /{document=**} {

@@ -58,6 +58,8 @@ import '../screens/admin_wallet_settings_screen.dart';
 import '../screens/admin_teacher_commissions_screen.dart';
 import '../screens/mohaffez_schedule_screen.dart'; // ← teacher calendar
 import '../screens/suspended_screen.dart';
+import '../screens/setup_account_screen.dart';
+import '../screens/exam_result_screen.dart';
 import '../screens/active_subscriptions_screen.dart'; // BUG-8: Active subscriptions screen
 import '../screens/direct_payment_screen.dart'; // Path C: Direct payment route
 import '../screens/booking_method_screen.dart'; // Booking method screen
@@ -153,6 +155,25 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/suspended',
         name: 'suspended',
         builder: (context, state) => const SuspendedScreen(),
+      ),
+      // ── One-time account setup (outside HomeShell — no bottom nav) ──
+      GoRoute(
+        path: '/setup',
+        name: 'setup',
+        builder: (context, state) => const SetupAccountScreen(),
+      ),
+      // ── Exam result screen ──
+      GoRoute(
+        path: '/exam-result',
+        name: 'exam-result',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return ExamResultScreen(
+            score: extra?['score'] ?? 0.0,
+            correctAnswers: extra?['correctAnswers'] ?? 0,
+            totalQuestions: extra?['totalQuestions'] ?? 0,
+          );
+        },
       ),
 
       // ============================================

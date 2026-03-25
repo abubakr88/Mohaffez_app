@@ -125,13 +125,36 @@ class _AdminCredentialsScreenState
                     title: Text(c['title']?.toString() ?? ArabicLabels.noData),
                     subtitle: Text(
                         '${ArabicLabels.userId}: $userId\n${ArabicLabels.submittedAt}: $ts'),
-                    leading: c['imageUrl'] != null
-                        ? ClipRRect(
-                            borderRadius: AppThemeConstants.borderRadiusSm,
-                            child: Image.network(c['imageUrl'].toString(),
-                                width: 48, height: 48, fit: BoxFit.cover),
-                          )
-                        : const Icon(Icons.image_not_supported),
+                    leading: GestureDetector(
+                      onTap: () {
+                        final urls = c['imageUrls'];
+                        if (urls is List && urls.isNotEmpty) {
+                          showDialog(
+                            context: context,
+                            builder: (_) => Dialog(
+                              child: InteractiveViewer(
+                                child: Image.network(urls.first.toString()),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: (c['imageUrls'] is List &&
+                              (c['imageUrls'] as List).isNotEmpty)
+                          ? ClipRRect(
+                              borderRadius:
+                                  AppThemeConstants.borderRadiusSm,
+                              child: Image.network(
+                                (c['imageUrls'] as List).first.toString(),
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.image_not_supported),
+                              ),
+                            )
+                          : const Icon(Icons.image_not_supported),
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

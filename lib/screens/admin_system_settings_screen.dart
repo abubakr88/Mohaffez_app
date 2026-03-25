@@ -29,7 +29,7 @@ class _AdminSystemSettingsScreenState
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -89,6 +89,7 @@ class _AdminSystemSettingsScreenState
               Tab(text: ArabicLabels.sessionSettings),
               Tab(text: ArabicLabels.appVersionSettings),
               Tab(text: 'التحقق'),
+              Tab(text: 'إعدادات الاختبار'),
             ],
           ),
         ),
@@ -112,6 +113,7 @@ class _AdminSystemSettingsScreenState
                 _bookingTab(config),
                 _appTab(config),
                 _verifyTab(config),
+                _examTab(config),
               ],
             );
           },
@@ -200,6 +202,39 @@ class _AdminSystemSettingsScreenState
           'maxCredentialFiles', 'أقصى عدد ملفات الشهادة', c.maxCredentialFiles),
       _saveButton(),
     ]);
+  }
+
+  Widget _examTab(SystemConfigModel c) {
+    return _sectionList([
+      _examScoreSliderTile(c),
+      _numberField('examMaxRetries', 'الحد الأقصى لمحاولات إعادة الاختبار', c.examMaxRetries),
+      _numberField('examRetryCooldownDays', 'فترة الانتظار بين المحاولات (أيام)',
+          c.examRetryCooldownDays),
+      _saveButton(),
+    ]);
+  }
+
+  Widget _examScoreSliderTile(SystemConfigModel c) {
+    return StatefulBuilder(
+      builder: (_, setState) {
+        final current = (updates['examPassingScore'] as double?) ?? c.examPassingScore;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('درجة النجاح في الاختبار: ${current.toStringAsFixed(0)}%'),
+            Slider(
+              value: current,
+              min: 0,
+              max: 100,
+              divisions: 20,
+              onChanged: (v) {
+                setState(() => updates['examPassingScore'] = v);
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _sectionList(List<Widget> children) {

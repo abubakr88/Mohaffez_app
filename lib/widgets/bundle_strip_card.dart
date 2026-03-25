@@ -27,11 +27,6 @@ class BundleStripCard extends StatelessWidget {
     return AppThemeConstants.error;
   }
 
-  String get _urgencyLabel {
-    if (sub.remainingSessions <= 2) return '⚠️ متبقي ${sub.remainingSessions} فقط';
-    return 'متبقي ${sub.remainingSessions} جلسة';
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

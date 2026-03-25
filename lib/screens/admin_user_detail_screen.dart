@@ -115,11 +115,12 @@ class _AdminUserDetailScreenState
               runSpacing: AppThemeConstants.spaceSm,
               children: [
                 // Suspend
-                _ActionButton(
-                  label: ArabicLabels.banUser,
-                  isLoading: _isLoadingSuspend,
-                  onPressed: () => _onSuspendPressed(actions),
-                ),
+                if (status != 'suspended')
+                  _ActionButton(
+                    label: ArabicLabels.banUser,
+                    isLoading: _isLoadingSuspend,
+                    onPressed: () => _onSuspendPressed(actions),
+                  ),
 
                 // Unsuspend (only shown when suspended)
                 if (status == 'suspended')
@@ -279,6 +280,15 @@ class _AdminUserDetailScreenState
       } finally {
         if (mounted) setState(() => _isLoadingSuspend = false);
       }
+    } else if (confirmed == true && reasonCtrl.text.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('يرجى إدخال سبب الإيقاف'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -309,6 +319,7 @@ class _AdminUserDetailScreenState
                   value: 'student', child: Text(ArabicLabels.student)),
               DropdownMenuItem(
                   value: 'mohaffez', child: Text(ArabicLabels.mohaffez)),
+              DropdownMenuItem(value: 'admin', child: Text('مشرف')),
             ],
             onChanged: (v) {
               if (v != null) setDialogState(() => role = v);
@@ -374,6 +385,7 @@ class _AdminUserDetailScreenState
     );
     if (first != true) return;
 
+    if (!mounted) return;
     final second = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(

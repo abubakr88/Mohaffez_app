@@ -29,14 +29,14 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
   }
 
   Stream<int> _countStream(String collection) {
-    return FirebaseFirestore.instance
-        .collection(collection)
-        .snapshots()
+    return Stream.periodic(const Duration(seconds: 30), (count) => count)
         .asyncMap((_) async {
-      final agg =
-          await FirebaseFirestore.instance.collection(collection).count().get();
+      final agg = await FirebaseFirestore.instance
+          .collection(collection)
+          .count()
+          .get();
       return agg.count ?? 0;
-    });
+    }).asBroadcastStream();
   }
 
   @override

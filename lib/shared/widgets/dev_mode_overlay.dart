@@ -155,6 +155,7 @@ class _DevModeOverlayState extends ConsumerState<DevModeOverlay> {
                 const SizedBox(height: AppThemeConstants.spaceSm),
                 ElevatedButton(
                   onPressed: () async {
+                    final ctx = context;
                     try {
                       final logs = await FirebaseFirestore.instance
                           .collection('devLogs')
@@ -165,7 +166,7 @@ class _DevModeOverlayState extends ConsumerState<DevModeOverlay> {
                       }
                       await batch.commit();
                       if (!mounted) return;
-                      Navigator.of(context).pop();
+                      Navigator.of(ctx).pop();
                     } catch (e) {
                       debugPrint('⚠️ Failed to clear dev logs: $e');
                     }

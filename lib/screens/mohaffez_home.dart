@@ -21,7 +21,6 @@ class MohaffezHome extends ConsumerStatefulWidget {
 }
 
 class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
-  bool _hasNavigated = false;
 
   @override
   void initState() {
@@ -31,12 +30,6 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
         AppVersionService.checkOnStartup(context);
       }
     });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _hasNavigated = false;
   }
 
   @override

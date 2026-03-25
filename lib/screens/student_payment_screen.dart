@@ -23,7 +23,7 @@ import 'payment_webview_screen.dart';
 import '../services/direct_payment_service.dart';
 import 'direct_payment_screen.dart';
 
-enum _DPMethod { online, direct }
+enum _DpMethod { online, direct }
 
 class StudentPaymentScreen extends ConsumerStatefulWidget {
   const StudentPaymentScreen({
@@ -88,7 +88,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   bool _hasDirectPayment = false;
   // ignore: unused_field
   Map<String, String?> _walletNumbers = {};
-  _DPMethod _selectedDPMethod = _DPMethod.online;
+  _DpMethod _selectedDPMethod = _DpMethod.online;
 
   // ── Existing getters ──────────────────────────────────────────────────────
   String get lockedSessionType =>
@@ -148,7 +148,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     //      Leaving the default as DPMethod.online causes "Pay Now"
     //      (Paymob gateway) to appear instead of the request flow.
     if (widget.showBundlePlansOnly) {
-      _selectedDPMethod = _DPMethod.direct;
+      _selectedDPMethod = _DpMethod.direct;
     }
     debugPrint(
       '🔍 [PaymentScreen] isLockedRequest=$isLockedRequest planId=${widget.lockedRequest?['planId']} paymentAmount=${widget.lockedRequest?['paymentAmount']}',
@@ -395,7 +395,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () =>
-                      setState(() => _selectedDPMethod = _DPMethod.online),
+                      setState(() => _selectedDPMethod = _DpMethod.online),
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
@@ -403,12 +403,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _selectedDPMethod == _DPMethod.online
+                        color: _selectedDPMethod == _DpMethod.online
                             ? AppTheme.accentGreen
                             : Colors.grey.shade300,
-                        width: _selectedDPMethod == _DPMethod.online ? 2 : 1,
+                        width: _selectedDPMethod == _DpMethod.online ? 2 : 1,
                       ),
-                      color: _selectedDPMethod == _DPMethod.online
+                      color: _selectedDPMethod == _DpMethod.online
                           ? AppTheme.accentGreen.withValues(alpha: 0.08)
                           : Colors.white,
                     ),
@@ -431,7 +431,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () =>
-                      setState(() => _selectedDPMethod = _DPMethod.direct),
+                      setState(() => _selectedDPMethod = _DpMethod.direct),
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
@@ -439,12 +439,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _selectedDPMethod == _DPMethod.direct
+                        color: _selectedDPMethod == _DpMethod.direct
                             ? Colors.green
                             : Colors.grey.shade300,
-                        width: _selectedDPMethod == _DPMethod.direct ? 2 : 1,
+                        width: _selectedDPMethod == _DpMethod.direct ? 2 : 1,
                       ),
-                      color: _selectedDPMethod == _DPMethod.direct
+                      color: _selectedDPMethod == _DpMethod.direct
                           ? Colors.green.withValues(alpha: 0.08)
                           : Colors.white,
                     ),
@@ -597,6 +597,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     if (selectedPlan == null) return;
     final user = ref.read(currentUserProvider).value;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('يرجى تسجيل الدخول')));
       return;
@@ -612,7 +613,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
     if (isFreeSession && appliedPromoCode != null) {
       await handleFreeSession(context, ref, user);
-    } else if (_selectedDPMethod == _DPMethod.direct) {
+    } else if (_selectedDPMethod == _DpMethod.direct) {
       // BUG-A FIX: Allow bundles to proceed without requestId
       if (isBundlePlan || widget.requestId != null) {
         _openDirectPaymentScreen(context, user, pricing);

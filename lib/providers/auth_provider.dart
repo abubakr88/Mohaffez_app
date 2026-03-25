@@ -129,6 +129,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'followingCount': 0,
           'rating': 0.0,
           'reviewCount': 0,
+          'setupCompleted': false,
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (e) {

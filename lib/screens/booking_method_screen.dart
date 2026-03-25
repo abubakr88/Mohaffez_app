@@ -207,6 +207,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
       (plan) =>
           plan.type == PlanType.bundle || plan.type == PlanType.subscription,
     );
+    final canBuyNewBundle = hasBundlePlans && activeBundle == null;
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -227,9 +228,11 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         _BookingOptionCard(
           icon: Icons.add_shopping_cart,
           title: 'شراء باقة جديدة',
-          subtitle: 'اختر باقة وابدأ على الفور',
-          isEnabled: hasBundlePlans,
-          onTap: hasBundlePlans ? _onBuyNewBundle : null,
+          subtitle: activeBundle != null
+              ? 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات'
+              : 'اختر باقة وابدأ على الفور',
+          isEnabled: canBuyNewBundle,
+          onTap: canBuyNewBundle ? _onBuyNewBundle : null,
         ),
         const SizedBox(height: 12),
 

@@ -245,11 +245,11 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         if (!mounted) return;
         setState(() => _confirmed = true);
         messenger.showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
               'تم شراء الباقة وإرسال طلب الجلسة الأولى بنجاح ✓',
             ),
-            duration: const Duration(seconds: 4),
+            duration: Duration(seconds: 4),
             backgroundColor: Colors.green,
           ),
         );

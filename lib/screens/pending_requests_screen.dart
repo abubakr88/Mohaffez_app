@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // FIX-CSS
 
 import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
@@ -576,7 +575,7 @@ class _PendingRequestsScreenState
           pendingRequestsFirstPageProvider(
               request['mohaffezId'] as String),
         );
-        context.go('/home');
+        context.go('/pending-requests');
       } else {
         // Error from CF - show error
         ScaffoldMessenger.of(context).showSnackBar(
@@ -924,7 +923,7 @@ class PendingRequestCard extends ConsumerWidget {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'الطالب أرسل إشعار دفع مباشر — اذهب لـ \"تأكيد المدفوعات\" لقبوله أو رفضه',
+                      'الطالب أرسل إشعار دفع مباشر — اذهب لـ "تأكيد المدفوعات" لقبوله أو رفضه',
                       style:
                           TextStyle(fontSize: 13, color: Colors.blue),
                     ),

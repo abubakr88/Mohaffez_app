@@ -24,6 +24,16 @@ class UserModel with _$UserModel {
     double? addressLat,
     double? addressLng,
     @TimestampConverter() DateTime? createdAt,
+    // ── Setup Account Fields ─────────────────────────────────
+    @Default(false) bool setupCompleted,
+    @TimestampConverter() DateTime? dateOfBirth,
+    String? city,
+    double? examScore,
+    @TimestampConverter() DateTime? examTakenAt,
+    @Default(0) int examRetryCount,
+    @Default(false) bool examPassed,
+    @TimestampConverter() DateTime? examNextRetryAt,
+    // ─────────────────────────────────────────────────────────
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) =>
