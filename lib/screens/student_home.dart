@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/subscription_model.dart';
 import '../providers/payment_provider.dart';
@@ -873,7 +874,10 @@ class RecentAssignmentsSection extends ConsumerWidget {
                 final hifz = (session['hifzAssignment'] as String?) ?? '';
                 final muraja =
                     (session['murajaAssignment'] as String?) ?? '';
-                final sessionDate = session['sessionDate'] as DateTime?;
+                final sessionDateRaw = session['sessionDate'];
+                final sessionDate = sessionDateRaw is Timestamp 
+                    ? sessionDateRaw.toDate() 
+                    : sessionDateRaw as DateTime?;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
