@@ -111,7 +111,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
       const mohaffezPhone     = (requestData.mohaffezPhone    as string  | null)  ?? null;
 
       const rawAmount = requestData.paymentAmount;
-      const amount: number =
+      let amount: number =
         rawAmount != null && typeof rawAmount === 'number' ? rawAmount : 0;
 
       // ── 6. Validate required string fields ────────────────────────────────
@@ -133,19 +133,6 @@ export const confirmSubscriptionSession = functions.https.onCall(
         toDate(requestData.slotEnd, 'slotEnd')
       );
 
-      // Diagnostic log
-      functions.logger.info('confirmSubscriptionSession: slot fields resolved', {
-        requestId,
-        subscriptionId,
-        slotDateType:  (requestData.slotDate  as any)?.constructor?.name ?? typeof requestData.slotDate,
-        slotStartType: (requestData.slotStart as any)?.constructor?.name ?? typeof requestData.slotStart,
-        slotEndType:   (requestData.slotEnd   as any)?.constructor?.name ?? typeof requestData.slotEnd,
-        sessionDateTs: sessionDateTs.toDate().toISOString(),
-        slotStartTs:   slotStartTs.toDate().toISOString(),
-        slotEndTs:     slotEndTs.toDate().toISOString(),
-        amount,
-      });
-
       // ── 8. Build refs ─────────────────────────────────────────────────────
       const subRef = db.collection('subscriptions').doc(subscriptionId);
       const transactionId = `direct_sub_${subscriptionId}_${requestId}`;
@@ -165,6 +152,34 @@ export const confirmSubscriptionSession = functions.https.onCall(
 
       const freshRequestData = requestSnap.data()!;
       const subscription     = subSnap.data()!;
+
+      // For subscription sessions, calculate amount from bundle price
+      if (amount === 0 && subscription) {
+        const bundlePrice = (subscription.bundlePrice as number) ?? 
+                           (subscription.totalPrice as number) ?? 
+                           (subscription.price as number) ?? 0;
+        const totalSessions = (subscription.totalSessions as number) ?? 
+                             (subscription.sessionCount as number) ?? 
+                             (subscription.sessionsCount as number) ?? 1;
+        if (bundlePrice > 0 && totalSessions > 0) {
+          amount = bundlePrice / totalSessions;
+        }
+      }
+
+      // Diagnostic log
+      functions.logger.info('confirmSubscriptionSession: slot fields resolved', {
+        requestId,
+        subscriptionId,
+        slotDateType:  (requestData.slotDate  as any)?.constructor?.name ?? typeof requestData.slotDate,
+        slotStartType: (requestData.slotStart as any)?.constructor?.name ?? typeof requestData.slotStart,
+        slotEndType:   (requestData.slotEnd   as any)?.constructor?.name ?? typeof requestData.slotEnd,
+        sessionDateTs: sessionDateTs.toDate().toISOString(),
+        slotStartTs:   slotStartTs.toDate().toISOString(),
+        slotEndTs:     slotEndTs.toDate().toISOString(),
+        amount,
+        bundlePrice: (subscription.bundlePrice as number) ?? (subscription.totalPrice as number) ?? (subscription.price as number) ?? 0,
+        totalSessions: (subscription.totalSessions as number) ?? (subscription.sessionCount as number) ?? (subscription.sessionsCount as number) ?? 1,
+      });
 
       // ── 10. Idempotency guard ───────────────────────────────────────────────
       if (freshRequestData.status === STATUS.ACCEPTED && freshRequestData.sessionId) {

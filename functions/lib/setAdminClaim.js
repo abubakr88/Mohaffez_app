@@ -18,7 +18,7 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     if (!targetUid) {
         throw new functions.https.HttpsError('invalid-argument', 'targetUid is required');
     }
-    await admin_1.auth.setCustomUserClaims(targetUid, { role: 'admin' });
+    await admin_1.auth.setCustomUserClaims(targetUid, { admin: true, role: 'admin' });
     // WHY: Keep immutable traceability for privilege changes.
     await admin_1.db.collection('adminAuditLog').add({
         action: 'set_admin_claim',

@@ -5,6 +5,7 @@
 //    because teacher-first rule applies to all bundles regardless of payment method
 // 3. Added: validityDays to transaction.set()
 // 4. Updated: notification title/body in 4f to reflect bundle vs single
+// 5. Added: active bundle check to prevent duplicate active bundle requests (NEW)
 // FIX-TS6133: subscriptionId destructured variable now used in both diagnostic log
 //             and transaction.set() — eliminates TS6133 'declared but never read' error.
 // All other logic (slot lock, conflict guard, availability disable, etc.) is UNTOUCHED
@@ -62,11 +63,9 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
     const { mohaffezId, studentName, mohaffezName, sessionType, preferredTimeSlot, slotDate, slotStart, slotEnd, imamAddressText, imamAddressLat, imamAddressLng, mohaffezPhone, subscriptionId, // FIX-TS6133: now consumed below (log + Firestore write)
     requiresPaymentOnAcceptance, selectedPaymentMethod, slotLockId, } = data;
     // ── NEW: plan fields with safe defaults ────────────────────────────────
-    // rawPlanType / isBundlePlan used later for initialStatus and notification
     const rawPlanType = (_j = data.planType) !== null && _j !== void 0 ? _j : 'single';
     const isBundlePlan = rawPlanType === 'bundle' || rawPlanType === 'subscription';
     const validityDays = typeof data.validityDays === 'number' ? data.validityDays : null;
-    // ──────────────────────────────────────────────────────────────────────
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (!mohaffezId ||
         !studentName ||
@@ -115,6 +114,24 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
         rawPlanType,
         isBundlePlan,
     });
+    // ────────────────────────────────────────────────────────────────────────
+    // ── NEW CHECK: Prevent duplicate active bundle requests ────────────────
+    // ────────────────────────────────────────────────────────────────────────
+    if (isBundlePlan) {
+        // Query for an active subscription of the same type for this student+teacher
+        const activeSubsQuery = admin_1.db
+            .collection('subscriptions')
+            .where('studentId', '==', studentId)
+            .where('mohaffezId', '==', mohaffezId)
+            .where('sessionType', '==', sessionType)
+            .where('status', '==', 'active')
+            .where('remainingSessions', '>', 0)
+            .limit(1);
+        const activeSnap = await activeSubsQuery.get();
+        if (!activeSnap.empty) {
+            throw new functions.https.HttpsError('resource-exhausted', 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات');
+        }
+    }
     // ── 4. Transaction ─────────────────────────────────────────────────────
     return admin_1.db.runTransaction(async (transaction) => {
         var _a, _b, _c, _d, _e;

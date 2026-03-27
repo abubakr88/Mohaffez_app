@@ -48,69 +48,72 @@ async function releaseExpiredSlotLocksNow() {
         try {
             await admin_1.db.runTransaction(async (transaction) => {
                 var _a;
-                // FIX lock-expiry-3: Only re-enable availability slot when availability
-                // info is present (Path A / createSessionRequest flow). Path B (buy-bundle)
-                // locks don't have availabilityDocId.
+                // ALL READS FIRST (required by Firestore)
+                let availabilityDoc = null;
                 if (hasAvailabilityInfo) {
                     const availabilityRef = admin_1.db
                         .collection('users')
                         .doc(mohaffezId)
                         .collection('availability')
                         .doc(availabilityDocId);
-                    const availabilityDoc = await transaction.get(availabilityRef);
-                    if (availabilityDoc.exists) {
-                        const data = (_a = availabilityDoc.data()) !== null && _a !== void 0 ? _a : {};
-                        const slots = Array.isArray(data.timeSlots)
-                            ? data.timeSlots
-                            : [];
-                        let changed = false;
-                        const selectedSlot = normalizeTimeSlot(timeSlot);
-                        const updatedSlots = slots.map((slot) => {
-                            const start = typeof slot.startTime === 'string' ? slot.startTime : '';
-                            const end = typeof slot.endTime === 'string' ? slot.endTime : '';
-                            const slotTime = normalizeTimeSlot(`${start}-${end}`);
-                            if (slotTime === selectedSlot &&
-                                slot.sessionType === sessionType &&
-                                slot.lockId === lockDoc.id) {
-                                changed = true;
-                                const updatedSlot = Object.assign({}, slot);
-                                delete updatedSlot.lockedBy;
-                                delete updatedSlot.lockId;
-                                delete updatedSlot.lockedAt;
-                                return updatedSlot;
-                            }
-                            return slot;
-                        });
-                        if (changed) {
-                            transaction.update(availabilityRef, {
-                                timeSlots: updatedSlots,
-                                updatedAt: admin_1.FieldValue.serverTimestamp(),
-                            });
+                    availabilityDoc = await transaction.get(availabilityRef);
+                }
+                let reqSnap = null;
+                if (sessionRequestId) {
+                    const sessionReqRef = admin_1.db.collection('sessionRequests').doc(sessionRequestId);
+                    reqSnap = await transaction.get(sessionReqRef);
+                }
+                // ALL WRITES AFTER (must be after all reads)
+                if (hasAvailabilityInfo && availabilityDoc && availabilityDoc.exists) {
+                    const data = (_a = availabilityDoc.data()) !== null && _a !== void 0 ? _a : {};
+                    const slots = Array.isArray(data.timeSlots)
+                        ? data.timeSlots
+                        : [];
+                    let changed = false;
+                    const selectedSlot = normalizeTimeSlot(timeSlot);
+                    const updatedSlots = slots.map((slot) => {
+                        const start = typeof slot.startTime === 'string' ? slot.startTime : '';
+                        const end = typeof slot.endTime === 'string' ? slot.endTime : '';
+                        const slotTime = normalizeTimeSlot(`${start}-${end}`);
+                        if (slotTime === selectedSlot &&
+                            slot.sessionType === sessionType &&
+                            slot.lockId === lockDoc.id) {
+                            changed = true;
+                            const updatedSlot = Object.assign({}, slot);
+                            delete updatedSlot.lockedBy;
+                            delete updatedSlot.lockId;
+                            delete updatedSlot.lockedAt;
+                            return updatedSlot;
                         }
+                        return slot;
+                    });
+                    if (changed) {
+                        const availabilityRef = admin_1.db
+                            .collection('users')
+                            .doc(mohaffezId)
+                            .collection('availability')
+                            .doc(availabilityDocId);
+                        transaction.update(availabilityRef, {
+                            timeSlots: updatedSlots,
+                            updatedAt: admin_1.FieldValue.serverTimestamp(),
+                        });
                     }
                 }
-                // FIX lock-expiry-3: Always release the lock (not conditional on changed)
+                // Release the lock
                 transaction.update(lockDoc.ref, {
                     released: true,
                     releasedAt: admin_1.FieldValue.serverTimestamp(),
                     releaseReason: hasAvailabilityInfo ? 'expired' : 'expired_no_availability',
                 });
-                // FIX lock-expiry-3: ALWAYS expire the linked sessionRequest
-                // Path B locks (buy-bundle) have sessionRequestId, Path A locks may not.
-                // The sessionRequest should be expired when lock expires, regardless of
-                // whether availabilityDocId was present.
-                if (sessionRequestId) {
-                    const sessionReqRef = admin_1.db.collection('sessionRequests').doc(sessionRequestId);
-                    const reqSnap = await transaction.get(sessionReqRef);
-                    if (reqSnap.exists) {
-                        const reqData = reqSnap.data();
-                        // Only update if status is awaitingdirectpaymentconfirmation (not already accepted)
-                        if ((reqData === null || reqData === void 0 ? void 0 : reqData.status) === 'awaitingdirectpaymentconfirmation') {
-                            transaction.update(sessionReqRef, {
-                                status: 'expired',
-                                updatedAt: admin_1.FieldValue.serverTimestamp(),
-                            });
-                        }
+                // Expire the linked sessionRequest
+                if (sessionRequestId && reqSnap && reqSnap.exists) {
+                    const reqData = reqSnap.data();
+                    if ((reqData === null || reqData === void 0 ? void 0 : reqData.status) === 'awaitingdirectpaymentconfirmation') {
+                        const sessionReqRef = admin_1.db.collection('sessionRequests').doc(sessionRequestId);
+                        transaction.update(sessionReqRef, {
+                            status: 'expired',
+                            updatedAt: admin_1.FieldValue.serverTimestamp(),
+                        });
                     }
                 }
             });

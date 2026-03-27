@@ -55,79 +55,83 @@ export async function releaseExpiredSlotLocksNow(): Promise<number> {
 
     try {
       await db.runTransaction(async (transaction) => {
-        // FIX lock-expiry-3: Only re-enable availability slot when availability
-        // info is present (Path A / createSessionRequest flow). Path B (buy-bundle)
-        // locks don't have availabilityDocId.
+        // ALL READS FIRST (required by Firestore)
+        let availabilityDoc: FirebaseFirestore.DocumentSnapshot | null = null;
         if (hasAvailabilityInfo) {
           const availabilityRef = db
             .collection('users')
             .doc(mohaffezId!)
             .collection('availability')
             .doc(availabilityDocId!);
+          availabilityDoc = await transaction.get(availabilityRef);
+        }
 
-          const availabilityDoc = await transaction.get(availabilityRef);
-          if (availabilityDoc.exists) {
-            const data = availabilityDoc.data() ?? {};
-            const slots = Array.isArray(data.timeSlots)
-              ? (data.timeSlots as Record<string, unknown>[])
-              : [];
+        let reqSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+        if (sessionRequestId) {
+          const sessionReqRef = db.collection('sessionRequests').doc(sessionRequestId);
+          reqSnap = await transaction.get(sessionReqRef);
+        }
 
-            let changed = false;
-            const selectedSlot = normalizeTimeSlot(timeSlot!);
+        // ALL WRITES AFTER (must be after all reads)
+        if (hasAvailabilityInfo && availabilityDoc && availabilityDoc.exists) {
+          const data = availabilityDoc.data() ?? {};
+          const slots = Array.isArray(data.timeSlots)
+            ? (data.timeSlots as Record<string, unknown>[])
+            : [];
 
-            const updatedSlots = slots.map((slot) => {
-              const start = typeof slot.startTime === 'string' ? slot.startTime : '';
-              const end = typeof slot.endTime === 'string' ? slot.endTime : '';
-              const slotTime = normalizeTimeSlot(`${start}-${end}`);
+          let changed = false;
+          const selectedSlot = normalizeTimeSlot(timeSlot!);
 
-              if (
-                slotTime === selectedSlot &&
-                slot.sessionType === sessionType &&
-                slot.lockId === lockDoc.id
-              ) {
-                changed = true;
-                const updatedSlot = { ...slot };
-                delete updatedSlot.lockedBy;
-                delete updatedSlot.lockId;
-                delete updatedSlot.lockedAt;
-                return updatedSlot;
-              }
+          const updatedSlots = slots.map((slot) => {
+            const start = typeof slot.startTime === 'string' ? slot.startTime : '';
+            const end = typeof slot.endTime === 'string' ? slot.endTime : '';
+            const slotTime = normalizeTimeSlot(`${start}-${end}`);
 
-              return slot;
-            });
-
-            if (changed) {
-              transaction.update(availabilityRef, {
-                timeSlots: updatedSlots,
-                updatedAt: FieldValue.serverTimestamp(),
-              });
+            if (
+              slotTime === selectedSlot &&
+              slot.sessionType === sessionType &&
+              slot.lockId === lockDoc.id
+            ) {
+              changed = true;
+              const updatedSlot = { ...slot };
+              delete updatedSlot.lockedBy;
+              delete updatedSlot.lockId;
+              delete updatedSlot.lockedAt;
+              return updatedSlot;
             }
+
+            return slot;
+          });
+
+          if (changed) {
+            const availabilityRef = db
+              .collection('users')
+              .doc(mohaffezId!)
+              .collection('availability')
+              .doc(availabilityDocId!);
+            transaction.update(availabilityRef, {
+              timeSlots: updatedSlots,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
           }
         }
 
-        // FIX lock-expiry-3: Always release the lock (not conditional on changed)
+        // Release the lock
         transaction.update(lockDoc.ref, {
           released: true,
           releasedAt: FieldValue.serverTimestamp(),
           releaseReason: hasAvailabilityInfo ? 'expired' : 'expired_no_availability',
         });
 
-        // FIX lock-expiry-3: ALWAYS expire the linked sessionRequest
-        // Path B locks (buy-bundle) have sessionRequestId, Path A locks may not.
-        // The sessionRequest should be expired when lock expires, regardless of
-        // whether availabilityDocId was present.
-        if (sessionRequestId) {
-          const sessionReqRef = db.collection('sessionRequests').doc(sessionRequestId);
-          const reqSnap = await transaction.get(sessionReqRef);
-          if (reqSnap.exists) {
-            const reqData = reqSnap.data();
-            // Only update if status is awaitingdirectpaymentconfirmation (not already accepted)
-            if (reqData?.status === 'awaitingdirectpaymentconfirmation') {
-              transaction.update(sessionReqRef, {
-                status: 'expired',
-                updatedAt: FieldValue.serverTimestamp(),
-              });
-            }
+        // Expire the linked sessionRequest
+        if (sessionRequestId && reqSnap && reqSnap.exists) {
+          const reqData = reqSnap.data();
+          if (reqData?.status === 'awaitingdirectpaymentconfirmation') {
+            const sessionReqRef = db.collection('sessionRequests').doc(sessionRequestId);
+            transaction.update(sessionReqRef, {
+              status: 'expired',
+              updatedAt: FieldValue.serverTimestamp(),
+            });
           }
         }
       });

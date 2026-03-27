@@ -198,7 +198,8 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                 .where('studentId', '==', studentId)
                 .where('mohaffezId', '==', mohaffezId)
                 .where('sessionType', '==', resolvedSessionType)
-                .where('status', '==', 'active'));
+                .where('status', '==', 'active')
+                .where('remainingSessions', '>', 0));
             if (activeSubsSnap.size >= PER_SESSION_TYPE_LIMIT) {
                 throw new functions.https.HttpsError('resource-exhausted', 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات');
             }
@@ -244,6 +245,7 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                 ? sessionsCount - 1
                 : sessionsCount;
             // 9g. Write subscription
+            const initialStatus = initialRemaining > 0 ? 'active' : 'depleted';
             transaction.set(subscriptionRef, {
                 studentId,
                 studentName: dp.studentName,
@@ -259,7 +261,7 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                 paymentTransactionId: transactionTag,
                 startDate: admin_1.FieldValue.serverTimestamp(),
                 expiryDate,
-                status: 'active',
+                status: initialStatus,
                 directPaymentRequestId: paymentId,
                 // WHY: preserves link back to the original bundle booking request
                 sessionRequestId: (_a = dp.sessionRequestId) !== null && _a !== void 0 ? _a : null,
@@ -448,6 +450,24 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                 subscriptionId: error.existingSubscriptionId,
                 message: 'Already confirmed',
             };
+        }
+        try {
+            const dpSnap = await dpRef.get();
+            if (dpSnap.exists) {
+                const dpData = dpSnap.data();
+                if ((dpData === null || dpData === void 0 ? void 0 : dpData.status) === 'confirming') {
+                    await dpRef.update({
+                        status: 'pendingconfirmation',
+                        updatedAt: admin_1.FieldValue.serverTimestamp(),
+                    });
+                }
+            }
+        }
+        catch (resetError) {
+            functions.logger.error('confirmBundleDirectPayment failed to restore payment status', {
+                paymentId,
+                resetError: resetError instanceof Error ? resetError.message : 'Unknown reset error',
+            });
         }
         // Re-throw HttpsErrors as-is — never wrap in 'internal'
         if (error instanceof functions.https.HttpsError)
