@@ -7,7 +7,14 @@
 
 # 1. Overview (Current Snapshot)
 
-Mohaffez v1.0.0 is a **live Flutter application** with Firebase backend serving students and Quran teachers (Mohaffez). The core platform is operational: authentication, role-based access, teacher discovery, and session booking are all functional. A major new feature — **Al-Mohaffez Bundle-Based Booking Flow** — has been partially implemented and is under active development. This new flow introduces three booking paths (use existing bundle, buy new bundle, direct single-session request) with complex state management across Flutter frontend and Firebase Cloud Functions.
+Mohaffez v1.0.0 is a **live Flutter application** with Firebase backend serving students and Quran teachers (Mohaffez). The core platform is operational: authentication, role-based access, teacher discovery, and session booking are all functional. 
+
+**Recent Updates (March 2026):**
+- **Student Assignments & Performance Tracking** — Students can now view completed session assignments, track their Hifz/Muraja performance with ratings, and review Quran recitation mistakes marked by teachers in an interactive Mushaf view
+- **Payment Scenarios** — All payment paths (Path A, B, C) now fully implemented and tested
+- **Security Hardening** — Removed exposed Google Cloud service account credentials from git history
+
+The **Al-Mohaffez Bundle-Based Booking Flow** remains the primary active development area with three booking paths (use existing bundle, buy new bundle, direct single-session request) with complex state management across Flutter frontend and Firebase Cloud Functions.
 
 ---
 
@@ -22,6 +29,9 @@ Mohaffez v1.0.0 is a **live Flutter application** with Firebase backend serving 
 | **Teacher Profiles** | Live | Availability schedules, pricing plans, student reviews |
 | **Basic Session Booking** | Live | Single-session requests with pending/accepted/rejected flows |
 | **Direct Payment (Path C)** | Live | Teacher-first approval → student pays → teacher confirms |
+| **Bundle/Subscription Booking** | Live | All 3 paths (A/B/C) complete; use existing bundle, buy new bundle, direct request |
+| **Student Assignments** | Live | View completed session assignments, performance ratings, teacher notes |
+| **Mistake Review System** | Live | Interactive Quran page showing teacher-marked recitation mistakes |
 | **Notifications** | Live | Push notifications via FCM; in-app notification center |
 | **Admin Dashboard** | Live | User management, credential approval, broadcast notifications, audit logs |
 | **Slot Locking** | Live | 24-hour temporary slot reservation mechanism |
@@ -66,7 +76,7 @@ The new bundle booking system introduces three mutually exclusive paths when a s
 - `confirmBundleDirectPayment()` CF (called by teacher) creates `subscription` document + first `hafizSession`
 - Atomic transaction ensures bundle activation + first session creation together
 
-**Implementation Status:** `Partially Implemented` — Core CFs operational; slot-lock integration has edge cases
+**Implementation Status:** `Implemented` — Production ready (March 2026)
 
 ---
 
@@ -83,7 +93,74 @@ The new bundle booking system introduces three mutually exclusive paths when a s
 - `createSessionRequest()` with `requiresPaymentOnAcceptance: true` (for non-bundle plans)
 - `mohaffezConfirmDirectPayment()` CF creates `hafizSession` after payment verification
 
-**Implementation Status:** `Implemented` — Production stable
+**Implementation Status:** `Implemented` — Production stable (March 2026)
+
+---
+
+# 3. Student Assignments & Performance Tracking (New — March 2026)
+
+A comprehensive system for students to review completed sessions, track their progress, and learn from teacher feedback.
+
+## 3.1 Student Assignments Screen
+
+**File:** `lib/screens/student_assignments_screen.dart`
+
+**Features:**
+- **Completed Sessions List**: Shows all completed `hafizSessions` with teacher name and date
+- **Assignment Cards**: Rich card UI displaying:
+  - Previous assignment performance (Hifz/Muraja completion status)
+  - Performance ratings (1-10 star ratings)
+  - Teacher's performance notes
+  - New assignments for next session (Hifz/Muraja content)
+  - Session rating and notes from teacher
+
+**Key Data Fields Used:**
+```
+session['previousHifzCompleted'] - bool
+session['previousHifzRating'] - int (0-10)
+session['previousMurajaCompleted'] - bool
+session['previousMurajaRating'] - int (0-10)
+session['performanceNotes'] - String
+session['hifzAssignment'] - String
+session['murajaAssignment'] - String
+session['sessionRating'] - int
+session['sessionNotes'] - String
+```
+
+## 3.2 Mistake Review System
+
+**File:** `lib/screens/student_assignments_screen.dart` (`_MistakeReviewCard`)
+
+**Features:**
+- **Mistake Aggregation**: Groups teacher-marked recitation mistakes by type
+- **Visual Chips**: Color-coded mistake type chips showing counts
+- **Interactive Mushaf**: Opens `InteractiveQuranPage` at the mistake location
+- **Read-Only Mode**: Students can view but not edit mistakes
+
+**Model:** `lib/models/quran_mistake_model.dart`
+
+```dart
+class QuranMistake {
+  final String id;
+  final int pageNumber;
+  final double x;  // Normalized coordinates (0-1)
+  final double y;
+  final MistakeType type;  // tajweed, hifz, makharij, etc.
+  final String? note;
+  final String? markedBy;
+  final DateTime? markedAt;
+}
+```
+
+## 3.3 Implementation Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Assignment Cards UI | Done | Rich card design with performance badges |
+| Mistake Review Card | Done | Grouped by type with interactive Mushaf link |
+| Interactive Quran Page | Done | Read-only mode for student review |
+| Performance Tracking | Done | Hifz/Muraja completion and ratings |
+| Teacher Notes Display | Done | Performance notes and session messages |
 
 ---
 
@@ -98,6 +175,7 @@ The new bundle booking system introduces three mutually exclusive paths when a s
 - `DirectPaymentScreen` — Payment method selection with wallet display
 - `DirectBookingRequestScreen` — Path C single-session request flow
 - `ActiveSubscriptionsScreen` — Student view of all active bundles
+- `StudentAssignmentsScreen` — View completed sessions, assignments, performance ratings, and mistake review
 - `BookingFlowProvider` — Centralized booking state (SlotContext, selected plan, path tracking)
 - `activeBundleProvider` — Query for single active bundle by (studentId, mohaffezId, sessionType)
 
@@ -137,7 +215,35 @@ The new bundle booking system introduces three mutually exclusive paths when a s
 
 ---
 
-## 4.3 Data Model & Constraints
+## 4.3 Security & Secrets Management
+
+**Issue Resolved (March 2026):** Exposed Google Cloud Service Account Credentials
+
+**Problem:**
+- `functions/serviceAccountKey.json` containing Google Cloud service account credentials was committed to git history
+- GitHub Push Protection blocked push with error: `GH013: Repository rule violations found`
+
+**Resolution:**
+1. Added `serviceAccountKey.json` to `functions/.gitignore`
+2. Used `git filter-branch` to remove file from entire git history
+3. Force pushed clean history to origin
+
+**Action Required:**
+- **CRITICAL:** Revoke the exposed service account credentials in Google Cloud Console immediately
+- Generate new service account key if needed
+- Store new credentials securely (environment variables, not in repo)
+
+**Prevention:**
+```
+# functions/.gitignore
+node_modules/
+*.local
+serviceAccountKey.json  # Never commit service account keys
+```
+
+---
+
+## 4.4 Data Model & Constraints
 
 ### Core Collections
 
@@ -208,9 +314,11 @@ rejected   cancelled              cancelled
 - `lib/screens/confirm_bundle_session_screen.dart` — Path A bundle usage
 - `lib/screens/direct_payment_screen.dart` — Payment marking
 - `lib/screens/direct_booking_request_screen.dart` — Path C single session
+- `lib/screens/student_assignments_screen.dart` — Student assignments and mistake review
 - `lib/providers/booking_flow_provider.dart` — Booking state management
 - `lib/models/subscription_model.dart` — Bundle data model
 - `lib/models/session_request_model.dart` — Request data model
+- `lib/models/quran_mistake_model.dart` — Quran recitation mistake tracking
 
 ### Backend (Firebase Functions)
 - `functions/src/bookings/createSessionRequest.ts` — Request creation
