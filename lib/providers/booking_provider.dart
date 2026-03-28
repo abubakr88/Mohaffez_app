@@ -589,8 +589,16 @@ class BookingService {
 
       if (responseMap['success'] == true) {
         final requestId = responseMap['requestId'] as String?;
-        if (kDebugMode) debugPrint('🎉 Session request created: $requestId');
-        return BookingResult.success(requestId ?? '');
+        final isDuplicate = responseMap['isDuplicate'] == true;
+        if (kDebugMode) {
+          debugPrint(isDuplicate 
+              ? '⚠️ Session request already exists: $requestId'
+              : '🎉 Session request created: $requestId');
+        }
+        return BookingResult.success(
+          requestId ?? '',
+          isDuplicate: isDuplicate,
+        );
       }
 
       final errorMsg =

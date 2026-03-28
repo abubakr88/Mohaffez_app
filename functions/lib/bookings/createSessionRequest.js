@@ -33,7 +33,7 @@ function parseFlutterDate(iso) {
     return new Date(iso);
 }
 exports.createSessionRequest = functions.https.onCall(async (data, context) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     const fallbackIdToken = typeof (data === null || data === void 0 ? void 0 : data.idToken) === 'string' ? data.idToken : null;
     let studentId = (_b = (_a = context.auth) === null || _a === void 0 ? void 0 : _a.uid) !== null && _b !== void 0 ? _b : null;
     // ── 0. DIAGNOSTIC LOG (remove after issue resolved) ───────────────────
@@ -117,7 +117,24 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
     // ────────────────────────────────────────────────────────────────────────
     // ── NEW CHECK: Prevent duplicate active bundle requests ────────────────
     // ────────────────────────────────────────────────────────────────────────
-    if (isBundlePlan) {
+    // BUG FIX: Only check for duplicates when BUYING a new bundle
+    // (requiresPaymentOnAcceptance = true). When USING an existing bundle
+    // (Path A), we skip this check because the student SHOULD have an active bundle.
+    const isBuyingNewBundle = isBundlePlan && requiresPaymentOnAcceptance === true;
+    // LOGGING: Path identification for debugging
+    functions.logger.info('createSessionRequest: Path identification', {
+        isBundlePlan,
+        requiresPaymentOnAcceptance: requiresPaymentOnAcceptance !== null && requiresPaymentOnAcceptance !== void 0 ? requiresPaymentOnAcceptance : false,
+        hasSubscriptionId: !!subscriptionId,
+        isBuyingNewBundle,
+        path: isBuyingNewBundle
+            ? 'PATH_B_BUY_NEW_BUNDLE'
+            : (isBundlePlan ? 'PATH_A_USE_EXISTING_BUNDLE' : 'PATH_C_SINGLE_SESSION'),
+        studentId,
+        mohaffezId,
+        sessionType,
+    });
+    if (isBuyingNewBundle) {
         // Query for an active subscription of the same type for this student+teacher
         const activeSubsQuery = admin_1.db
             .collection('subscriptions')
@@ -128,7 +145,20 @@ exports.createSessionRequest = functions.https.onCall(async (data, context) => {
             .where('remainingSessions', '>', 0)
             .limit(1);
         const activeSnap = await activeSubsQuery.get();
+        functions.logger.info('createSessionRequest: Duplicate bundle check', {
+            foundExistingBundle: !activeSnap.empty,
+            existingBundleCount: activeSnap.size,
+            studentId,
+            mohaffezId,
+            sessionType,
+        });
         if (!activeSnap.empty) {
+            functions.logger.warn('createSessionRequest: BLOCKED - duplicate active bundle exists', {
+                studentId,
+                mohaffezId,
+                sessionType,
+                existingBundleId: (_k = activeSnap.docs[0]) === null || _k === void 0 ? void 0 : _k.id,
+            });
             throw new functions.https.HttpsError('resource-exhausted', 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات');
         }
     }

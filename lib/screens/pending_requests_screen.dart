@@ -555,7 +555,22 @@ class _PendingRequestsScreenState
         'mohaffezName': request['mohaffezName'] as String? ?? '',
       });
 
-      final data = Map<String, dynamic>.from(result.data as Map);
+      // SAFETY: Handle null or non-Map response data gracefully
+      if (result.data == null) {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('خطأ: استجابة فارغة من الخادم'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      final data = result.data is Map 
+          ? Map<String, dynamic>.from(result.data as Map)
+          : <String, dynamic>{};
       
       // IMPORTANT: Check mounted BEFORE any navigation
       if (!mounted) return;
@@ -564,6 +579,7 @@ class _PendingRequestsScreenState
       Navigator.of(context).pop();
 
       if (data['success'] == true) {
+        // Show success message first
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم قبول الجلسة بنجاح'),
@@ -571,11 +587,22 @@ class _PendingRequestsScreenState
             duration: Duration(seconds: 3),
           ),
         );
-        ref.invalidate(
-          pendingRequestsFirstPageProvider(
-              request['mohaffezId'] as String),
-        );
-        context.go('/pending-requests');
+        
+        // Use post-frame to avoid navigation during disposal
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          
+          // Invalidate provider after frame to avoid disposal issues
+          ref.invalidate(
+            pendingRequestsFirstPageProvider(
+                request['mohaffezId'] as String),
+          );
+          
+          // Navigate safely
+          if (mounted) {
+            context.go('/pending-requests');
+          }
+        });
       } else {
         // Error from CF - show error
         ScaffoldMessenger.of(context).showSnackBar(

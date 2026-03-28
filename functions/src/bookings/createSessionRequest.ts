@@ -174,7 +174,26 @@ export const createSessionRequest = functions.https.onCall(
     // ────────────────────────────────────────────────────────────────────────
     // ── NEW CHECK: Prevent duplicate active bundle requests ────────────────
     // ────────────────────────────────────────────────────────────────────────
-    if (isBundlePlan) {
+    // BUG FIX: Only check for duplicates when BUYING a new bundle
+    // (requiresPaymentOnAcceptance = true). When USING an existing bundle
+    // (Path A), we skip this check because the student SHOULD have an active bundle.
+    const isBuyingNewBundle = isBundlePlan && requiresPaymentOnAcceptance === true;
+    
+    // LOGGING: Path identification for debugging
+    functions.logger.info('createSessionRequest: Path identification', {
+      isBundlePlan,
+      requiresPaymentOnAcceptance: requiresPaymentOnAcceptance ?? false,
+      hasSubscriptionId: !!subscriptionId,
+      isBuyingNewBundle,
+      path: isBuyingNewBundle 
+        ? 'PATH_B_BUY_NEW_BUNDLE' 
+        : (isBundlePlan ? 'PATH_A_USE_EXISTING_BUNDLE' : 'PATH_C_SINGLE_SESSION'),
+      studentId,
+      mohaffezId,
+      sessionType,
+    });
+    
+    if (isBuyingNewBundle) {
       // Query for an active subscription of the same type for this student+teacher
       const activeSubsQuery = db
         .collection('subscriptions')
@@ -186,7 +205,22 @@ export const createSessionRequest = functions.https.onCall(
         .limit(1);
 
       const activeSnap = await activeSubsQuery.get();
+      
+      functions.logger.info('createSessionRequest: Duplicate bundle check', {
+        foundExistingBundle: !activeSnap.empty,
+        existingBundleCount: activeSnap.size,
+        studentId,
+        mohaffezId,
+        sessionType,
+      });
+      
       if (!activeSnap.empty) {
+        functions.logger.warn('createSessionRequest: BLOCKED - duplicate active bundle exists', {
+          studentId,
+          mohaffezId,
+          sessionType,
+          existingBundleId: activeSnap.docs[0]?.id,
+        });
         throw new functions.https.HttpsError(
           'resource-exhausted',
           'لديك باقة نشطة بالفعل لهذا النوع من الجلسات'

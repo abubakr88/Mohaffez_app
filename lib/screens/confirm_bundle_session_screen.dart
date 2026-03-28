@@ -218,12 +218,37 @@ class _ConfirmBundleSessionScreenState
 
     setState(() => _isLoading = true);
 
+    String? slotLockId;
     try {
       final bookingService = ref.read(bookingServiceProvider);
 
       final slotDate = DateTime.parse(slotContext.slotDate);
       final slotStart = DateTime.parse(slotContext.slotStart);
       final slotEnd = DateTime.parse(slotContext.slotEnd);
+
+      // ── CREATE SLOT LOCK ───────────────────────────────────────────────────
+      // Path A (use existing bundle) needs a slot lock to prevent conflicts,
+      // just like Path B (buy new bundle) creates one in directPayment.ts
+      final firestore = FirebaseFirestore.instance;
+      final lockRef = firestore.collection('slotLocks').doc();
+      slotLockId = lockRef.id;
+      
+      final expiresAt = DateTime.now().add(const Duration(hours: 24));
+      
+      await lockRef.set({
+        'id': slotLockId,
+        'mohaffezId': slotContext.mohaffezId,
+        'slotDate': Timestamp.fromDate(slotDate),
+        'timeSlot': slotContext.preferredTimeSlot,
+        'sessionType': slotContext.sessionType,
+        'lockedBy': currentUser.uid,
+        'lockedAt': FieldValue.serverTimestamp(),
+        'expiresAt': Timestamp.fromDate(expiresAt),
+        'released': false,
+        'sessionRequestId': null, // Will be updated by createSessionRequest CF
+      });
+      
+      debugPrint('🔒 Slot lock created: $slotLockId for bundle session');
 
       final result = await bookingService.createSessionRequest(
         mohaffezId: slotContext.mohaffezId,
@@ -240,7 +265,7 @@ class _ConfirmBundleSessionScreenState
         imamAddressLng: slotContext.imamAddressLng,
         mohaffezPhone: slotContext.mohaffezPhone,
         subscriptionId: sub.id,
-        slotLockId: slotContext.slotLockId,
+        slotLockId: slotLockId, // Use the newly created slot lock
         // INTENTIONALLY false: no new payment needed — student already owns
         // this bundle. PendingRequestsScreen.handleAccept() detects
         // selectedPaymentMethod == 'subscriptionCredit' and routes to
@@ -257,10 +282,17 @@ class _ConfirmBundleSessionScreenState
 
       if (result.success) {
         ref.read(bookingFlowProvider.notifier).reset();
+        
+        // Show different message for duplicate vs new request
+        final message = result.isDuplicate
+            ? 'لديك طلب موجود بالفعل لهذا الموعد — تم استخدامه'
+            : 'تم إرسال طلب الجلسة بنجاح ✓';
+            
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إرسال طلب الجلسة بنجاح ✓'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: Text(message),
+            backgroundColor: result.isDuplicate ? Colors.orange : Colors.green,
+            duration: Duration(seconds: result.isDuplicate ? 4 : 3),
           ),
         );
         context.go('/home');

@@ -221,7 +221,7 @@ exports.mohaffezConfirmDirectPayment = functions.https.onCall(async (data, conte
     if (!callerDoc.exists || ((_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'mohaffez') {
         throw new functions.https.HttpsError('permission-denied', 'Caller must be a mohaffez');
     }
-    const directPaymentRequestId = data;
+    const { directPaymentRequestId } = data;
     if (!directPaymentRequestId) {
         throw new functions.https.HttpsError('invalid-argument', 'directPaymentRequestId required');
     }

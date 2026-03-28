@@ -139,12 +139,12 @@ class DirectPaymentService {
   static Future<Map<String, dynamic>> mohaffezConfirm(
       String directPaymentRequestId) async {
     try {
-      final result = await FirebaseFunctions.instance  // ✅ no underscore
+      final result = await FirebaseFunctions.instance
           .httpsCallable(
             'mohaffezConfirmDirectPayment',
             options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
           )
-          .call(directPaymentRequestId);
+          .call({'directPaymentRequestId': directPaymentRequestId});
 
       if (result.data is Map) {
         return Map<String, dynamic>.from(result.data as Map);

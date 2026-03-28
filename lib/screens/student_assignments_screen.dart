@@ -1,5 +1,6 @@
 ﻿// lib/screens/student_assignments_screen.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -193,7 +194,11 @@ class _CompletedAssignmentCard extends ConsumerWidget {
         session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
-    final sessionDate = session['sessionDate'] as DateTime?;
+    // FIX: Firestore stores dates as Timestamp, convert to DateTime
+    final sessionDateRaw = session['sessionDate'];
+    final sessionDate = sessionDateRaw is Timestamp 
+        ? sessionDateRaw.toDate() 
+        : sessionDateRaw as DateTime?;
 
     // Evaluation values
     final previousHifzCompleted = session['previousHifzCompleted'] as bool?;

@@ -292,7 +292,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
       throw new functions.https.HttpsError('permission-denied', 'Caller must be a mohaffez');
     }
 
-    const directPaymentRequestId = data as string;
+    const { directPaymentRequestId } = data as { directPaymentRequestId?: string };
     if (!directPaymentRequestId) {
       throw new functions.https.HttpsError('invalid-argument', 'directPaymentRequestId required');
     }
