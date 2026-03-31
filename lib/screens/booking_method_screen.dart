@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/pricing_plan_model.dart';
-import '../models/subscription_model.dart';        // ← ADD THIS BACK
+import '../models/subscription_model.dart';
 import '../providers/booking_flow_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/pricing_provider.dart';
+import '../shared/theme/app_theme_constants.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
@@ -214,7 +215,9 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
       children: [
         // ── Option 1: Use existing bundle ──────────────────────────────────
         _BookingOptionCard(
-          icon: Icons.card_membership,
+          icon: Icons.card_membership_rounded,
+          backgroundColor: AppThemeConstants.successBackground,
+          iconColor: AppThemeConstants.success,
           title: 'استخدام باقة حالية',
           subtitle: activeBundle != null
               ? 'متبقي ${activeBundle.remainingSessions} جلسة من ${activeBundle.totalSessions}'
@@ -222,11 +225,13 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           isEnabled: activeBundle != null,
           onTap: activeBundle != null ? _onUseExistingBundle : null,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
         // ── Option 2: Buy new bundle ────────────────────────────────────
         _BookingOptionCard(
-          icon: Icons.add_shopping_cart,
+          icon: Icons.add_shopping_cart_rounded,
+          backgroundColor: AppThemeConstants.accentBackground,
+          iconColor: AppThemeConstants.primary,
           title: 'شراء باقة جديدة',
           subtitle: activeBundle != null
               ? 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات'
@@ -234,27 +239,34 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           isEnabled: canBuyNewBundle,
           onTap: canBuyNewBundle ? _onBuyNewBundle : null,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
 
         // ── Option 3: Direct single-session request ─────────────────────
         _BookingOptionCard(
-          icon: Icons.payment,
+          icon: Icons.payment_rounded,
+          backgroundColor: AppThemeConstants.surface,
+          iconColor: AppThemeConstants.primary,
+          borderColor: AppThemeConstants.primary,
           title: 'إرسال طلب حجز جديد',
           subtitle: 'دفع مباشر لجلسة واحدة',
           isEnabled: true,
           onTap: _onNewDirectRequest,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
 
         // ── Cancel ──────────────────────────────────────────────────────
         TextButton(
           onPressed: () => context.pop(),
+          style: TextButton.styleFrom(
+            foregroundColor: AppThemeConstants.textSecondary,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
           child: const Text(
             'إلغاء',
-            style: TextStyle(color: Colors.grey, fontSize: 15),
+            style: TextStyle(fontSize: 15),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -312,6 +324,9 @@ class _BookingOptionCard extends StatelessWidget {
   final String subtitle;
   final bool isEnabled;
   final VoidCallback? onTap;
+  final Color? backgroundColor;
+  final Color? iconColor;
+  final Color? borderColor;
 
   const _BookingOptionCard({
     required this.icon,
@@ -319,58 +334,82 @@ class _BookingOptionCard extends StatelessWidget {
     required this.subtitle,
     required this.isEnabled,
     this.onTap,
+    this.backgroundColor,
+    this.iconColor,
+    this.borderColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Opacity(
-      opacity: isEnabled ? 1.0 : 0.4,
-      child: InkWell(
-        onTap: isEnabled ? onTap : null,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context)
-                  .colorScheme
-                  .outline
-                  .withValues(alpha: 0.5),
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 32,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+      opacity: isEnabled ? 1.0 : 0.5,
+      child: Card(
+        elevation: AppThemeConstants.elevationSm,
+        shadowColor: AppThemeConstants.shadow,
+        color: backgroundColor ?? AppThemeConstants.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppThemeConstants.borderRadiusMd,
+          side: borderColor != null 
+              ? BorderSide(color: borderColor!, width: 1.5)
+              : BorderSide.none,
+        ),
+        child: InkWell(
+          onTap: isEnabled ? onTap : null,
+          borderRadius: AppThemeConstants.borderRadiusMd,
+          child: Padding(
+            padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (iconColor ?? colorScheme.primary).withOpacity(0.1),
+                    borderRadius: AppThemeConstants.borderRadiusSm,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 28,
+                    color: isEnabled 
+                        ? (iconColor ?? colorScheme.primary)
+                        : AppThemeConstants.textDisabled,
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_left, color: Colors.grey[400]),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppThemeConstants.titleMedium.copyWith(
+                          color: isEnabled 
+                              ? AppThemeConstants.textPrimary
+                              : AppThemeConstants.textDisabled,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: AppThemeConstants.bodySmall.copyWith(
+                          color: isEnabled
+                              ? AppThemeConstants.textSecondary
+                              : AppThemeConstants.textDisabled,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_left_rounded, 
+                  color: isEnabled 
+                      ? AppThemeConstants.textSecondary
+                      : AppThemeConstants.textDisabled,
+                ),
+              ],
+            ),
           ),
         ),
       ),

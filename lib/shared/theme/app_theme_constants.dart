@@ -1,32 +1,62 @@
 import 'package:flutter/material.dart';
 
 /// Centralized theme constants following Material Design 3.
-/// Single source of truth for design tokens.
+/// Updated for new visual identity: Turquoise, Gold, and Warm White.
 class AppThemeConstants {
   AppThemeConstants._();
 
-  // Color palette
-  static const Color primaryAmber = Color.fromARGB(255, 196, 143, 64);
-  static const Color primaryAmberDark = Color.fromARGB(255, 163, 109, 56);
-  static const Color primaryAmberLight = Color.fromARGB(255, 179, 125, 45);
+  // ─── Primary Colors (Dark Turquoise) ───────────────────────────────────────
+  static const Color primary = Color(0xFF0B7A75);           // Dark turquoise
+  static const Color primaryVariant = Color(0xFF11A7A0);    // Lighter turquoise
+  static const Color onPrimary = Colors.white;
 
-  static const Color accentGreen = Color(0xFF66BB6A);
-  static const Color accentGreenDark = Color(0xFF388E3C);
-  static const Color accentGreenLight = Color(0xFF81C784);
+  // ─── Secondary Colors (Soft Gold) ──────────────────────────────────────────
+  static const Color secondary = Color(0xFFD4A44A);         // Soft gold
+  static const Color secondaryContainer = Color(0xFFFEF3C7); // Light gold bg
+  static const Color onSecondary = Color(0xFF1E2933);
 
-  static const Color backgroundLight = Color(0xFFFAFAFA);
-  static const Color surfaceWhite = Colors.white;
-  static const Color divider = Color(0xFFE0E0E0);
+  // ─── Accent & Background Colors ──────────────────────────────────────────
+  static const Color accentBackground = Color(0xFFE3F3F7);  // Pale sky
+  static const Color background = Color(0xFFFDFBF7);        // Warm white
+  static const Color surface = Colors.white;
 
-  static const Color error = Color(0xFFD32F2F);
-  static const Color success = Color(0xFF4CAF50);
-  static const Color warning = Color(0xFFFF9800);
-  static const Color info = Color(0xFF2196F3);
-
-  static const Color textPrimary = Color(0xFF212121);
-  static const Color textSecondary = Color(0xFF757575);
-  static const Color textDisabled = Color(0xFFBDBDBD);
+  // ─── Text Colors ─────────────────────────────────────────────────────────
+  static const Color textPrimary = Color(0xFF1E2933);       // Dark bluish gray
+  static const Color textSecondary = Color(0xFF6B7280);     // Medium gray
+  static const Color textDisabled = Color(0xFF9CA3AF);
   static const Color textOnPrimary = Colors.white;
+
+  // ─── Semantic Colors ───────────────────────────────────────────────────────
+  static const Color success = Color(0xFF16A34A);
+  static const Color successBackground = Color(0xFFDCFCE7);
+  static const Color warning = Color(0xFFEA580C);
+  static const Color warningBackground = Color(0xFFFFF3E0);
+  static const Color error = Color(0xFFB91C1C);
+  static const Color errorBackground = Color(0xFFFEE2E2);
+  static const Color info = Color(0xFF0B7A75);
+
+  // ─── Utility Colors ──────────────────────────────────────────────────────
+  static const Color divider = Color(0xFFE5E7EB);
+  static const Color outline = Color(0xFFE5E7EB);
+  static const Color shadow = Color(0x1A000000);           // Very subtle shadow
+
+  // ─── Legacy aliases for backwards compatibility ─────────────────────────
+  @Deprecated('Use primary instead')
+  static const Color primaryAmber = primary;
+  @Deprecated('Use primaryVariant instead')
+  static const Color primaryAmberDark = primaryVariant;
+  @Deprecated('Use primaryVariant instead')
+  static const Color primaryAmberLight = primaryVariant;
+  @Deprecated('Use secondary instead')
+  static const Color accentGreen = secondary;
+  @Deprecated('Use secondary instead')
+  static const Color accentGreenDark = secondary;
+  @Deprecated('Use secondary instead')
+  static const Color accentGreenLight = secondary;
+  @Deprecated('Use background instead')
+  static const Color backgroundLight = background;
+  @Deprecated('Use surface instead')
+  static const Color surfaceWhite = surface;
 
   // Spacing (8pt grid)
   static const double spaceXs = 4.0;
@@ -37,7 +67,7 @@ class AppThemeConstants {
   static const double space2xl = 48.0;
   static const double space3xl = 64.0;
 
-  // Border radius
+  // ─── Border radius (8-12px per spec) ─────────────────────────────────────
   static const double radiusXs = 4.0;
   static const double radiusSm = 8.0;
   static const double radiusMd = 12.0;
@@ -52,34 +82,66 @@ class AppThemeConstants {
   static const BorderRadius borderRadiusXl = BorderRadius.all(Radius.circular(radiusXl));
   static const BorderRadius borderRadiusRound = BorderRadius.all(Radius.circular(radiusRound));
 
-  // Elevation
+  // ─── Elevation (very light as per spec) ─────────────────────────────────
   static const double elevationNone = 0.0;
   static const double elevationXs = 1.0;
   static const double elevationSm = 2.0;
-  static const double elevationMd = 4.0;
+  static const double elevationMd = 3.0;
   static const double elevationLg = 8.0;
   static const double elevationXl = 16.0;
 
-  // Typography
-  static const TextStyle displayLarge = TextStyle(fontSize: 57, fontWeight: FontWeight.w400, letterSpacing: -0.25, height: 1.12);
-  static const TextStyle displayMedium = TextStyle(fontSize: 45, fontWeight: FontWeight.w400, letterSpacing: 0, height: 1.16);
-  static const TextStyle displaySmall = TextStyle(fontSize: 36, fontWeight: FontWeight.w400, letterSpacing: 0, height: 1.22);
+  // ─── Typography (matching spec: Cairo/IBM Plex Sans Arabic) ───────────────
+  // Titles (H1/H2 / main screen titles): 20–22, semi-bold
+  static const TextStyle displayLarge = TextStyle(
+    fontSize: 36, fontWeight: FontWeight.w600, letterSpacing: -0.5, height: 1.2, color: textPrimary,
+  );
+  static const TextStyle displayMedium = TextStyle(
+    fontSize: 28, fontWeight: FontWeight.w600, letterSpacing: 0, height: 1.25, color: textPrimary,
+  );
+  static const TextStyle displaySmall = TextStyle(
+    fontSize: 24, fontWeight: FontWeight.w500, letterSpacing: 0, height: 1.3, color: textPrimary,
+  );
 
-  static const TextStyle headlineLarge = TextStyle(fontSize: 32, fontWeight: FontWeight.w400, letterSpacing: 0, height: 1.25);
-  static const TextStyle headlineMedium = TextStyle(fontSize: 28, fontWeight: FontWeight.w400, letterSpacing: 0, height: 1.29);
-  static const TextStyle headlineSmall = TextStyle(fontSize: 24, fontWeight: FontWeight.w400, letterSpacing: 0, height: 1.33);
+  static const TextStyle headlineLarge = TextStyle(
+    fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: 0, height: 1.25, color: textPrimary,
+  );
+  static const TextStyle headlineMedium = TextStyle(
+    fontSize: 18, fontWeight: FontWeight.w500, letterSpacing: 0, height: 1.3, color: textPrimary,
+  );
+  static const TextStyle headlineSmall = TextStyle(
+    fontSize: 16, fontWeight: FontWeight.w500, letterSpacing: 0, height: 1.35, color: textPrimary,
+  );
 
-  static const TextStyle titleLarge = TextStyle(fontSize: 22, fontWeight: FontWeight.w500, letterSpacing: 0, height: 1.27);
-  static const TextStyle titleMedium = TextStyle(fontSize: 16, fontWeight: FontWeight.w500, letterSpacing: 0.15, height: 1.50);
-  static const TextStyle titleSmall = TextStyle(fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1, height: 1.43);
+  static const TextStyle titleLarge = TextStyle(
+    fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: 0, height: 1.27, color: textPrimary,
+  );
+  static const TextStyle titleMedium = TextStyle(
+    fontSize: 16, fontWeight: FontWeight.w500, letterSpacing: 0.15, height: 1.50, color: textPrimary,
+  );
+  static const TextStyle titleSmall = TextStyle(
+    fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1, height: 1.43, color: textPrimary,
+  );
 
-  static const TextStyle bodyLarge = TextStyle(fontSize: 16, fontWeight: FontWeight.w400, letterSpacing: 0.5, height: 1.50);
-  static const TextStyle bodyMedium = TextStyle(fontSize: 14, fontWeight: FontWeight.w400, letterSpacing: 0.25, height: 1.43);
-  static const TextStyle bodySmall = TextStyle(fontSize: 12, fontWeight: FontWeight.w400, letterSpacing: 0.4, height: 1.33);
+  // Body/description: 13–14, regular
+  static const TextStyle bodyLarge = TextStyle(
+    fontSize: 16, fontWeight: FontWeight.w400, letterSpacing: 0.5, height: 1.50, color: textSecondary,
+  );
+  static const TextStyle bodyMedium = TextStyle(
+    fontSize: 14, fontWeight: FontWeight.w400, letterSpacing: 0.25, height: 1.43, color: textSecondary,
+  );
+  static const TextStyle bodySmall = TextStyle(
+    fontSize: 13, fontWeight: FontWeight.w400, letterSpacing: 0.4, height: 1.33, color: textSecondary,
+  );
 
-  static const TextStyle labelLarge = TextStyle(fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1, height: 1.43);
-  static const TextStyle labelMedium = TextStyle(fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.5, height: 1.33);
-  static const TextStyle labelSmall = TextStyle(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.5, height: 1.45);
+  static const TextStyle labelLarge = TextStyle(
+    fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1, height: 1.43, color: textPrimary,
+  );
+  static const TextStyle labelMedium = TextStyle(
+    fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.5, height: 1.33, color: textSecondary,
+  );
+  static const TextStyle labelSmall = TextStyle(
+    fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.5, height: 1.45, color: textSecondary,
+  );
 
   // Icon sizes
   static const double iconXs = 16.0;
