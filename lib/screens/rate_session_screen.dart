@@ -19,7 +19,7 @@ class RateSessionScreen extends ConsumerStatefulWidget {
 }
 
 class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
-  int rating = 5; // Default to 5
+  int rating = 10; // Default to 10 (best rating)
   final notesController = TextEditingController();
 
   @override

@@ -92,6 +92,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       await CacheService.saveUserRole(data['role'] as String);
       await CacheService.saveUserName(data['name'] as String);
 
+      // ✅ FIX: Ensure existing users have all UserModel fields initialized
+      // This handles backward compatibility for users created before field additions
+      await _ensureUserFields(userId, data);
+
       await _saveFCMTokenWithRetry();
     });
   }
@@ -125,11 +129,24 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'role': role,
           'status': 'active',
           'photoUrl': null,
+          'bio': null,
+          'specialization': null,
+          'phoneNumber': null,
           'followerCount': 0,
           'followingCount': 0,
           'rating': 0.0,
           'reviewCount': 0,
+          'addressText': null,
+          'addressLat': null,
+          'addressLng': null,
           'setupCompleted': false,
+          'dateOfBirth': null,
+          'city': null,
+          'examScore': null,
+          'examTakenAt': null,
+          'examRetryCount': 0,
+          'examPassed': false,
+          'examNextRetryAt': null,
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (e) {
@@ -204,6 +221,54 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       } catch (e) {
         if (attempt == 2) rethrow;
         await Future.delayed(const Duration(seconds: 1));
+      }
+    }
+  }
+
+  /// Ensures existing users have all UserModel fields initialized.
+  /// This handles backward compatibility when new fields are added to UserModel.
+  Future<void> _ensureUserFields(
+    String userId,
+    Map<String, dynamic> existingData,
+  ) async {
+    final updates = <String, dynamic>{};
+
+    // Define default values for all UserModel fields
+    final fieldDefaults = <String, dynamic>{
+      'bio': null,
+      'specialization': null,
+      'phoneNumber': null,
+      'addressText': null,
+      'addressLat': null,
+      'addressLng': null,
+      'setupCompleted': false,
+      'dateOfBirth': null,
+      'city': null,
+      'examScore': null,
+      'examTakenAt': null,
+      'examRetryCount': 0,
+      'examPassed': false,
+      'examNextRetryAt': null,
+    };
+
+    // Check each field and add to updates if missing
+    for (final entry in fieldDefaults.entries) {
+      if (!existingData.containsKey(entry.key)) {
+        updates[entry.key] = entry.value;
+      }
+    }
+
+    // Only update if there are missing fields
+    if (updates.isNotEmpty) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update(updates);
+        debugPrint('AuthNotifier: Updated missing fields for user $userId: ${updates.keys.join(', ')}');
+      } catch (e) {
+        // Non-fatal: Log but don't block login
+        debugPrint('AuthNotifier: Failed to update user fields (non-fatal): $e');
       }
     }
   }

@@ -1134,7 +1134,70 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     if (muraja != null) updates['murajaAssignment'] = muraja;
     if (notes != null) updates['sessionNotes'] = notes;
     if (rating != null) updates['sessionRating'] = rating;
-    if (updates.isNotEmpty) await updateSession(sessionId, updates);
+    if (updates.isNotEmpty) {
+      await updateSession(sessionId, updates);
+      
+      // Update teacher's overall rating when student rates session
+      if (rating != null) {
+        await _updateTeacherRating(sessionId);
+      }
+    }
+  }
+
+  /// Updates teacher's overall rating based on average of all session ratings
+  Future<void> _updateTeacherRating(String sessionId) async {
+    try {
+      // Get session to find teacher ID
+      final sessionDoc = await _firestore
+          .collection('hafizSessions')
+          .doc(sessionId)
+          .get();
+      
+      if (!sessionDoc.exists) return;
+      
+      final sessionData = sessionDoc.data()!;
+      final mohaffezId = sessionData['mohaffezId'] as String?;
+      if (mohaffezId == null) return;
+
+      // Get all completed sessions for this teacher with ratings
+      final sessionsQuery = await _firestore
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('status', isEqualTo: 'completed')
+          .where('sessionRating', isGreaterThan: 0)
+          .get();
+
+      if (sessionsQuery.docs.isEmpty) return;
+
+      // Calculate average rating
+      var totalRating = 0;
+      var ratingCount = 0;
+      
+      for (final doc in sessionsQuery.docs) {
+        final data = doc.data();
+        final sessionRating = data['sessionRating'] as int? ?? 0;
+        if (sessionRating > 0) {
+          totalRating += sessionRating;
+          ratingCount++;
+        }
+      }
+
+      if (ratingCount == 0) return;
+
+      final averageRating = totalRating / ratingCount;
+
+      // Update teacher's rating and review count
+      await _firestore.collection('users').doc(mohaffezId).update({
+        'rating': averageRating,
+        'reviewCount': ratingCount,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      debugPrint('Updated teacher $mohaffezId rating: $averageRating ($ratingCount reviews)');
+    } catch (e) {
+      // Non-fatal: don't block the rating if teacher update fails
+      debugPrint('Failed to update teacher rating (non-fatal): $e');
+    }
   }
 
   Future<void> completeSessionWithDetails({

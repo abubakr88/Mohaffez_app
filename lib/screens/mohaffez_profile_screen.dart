@@ -794,6 +794,10 @@ class _MohaffezProfileScreenState
   // ─── Basic info ───────────────────────────────────────────────────────────
 
   Widget _buildBasicInfo(Map<String, dynamic> profile) {
+    final rating = profile['rating'] as num? ?? 0.0;
+    final reviewCount = profile['reviewCount'] as int? ?? 0;
+    final ratingText = reviewCount > 0 ? '${rating.toStringAsFixed(1)}/10' : 'جديد';
+    
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -802,7 +806,7 @@ class _MohaffezProfileScreenState
           _buildInfoCard(
             icon: Icons.star,
             label: 'التقييم',
-            value: '${profile['rating'] ?? 0.0}/10',
+            value: ratingText,
             color: Colors.amber,
           ),
           _buildInfoCard(

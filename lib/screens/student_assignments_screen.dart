@@ -14,6 +14,7 @@ import '../providers/user_provider.dart';
 import '../utils/arabic_labels.dart';
 import '../models/quran_mistake_model.dart';
 import '../utils/quran_mistake_utils.dart';
+import 'rate_session_screen.dart';
 
 class StudentAssignmentsScreen extends ConsumerWidget {
   const StudentAssignmentsScreen({super.key});
@@ -179,7 +180,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
   // COMPLETED ASSIGNMENT CARD
 // ============================================================================
 
-class _CompletedAssignmentCard extends ConsumerWidget {
+class _CompletedAssignmentCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> session;
   final String studentId;
 
@@ -189,15 +190,64 @@ class _CompletedAssignmentCard extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CompletedAssignmentCard> createState() =>
+      _CompletedAssignmentCardState();
+}
+
+class _CompletedAssignmentCardState
+    extends ConsumerState<_CompletedAssignmentCard> {
+  late Map<String, dynamic> session;
+
+  @override
+  void initState() {
+    super.initState();
+    session = widget.session;
+  }
+
+  Future<void> _navigateToRating() async {
+    final sessionId = session['id'] as String?;
+    if (sessionId == null || sessionId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذّر تحديد الجلسة'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RateSessionScreen(
+          sessionId: sessionId,
+          mohaffezName: session['mohaffezName'] as String? ?? ArabicLabels.mohaffez,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh the parent list
+      ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('شكراً على تقييمك!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final mohaffezName =
         session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
     // FIX: Firestore stores dates as Timestamp, convert to DateTime
     final sessionDateRaw = session['sessionDate'];
-    final sessionDate = sessionDateRaw is Timestamp 
-        ? sessionDateRaw.toDate() 
+    final sessionDate = sessionDateRaw is Timestamp
+        ? sessionDateRaw.toDate()
         : sessionDateRaw as DateTime?;
 
     // Evaluation values
@@ -459,6 +509,31 @@ class _CompletedAssignmentCard extends ConsumerWidget {
 
             // Mistakes review card
             _MistakeReviewCard(session: session),
+
+            // Rate Session Button (if not rated yet)
+            if (sessionRating == 0) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _navigateToRating,
+                  icon: const Icon(Icons.star, color: Colors.white),
+                  label: const Text(
+                    'تقييم الجلسة',
+                    style: TextStyle(fontSize: 16, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
