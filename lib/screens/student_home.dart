@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 import '../models/subscription_model.dart';
 import '../providers/payment_provider.dart';
@@ -85,7 +86,83 @@ class StudentHomeContent extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              _buildAppBar(context, ref),
+              // Simple App Bar
+              SliverAppBar(
+                expandedHeight: 100,
+                floating: false,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeConstants.primaryAmber,
+                          AppThemeConstants.primaryAmberLight,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppThemeConstants.surfaceWhite
+                                        .withValues(alpha: 0.2),
+                                    borderRadius: AppThemeConstants.borderRadiusMd,
+                                  ),
+                                  child: const Icon(
+                                    Icons.menu_book_rounded,
+                                    size: 32,
+                                    color: AppThemeConstants.surfaceWhite,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Consumer(
+                                    builder: (context, ref, _) {
+                                      final user = ref.watch(currentUserProvider).value;
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'أهلاً بك',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: AppThemeConstants.surfaceWhite
+                                                  .withValues(alpha: 0.7),
+                                            ),
+                                          ),
+                                          Text(
+                                            user?.name ?? 'طالب',
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppThemeConstants.surfaceWhite,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 sliver: SliverList(
@@ -111,263 +188,73 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
-  // ── APP BAR ─────────────────────────────────────────────────
-  Widget _buildAppBar(BuildContext context, WidgetRef ref) {
+  // ── WELCOME CARD ─────────────────────────────────────────────
+  Widget _buildWelcomeCard(WidgetRef ref) {
     final now = DateTime.now();
-    final dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    final monthNames = [
-      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-    ];
-    final dateLabel =
-        '${dayNames[now.weekday % 7]}، ${now.day} ${monthNames[now.month - 1]}';
+    final hour = now.hour;
+    String greeting;
+    IconData greetingIcon;
 
-    return SliverAppBar(
-      expandedHeight: 180,
-      floating: false,
-      pinned: true,
+    if (hour < 12) {
+      greeting = 'صباح الخير';
+      greetingIcon = Icons.wb_sunny;
+    } else if (hour < 17) {
+      greeting = 'مساء الخير';
+      greetingIcon = Icons.wb_cloudy;
+    } else {
+      greeting = 'مساء الخير';
+      greetingIcon = Icons.nights_stay;
+    }
+
+    return Card(
       elevation: 0,
-      backgroundColor: AppThemeConstants.primaryAmber,
-      automaticallyImplyLeading: false,
-      systemOverlayStyle: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
+      color: AppThemeConstants.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppThemeConstants.borderRadiusLg,
       ),
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.pin,
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppThemeConstants.primaryAmber,
-                AppThemeConstants.primaryAmberLight,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+                borderRadius: AppThemeConstants.borderRadiusMd,
+              ),
+              child: Icon(
+                greetingIcon,
+                size: 28,
+                color: AppThemeConstants.accentGreen,
+              ),
             ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            const SizedBox(width: 16),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Logo row
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.25),
-                          borderRadius: AppThemeConstants.borderRadiusMd,
-                        ),
-                        child: Image.asset(
-                          'assets/images/icon.png',
-                          height: 30,
-                          width: 30,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.school,
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'المحفظ',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const Spacer(),
-                      // Date badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          dateLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    greeting,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeConstants.textPrimary,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  // Decorative Quran verse hint
-                  Row(
-                    children: [
-                      Container(
-                        width: 3,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'حافظوا على القرآن الكريم',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            'تتبّع جلساتك ومهامك بسهولة',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.75),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  const SizedBox(height: 4),
+                  Text(
+                    DateFormat('EEEE، d MMMM yyyy', 'ar').format(now),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
-    );
-  }
-
-  // ── WELCOME CARD ─────────────────────────────────────────────
-  Widget _buildWelcomeCard(WidgetRef ref) {
-    final hour = DateTime.now().hour;
-    final String greeting;
-    final IconData greetIcon;
-    if (hour >= 5 && hour < 12) {
-      greeting = 'صباح الخير 🌤';
-      greetIcon = Icons.wb_sunny_outlined;
-    } else if (hour >= 12 && hour < 17) {
-      greeting = 'مساء الخير ☀️';
-      greetIcon = Icons.wb_twilight_outlined;
-    } else if (hour >= 17 && hour < 21) {
-      greeting = 'مساء النور 🌆';
-      greetIcon = Icons.nights_stay_outlined;
-    } else {
-      greeting = 'تصبح على خير 🌙';
-      greetIcon = Icons.bedtime_outlined;
-    }
-
-    return Consumer(
-      builder: (context, ref, _) {
-        final user = ref.watch(currentUserProvider).value;
-        final firstName = user?.name.split(' ').first ?? 'الطالب';
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppThemeConstants.surfaceWhite,
-            borderRadius: AppThemeConstants.borderRadiusXl,
-            boxShadow: [
-              BoxShadow(
-                color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppThemeConstants.primaryAmber,
-                      AppThemeConstants.primaryAmberLight,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: AppThemeConstants.borderRadiusMd,
-                ),
-                child: Icon(greetIcon, color: Colors.white, size: 26),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      greeting,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      firstName,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppThemeConstants.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'استمر في رحلتك مع القرآن الكريم ✨',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Avatar circle
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      AppThemeConstants.primaryAmber,
-                      AppThemeConstants.primaryAmberLight,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3),
-                    width: 2,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    firstName.isNotEmpty ? firstName[0] : '؟',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

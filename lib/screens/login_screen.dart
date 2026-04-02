@@ -3,9 +3,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
-import '../shared/theme/app_theme_constants.dart';
-import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/offline_banner.dart';
+
+// ============================================================
+// PREMIUM LOGIN THEME
+// ============================================================
+class _LoginTheme {
+  static const Color deepTeal = Color(0xFF0B4A4A);
+  static const Color midTeal = Color(0xFF0D5C5C);
+  static const Color primaryTeal = Color(0xFF0B7A75);
+  static const Color lightTeal = Color(0xFF14B8A6);
+  static const Color softGold = Color(0xFFD4A44A);
+  static const Color textPrimary = Color(0xFF1E2933);
+  static const Color textMuted = Color(0xFF9CA3AF);
+  
+  static const List<Color> tealGradient = [
+    deepTeal,
+    midTeal,
+    primaryTeal,
+  ];
+}
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -25,16 +42,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1000),
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.2, 0.8, curve: Curves.easeOut),
+      ),
     );
     _animationController.forward();
   }
@@ -65,16 +95,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(state.error.toString()),
-          backgroundColor: AppThemeConstants.error,
+          backgroundColor: const Color(0xFFDC2626),
           behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else if (state.hasValue) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تسجيل الدخول بنجاح'),
-          backgroundColor: AppThemeConstants.accentGreen,
-          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -90,243 +113,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       child: Scaffold(
         body: Stack(
           children: [
+            // ── Gradient Background ─────────────────────────────
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppThemeConstants.primaryAmber,
-                    AppThemeConstants.primaryAmberLight,
-                    AppThemeConstants.surfaceWhite,
-                  ],
-                  stops: [0.0, 0.3, 1.0],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _LoginTheme.tealGradient,
                 ),
               ),
             ),
+            
+            // ── Islamic Geometric Pattern (Subtle) ──────────────
+            CustomPaint(
+              size: Size.infinite,
+              painter: _IslamicPatternPainter(),
+            ),
+            
             const OfflineBanner(),
+            
             SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                   child: FadeTransition(
                     opacity: _fadeAnimation,
-                    child: Form(
-                      key: _formKey,
-                      autovalidateMode: _autoValidate
-                          ? AutovalidateMode.onUserInteraction
-                          : AutovalidateMode.disabled,
+                    child: SlideTransition(
+                      position: _slideAnimation,
                       child: Column(
                         children: [
-                          Hero(
-                            tag: 'app-logo',
-                            child: Container(
-                              padding:
-                                  const EdgeInsets.all(AppThemeConstants.spaceLg),
-                              decoration: BoxDecoration(
-                                color: AppThemeConstants.surfaceWhite,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
-                                    blurRadius: 30,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Image.asset(
-                                'assets/images/icon.png',
-                                width: AppThemeConstants.icon3xl,
-                                height: AppThemeConstants.icon3xl,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.school,
-                                  size: AppThemeConstants.icon3xl,
-                                  color: AppThemeConstants.primaryAmber,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Spacing.vXl,
-                          Text(
-                            'تسجيل الدخول',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  color: AppThemeConstants.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          Spacing.vSm,
+                          // ── Logo with Soft Shadow ─────────────────
+                          _buildLogo(),
+                          const SizedBox(height: 32),
+                          
+                          // ── Title & Subtitle ─────────────────────
                           const Text(
-                            'مرحبًا بعودتك!',
+                            'تسجيل الدخول',
                             style: TextStyle(
-                              fontSize: 14,
-                              color: AppThemeConstants.textSecondary,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontFamily: 'Cairo',
                             ),
                           ),
-                          const SizedBox(
-                            height: AppThemeConstants.spaceXl +
-                                AppThemeConstants.spaceSm,
-                          ),
-                          Container(
-                            padding:
-                                const EdgeInsets.all(AppThemeConstants.spaceLg),
-                            decoration: BoxDecoration(
-                              color: AppThemeConstants.surfaceWhite,
-                              borderRadius: AppThemeConstants.borderRadiusXl,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              children: [
-                                TextFormField(
-                                  controller: _emailController,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textDirection: TextDirection.ltr,
-                                  decoration: const InputDecoration(
-                                    labelText: 'البريد الإلكتروني',
-                                    prefixIcon: Icon(Icons.email_outlined),
-                                    border: OutlineInputBorder(
-                                      borderRadius:
-                                          AppThemeConstants.borderRadiusMd,
-                                    ),
-                                    filled: true,
-                                    fillColor: AppThemeConstants.backgroundLight,
-                                    errorMaxLines: 2,
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'الرجاء إدخال البريد الإلكتروني';
-                                    }
-                                    final emailRegex = RegExp(
-                                      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                                    );
-                                    if (!emailRegex.hasMatch(value.trim())) {
-                                      return 'البريد الإلكتروني غير صحيح';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                Spacing.vMd,
-                                TextFormField(
-                                  controller: _passwordController,
-                                  obscureText: _obscurePassword,
-                                  decoration: InputDecoration(
-                                    labelText: 'كلمة المرور',
-                                    prefixIcon: const Icon(Icons.lock_outline),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _obscurePassword
-                                            ? Icons.visibility_off
-                                            : Icons.visibility,
-                                      ),
-                                      onPressed: () {
-                                        setState(() {
-                                          _obscurePassword = !_obscurePassword;
-                                        });
-                                      },
-                                    ),
-                                    border: const OutlineInputBorder(
-                                      borderRadius:
-                                          AppThemeConstants.borderRadiusMd,
-                                    ),
-                                    filled: true,
-                                    fillColor: AppThemeConstants.backgroundLight,
-                                  ),
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'الرجاء إدخال كلمة المرور';
-                                    }
-                                    if (value.length < 8) {
-                                      return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                Spacing.vLg,
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: AppThemeConstants.buttonHeightLarge,
-                                  child: ElevatedButton(
-                                    onPressed: isLoading ? null : _submit,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          AppThemeConstants.primaryAmber,
-                                      shape: const RoundedRectangleBorder(
-                                        borderRadius:
-                                            AppThemeConstants.borderRadiusMd,
-                                      ),
-                                      elevation: AppThemeConstants.elevationSm,
-                                    ),
-                                    child: isLoading
-                                        ? const SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                AppThemeConstants.surfaceWhite,
-                                              ),
-                                            ),
-                                          )
-                                        : const Text(
-                                            'تسجيل الدخول',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                                const SizedBox(height: AppThemeConstants.spaceLg),
-                                const Row(
-                                  children: [
-                                    Expanded(child: Divider()),
-                                    Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: AppThemeConstants.spaceMd,
-                                      ),
-                                      child: Text('أو'),
-                                    ),
-                                    Expanded(child: Divider()),
-                                  ],
-                                ),
-                                const SizedBox(height: AppThemeConstants.spaceLg),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: AppThemeConstants.buttonHeightMedium,
-                                  child: OutlinedButton(
-                                    onPressed: () => context.push('/register'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor:
-                                          AppThemeConstants.primaryAmber,
-                                      side: const BorderSide(
-                                        color: AppThemeConstants.primaryAmber,
-                                      ),
-                                      shape: const RoundedRectangleBorder(
-                                        borderRadius:
-                                            AppThemeConstants.borderRadiusMd,
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'إنشاء حساب جديد',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(height: 8),
+                          const Text(
+                            'مرحباً بعودتك 👋',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
+                          const SizedBox(height: 40),
+                          
+                          // ── Login Card ────────────────────────────
+                          _buildLoginCard(isLoading),
                         ],
                       ),
                     ),
@@ -339,4 +181,423 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
+
+  Widget _buildLogo() {
+    return Hero(
+      tag: 'app-logo',
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 30,
+              offset: const Offset(0, 10),
+            ),
+            BoxShadow(
+              color: _LoginTheme.softGold.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: ClipOval(
+            child: Image.asset(
+              'assets/images/icon.png',
+              width: 85,
+              height: 85,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_LoginTheme.primaryTeal, _LoginTheme.lightTeal],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.menu_book_rounded,
+                  color: Colors.white,
+                  size: 48,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoginCard(bool isLoading) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 40,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 60,
+            offset: const Offset(0, 20),
+          ),
+        ],
+      ),
+      child: Form(
+        key: _formKey,
+        autovalidateMode: _autoValidate
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Email Input ────────────────────────────────
+            _buildTextField(
+              controller: _emailController,
+              label: 'البريد الإلكتروني',
+              icon: Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'الرجاء إدخال البريد الإلكتروني';
+                }
+                final emailRegex = RegExp(
+                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                );
+                if (!emailRegex.hasMatch(value.trim())) {
+                  return 'البريد الإلكتروني غير صحيح';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+            
+            // ── Password Input ────────────────────────────
+            _buildTextField(
+              controller: _passwordController,
+              label: 'كلمة المرور',
+              icon: Icons.lock_outline,
+              obscureText: _obscurePassword,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: _LoginTheme.textMuted,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'الرجاء إدخال كلمة المرور';
+                }
+                if (value.length < 8) {
+                  return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
+                }
+                return null;
+              },
+            ),
+            
+            // ── Forgot Password ───────────────────────────
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => context.push('/forgot-password'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _LoginTheme.primaryTeal,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                child: const Text(
+                  'نسيت كلمة المرور؟',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // ── Primary Button ────────────────────────────
+            SizedBox(
+              height: 54,
+              child: ElevatedButton(
+                onPressed: isLoading ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        _LoginTheme.primaryTeal,
+                        _LoginTheme.lightTeal,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _LoginTheme.primaryTeal.withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    alignment: Alignment.center,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'تسجيل الدخول',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              fontFamily: 'Cairo',
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // ── Divider ────────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          _LoginTheme.textMuted.withOpacity(0.3),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'أو',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _LoginTheme.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          _LoginTheme.textMuted.withOpacity(0.3),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // ── Secondary Button ──────────────────────────
+            SizedBox(
+              height: 54,
+              child: OutlinedButton(
+                onPressed: () => context.push('/register'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _LoginTheme.primaryTeal,
+                  side: BorderSide(
+                    color: _LoginTheme.primaryTeal.withOpacity(0.5),
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'إنشاء حساب جديد',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    bool obscureText = false,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      textDirection: keyboardType == TextInputType.emailAddress
+          ? TextDirection.ltr
+          : TextDirection.rtl,
+      style: const TextStyle(
+        fontSize: 15,
+        color: _LoginTheme.textPrimary,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: _LoginTheme.textMuted,
+          fontSize: 14,
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: _LoginTheme.primaryTeal,
+          size: 22,
+        ),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: _LoginTheme.primaryTeal,
+            width: 1.5,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFDC2626),
+            width: 1.5,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: Color(0xFFDC2626),
+            width: 1.5,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
+      ),
+      validator: validator,
+    );
+  }
+}
+
+// ============================================================
+// ISLAMIC GEOMETRIC PATTERN PAINTER
+// ============================================================
+class _IslamicPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.03)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    const spacing = 60.0;
+    
+    for (double x = 0; x < size.width + spacing; x += spacing) {
+      for (double y = 0; y < size.height + spacing; y += spacing) {
+        _drawStar(canvas, Offset(x, y), 15, paint);
+      }
+    }
+  }
+
+  void _drawStar(Canvas canvas, Offset center, double radius, Paint paint) {
+    final path = Path();
+    const points = 8;
+    
+    for (int i = 0; i < points * 2; i++) {
+      final angle = (i * 3.14159 / points) - 3.14159 / 2;
+      final r = i.isEven ? radius : radius * 0.4;
+      final x = center.dx + r * 0.8 * _cos(angle);
+      final y = center.dy + r * _sin(angle);
+      
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  double _cos(double angle) {
+    return switch (angle.toStringAsFixed(2)) {
+      '0.00' || '-0.00' => 1.0,
+      '1.57' => 0.0,
+      '3.14' || '-3.14' => -1.0,
+      '-1.57' => 0.0,
+      _ => 0.0,
+    };
+  }
+  
+  double _sin(double angle) {
+    return switch (angle.toStringAsFixed(2)) {
+      '0.00' || '-0.00' => 0.0,
+      '1.57' => 1.0,
+      '3.14' || '-3.14' => 0.0,
+      '-1.57' => -1.0,
+      _ => 0.0,
+    };
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

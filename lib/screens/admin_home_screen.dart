@@ -112,7 +112,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                       const EdgeInsets.only(bottom: AppThemeConstants.spaceMd),
                   padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
                   decoration: BoxDecoration(
-                    color: AppThemeConstants.warning.withValues(alpha: 0.2),
+                    color: AppThemeConstants.secondary.withValues(alpha: 0.2),
                     borderRadius: AppThemeConstants.borderRadiusMd,
                   ),
                   child: Text(
@@ -228,7 +228,7 @@ class _AdminNavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: AppThemeConstants.primaryAmber),
+      leading: Icon(icon, color: AppThemeConstants.secondary),
       title: Text(title),
       trailing: const Icon(Icons.chevron_left),
       onTap: () => context.pushNamed(routeName),

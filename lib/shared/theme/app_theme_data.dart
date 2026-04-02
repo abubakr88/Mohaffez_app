@@ -54,11 +54,15 @@ class AppThemeData {
         ),
       ),
       cardTheme: CardThemeData(
-        color: AppThemeConstants.surface,
+        color: AppThemeConstants.surfaceCream,                  // Cream card background
         elevation: AppThemeConstants.elevationSm,
         shadowColor: AppThemeConstants.shadow,
-        shape: const RoundedRectangleBorder(
-          borderRadius: AppThemeConstants.borderRadiusMd,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppThemeConstants.borderRadiusLg,
+          side: BorderSide(
+            color: AppThemeConstants.secondary.withOpacity(0.3), // Gold border
+            width: 1,
+          ),
         ),
         margin: const EdgeInsets.symmetric(
           horizontal: AppThemeConstants.spaceMd,
@@ -186,13 +190,15 @@ class AppThemeData {
       ),
       
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: AppThemeConstants.surface,
-        selectedItemColor: AppThemeConstants.primary,
-        unselectedItemColor: AppThemeConstants.textSecondary,
-        selectedLabelStyle: AppThemeConstants.labelSmall,
+        backgroundColor: AppThemeConstants.primary,           // Deep blue background
+        selectedItemColor: AppThemeConstants.secondary,         // Gold selected
+        unselectedItemColor: Colors.white.withOpacity(0.7),     // White unselected
+        selectedLabelStyle: AppThemeConstants.labelSmall.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
         unselectedLabelStyle: AppThemeConstants.labelSmall,
         type: BottomNavigationBarType.fixed,
-        elevation: AppThemeConstants.elevationSm,
+        elevation: AppThemeConstants.elevationLg,
       ),
       
       floatingActionButtonTheme: FloatingActionButtonThemeData(

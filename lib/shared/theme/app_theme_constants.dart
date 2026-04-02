@@ -1,28 +1,32 @@
 import 'package:flutter/material.dart';
 
 /// Centralized theme constants following Material Design 3.
-/// Updated for new visual identity: Turquoise, Gold, and Warm White.
+/// Teal/Green Islamic theme matching LoginScreen design.
 class AppThemeConstants {
   AppThemeConstants._();
 
-  // ─── Primary Colors (Dark Turquoise) ───────────────────────────────────────
-  static const Color primary = Color(0xFF0B7A75);           // Dark turquoise
-  static const Color primaryVariant = Color(0xFF11A7A0);    // Lighter turquoise
+  // ─── Primary Colors (Teal Gradient from Login) ────────────────────────────
+  static const Color deepTeal = Color(0xFF0B4A4A);          // Darkest teal
+  static const Color midTeal = Color(0xFF0D5C5C);           // Mid teal
+  static const Color primary = Color(0xFF0B7A75);           // Primary teal (from login)
+  static const Color primaryVariant = Color(0xFF14B8A6);      // Light teal
   static const Color onPrimary = Colors.white;
 
-  // ─── Secondary Colors (Soft Gold) ──────────────────────────────────────────
+  // ─── Secondary Colors (Soft Gold from Login) ─────────────────────────────
   static const Color secondary = Color(0xFFD4A44A);         // Soft gold
-  static const Color secondaryContainer = Color(0xFFFEF3C7); // Light gold bg
+  static const Color secondaryContainer = Color(0xFFFDF5E6); // Light cream/gold bg
   static const Color onSecondary = Color(0xFF1E2933);
 
   // ─── Accent & Background Colors ──────────────────────────────────────────
-  static const Color accentBackground = Color(0xFFE3F3F7);  // Pale sky
-  static const Color background = Color(0xFFFDFBF7);        // Warm white
+  static const Color accentBackground = Color(0xFFE8F4F3);  // Pale teal-gray
+  static const Color background = Color(0xFFF5FAF9);          // Very light teal tint
   static const Color surface = Colors.white;
+  static const Color surfaceCream = Color(0xFFFDF9F3);       // Cream card background
 
   // ─── Text Colors ─────────────────────────────────────────────────────────
   static const Color textPrimary = Color(0xFF1E2933);       // Dark bluish gray
   static const Color textSecondary = Color(0xFF6B7280);     // Medium gray
+  static const Color textMuted = Color(0xFF9CA3AF);         // From login
   static const Color textDisabled = Color(0xFF9CA3AF);
   static const Color textOnPrimary = Colors.white;
 
@@ -41,6 +45,8 @@ class AppThemeConstants {
   static const Color shadow = Color(0x1A000000);           // Very subtle shadow
 
   // ─── Legacy aliases for backwards compatibility ─────────────────────────
+  @Deprecated('Use deepTeal instead')
+  static const Color primaryTeal = deepTeal;
   @Deprecated('Use primary instead')
   static const Color primaryAmber = primary;
   @Deprecated('Use primaryVariant instead')
@@ -57,6 +63,11 @@ class AppThemeConstants {
   static const Color backgroundLight = background;
   @Deprecated('Use surface instead')
   static const Color surfaceWhite = surface;
+  @Deprecated('Use surfaceCream instead')
+  static const Color surfaceLight = surfaceCream;
+
+  // ─── Gradient for AppBar/Backgrounds ─────────────────────────────────────
+  static const List<Color> tealGradient = [deepTeal, midTeal, primary];
 
   // Spacing (8pt grid)
   static const double spaceXs = 4.0;

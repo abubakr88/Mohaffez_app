@@ -186,15 +186,17 @@ PreferredSizeWidget buildAppBar(
                 color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Image.asset(
-                'assets/images/icon.png',
-                height: 24,
-                width: 24,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.school,
-                  color: Colors.white,
-                  size: 22,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/icon.png',
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.school,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
@@ -203,7 +205,7 @@ PreferredSizeWidget buildAppBar(
               getScreenTitle(isMohaffez, isAdmin, currentIndex),
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -388,8 +390,8 @@ Widget buildBottomNavBar(
   if (!isMohaffez && !isAdmin) {
     return BottomNavigationBar(
       currentIndex: currentIndex,
-      selectedItemColor: selectedColor,
-      unselectedItemColor: unselectedColor,
+      selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
+      unselectedItemColor: const Color.fromARGB(255, 255, 255, 255),
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle: const TextStyle(
         fontSize: 11,
@@ -403,87 +405,18 @@ Widget buildBottomNavBar(
           case 0:
             context.go('/home');
           case 1:
-            context.go('/nearby');
-          case 2:
             context.go('/notifications');
-          case 3:
+          case 2:
             context.go('/profile');
         }
       },
       items: [
-        // HOME — with bundle badge
-        BottomNavigationBarItem(
-          icon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(Icons.home_outlined),
-              if (bundleCount > 0)
-                Positioned(
-                  right: -6,
-                  top: -4,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryAmber,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1),
-                    ),
-                    constraints:
-                        const BoxConstraints(minWidth: 14, minHeight: 14),
-                    child: Text(
-                      bundleCount > 9 ? '9+' : '$bundleCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          activeIcon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(Icons.home_rounded),
-              if (bundleCount > 0)
-                Positioned(
-                  right: -6,
-                  top: -4,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryAmber,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1),
-                    ),
-                    constraints:
-                        const BoxConstraints(minWidth: 14, minHeight: 14),
-                    child: Text(
-                      bundleCount > 9 ? '9+' : '$bundleCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home_rounded),
           label: ArabicLabels.home,
         ),
-        // SEARCH / NEARBY
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.search_outlined),
-          activeIcon: Icon(Icons.search_rounded),
-          label: ArabicLabels.search,
-        ),
-        // NOTIFICATIONS
         notifItem(),
-        // PROFILE
         const BottomNavigationBarItem(
           icon: Icon(Icons.person_outline_rounded),
           activeIcon: Icon(Icons.person_rounded),
@@ -497,8 +430,8 @@ Widget buildBottomNavBar(
   if (isMohaffez) {
     return BottomNavigationBar(
       currentIndex: currentIndex,
-      selectedItemColor: selectedColor,
-      unselectedItemColor: unselectedColor,
+      selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
+      unselectedItemColor: const Color.fromARGB(255, 255, 255, 255),
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle: const TextStyle(
         fontSize: 11,
@@ -536,7 +469,7 @@ Widget buildBottomNavBar(
   // ── Admin ───────────────────────────────────────────────────
   return BottomNavigationBar(
     currentIndex: currentIndex,
-    selectedItemColor: selectedColor,
+    selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
     unselectedItemColor: unselectedColor,
     type: BottomNavigationBarType.fixed,
     selectedLabelStyle: const TextStyle(
