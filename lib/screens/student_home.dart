@@ -1,23 +1,16 @@
-// lib/screens/student_home.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
-import '../models/subscription_model.dart';
 import '../providers/payment_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
 import '../services/app_version_service.dart';
 import '../shared/theme/app_theme_constants.dart';
-import '../shared/theme/theme_extensions.dart';
 import '../shared/widgets/error_widgets.dart';
 
-// ============================================================
-// ROOT ENTRY POINT
-// ============================================================
 class StudentHome extends ConsumerStatefulWidget {
   const StudentHome({super.key});
 
@@ -58,22 +51,24 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
   }
 }
 
-// ============================================================
-// MAIN CONTENT
-// ============================================================
 class StudentHomeContent extends ConsumerWidget {
   final String studentId;
+
   const StudentHomeContent({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).value;
+    final theme = Theme.of(context);
+    final primary = theme.primaryColor;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: AppThemeConstants.backgroundLight,
+        backgroundColor: AppThemeConstants.background,
         body: RefreshIndicator(
           displacement: 20,
-          color: AppThemeConstants.primaryAmber,
+          color: primary,
           onRefresh: () async {
             ref.invalidate(currentUserProvider);
             ref.invalidate(studentSessionsFirstPageProvider(studentId));
@@ -86,98 +81,34 @@ class StudentHomeContent extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // Simple App Bar
               SliverAppBar(
-                expandedHeight: 100,
-                floating: false,
+                expandedHeight: 248,
                 pinned: true,
+                elevation: 0,
+                backgroundColor: primary,
+                surfaceTintColor: Colors.transparent,
                 flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppThemeConstants.primaryAmber,
-                          AppThemeConstants.primaryAmberLight,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: AppThemeConstants.surfaceWhite
-                                        .withValues(alpha: 0.2),
-                                    borderRadius: AppThemeConstants.borderRadiusMd,
-                                  ),
-                                  child: const Icon(
-                                    Icons.menu_book_rounded,
-                                    size: 32,
-                                    color: AppThemeConstants.surfaceWhite,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Consumer(
-                                    builder: (context, ref, _) {
-                                      final user = ref.watch(currentUserProvider).value;
-                                      return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'أهلاً بك',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              color: AppThemeConstants.surfaceWhite
-                                                  .withValues(alpha: 0.7),
-                                            ),
-                                          ),
-                                          Text(
-                                            user?.name ?? 'طالب',
-                                            style: const TextStyle(
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppThemeConstants.surfaceWhite,
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  collapseMode: CollapseMode.pin,
+                  background: _DashboardHeader(
+                    name: user?.name ?? 'الطالب',
+                    photoUrl: user?.photoUrl,
+                    roleLabel: 'لوحة الطالب',
+                    subtitle: _greetingMessage(),
+                    dateText: DateFormat('EEEE، d MMMM', 'ar')
+                        .format(DateTime.now()),
                   ),
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    _buildWelcomeCard(ref),
-                    const SizedBox(height: 20),
                     QuickStatsSection(studentId: studentId),
-                    Spacing.vLg,
-                    // ── NEW: Bundle strip (hidden when empty) ──────────────
-                    BundleStripSection(studentId: studentId),
-                    // ── Quick Actions ──────────────────────────────────────
+                    const SizedBox(height: 24),
                     QuickActionsSection(studentId: studentId),
-                    Spacing.vLg,
+                    const SizedBox(height: 24),
                     RecentAssignmentsSection(studentId: studentId),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                   ]),
                 ),
               ),
@@ -188,569 +119,309 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
-  // ── WELCOME CARD ─────────────────────────────────────────────
-  Widget _buildWelcomeCard(WidgetRef ref) {
-    final now = DateTime.now();
-    final hour = now.hour;
-    String greeting;
-    IconData greetingIcon;
-
-    if (hour < 12) {
-      greeting = 'صباح الخير';
-      greetingIcon = Icons.wb_sunny;
-    } else if (hour < 17) {
-      greeting = 'مساء الخير';
-      greetingIcon = Icons.wb_cloudy;
-    } else {
-      greeting = 'مساء الخير';
-      greetingIcon = Icons.nights_stay;
-    }
-
-    return Card(
-      elevation: 0,
-      color: AppThemeConstants.surfaceWhite,
-      shape: const RoundedRectangleBorder(
-        borderRadius: AppThemeConstants.borderRadiusLg,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
-                borderRadius: AppThemeConstants.borderRadiusMd,
-              ),
-              child: Icon(
-                greetingIcon,
-                size: 28,
-                color: AppThemeConstants.accentGreen,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    greeting,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppThemeConstants.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    DateFormat('EEEE، d MMMM yyyy', 'ar').format(now),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _greetingMessage() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'صباح الخير، جاهز لرحلة الحفظ اليوم؟';
+    if (hour < 17) return 'يوم جميل لمراجعة ما أنجزته .';
+    return 'مساء هادئ لمتابعة الجلسات والواجبات.';
   }
 }
 
-// ============================================================
-// QUICK STATS SECTION
-// ============================================================
 class QuickStatsSection extends ConsumerWidget {
   final String studentId;
+
   const QuickStatsSection({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
     final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
+    final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
+    final primary = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'نظرة سريعة',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppThemeConstants.textPrimary,
+        _DashboardSectionHeader(
+          title: 'إحصائيات سريعة',
+          subtitle: 'ملخص سريع لنشاطك الحالي',
+          trailing: _SectionChip(
+            label: 'محدث الآن',
+            color: primary,
+            icon: Icons.bolt_rounded,
           ),
         ),
-        Spacing.vMd,
-        Row(
-          children: [
-            Expanded(
-              child: StatCard(
-                icon: Icons.event_available_rounded,
-                title: 'الجلسات المكتملة',
+        const SizedBox(height: 14),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 360;
+            final stats = [
+              _DashboardStatData(
+                title: 'إجمالي الجلسات',
+                subtitle: 'الجلسات المكتملة والمقبولة',
                 value: sessionsAsync.when(
                   data: (sessions) => sessions
-                      .where((s) {
-                        final st = (s['status'] as String?)?.toLowerCase();
-                        return st == 'accepted' || st == 'completed';
+                      .where((session) {
+                        final status =
+                            (session['status'] as String?)?.toLowerCase();
+                        return status == 'accepted' || status == 'completed';
                       })
                       .length
                       .toString(),
                   loading: () => '...',
                   error: (_, __) => '0',
                 ),
-                color: AppThemeConstants.accentGreen,
+                icon: Icons.calendar_today,
+                accent: primary,
                 onTap: () => context.go('/my-sessions'),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: StatCard(
-                icon: Icons.pending_actions_rounded,
+              _DashboardStatData(
                 title: 'الطلبات النشطة',
+                subtitle: 'طلبات بانتظار المتابعة',
                 value: requestsAsync.when(
                   data: (requests) => requests
-                      .where((r) {
-                        final st = (r['status'] as String?)?.toLowerCase();
-                        return st == 'pending' || st == 'awaitingpayment';
+                      .where((request) {
+                        final status =
+                            (request['status'] as String?)?.toLowerCase();
+                        return status == 'pending' ||
+                            status == 'awaitingpayment';
                       })
                       .length
                       .toString(),
                   loading: () => '...',
                   error: (_, __) => '0',
                 ),
-                color: Colors.orange,
+                icon: Icons.history_edu,
+                accent: const Color(0xFFE67E22),
                 onTap: () => context.go('/requests'),
               ),
-            ),
-          ],
+              _DashboardStatData(
+                title: 'الباقات النشطة',
+                subtitle: 'اشتراكات متاحة للحجز',
+                value: subscriptionsAsync.when(
+                  data: (subscriptions) => subscriptions.length.toString(),
+                  loading: () => '...',
+                  error: (_, __) => '0',
+                ),
+                icon: Icons.workspace_premium,
+                accent: const Color(0xFF2E8B57),
+                onTap: () => context.push('/active-subscriptions'),
+              ),
+              _DashboardStatData(
+                title: 'الجلسات المتبقية',
+                subtitle: 'إجمالي الرصيد المتبقي',
+                value: subscriptionsAsync.when(
+                  data: (subscriptions) => subscriptions
+                      .fold<int>(
+                        0,
+                        (sum, subscription) =>
+                            sum + subscription.remainingSessions,
+                      )
+                      .toString(),
+                  loading: () => '...',
+                  error: (_, __) => '0',
+                ),
+                icon: Icons.stars_rounded,
+                accent: const Color(0xFF7A5AF8),
+                onTap: () => context.push('/active-subscriptions'),
+              ),
+            ];
+
+            return GridView.builder(
+              itemCount: stats.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isNarrow ? 1 : 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: isNarrow ? 1.65 : 0.95,
+              ),
+              itemBuilder: (context, index) {
+                final stat = stats[index];
+                return _DashboardStatCard(data: stat);
+              },
+            );
+          },
         ),
       ],
     );
   }
 }
 
-// ============================================================
-// BUNDLE STRIP SECTION  ── NEW ──
-// ============================================================
-class BundleStripSection extends ConsumerWidget {
-  final String studentId;
-  const BundleStripSection({super.key, required this.studentId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final subsAsync = ref.watch(activeSubscriptionsProvider(studentId));
-
-    return subsAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-      data: (subs) {
-        if (subs.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Section Header ──────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color:
-                            AppThemeConstants.primaryAmber.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.collections_bookmark_rounded,
-                        size: 16,
-                        color: AppThemeConstants.primaryAmber,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'باقاتك النشطة',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppThemeConstants.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Count chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppThemeConstants.primaryAmber,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${subs.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                TextButton(
-                  onPressed: () => context.push('/active-subscriptions'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppThemeConstants.primaryAmber,
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('عرض الكل',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      SizedBox(width: 2),
-                      Icon(Icons.arrow_back_ios_new_rounded, size: 12),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // ── Horizontal scroll list ──────────────────────────
-            SizedBox(
-              height: 148,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.only(left: 2, right: 2, bottom: 4),
-                itemCount: subs.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (_, i) => BundleStripCard(sub: subs[i]),
-              ),
-            ),
-            Spacing.vLg,
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ── Individual bundle card ─────────────────────────────────────
-class BundleStripCard extends StatelessWidget {
-  final SubscriptionModel sub;
-  const BundleStripCard({super.key, required this.sub});
-
-  Color get _progressColor {
-    final p = sub.progressPercentage;
-    if (p >= 0.5) return AppThemeConstants.accentGreen;
-    if (p >= 0.2) return const Color(0xFFFFA000);
-    return AppThemeConstants.error;
-  }
-
-  bool get _isUrgent => sub.remainingSessions <= 2;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/active-subscriptions'),
-      child: Container(
-        width: 190,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppThemeConstants.surfaceWhite,
-          borderRadius: AppThemeConstants.borderRadiusLg,
-          border: Border.all(
-            color: _isUrgent
-                ? AppThemeConstants.error.withValues(alpha: 0.5)
-                : _progressColor.withValues(alpha: 0.25),
-            width: _isUrgent ? 1.5 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: _progressColor.withValues(alpha: 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header ──────────────────────────────────────────
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor:
-                      AppThemeConstants.primaryAmber.withValues(alpha: 0.15),
-                  child: Text(
-                    sub.mohaffezName.isNotEmpty ? sub.mohaffezName[0] : '؟',
-                    style: const TextStyle(
-                      color: AppThemeConstants.primaryAmber,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    sub.mohaffezName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppThemeConstants.textPrimary,
-                    ),
-                  ),
-                ),
-                if (_isUrgent)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppThemeConstants.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      '⚠️',
-                      style: TextStyle(
-                          fontSize: 10, color: AppThemeConstants.error),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Plan title
-            Text(
-              sub.planTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-            ),
-            const Spacer(),
-            // ── Progress bar ─────────────────────────────────────
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: sub.progressPercentage,
-                backgroundColor: Colors.grey.shade200,
-                valueColor: AlwaysStoppedAnimation<Color>(_progressColor),
-                minHeight: 6,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // ── Sessions counter ─────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '${sub.remainingSessions}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _progressColor,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '/${sub.totalSessions} جلسة',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Quick "book now" button
-                if (sub.canBookSession)
-                  GestureDetector(
-                    onTap: () =>
-                        context.push('/mohaffez/${sub.mohaffezId}'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppThemeConstants.primaryAmber,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'احجز',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// QUICK ACTIONS SECTION
-// ============================================================
 class QuickActionsSection extends StatelessWidget {
   final String studentId;
+
   const QuickActionsSection({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).primaryColor;
+    final actions = [
+      _DashboardActionData(
+        title: 'احجز جلسة',
+        subtitle: 'ابحث عن محفظ مناسب وابدأ الحجز',
+        icon: Icons.calendar_today,
+        accent: primary,
+        height: 184,
+        onTap: () => context.go('/nearby'),
+      ),
+      _DashboardActionData(
+        title: 'جدولي الدراسي',
+        subtitle: 'راجع مواعيدك القادمة بسرعة',
+        icon: Icons.schedule,
+        accent: const Color(0xFF0F766E),
+        height: 162,
+        onTap: () => context.go('/my-schedule'),
+      ),
+      _DashboardActionData(
+        title: 'جلساتي',
+        subtitle: 'تابع الجلسات المكتملة والقادمة',
+        icon: Icons.history_edu,
+        accent: const Color(0xFF2E8B57),
+        height: 162,
+        onTap: () => context.go('/my-sessions'),
+      ),
+      _DashboardActionData(
+        title: 'واجباتي',
+        subtitle: 'آخر التكليفات من محفظك',
+        icon: Icons.assignment_rounded,
+        accent: const Color(0xFFE67E22),
+        height: 184,
+        onTap: () => context.go('/assignments'),
+      ),
+      _DashboardActionData(
+        title: 'طلباتي',
+        subtitle: 'راجع حالة الطلبات والمدفوعات',
+        icon: Icons.pending_actions_rounded,
+        accent: const Color(0xFF7A5AF8),
+        height: 184,
+        onTap: () => context.go('/requests'),
+      ),
+      _DashboardActionData(
+        title: 'اشتراكاتي',
+        subtitle: 'إدارة الباقات والجلسات المتبقية',
+        icon: Icons.account_balance_wallet,
+        accent: const Color(0xFFB7791F),
+        height: 162,
+        onTap: () => context.push('/active-subscriptions'),
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'الإجراءات السريعة',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppThemeConstants.textPrimary,
-          ),
+        _DashboardSectionHeader(
+          title: 'الإجراءات الرئيسية',
+          subtitle: 'كل ما تحتاجه في مكان واحد',
         ),
-        Spacing.vMd,
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.5,
-          children: [
-            ActionCard(
-              icon: Icons.search_rounded,
-              title: 'ابحث عن محفظ',
-              gradient: const LinearGradient(
-                colors: [
-                  AppThemeConstants.primaryAmber,
-                  AppThemeConstants.primaryAmberLight,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              onTap: () => context.go('/nearby'),
-            ),
-            ActionCard(
-              icon: Icons.event_available_rounded,
-              title: 'جلساتي',
-              gradient: const LinearGradient(
-                colors: [
-                  AppThemeConstants.accentGreen,
-                  Color(0xFF66BB6A),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              onTap: () => context.go('/my-sessions'),
-            ),
-            ActionCard(
-              icon: Icons.assignment_rounded,
-              title: 'واجباتي',
-              gradient: LinearGradient(
-                colors: [Colors.blue.shade600, Colors.blue.shade400],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              onTap: () => context.go('/assignments'),
-            ),
-            ActionCard(
-              icon: Icons.calendar_month_rounded,
-              title: 'الجدول الزمني',
-              gradient: LinearGradient(
-                colors: [Colors.purple.shade600, Colors.purple.shade400],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              onTap: () => context.go('/my-schedule'),
-            ),
-          ],
+        const SizedBox(height: 14),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 360) {
+              return Column(
+                children: actions
+                    .map(
+                      (action) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _DashboardActionCard(data: action),
+                      ),
+                    )
+                    .toList(),
+              );
+            }
+
+            final columns = <List<_DashboardActionData>>[
+              <_DashboardActionData>[],
+              <_DashboardActionData>[],
+            ];
+
+            for (var index = 0; index < actions.length; index++) {
+              columns[index % 2].add(actions[index]);
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    children: columns[0]
+                        .map(
+                          (action) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _DashboardActionCard(data: action),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    children: columns[1]
+                        .map(
+                          (action) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _DashboardActionCard(data: action),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
   }
 }
 
-// ============================================================
-// RECENT ASSIGNMENTS SECTION
-// ============================================================
 class RecentAssignmentsSection extends ConsumerWidget {
   final String studentId;
+
   const RecentAssignmentsSection({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync =
-        ref.watch(studentSessionsFirstPageProvider(studentId));
+    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
+    final primary = Theme.of(context).primaryColor;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'آخر الواجبات',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppThemeConstants.textPrimary,
-              ),
+        _DashboardSectionHeader(
+          title: 'آخر الواجبات',
+          subtitle: 'مراجعة سريعة لأحدث التكليفات',
+          trailing: TextButton.icon(
+            onPressed: () => context.go('/assignments'),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
+            label: const Text('عرض الكل'),
+            style: TextButton.styleFrom(
+              foregroundColor: primary,
+              padding: EdgeInsets.zero,
             ),
-            TextButton.icon(
-              onPressed: () => context.go('/assignments'),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
-              label: const Text('عرض الكل'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppThemeConstants.primaryAmber,
-              ),
-            ),
-          ],
+          ),
         ),
-        Spacing.vMd,
+        const SizedBox(height: 14),
         sessionsAsync.when(
           data: (sessions) {
             final assignments = sessions
-                .where((s) =>
-                    ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
-                    ((s['murajaAssignment'] as String?) ?? '').isNotEmpty)
+                .where(
+                  (session) =>
+                      ((session['hifzAssignment'] as String?) ?? '').isNotEmpty ||
+                      ((session['murajaAssignment'] as String?) ?? '')
+                          .isNotEmpty,
+                )
                 .take(3)
                 .toList();
 
             if (assignments.isEmpty) {
-              return Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: AppThemeConstants.borderRadiusLg,
-                  border: Border.all(
-                    color: Colors.amber.shade200,
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded,
-                        color: Colors.amber.shade700),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'لا توجد واجبات جديدة حالياً',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
+              return _DashboardEmptyCard(
+                icon: Icons.assignment_late_outlined,
+                title: 'لا توجد واجبات جديدة حالياً',
+                subtitle: 'عند إضافة تكليف جديد سيظهر هنا مباشرة.',
+                accent: primary,
               );
             }
 
@@ -759,126 +430,34 @@ class RecentAssignmentsSection extends ConsumerWidget {
                 final mohaffezName =
                     (session['mohaffezName'] as String?) ?? 'محفظ';
                 final hifz = (session['hifzAssignment'] as String?) ?? '';
-                final muraja =
-                    (session['murajaAssignment'] as String?) ?? '';
+                final muraja = (session['murajaAssignment'] as String?) ?? '';
                 final sessionDateRaw = session['sessionDate'];
-                final sessionDate = sessionDateRaw is Timestamp 
-                    ? sessionDateRaw.toDate() 
+                final sessionDate = sessionDateRaw is Timestamp
+                    ? sessionDateRaw.toDate()
                     : sessionDateRaw as DateTime?;
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: AppThemeConstants.surfaceWhite,
-                    borderRadius: AppThemeConstants.borderRadiusLg,
-                    border: Border.all(
-                      color: Colors.grey.shade200,
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: AppThemeConstants.borderRadiusLg,
-                    child: InkWell(
-                      onTap: () => context.go('/assignments'),
-                      borderRadius: AppThemeConstants.borderRadiusLg,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppThemeConstants.accentGreen
-                                        .withValues(alpha: 0.1),
-                                    borderRadius:
-                                        AppThemeConstants.borderRadiusSm,
-                                  ),
-                                  child: const Icon(
-                                    Icons.person_rounded,
-                                    size: 18,
-                                    color: AppThemeConstants.accentGreen,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    mohaffezName,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppThemeConstants.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                if (sessionDate != null)
-                                  Text(
-                                    '${sessionDate.day}/${sessionDate.month}/${sessionDate.year}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              const Divider(height: 1),
-                              const SizedBox(height: 12),
-                              if (hifz.isNotEmpty)
-                                AssignmentRow(
-                                  label: 'حفظ',
-                                  text: hifz,
-                                  color: Colors.green.shade700,
-                                ),
-                              if (muraja.isNotEmpty)
-                                AssignmentRow(
-                                  label: 'مراجعة',
-                                  text: muraja,
-                                  color: Colors.blue.shade700,
-                                ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _DashboardAssignmentCard(
+                    mohaffezName: mohaffezName,
+                    hifz: hifz,
+                    muraja: muraja,
+                    sessionDate: sessionDate,
+                    onTap: () => context.go('/assignments'),
                   ),
                 );
               }).toList(),
             );
           },
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(40),
-              child: CircularProgressIndicator(),
-            ),
+          loading: () => const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(child: CircularProgressIndicator()),
           ),
-          error: (e, _) => Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: AppThemeConstants.borderRadiusLg,
-              border: Border.all(color: Colors.red.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red.shade700),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('حدث خطأ أثناء تحميل البيانات'),
-                ),
-              ],
-            ),
+          error: (e, _) => _DashboardEmptyCard(
+            icon: Icons.error_outline,
+            title: 'تعذر تحميل الواجبات',
+            subtitle: 'حاول التحديث مرة أخرى.',
+            accent: AppThemeConstants.error,
           ),
         ),
       ],
@@ -886,80 +465,162 @@ class RecentAssignmentsSection extends ConsumerWidget {
   }
 }
 
-// ============================================================
-// SHARED HELPER WIDGETS
-// ============================================================
-class StatCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final Color color;
-  final VoidCallback onTap;
+class _DashboardHeader extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+  final String roleLabel;
+  final String subtitle;
+  final String dateText;
 
-  const StatCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.color,
-    required this.onTap,
+  const _DashboardHeader({
+    required this.name,
+    required this.photoUrl,
+    required this.roleLabel,
+    required this.subtitle,
+    required this.dateText,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppThemeConstants.surfaceWhite,
-      borderRadius: AppThemeConstants.borderRadiusLg,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppThemeConstants.borderRadiusLg,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: AppThemeConstants.borderRadiusLg,
-            border: Border.all(
-              color: color.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
+    final primary = Theme.of(context).primaryColor;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            primary,
+            AppThemeConstants.midTeal,
+            AppThemeConstants.deepTeal,
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: AppThemeConstants.borderRadiusMd,
-                    ),
-                    child: Icon(icon, size: 24, color: color),
+                  _ProfileAvatar(
+                    name: name,
+                    photoUrl: photoUrl,
                   ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: Colors.grey.shade400,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.dashboard_customize_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                roleLabel,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'مرحباً، $name',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withValues(alpha: 0.84),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              Spacing.vMd,
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                  height: 1.1,
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
+                child: Row(
+                  children: [
+                    Container(
+                      height: 46,
+                      width: 46,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.auto_graph_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dateText,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'رتب أولوياتك اليوم.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withValues(alpha: 0.84),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -970,56 +631,512 @@ class StatCard extends StatelessWidget {
   }
 }
 
-class ActionCard extends StatelessWidget {
-  final IconData icon;
+class _DashboardSectionHeader extends StatelessWidget {
   final String title;
-  final Gradient gradient;
+  final String subtitle;
+  final Widget? trailing;
+
+  const _DashboardSectionHeader({
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeConstants.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppThemeConstants.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 12),
+          trailing!,
+        ],
+      ],
+    );
+  }
+}
+
+class _SectionChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  const _SectionChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardStatData {
+  final String title;
+  final String subtitle;
+  final String value;
+  final IconData icon;
+  final Color accent;
   final VoidCallback onTap;
 
-  const ActionCard({
-    super.key,
-    required this.icon,
+  const _DashboardStatData({
     required this.title,
-    required this.gradient,
+    required this.subtitle,
+    required this.value,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  });
+}
+
+class _DashboardStatCard extends StatelessWidget {
+  final _DashboardStatData data;
+
+  const _DashboardStatCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: data.onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: data.accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: data.accent.withValues(alpha: 0.12)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      height: 42,
+                      width: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(data.icon, color: data.accent),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: data.accent.withValues(alpha: 0.7),
+                    ),
+                  ],
+                ),
+                Text(
+                  data.value,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: data.accent,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  data.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppThemeConstants.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  data.subtitle,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppThemeConstants.textSecondary,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardActionData {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accent;
+  final double height;
+  final VoidCallback onTap;
+
+  const _DashboardActionData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accent,
+    required this.height,
+    required this.onTap,
+  });
+}
+
+class _DashboardActionCard extends StatelessWidget {
+  final _DashboardActionData data;
+
+  const _DashboardActionCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: data.height,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: data.onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [
+                  data.accent.withValues(alpha: 0.18),
+                  data.accent.withValues(alpha: 0.08),
+                ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+              border: Border.all(color: data.accent.withValues(alpha: 0.14)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        height: 46,
+                        width: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.82),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(data.icon, color: data.accent),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        color: data.accent,
+                      ),
+                    ],
+                  ),
+                  Text(
+                    data.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeConstants.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    data.subtitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppThemeConstants.textSecondary,
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardAssignmentCard extends StatelessWidget {
+  final String mohaffezName;
+  final String hifz;
+  final String muraja;
+  final DateTime? sessionDate;
+  final VoidCallback onTap;
+
+  const _DashboardAssignmentCard({
+    required this.mohaffezName,
+    required this.hifz,
+    required this.muraja,
+    required this.sessionDate,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).primaryColor;
+
     return Material(
-      borderRadius: AppThemeConstants.borderRadiusLg,
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: AppThemeConstants.borderRadiusLg,
-        child: Container(
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
           decoration: BoxDecoration(
-            gradient: gradient,
-            borderRadius: AppThemeConstants.borderRadiusLg,
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: primary.withValues(alpha: 0.08)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 36, color: Colors.white),
-              Spacing.vSm,
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      height: 44,
+                      width: 44,
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(Icons.person_rounded, color: primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mohaffezName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppThemeConstants.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            sessionDate == null
+                                ? 'تاريخ غير محدد'
+                                : DateFormat('d MMMM yyyy', 'ar')
+                                    .format(sessionDate!),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppThemeConstants.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: primary.withValues(alpha: 0.7),
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Divider(height: 1),
+                  const SizedBox(height: 14),
+                  if (hifz.isNotEmpty)
+                    AssignmentRow(
+                      label: 'حفظ',
+                      text: hifz,
+                      color: primary,
+                    ),
+                  if (muraja.isNotEmpty)
+                    AssignmentRow(
+                      label: 'مراجعة',
+                      text: muraja,
+                      color: const Color(0xFF2E8B57),
+                    ),
+                ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DashboardEmptyCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accent;
+
+  const _DashboardEmptyCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 56,
+            width: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, color: accent, size: 28),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppThemeConstants.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppThemeConstants.textSecondary,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+
+  const _ProfileAvatar({
+    required this.name,
+    required this.photoUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedName = name.trim();
+    final initials = trimmedName.isEmpty ? 'ط' : trimmedName.substring(0, 1);
+
+    return Container(
+      height: 56,
+      width: 56,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: photoUrl != null && photoUrl!.isNotEmpty
+            ? Image.network(photoUrl!, fit: BoxFit.cover)
+            : Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -1045,15 +1162,11 @@ class AssignmentRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: color.withValues(alpha: 0.3),
-                width: 1,
-              ),
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Text(
               label,
@@ -1068,7 +1181,11 @@ class AssignmentRow extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 13, height: 1.4),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppThemeConstants.textPrimary,
+                height: 1.5,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
