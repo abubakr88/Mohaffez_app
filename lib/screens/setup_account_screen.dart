@@ -11,6 +11,7 @@ import '../providers/auth_provider.dart';
 import '../providers/setup_provider.dart';
 import '../providers/system_config_provider.dart';
 import '../providers/user_provider.dart';
+import 'pick_location_screen.dart';
 
 class SetupAccountScreen extends ConsumerStatefulWidget {
   const SetupAccountScreen({super.key});
@@ -29,6 +30,9 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
   final _phoneController = TextEditingController();
   final _cityController = TextEditingController();
   DateTime? _dateOfBirth;
+  String? _mainLocationText;
+  double? _mainLocationLat;
+  double? _mainLocationLng;
 
   // ─── Exam state (mohaffez only) ────────────────────────────────
   List<ExamQuestion>? _questions;
@@ -51,6 +55,9 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
           _phoneController.text = user.phoneNumber ?? '';
           _cityController.text = user.city ?? '';
           _dateOfBirth = user.dateOfBirth;
+          _mainLocationText = user.addressText;
+          _mainLocationLat = user.addressLat;
+          _mainLocationLng = user.addressLng;
         });
       }
     });
@@ -82,6 +89,15 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
     if (_dateOfBirth == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('يرجى اختيار تاريخ الميلاد')),
+      );
+      return;
+    }
+    if (_mainLocationText == null ||
+        _mainLocationText!.trim().isEmpty ||
+        _mainLocationLat == null ||
+        _mainLocationLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى تحديد موقعك الرئيسي على الخريطة')),
       );
       return;
     }
@@ -204,6 +220,9 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         phoneNumber: _phoneController.text.trim(),
         dateOfBirth: _dateOfBirth!,
         city: _cityController.text.trim(),
+        addressText: _mainLocationText!.trim(),
+        addressLat: _mainLocationLat!,
+        addressLng: _mainLocationLng!,
       );
 
       // Invalidate user provider to pick up setupCompleted: true
@@ -222,6 +241,37 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
   }
 
   // ─── Start exam ────────────────────────────────────────────────
+  Future<void> _pickMainLocation() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PickLocationScreen(
+          initialLat: _mainLocationLat,
+          initialLng: _mainLocationLng,
+          initialSearchQuery: _cityController.text.trim().isEmpty
+              ? null
+              : _cityController.text.trim(),
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _mainLocationLat = result['lat'] as double?;
+      _mainLocationLng = result['lng'] as double?;
+      _mainLocationText =
+          (result['locationName'] as String?) ??
+          (result['city'] as String?) ??
+          'موقع محدد';
+
+      final pickedCity = (result['city'] as String?)?.trim();
+      if (pickedCity != null && pickedCity.isNotEmpty) {
+        _cityController.text = pickedCity;
+      }
+    });
+  }
+
   void _startExam() {
     final questionsAsync = ref.read(examQuestionsProvider);
     questionsAsync.when(
@@ -324,6 +374,9 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         phoneNumber: _phoneController.text.trim(),
         dateOfBirth: _dateOfBirth!,
         city: _cityController.text.trim(),
+        addressText: _mainLocationText!.trim(),
+        addressLat: _mainLocationLat!,
+        addressLng: _mainLocationLng!,
         examScore: score,
         totalQuestions: questions.length,
         correctAnswers: correct,
@@ -494,6 +547,45 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                 return null;
               },
             ),
+            const SizedBox(height: 16),
+
+            InkWell(
+              onTap: _pickMainLocation,
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'الموقع الرئيسي',
+                  prefixIcon: Icon(Icons.location_on),
+                  border: OutlineInputBorder(),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        (_mainLocationText?.trim().isNotEmpty ?? false)
+                            ? _mainLocationText!
+                            : 'اختر موقعك الرئيسي من الخريطة',
+                        style: TextStyle(
+                          color:
+                              (_mainLocationText?.trim().isNotEmpty ?? false)
+                                  ? null
+                                  : Colors.grey,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.map_outlined),
+                  ],
+                ),
+              ),
+            ),
+            if (_mainLocationLat != null && _mainLocationLng != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'الإحداثيات: ${_mainLocationLat!.toStringAsFixed(4)}, ${_mainLocationLng!.toStringAsFixed(4)}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
             const SizedBox(height: 32),
 
             // Next / Submit button

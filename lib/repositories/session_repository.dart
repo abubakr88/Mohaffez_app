@@ -126,10 +126,36 @@ class SessionRepository {
         .where('status', whereNotIn: RequestStatus.teacherInboxExcluded)
         .orderBy('slotDate', descending: false) // nearest first
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => SessionRequestModel.fromJson(
-                {...doc.data(), 'id': doc.id}))
-            .toList());
+        .asyncMap((snap) async {
+          final docs = snap.docs;
+          final studentIds = docs
+              .map((doc) => doc.data()['studentId'] as String?)
+              .whereType<String>()
+              .where((id) => id.isNotEmpty)
+              .toSet();
+
+          final studentAges = <String, int?>{};
+          await Future.wait(
+            studentIds.map((studentId) async {
+              final userDoc =
+                  await _firestore.collection('users').doc(studentId).get();
+              final data = userDoc.data();
+              final dob = data?['dateOfBirth'];
+              studentAges[studentId] = _calculateAgeFromField(dob);
+            }),
+          );
+
+          return docs.map((doc) {
+            final data = doc.data();
+            final studentId = data['studentId'] as String?;
+            return SessionRequestModel.fromJson({
+              ...data,
+              'id': doc.id,
+              'studentAge':
+                  studentId != null ? studentAges[studentId] : null,
+            });
+          }).toList();
+        });
   }
 
   /// Alias kept for backward compatibility with any code still calling
@@ -148,10 +174,49 @@ class SessionRepository {
         .orderBy('slotDate', descending: false)
         .get();
 
-    return snapshot.docs
-        .map((doc) => SessionRequestModel.fromJson(
-            {...doc.data(), 'id': doc.id}))
-        .toList();
+    final studentIds = snapshot.docs
+        .map((doc) => doc.data()['studentId'] as String?)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    final studentAges = <String, int?>{};
+    await Future.wait(
+      studentIds.map((studentId) async {
+        final userDoc =
+            await _firestore.collection('users').doc(studentId).get();
+        final data = userDoc.data();
+        studentAges[studentId] = _calculateAgeFromField(data?['dateOfBirth']);
+      }),
+    );
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      final studentId = data['studentId'] as String?;
+      return SessionRequestModel.fromJson({
+        ...data,
+        'id': doc.id,
+        'studentAge': studentId != null ? studentAges[studentId] : null,
+      });
+    }).toList();
+  }
+
+  int? _calculateAgeFromField(Object? rawDob) {
+    DateTime? dob;
+    if (rawDob is Timestamp) {
+      dob = rawDob.toDate();
+    } else if (rawDob is DateTime) {
+      dob = rawDob;
+    }
+    if (dob == null) return null;
+
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age < 0 ? null : age;
   }
 
   /// Paginated load-more for the pending requests list.

@@ -777,7 +777,7 @@ class _SummaryBoard extends StatelessWidget {
             child: Row(
               children: [
                 Flexible(
-                  flex: 4,
+                  flex: 5,
                   child: _BoardCell(
                     title: topRightTitle,
                     value: '',
@@ -787,7 +787,7 @@ class _SummaryBoard extends StatelessWidget {
                 ),
                 _BoardDivider.vertical(),
                 Flexible(
-                  flex: 5,
+                  flex: 9,
                   child: _BoardProfileCell(
                     title: topLeftLabel,
                     value: topLeftValue,
@@ -802,7 +802,7 @@ class _SummaryBoard extends StatelessWidget {
             child: Row(
               children: [
                 Flexible(
-                  flex: 4,
+                  flex: 5,
                   child: _BoardCell(
                     title: bottomRightLabel,
                     value: bottomRightValue,
@@ -812,7 +812,7 @@ class _SummaryBoard extends StatelessWidget {
                 ),
                 _BoardDivider.vertical(),
                 Flexible(
-                  flex: 5,
+                  flex: 9,
                   child: _BoardMetricCell(
                     primaryLabel: bottomLeftLabel,
                     primaryValue: bottomLeftValue,
@@ -840,7 +840,7 @@ class _BoardDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     if (axis == Axis.vertical) {
       return Container(
-        width: 3,
+        width: 4,
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: const Color(0xFF0C6F6A).withValues(alpha: 0.42),

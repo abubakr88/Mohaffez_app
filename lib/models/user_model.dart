@@ -14,6 +14,7 @@ class UserModel with _$UserModel {
     @Default('active') String status,
     String? photoUrl,
     String? bio,
+    String? youtubeVideoUrl,
     String? specialization,
     String? phoneNumber,
     @Default(0) int followerCount,

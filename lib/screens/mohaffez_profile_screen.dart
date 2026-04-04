@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../shared/widgets/skeleton_card.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../providers/mohaffez_profile_providers.dart';
@@ -37,6 +38,15 @@ class _MohaffezProfileScreenState
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
   int? selectedDayOfWeek;
+
+  Future<void> _openYoutubeVideo(String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null) return;
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   // ─── Navigation helper ────────────────────────────────────────────────────
 
@@ -150,6 +160,11 @@ class _MohaffezProfileScreenState
                       if (profile['bio'] != null &&
                           (profile['bio'] as String).isNotEmpty)
                         _buildBioSection(profile['bio'] as String),
+                      if (profile['youtubeVideoUrl'] != null &&
+                          (profile['youtubeVideoUrl'] as String).isNotEmpty)
+                        _buildYoutubeSection(
+                          profile['youtubeVideoUrl'] as String,
+                        ),
                       const SizedBox(height: 16),
                       _buildCredentialsSection(ref),
                       const SizedBox(height: 16),
@@ -885,6 +900,69 @@ class _MohaffezProfileScreenState
   }
 
   // ─── Credentials ──────────────────────────────────────────────────────────
+
+  Widget _buildYoutubeSection(String youtubeUrl) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'فيديو تلاوة',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.shade100),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.play_circle_fill_rounded,
+                      color: Colors.red,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'استمع إلى تلاوة تعريفية بصوت المحفّظ',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  youtubeUrl,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () => _openYoutubeVideo(youtubeUrl),
+                  icon: const Icon(Icons.ondemand_video_outlined),
+                  label: const Text('فتح فيديو التلاوة'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildCredentialsSection(WidgetRef ref) {
     return Consumer(

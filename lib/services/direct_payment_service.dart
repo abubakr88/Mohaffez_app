@@ -18,11 +18,11 @@ class DirectPaymentService {
   }) async {
     await _db.collection('users').doc(mohaffezId).update({
       'walletNumbers': {
-        'instapay':      instapayNumber?.trim(),
-        'vodafone_cash': vodafoneNumber?.trim(),
-        'orange_money':  orangeNumber?.trim(),
-        'etisalat_cash': etisalatNumber?.trim(),
-        'we_pay':        wePayNumber?.trim(),
+        'instapay': instapayNumber?.trim(),
+        'vodafonecash': vodafoneNumber?.trim(),
+        'orangemoney': orangeNumber?.trim(),
+        'etisalatcash': etisalatNumber?.trim(),
+        'wepay': wePayNumber?.trim(),
       },
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -34,7 +34,17 @@ class DirectPaymentService {
     final doc = await _db.collection('users').doc(mohaffezId).get();
     final wallets =
         doc.data()?['walletNumbers'] as Map<String, dynamic>? ?? {};
-    return wallets.map((k, v) => MapEntry(k, v as String?));
+    return {
+      'instapay': wallets['instapay'] as String?,
+      // Backward compatible: read both old underscored keys and new canonical keys.
+      'vodafonecash':
+          (wallets['vodafonecash'] ?? wallets['vodafone_cash']) as String?,
+      'orangemoney':
+          (wallets['orangemoney'] ?? wallets['orange_money']) as String?,
+      'etisalatcash':
+          (wallets['etisalatcash'] ?? wallets['etisalat_cash']) as String?,
+      'wepay': (wallets['wepay'] ?? wallets['we_pay']) as String?,
+    };
   }
 
   // ── Student: mark payment sent ───────────────────────────────────────────

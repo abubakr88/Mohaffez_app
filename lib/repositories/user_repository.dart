@@ -156,6 +156,7 @@ class UserRepository {
         'role': user.role,
         'photoUrl': user.photoUrl,
         'bio': user.bio,
+        'youtubeVideoUrl': user.youtubeVideoUrl,
         'specialization': user.specialization,
         'phoneNumber': user.phoneNumber,
         'addressLat': user.addressLat,

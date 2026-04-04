@@ -22,11 +22,14 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool isEditingBio = false;
+  bool isEditingYoutubeLink = false;
   final bioController = TextEditingController();
+  final youtubeController = TextEditingController();
 
   @override
   void dispose() {
     bioController.dispose();
+    youtubeController.dispose();
     super.dispose();
   }
 
@@ -64,6 +67,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SnackBar(content: Text('لا يمكن فتح تطبيق البريد')),
           );
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ArabicLabels.error}: $e')),
+        );
+      }
+    }
+  }
+
+  bool _isValidYoutubeUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) return false;
+    final host = uri.host.toLowerCase();
+    return host.contains('youtube.com') || host.contains('youtu.be');
+  }
+
+  Future<void> _openYoutubeVideo(String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null) return;
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لا يمكن فتح رابط الفيديو')),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -546,6 +577,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   color: Colors.green,
                                   onTap: () => context.push('/wallet-settings'),
                                 ),
+                                const SizedBox(height: 12),
+                                _ManagementTile(
+                                  icon: Icons.ondemand_video_outlined,
+                                  title: 'رابط فيديو التلاوة',
+                                  subtitle:
+                                      (user.youtubeVideoUrl?.isNotEmpty ??
+                                              false)
+                                          ? 'تمت إضافة رابط YouTube'
+                                          : 'أضف رابط YouTube لتلاوة مسجلة',
+                                  color: Colors.red,
+                                  onTap: () {
+                                    youtubeController.text =
+                                        user.youtubeVideoUrl ?? '';
+                                    _showYoutubeLinkDialog(user.uid);
+                                  },
+                                ),
                               ],
                             ),
                           ),
@@ -682,6 +729,79 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم حفظ النبذة بنجاح')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ArabicLabels.error}: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showYoutubeLinkDialog(String userId) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('رابط فيديو التلاوة'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: youtubeController,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  hintText: 'https://youtube.com/...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'أضف رابط YouTube لفيديو تلاوة مسجل بصوتك.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(ArabicLabels.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _saveYoutubeLink(userId);
+              },
+              child: const Text(ArabicLabels.save),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveYoutubeLink(String userId) async {
+    try {
+      final trimmed = youtubeController.text.trim();
+      if (trimmed.isNotEmpty && !_isValidYoutubeUrl(trimmed)) {
+        throw Exception('يرجى إدخال رابط YouTube صحيح');
+      }
+
+      final repository = ref.read(userRepositoryProvider);
+      await repository.updateUser(userId, {
+        'youtubeVideoUrl': trimmed.isEmpty ? null : trimmed,
+      });
+      ref.invalidate(currentUserProvider);
+
+      if (mounted) {
+        setState(() {
+          isEditingYoutubeLink = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حفظ رابط الفيديو بنجاح')),
         );
       }
     } catch (e) {

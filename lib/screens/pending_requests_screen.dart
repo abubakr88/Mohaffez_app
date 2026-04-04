@@ -738,6 +738,7 @@ class PendingRequestCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = (request['status'] as String? ?? '').toLowerCase();
     final studentName = request['studentName'] as String? ?? 'غير معروف';
+    final studentAge = (request['studentAge'] as num?)?.toInt();
     final sessionType = request['sessionType'] as String? ?? '';
     final location = request['location'] as String? ?? '';
 
@@ -995,6 +996,10 @@ class PendingRequestCard extends ConsumerWidget {
               ArabicLabels.getSessionTypeLabel(sessionType),
             ),
             const SizedBox(height: 8),
+
+            if (studentAge != null)
+              _buildDetailRow('العمر', '$studentAge سنة'),
+            if (studentAge != null) const SizedBox(height: 8),
 
             if (sessionDate != null)
               _buildDetailRow(

@@ -10,6 +10,7 @@ class SessionRequestModel {
   final String id;
   final String studentId;
   final String studentName;
+  final int? studentAge;
   final String mohaffezId;
   final String mohaffezName;
   final String sessionType;
@@ -66,6 +67,7 @@ class SessionRequestModel {
     required this.id,
     required this.studentId,
     required this.studentName,
+    this.studentAge,
     required this.mohaffezId,
     required this.mohaffezName,
     required this.sessionType,
@@ -123,6 +125,7 @@ class SessionRequestModel {
       id: id,
       studentId: map['studentId'] as String? ?? '',
       studentName: map['studentName'] as String? ?? '',
+      studentAge: (map['studentAge'] as num?)?.toInt(),
       mohaffezId: map['mohaffezId'] as String? ?? '',
       mohaffezName: map['mohaffezName'] as String? ?? '',
       sessionType: map['sessionType'] as String? ?? 'online',
@@ -163,6 +166,7 @@ class SessionRequestModel {
   Map<String, dynamic> toMap() => {
         'studentId': studentId,
         'studentName': studentName,
+        if (studentAge != null) 'studentAge': studentAge,
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
@@ -216,6 +220,7 @@ class SessionRequestModel {
         id: id,
         studentId: studentId,
         studentName: studentName,
+        studentAge: studentAge,
         mohaffezId: mohaffezId,
         mohaffezName: mohaffezName,
         sessionType: sessionType,

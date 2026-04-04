@@ -130,6 +130,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'status': 'active',
           'photoUrl': null,
           'bio': null,
+          'youtubeVideoUrl': null,
           'specialization': null,
           'phoneNumber': null,
           'followerCount': 0,
@@ -236,6 +237,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     // Define default values for all UserModel fields
     final fieldDefaults = <String, dynamic>{
       'bio': null,
+      'youtubeVideoUrl': null,
       'specialization': null,
       'phoneNumber': null,
       'addressText': null,
