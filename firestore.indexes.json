@@ -14,6 +14,15 @@
       "collectionGroup": "hafizSessions",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "mohaffezId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "isPaid", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hafizSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "isPaid", "order": "ASCENDING" },
         { "fieldPath": "mohaffezId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },

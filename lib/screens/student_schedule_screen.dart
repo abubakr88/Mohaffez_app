@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../providers/user_provider.dart';
@@ -59,7 +60,8 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
             // Group sessions by date
             final sessionsByDate = <DateTime, List<Map<String, dynamic>>>{};
             for (final session in acceptedSessions) {
-              final date = session['sessionDate'] as DateTime?;
+              final dateRaw = session['sessionDate'];
+              final date = dateRaw is Timestamp ? dateRaw.toDate() : dateRaw as DateTime?;
               if (date != null) {
                 final dateKey = DateTime(date.year, date.month, date.day);
                 sessionsByDate.putIfAbsent(dateKey, () => []).add(session);

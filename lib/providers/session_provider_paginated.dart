@@ -39,13 +39,23 @@ final completedSessionsCountProvider = FutureProvider.family<int, String>(
 
 final acceptedSessionsCountProvider = FutureProvider.family<int, String>(
   (ref, mohaffezId) async {
-    final query = FirebaseFirestore.instance
-        .collection('hafizSessions')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'accepted')
-        .where('isPaid', isEqualTo: true);
-    final snapshot = await query.count().get();
-    return snapshot.count ?? 0;
+    try {
+      final query = FirebaseFirestore.instance
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('status', isEqualTo: 'accepted')
+          .where('isPaid', isEqualTo: true);
+      final snapshot = await query.count().get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      // Fallback: query without count() if index is missing
+      final snapshot = await FirebaseFirestore.instance
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('status', isEqualTo: 'accepted')
+          .get();
+      return snapshot.docs.where((d) => d.data()['isPaid'] == true).length;
+    }
   },
 );
 

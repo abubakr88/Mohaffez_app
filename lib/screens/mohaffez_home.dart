@@ -64,6 +64,11 @@ class MohaffezHomeContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).value;
     final primary = Theme.of(context).primaryColor;
+    final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
+    final pendingRequestsCount =
+        ref.watch(pendingRequestsCountProvider(mohaffezId));
+    final acceptedSessionsCount =
+        ref.watch(acceptedSessionsCountProvider(mohaffezId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -84,7 +89,7 @@ class MohaffezHomeContent extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverAppBar(
-                expandedHeight: 248,
+                expandedHeight: 282,
                 pinned: true,
                 elevation: 0,
                 backgroundColor: primary,
@@ -97,6 +102,17 @@ class MohaffezHomeContent extends ConsumerWidget {
                     subtitle: _teacherGreeting(),
                     dateText: DateFormat('EEEE، d MMMM', 'ar')
                         .format(DateTime.now()),
+                    secondaryValue: upcomingSessions.when(
+                      data: (sessions) => sessions.length.toString(),
+                      loading: () => '...',
+                      error: (_, __) => '0',
+                    ),
+                    tertiaryValue: pendingRequestsCount.toString(),
+                    quaternaryValue: acceptedSessionsCount.when(
+                      data: (count) => count.toString(),
+                      loading: () => '...',
+                      error: (_, __) => '0',
+                    ),
                   ),
                 ),
               ),
@@ -353,7 +369,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'راجع الطلبات الجديدة بسرعة',
         icon: Icons.pending_actions,
         accent: const Color(0xFFE67E22),
-        height: 184,
+        height: 176,
         onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
       ),
       _TeacherActionData(
@@ -361,7 +377,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'تنظيم المواعيد الأسبوعية',
         icon: Icons.calendar_today,
         accent: primary,
-        height: 162,
+        height: 176,
         onTap: () => context.go('/teacher-schedule'),
       ),
       _TeacherActionData(
@@ -369,7 +385,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'كل الجلسات القادمة في شاشة واحدة',
         icon: Icons.history_edu,
         accent: const Color(0xFF2E8B57),
-        height: 162,
+        height: 176,
         onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
       ),
       _TeacherActionData(
@@ -377,7 +393,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'تحديث الخطط والأسعار بسهولة',
         icon: Icons.payments,
         accent: const Color(0xFF7A5AF8),
-        height: 184,
+        height: 176,
         onTap: () => context.push('/pricing-management'),
       ),
       _TeacherActionData(
@@ -385,7 +401,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'راجع العمولات والمدفوعات',
         icon: Icons.account_balance_wallet,
         accent: const Color(0xFFB7791F),
-        height: 184,
+        height: 176,
         onTap: () => context.push('/mohaffez-commissions'),
       ),
       _TeacherActionData(
@@ -393,7 +409,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'الوصول السريع إلى قائمة الطلاب',
         icon: Icons.groups_rounded,
         accent: const Color(0xFF0F766E),
-        height: 162,
+        height: 176,
         onTap: () => context.go('/my-students'),
       ),
       _TeacherActionData(
@@ -401,7 +417,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'إدارة الملفات والشهادات المعتمدة',
         icon: Icons.verified_user,
         accent: const Color(0xFF2563EB),
-        height: 162,
+        height: 176,
         onTap: () => context.push('/credentials'),
       ),
       _TeacherActionData(
@@ -409,7 +425,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'ضبط المواعيد المتاحة للحجز',
         icon: Icons.schedule,
         accent: const Color(0xFFDC2626),
-        height: 184,
+        height: 176,
         onTap: () => context.push('/availability'),
       ),
     ];
@@ -436,45 +452,19 @@ class QuickActionsSection extends StatelessWidget {
                     .toList(),
               );
             }
-
-            final columns = <List<_TeacherActionData>>[
-              <_TeacherActionData>[],
-              <_TeacherActionData>[],
-            ];
-
-            for (var index = 0; index < actions.length; index++) {
-              columns[index % 2].add(actions[index]);
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    children: columns[0]
-                        .map(
-                          (action) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ActionCard(data: action),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    children: columns[1]
-                        .map(
-                          (action) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: ActionCard(data: action),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ],
+            return GridView.builder(
+              itemCount: actions.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.88,
+              ),
+              itemBuilder: (context, index) {
+                return ActionCard(data: actions[index]);
+              },
             );
           },
         ),
@@ -655,12 +645,18 @@ class _TeacherHeader extends StatelessWidget {
   final String? photoUrl;
   final String subtitle;
   final String dateText;
+  final String secondaryValue;
+  final String tertiaryValue;
+  final String quaternaryValue;
 
   const _TeacherHeader({
     required this.name,
     required this.photoUrl,
     required this.subtitle,
     required this.dateText,
+    required this.secondaryValue,
+    required this.tertiaryValue,
+    required this.quaternaryValue,
   });
 
   @override
@@ -686,127 +682,371 @@ class _TeacherHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ProfileAvatar(name: name, photoUrl: photoUrl),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.school_rounded,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'لوحة المحفظ',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'مرحباً، $name',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white.withValues(alpha: 0.84),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: _SummaryBoard(
+                    topRightTitle: 'لوحة المحفظ',
+                    topRightIcon: Icons.auto_stories_rounded,
+                    topLeftLabel: 'اسم المحفظ',
+                    topLeftValue: name,
+                    topLeftPhotoUrl: photoUrl,
+                    bottomRightLabel: 'التاريخ',
+                    bottomRightValue: dateText,
+                    bottomRightIcon: Icons.event_note_rounded,
+                    bottomLeftLabel: 'القادمة',
+                    bottomLeftValue: secondaryValue,
+                    bottomLeftSecondaryLabel: 'المؤكدة',
+                    bottomLeftSecondaryValue: quaternaryValue,
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      height: 46,
-                      width: 46,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.auto_graph_rounded,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            dateText,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'تابع الإحصائيات والاختصارات لتبقى يومك منظماً وواضحاً.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.84),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.92),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SummaryBoard extends StatelessWidget {
+  final String topRightTitle;
+  final IconData topRightIcon;
+  final String topLeftLabel;
+  final String topLeftValue;
+  final String? topLeftPhotoUrl;
+  final String bottomRightLabel;
+  final String bottomRightValue;
+  final IconData bottomRightIcon;
+  final String bottomLeftLabel;
+  final String bottomLeftValue;
+  final String bottomLeftSecondaryLabel;
+  final String bottomLeftSecondaryValue;
+
+  const _SummaryBoard({
+    required this.topRightTitle,
+    required this.topRightIcon,
+    required this.topLeftLabel,
+    required this.topLeftValue,
+    required this.topLeftPhotoUrl,
+    required this.bottomRightLabel,
+    required this.bottomRightValue,
+    required this.bottomRightIcon,
+    required this.bottomLeftLabel,
+    required this.bottomLeftValue,
+    required this.bottomLeftSecondaryLabel,
+    required this.bottomLeftSecondaryValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 188,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.74),
+            Colors.white.withValues(alpha: 0.56),
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  flex: 4,
+                  child: _BoardCell(
+                    title: topRightTitle,
+                    value: '',
+                    icon: topRightIcon,
+                    alignEnd: true,
+                  ),
+                ),
+                _BoardDivider.vertical(),
+                Flexible(
+                  flex: 5,
+                  child: _BoardProfileCell(
+                    title: topLeftLabel,
+                    value: topLeftValue,
+                    photoUrl: topLeftPhotoUrl,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _BoardDivider.horizontal(),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  flex: 4,
+                  child: _BoardCell(
+                    title: bottomRightLabel,
+                    value: bottomRightValue,
+                    icon: bottomRightIcon,
+                    alignEnd: true,
+                  ),
+                ),
+                _BoardDivider.vertical(),
+                Flexible(
+                  flex: 5,
+                  child: _BoardMetricCell(
+                    primaryLabel: bottomLeftLabel,
+                    primaryValue: bottomLeftValue,
+                    secondaryLabel: bottomLeftSecondaryLabel,
+                    secondaryValue: bottomLeftSecondaryValue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoardDivider extends StatelessWidget {
+  final Axis axis;
+
+  const _BoardDivider.vertical() : axis = Axis.vertical;
+
+  const _BoardDivider.horizontal() : axis = Axis.horizontal;
+
+  @override
+  Widget build(BuildContext context) {
+    if (axis == Axis.vertical) {
+      return Container(
+        width: 3,
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0C6F6A).withValues(alpha: 0.42),
+          borderRadius: BorderRadius.circular(999),
+        ),
+      );
+    }
+
+    return Container(
+      height: 3,
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C6F6A).withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(999),
+      ),
+    );
+  }
+}
+
+class _BoardCell extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData? icon;
+  final bool alignEnd;
+
+  const _BoardCell({
+    required this.title,
+    required this.value,
+    required this.icon,
+    this.alignEnd = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textAlign = alignEnd ? TextAlign.right : TextAlign.left;
+    final alignment =
+        alignEnd ? Alignment.centerRight : Alignment.centerLeft;
+
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Align(
+          alignment: alignment,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (alignEnd && icon != null) ...[
+                Icon(icon, color: const Color(0xFF0C6F6A), size: 28),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0C6F6A),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: textAlign,
+                ),
+              ),
+              if (!alignEnd && icon != null) ...[
+                const SizedBox(width: 8),
+                Icon(icon, color: const Color(0xFF0C6F6A), size: 28),
+              ],
+            ],
+          ),
+        ),
+        if (value.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: alignment,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0C6F6A),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: textAlign,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _BoardProfileCell extends StatelessWidget {
+  final String title;
+  final String value;
+  final String? photoUrl;
+
+  const _BoardProfileCell({
+    required this.title,
+    required this.value,
+    required this.photoUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0C6F6A),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ProfileAvatar(
+                name: value,
+                photoUrl: photoUrl,
+                size: 34,
+                borderRadius: 12,
+                foregroundColor: const Color(0xFF0C6F6A),
+                backgroundColor:
+                    const Color(0xFF0C6F6A).withValues(alpha: 0.12),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0C6F6A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BoardMetricCell extends StatelessWidget {
+  final String primaryLabel;
+  final String primaryValue;
+  final String secondaryLabel;
+  final String secondaryValue;
+
+  const _BoardMetricCell({
+    required this.primaryLabel,
+    required this.primaryValue,
+    required this.secondaryLabel,
+    required this.secondaryValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          '$primaryLabel: $primaryValue',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0C6F6A),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.right,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '$secondaryLabel: $secondaryValue',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0C6F6A),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.right,
+        ),
+      ],
     );
   }
 }
@@ -1104,10 +1344,18 @@ class _TeacherEmptyCard extends StatelessWidget {
 class _ProfileAvatar extends StatelessWidget {
   final String name;
   final String? photoUrl;
+  final double size;
+  final double borderRadius;
+  final Color foregroundColor;
+  final Color backgroundColor;
 
   const _ProfileAvatar({
     required this.name,
     required this.photoUrl,
+    this.size = 56,
+    this.borderRadius = 18,
+    this.foregroundColor = Colors.white,
+    this.backgroundColor = const Color(0x2EFFFFFF),
   });
 
   @override
@@ -1116,23 +1364,23 @@ class _ProfileAvatar extends StatelessWidget {
     final initials = trimmedName.isEmpty ? 'م' : trimmedName.substring(0, 1);
 
     return Container(
-      height: 56,
-      width: 56,
+      height: size,
+      width: size,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(18),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(borderRadius),
         child: photoUrl != null && photoUrl!.isNotEmpty
             ? Image.network(photoUrl!, fit: BoxFit.cover)
             : Center(
                 child: Text(
                   initials,
-                  style: const TextStyle(
-                    fontSize: 22,
+                  style: TextStyle(
+                    fontSize: size * 0.4,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: foregroundColor,
                   ),
                 ),
               ),

@@ -124,6 +124,16 @@ PreferredSizeWidget buildAppBar(
   required String userId,
   required int unreadCount,
 }) {
+  final currentPath = GoRouterState.of(context).uri.path;
+  const rootShellPaths = {
+    '/home',
+    '/notifications',
+    '/profile',
+    '/mohaffez-home',
+    '/admin-home',
+  };
+  final showBackButton = !rootShellPaths.contains(currentPath);
+
   return PreferredSize(
     preferredSize: const Size.fromHeight(60),
     child: Container(
@@ -148,7 +158,7 @@ PreferredSizeWidget buildAppBar(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ),
-        leading: context.canPop()
+        leading: showBackButton
             ? IconButton(
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
