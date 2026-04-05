@@ -371,7 +371,7 @@ class QuickActionsSection extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.08,
+                childAspectRatio: 1.0,
               ),
               itemBuilder: (context, index) {
                 return _DashboardActionCard(data: actions[index]);
@@ -1083,27 +1083,19 @@ class _DashboardActionCard extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        height: 46,
-                        width: 46,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(data.icon, color: data.accent),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.arrow_outward_rounded,
-                        color: data.accent,
-                      ),
-                    ],
+                  Container(
+                    height: 56,
+                    width: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(data.icon, color: data.accent, size: 32),
                   ),
+                  const SizedBox(height: 16),
                   Text(
                     data.title,
                     style: const TextStyle(
@@ -1111,6 +1103,7 @@ class _DashboardActionCard extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       color: AppThemeConstants.textPrimary,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
