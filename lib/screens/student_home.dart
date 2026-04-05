@@ -755,56 +755,44 @@ class _BoardProfileCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0C6F6A),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
+        // Title at top
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0C6F6A),
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ProfileAvatar(
-                  name: value,
-                  photoUrl: photoUrl,
-                  size: 68,
-                  isCircular: true,
-                  foregroundColor: const Color(0xFF0C6F6A),
-                  backgroundColor:
-                      const Color(0xFF0C6F6A).withValues(alpha: 0.12),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0C6F6A),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-              ],
-            ),
+        const SizedBox(height: 12),
+        // Avatar at top center
+        _ProfileAvatar(
+          name: value,
+          photoUrl: photoUrl,
+          size: 68,
+          isCircular: true,
+          foregroundColor: const Color(0xFF0C6F6A),
+          backgroundColor:
+              const Color(0xFF0C6F6A).withValues(alpha: 0.12),
+        ),
+        const SizedBox(height: 12),
+        // Name at bottom
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0C6F6A),
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
       ],
     );

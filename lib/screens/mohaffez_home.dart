@@ -179,7 +179,6 @@ class QuickStatsSection extends ConsumerWidget {
               _TeacherStatData(
                 icon: Icons.event_available,
                 title: ArabicLabels.upcomingSessions,
-                subtitle: 'الجلسات القادمة المسجلة',
                 value: upcomingSessions.when(
                   data: (sessions) => sessions.length.toString(),
                   loading: () => '...',
@@ -195,7 +194,6 @@ class QuickStatsSection extends ConsumerWidget {
               _TeacherStatData(
                 icon: Icons.today_rounded,
                 title: 'جلسات اليوم',
-                subtitle: 'مواعيد اليوم فقط',
                 value: upcomingSessions.when(
                   data: (sessions) {
                     final now = DateTime.now();
@@ -217,7 +215,6 @@ class QuickStatsSection extends ConsumerWidget {
               _TeacherStatData(
                 icon: Icons.pending_actions,
                 title: ArabicLabels.pendingRequests,
-                subtitle: 'طلبات بانتظار القرار',
                 value: pendingRequestsCount.toString(),
                 color: const Color(0xFFE67E22),
                 onTap: () {
@@ -227,7 +224,6 @@ class QuickStatsSection extends ConsumerWidget {
               _TeacherStatData(
                 icon: Icons.verified_rounded,
                 title: 'الجلسات المؤكدة',
-                subtitle: 'إجمالي الجلسات المقبولة',
                 value: acceptedSessionsCount.when(
                   data: (count) => count.toString(),
                   loading: () => '...',
@@ -325,6 +321,7 @@ class StatCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 8),
                 Text(
                   data.title,
                   style: const TextStyle(
@@ -355,7 +352,6 @@ class QuickActionsSection extends StatelessWidget {
     final actions = [
       _TeacherActionData(
         title: ArabicLabels.pendingRequests,
-        subtitle: 'راجع الطلبات الجديدة بسرعة',
         icon: Icons.pending_actions,
         accent: const Color(0xFFE67E22),
         height: 142,
@@ -363,7 +359,6 @@ class QuickActionsSection extends StatelessWidget {
       ),
       _TeacherActionData(
         title: 'الجدول',
-        subtitle: 'تنظيم المواعيد الأسبوعية',
         icon: Icons.calendar_today,
         accent: primary,
         height: 142,
@@ -371,7 +366,6 @@ class QuickActionsSection extends StatelessWidget {
       ),
       _TeacherActionData(
         title: ArabicLabels.upcomingSessions,
-        subtitle: 'كل الجلسات القادمة في شاشة واحدة',
         icon: Icons.history_edu,
         accent: const Color(0xFF2E8B57),
         height: 142,
@@ -379,7 +373,6 @@ class QuickActionsSection extends StatelessWidget {
       ),
       _TeacherActionData(
         title: 'إدارة الأسعار',
-        subtitle: 'تحديث الخطط والأسعار بسهولة',
         icon: Icons.payments,
         accent: const Color(0xFF7A5AF8),
         height: 142,
@@ -387,7 +380,6 @@ class QuickActionsSection extends StatelessWidget {
       ),
       _TeacherActionData(
         title: 'مستحقات المنصة',
-        subtitle: 'راجع العمولات والمدفوعات',
         icon: Icons.account_balance_wallet,
         accent: const Color(0xFFB7791F),
         height: 142,
@@ -395,7 +387,6 @@ class QuickActionsSection extends StatelessWidget {
       ),
       _TeacherActionData(
         title: 'طلابي',
-        subtitle: 'الوصول السريع إلى قائمة الطلاب',
         icon: Icons.groups_rounded,
         accent: const Color(0xFF0F766E),
         height: 142,
@@ -403,7 +394,6 @@ class QuickActionsSection extends StatelessWidget {
       ),
       _TeacherActionData(
         title: 'الشهادات',
-        subtitle: 'إدارة الملفات والشهادات المعتمدة',
         icon: Icons.verified_user,
         accent: const Color(0xFF2563EB),
         height: 142,
@@ -411,7 +401,6 @@ class QuickActionsSection extends StatelessWidget {
       ),
       _TeacherActionData(
         title: 'الأوقات المتاحة',
-        subtitle: 'ضبط المواعيد المتاحة للحجز',
         icon: Icons.schedule,
         accent: const Color(0xFFDC2626),
         height: 142,
@@ -449,7 +438,7 @@ class QuickActionsSection extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.08,
+                childAspectRatio: 0.88,
               ),
               itemBuilder: (context, index) {
                 return ActionCard(data: actions[index]);
@@ -898,56 +887,44 @@ class _BoardProfileCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0C6F6A),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
+        // Title at top
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0C6F6A),
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ProfileAvatar(
-                  name: value,
-                  photoUrl: photoUrl,
-                  size: 68,
-                  isCircular: true,
-                  foregroundColor: const Color(0xFF0C6F6A),
-                  backgroundColor:
-                      const Color(0xFF0C6F6A).withValues(alpha: 0.12),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0C6F6A),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                  ),
-                ),
-              ],
-            ),
+        const SizedBox(height: 12),
+        // Avatar at top center
+        _ProfileAvatar(
+          name: value,
+          photoUrl: photoUrl,
+          size: 68,
+          isCircular: true,
+          foregroundColor: const Color(0xFF0C6F6A),
+          backgroundColor:
+              const Color(0xFF0C6F6A).withValues(alpha: 0.12),
+        ),
+        const SizedBox(height: 12),
+        // Name at bottom
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0C6F6A),
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -1090,7 +1067,6 @@ class _TeacherSectionChip extends StatelessWidget {
 class _TeacherStatData {
   final IconData icon;
   final String title;
-  final String subtitle;
   final String value;
   final Color color;
   final VoidCallback onTap;
@@ -1098,7 +1074,6 @@ class _TeacherStatData {
   const _TeacherStatData({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.value,
     required this.color,
     required this.onTap,
@@ -1107,7 +1082,6 @@ class _TeacherStatData {
 
 class _TeacherActionData {
   final String title;
-  final String subtitle;
   final IconData icon;
   final Color accent;
   final double height;
@@ -1115,7 +1089,6 @@ class _TeacherActionData {
 
   const _TeacherActionData({
     required this.title,
-    required this.subtitle,
     required this.icon,
     required this.accent,
     required this.height,
