@@ -268,7 +268,7 @@ class QuickStatsSection extends ConsumerWidget {
                 crossAxisCount: isNarrow ? 1 : 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: isNarrow ? 1.65 : 0.95,
+                childAspectRatio: isNarrow ? 1.95 : 1.18,
               ),
               itemBuilder: (context, index) {
                 final stat = stats[index];
@@ -296,7 +296,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'ابحث عن محفظ مناسب وابدأ الحجز',
         icon: Icons.calendar_today,
         accent: primary,
-        height: 176,
+        height: 142,
         onTap: () => context.go('/nearby'),
       ),
       _DashboardActionData(
@@ -304,7 +304,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'راجع مواعيدك القادمة بسرعة',
         icon: Icons.schedule,
         accent: const Color(0xFF0F766E),
-        height: 176,
+        height: 142,
         onTap: () => context.go('/my-schedule'),
       ),
       _DashboardActionData(
@@ -312,7 +312,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'تابع الجلسات المكتملة والقادمة',
         icon: Icons.history_edu,
         accent: const Color(0xFF2E8B57),
-        height: 176,
+        height: 142,
         onTap: () => context.go('/my-sessions'),
       ),
       _DashboardActionData(
@@ -320,7 +320,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'آخر التكليفات من محفظك',
         icon: Icons.assignment_rounded,
         accent: const Color(0xFFE67E22),
-        height: 176,
+        height: 142,
         onTap: () => context.go('/assignments'),
       ),
       _DashboardActionData(
@@ -328,7 +328,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'راجع حالة الطلبات والمدفوعات',
         icon: Icons.pending_actions_rounded,
         accent: const Color(0xFF7A5AF8),
-        height: 176,
+        height: 142,
         onTap: () => context.go('/requests'),
       ),
       _DashboardActionData(
@@ -336,7 +336,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'إدارة الباقات والجلسات المتبقية',
         icon: Icons.account_balance_wallet,
         accent: const Color(0xFFB7791F),
-        height: 176,
+        height: 142,
         onTap: () => context.push('/active-subscriptions'),
       ),
     ];
@@ -371,7 +371,7 @@ class QuickActionsSection extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.88,
+                childAspectRatio: 1.08,
               ),
               itemBuilder: (context, index) {
                 return _DashboardActionCard(data: actions[index]);
@@ -1021,7 +1021,6 @@ class _DashboardStatCard extends StatelessWidget {
                     height: 1.1,
                   ),
                 ),
-                const SizedBox(height: 8),
                 Text(
                   data.title,
                   style: const TextStyle(
@@ -1030,16 +1029,6 @@ class _DashboardStatCard extends StatelessWidget {
                     color: AppThemeConstants.textPrimary,
                   ),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  data.subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppThemeConstants.textSecondary,
-                  ),
-                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -1134,17 +1123,6 @@ class _DashboardActionCard extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       color: AppThemeConstants.textPrimary,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    data.subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppThemeConstants.textSecondary,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

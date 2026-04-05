@@ -250,7 +250,7 @@ class QuickStatsSection extends ConsumerWidget {
                 crossAxisCount: isNarrow ? 1 : 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: isNarrow ? 1.65 : 0.95,
+                childAspectRatio: isNarrow ? 1.95 : 1.18,
               ),
               itemBuilder: (context, index) => StatCard(data: stats[index]),
             );
@@ -325,7 +325,6 @@ class StatCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
                 Text(
                   data.title,
                   style: const TextStyle(
@@ -334,16 +333,6 @@ class StatCard extends StatelessWidget {
                     color: AppThemeConstants.textPrimary,
                   ),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  data.subtitle,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppThemeConstants.textSecondary,
-                  ),
-                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -369,7 +358,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'راجع الطلبات الجديدة بسرعة',
         icon: Icons.pending_actions,
         accent: const Color(0xFFE67E22),
-        height: 176,
+        height: 142,
         onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
       ),
       _TeacherActionData(
@@ -377,7 +366,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'تنظيم المواعيد الأسبوعية',
         icon: Icons.calendar_today,
         accent: primary,
-        height: 176,
+        height: 142,
         onTap: () => context.go('/teacher-schedule'),
       ),
       _TeacherActionData(
@@ -385,7 +374,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'كل الجلسات القادمة في شاشة واحدة',
         icon: Icons.history_edu,
         accent: const Color(0xFF2E8B57),
-        height: 176,
+        height: 142,
         onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
       ),
       _TeacherActionData(
@@ -393,7 +382,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'تحديث الخطط والأسعار بسهولة',
         icon: Icons.payments,
         accent: const Color(0xFF7A5AF8),
-        height: 176,
+        height: 142,
         onTap: () => context.push('/pricing-management'),
       ),
       _TeacherActionData(
@@ -401,7 +390,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'راجع العمولات والمدفوعات',
         icon: Icons.account_balance_wallet,
         accent: const Color(0xFFB7791F),
-        height: 176,
+        height: 142,
         onTap: () => context.push('/mohaffez-commissions'),
       ),
       _TeacherActionData(
@@ -409,7 +398,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'الوصول السريع إلى قائمة الطلاب',
         icon: Icons.groups_rounded,
         accent: const Color(0xFF0F766E),
-        height: 176,
+        height: 142,
         onTap: () => context.go('/my-students'),
       ),
       _TeacherActionData(
@@ -417,7 +406,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'إدارة الملفات والشهادات المعتمدة',
         icon: Icons.verified_user,
         accent: const Color(0xFF2563EB),
-        height: 176,
+        height: 142,
         onTap: () => context.push('/credentials'),
       ),
       _TeacherActionData(
@@ -425,7 +414,7 @@ class QuickActionsSection extends StatelessWidget {
         subtitle: 'ضبط المواعيد المتاحة للحجز',
         icon: Icons.schedule,
         accent: const Color(0xFFDC2626),
-        height: 176,
+        height: 142,
         onTap: () => context.push('/availability'),
       ),
     ];
@@ -460,7 +449,7 @@ class QuickActionsSection extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.88,
+                childAspectRatio: 1.08,
               ),
               itemBuilder: (context, index) {
                 return ActionCard(data: actions[index]);
@@ -540,17 +529,6 @@ class ActionCard extends StatelessWidget {
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                       color: AppThemeConstants.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    data.subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppThemeConstants.textSecondary,
-                      height: 1.4,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
