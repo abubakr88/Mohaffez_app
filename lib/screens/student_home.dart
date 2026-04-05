@@ -530,10 +530,6 @@ class _DashboardHeader extends StatelessWidget {
                     bottomRightLabel: 'التاريخ',
                     bottomRightValue: dateText,
                     bottomRightIcon: Icons.event_note_rounded,
-                    bottomLeftLabel: 'الطلبات',
-                    bottomLeftValue: secondaryValue,
-                    bottomLeftSecondaryLabel: 'الجلسات',
-                    bottomLeftSecondaryValue: quaternaryValue,
                   ),
                 ),
               ),
@@ -568,10 +564,6 @@ class _SummaryBoard extends StatelessWidget {
   final String bottomRightLabel;
   final String bottomRightValue;
   final IconData bottomRightIcon;
-  final String bottomLeftLabel;
-  final String bottomLeftValue;
-  final String bottomLeftSecondaryLabel;
-  final String bottomLeftSecondaryValue;
 
   const _SummaryBoard({
     required this.topRightTitle,
@@ -582,10 +574,6 @@ class _SummaryBoard extends StatelessWidget {
     required this.bottomRightLabel,
     required this.bottomRightValue,
     required this.bottomRightIcon,
-    required this.bottomLeftLabel,
-    required this.bottomLeftValue,
-    required this.bottomLeftSecondaryLabel,
-    required this.bottomLeftSecondaryValue,
   });
 
   @override
@@ -605,13 +593,13 @@ class _SummaryBoard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
       ),
-      child: Column(
+      child: Row(
         children: [
           Expanded(
-            child: Row(
+            flex: 5,
+            child: Column(
               children: [
-                Flexible(
-                  flex: 5,
+                Expanded(
                   child: _BoardCell(
                     title: topRightTitle,
                     value: '',
@@ -619,24 +607,8 @@ class _SummaryBoard extends StatelessWidget {
                     alignEnd: true,
                   ),
                 ),
-                _BoardDivider.vertical(),
-                Flexible(
-                  flex: 9,
-                  child: _BoardProfileCell(
-                    title: topLeftLabel,
-                    value: topLeftValue,
-                    photoUrl: topLeftPhotoUrl,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _BoardDivider.horizontal(),
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  flex: 5,
+                _BoardDivider.horizontal(),
+                Expanded(
                   child: _BoardCell(
                     title: bottomRightLabel,
                     value: bottomRightValue,
@@ -644,17 +616,16 @@ class _SummaryBoard extends StatelessWidget {
                     alignEnd: true,
                   ),
                 ),
-                _BoardDivider.vertical(),
-                Flexible(
-                  flex: 9,
-                  child: _BoardMetricCell(
-                    primaryLabel: bottomLeftLabel,
-                    primaryValue: bottomLeftValue,
-                    secondaryLabel: bottomLeftSecondaryLabel,
-                    secondaryValue: bottomLeftSecondaryValue,
-                  ),
-                ),
               ],
+            ),
+          ),
+          _BoardDivider.vertical(),
+          Expanded(
+            flex: 9,
+            child: _BoardProfileCell(
+              title: topLeftLabel,
+              value: topLeftValue,
+              photoUrl: topLeftPhotoUrl,
             ),
           ),
         ],
@@ -801,36 +772,38 @@ class _BoardProfileCell extends StatelessWidget {
             textAlign: TextAlign.right,
           ),
         ),
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ProfileAvatar(
-                name: value,
-                photoUrl: photoUrl,
-                size: 34,
-                borderRadius: 12,
-                foregroundColor: const Color(0xFF0C6F6A),
-                backgroundColor:
-                    const Color(0xFF0C6F6A).withValues(alpha: 0.12),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0C6F6A),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
+        const SizedBox(height: 8),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ProfileAvatar(
+                  name: value,
+                  photoUrl: photoUrl,
+                  size: 68,
+                  isCircular: true,
+                  foregroundColor: const Color(0xFF0C6F6A),
+                  backgroundColor:
+                      const Color(0xFF0C6F6A).withValues(alpha: 0.12),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0C6F6A),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -1361,6 +1334,7 @@ class _ProfileAvatar extends StatelessWidget {
   final String? photoUrl;
   final double size;
   final double borderRadius;
+  final bool isCircular;
   final Color foregroundColor;
   final Color backgroundColor;
 
@@ -1369,6 +1343,7 @@ class _ProfileAvatar extends StatelessWidget {
     required this.photoUrl,
     this.size = 56,
     this.borderRadius = 18,
+    this.isCircular = false,
     this.foregroundColor = Colors.white,
     this.backgroundColor = const Color(0x2EFFFFFF),
   });
@@ -1383,10 +1358,12 @@ class _ProfileAvatar extends StatelessWidget {
       width: size,
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(borderRadius),
+        borderRadius:
+            BorderRadius.circular(isCircular ? size / 2 : borderRadius),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
+        borderRadius:
+            BorderRadius.circular(isCircular ? size / 2 : borderRadius),
         child: photoUrl != null && photoUrl!.isNotEmpty
             ? Image.network(photoUrl!, fit: BoxFit.cover)
             : Center(
