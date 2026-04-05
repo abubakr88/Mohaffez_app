@@ -294,7 +294,7 @@ class QuickActionsSection extends StatelessWidget {
       _DashboardActionData(
         title: 'احجز جلسة',
         subtitle: 'ابحث عن محفظ مناسب وابدأ الحجز',
-        icon: Icons.calendar_today,
+        icon: Icons.calendar_month_rounded,
         accent: primary,
         height: 142,
         onTap: () => context.go('/nearby'),
@@ -302,7 +302,7 @@ class QuickActionsSection extends StatelessWidget {
       _DashboardActionData(
         title: 'جدولي الدراسي',
         subtitle: 'راجع مواعيدك القادمة بسرعة',
-        icon: Icons.schedule,
+        icon: Icons.event_note_rounded,
         accent: const Color(0xFF0F766E),
         height: 142,
         onTap: () => context.go('/my-schedule'),
@@ -310,7 +310,7 @@ class QuickActionsSection extends StatelessWidget {
       _DashboardActionData(
         title: 'جلساتي',
         subtitle: 'تابع الجلسات المكتملة والقادمة',
-        icon: Icons.history_edu,
+        icon: Icons.local_library_rounded,
         accent: const Color(0xFF2E8B57),
         height: 142,
         onTap: () => context.go('/my-sessions'),
@@ -318,7 +318,7 @@ class QuickActionsSection extends StatelessWidget {
       _DashboardActionData(
         title: 'واجباتي',
         subtitle: 'آخر التكليفات من محفظك',
-        icon: Icons.assignment_rounded,
+        icon: Icons.task_alt_rounded,
         accent: const Color(0xFFE67E22),
         height: 142,
         onTap: () => context.go('/assignments'),
@@ -326,7 +326,7 @@ class QuickActionsSection extends StatelessWidget {
       _DashboardActionData(
         title: 'طلباتي',
         subtitle: 'راجع حالة الطلبات والمدفوعات',
-        icon: Icons.pending_actions_rounded,
+        icon: Icons.hourglass_top_rounded,
         accent: const Color(0xFF7A5AF8),
         height: 142,
         onTap: () => context.go('/requests'),
@@ -334,7 +334,7 @@ class QuickActionsSection extends StatelessWidget {
       _DashboardActionData(
         title: 'اشتراكاتي',
         subtitle: 'إدارة الباقات والجلسات المتبقية',
-        icon: Icons.account_balance_wallet,
+        icon: Icons.wallet_rounded,
         accent: const Color(0xFFB7791F),
         height: 142,
         onTap: () => context.push('/active-subscriptions'),

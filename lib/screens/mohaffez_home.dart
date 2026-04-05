@@ -177,7 +177,7 @@ class QuickStatsSection extends ConsumerWidget {
             final isNarrow = constraints.maxWidth < 360;
             final stats = [
               _TeacherStatData(
-                icon: Icons.event_available,
+                icon: Icons.event_available_rounded,
                 title: ArabicLabels.upcomingSessions,
                 value: upcomingSessions.when(
                   data: (sessions) => sessions.length.toString(),
@@ -213,7 +213,7 @@ class QuickStatsSection extends ConsumerWidget {
                 onTap: () => context.go('/teacher-schedule'),
               ),
               _TeacherStatData(
-                icon: Icons.pending_actions,
+                icon: Icons.hourglass_top_rounded,
                 title: ArabicLabels.pendingRequests,
                 value: pendingRequestsCount.toString(),
                 color: const Color(0xFFE67E22),
@@ -352,56 +352,56 @@ class QuickActionsSection extends StatelessWidget {
     final actions = [
       _TeacherActionData(
         title: ArabicLabels.pendingRequests,
-        icon: Icons.pending_actions,
+        icon: Icons.inbox_rounded,
         accent: const Color(0xFFE67E22),
         height: 142,
         onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
       ),
       _TeacherActionData(
         title: 'الجدول',
-        icon: Icons.calendar_today,
+        icon: Icons.calendar_month_rounded,
         accent: primary,
         height: 142,
         onTap: () => context.go('/teacher-schedule'),
       ),
       _TeacherActionData(
         title: ArabicLabels.upcomingSessions,
-        icon: Icons.history_edu,
+        icon: Icons.local_library_rounded,
         accent: const Color(0xFF2E8B57),
         height: 142,
         onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
       ),
       _TeacherActionData(
         title: 'إدارة الأسعار',
-        icon: Icons.payments,
+        icon: Icons.price_change_rounded,
         accent: const Color(0xFF7A5AF8),
         height: 142,
         onTap: () => context.push('/pricing-management'),
       ),
       _TeacherActionData(
         title: 'مستحقات المنصة',
-        icon: Icons.account_balance_wallet,
+        icon: Icons.wallet_rounded,
         accent: const Color(0xFFB7791F),
         height: 142,
         onTap: () => context.push('/mohaffez-commissions'),
       ),
       _TeacherActionData(
         title: 'طلابي',
-        icon: Icons.groups_rounded,
+        icon: Icons.people_alt_rounded,
         accent: const Color(0xFF0F766E),
         height: 142,
         onTap: () => context.go('/my-students'),
       ),
       _TeacherActionData(
         title: 'الشهادات',
-        icon: Icons.verified_user,
+        icon: Icons.badge_rounded,
         accent: const Color(0xFF2563EB),
         height: 142,
         onTap: () => context.push('/credentials'),
       ),
       _TeacherActionData(
         title: 'الأوقات المتاحة',
-        icon: Icons.schedule,
+        icon: Icons.access_time_rounded,
         accent: const Color(0xFFDC2626),
         height: 142,
         onTap: () => context.push('/availability'),
