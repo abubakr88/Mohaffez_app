@@ -15,9 +15,34 @@ import '../shared/widgets/offline_banner.dart';
 import '../utils/arabic_labels.dart';
 import 'direct_payment_confirmations_screen.dart';
 
-// ============================================================
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHELL DESIGN TOKENS — keep in sync with mohaffez_home.dart _DS
+// ═══════════════════════════════════════════════════════════════════════════════
+class _ShellDS {
+  // Teal brand (teacher / mohaffez)
+  static const teal800 = Color(0xFF095752);
+  static const teal700 = Color(0xFF0C6F6A);
+  static const teal600 = Color(0xFF0E8278);
+  static const teal500 = Color(0xFF1A9E84);
+  static const teal50  = Color(0xFFEAF6F3);
+
+  // Student / Admin use the original amber palette
+  static const amber     = Color(0xFFD4840A);
+  static const amberLight= Color(0xFFF5A623);
+
+  // Neutral
+  static const white70 = Color(0xB3FFFFFF);
+  static const white40 = Color(0x66FFFFFF);
+  static const white15 = Color(0x26FFFFFF);
+
+  // Bottom nav background (shared)
+  static const navBg   = Color(0xFF0C6F6A);  // teal for mohaffez
+  static const navBgStudent = Color(0xFF0C6F6A); // keep consistent app-wide
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // HOME SHELL
-// ============================================================
+// ═══════════════════════════════════════════════════════════════════════════════
 class HomeShell extends ConsumerWidget {
   final Widget child;
   const HomeShell({super.key, required this.child});
@@ -27,9 +52,7 @@ class HomeShell extends ConsumerWidget {
     final userAsync = ref.watch(currentUserProvider);
 
     return userAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
         body: Center(
           child: Column(
@@ -50,41 +73,42 @@ class HomeShell extends ConsumerWidget {
       ),
       data: (user) {
         if (user == null) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        final currentIndex = ref.watch(bottomNavIndexProvider);
-        final isMohaffez = user.role == 'mohaffez';
-        final isAdmin = user.role == 'admin';
+        final currentIndex    = ref.watch(bottomNavIndexProvider);
+        final isMohaffez      = user.role == 'mohaffez';
+        final isAdmin         = user.role == 'admin';
         final isDevModeActive = ref.watch(isDevModeActiveProvider);
 
-        // Shared: unread notification count (AppBar + BottomNav badge)
         final unreadCount = ref
             .watch(unreadNotificationsCountProvider(user.uid))
             .value ?? 0;
 
-        // Student only: active bundle count for home tab badge
         final bundleCount = (!isMohaffez && !isAdmin)
             ? (ref.watch(activeSubscriptionsProvider(user.uid)).value?.length ?? 0)
             : 0;
 
+        // Status bar brightness: always light icons (we always use dark background)
+        SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ));
+
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
-            appBar: buildAppBar(
-              context,
-              ref,
+            backgroundColor: const Color(0xFFF4F7F6),
+            appBar: _buildAppBar(
+              context, ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
               currentIndex: currentIndex,
               userId: user.uid,
               unreadCount: unreadCount,
             ),
-            drawer: buildDrawer(
-              context,
-              ref,
+            drawer: _buildDrawer(
+              context, ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
               isDevModeActive: isDevModeActive,
@@ -96,9 +120,8 @@ class HomeShell extends ConsumerWidget {
                 Expanded(child: child),
               ],
             ),
-            bottomNavigationBar: buildBottomNavBar(
-              context,
-              ref,
+            bottomNavigationBar: _buildBottomNavBar(
+              context, ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
               currentIndex: currentIndex,
@@ -112,10 +135,10 @@ class HomeShell extends ConsumerWidget {
   }
 }
 
-// ============================================================
-// APP BAR
-// ============================================================
-PreferredSizeWidget buildAppBar(
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP BAR — unified teal across all roles
+// ═══════════════════════════════════════════════════════════════════════════════
+PreferredSizeWidget _buildAppBar(
   BuildContext context,
   WidgetRef ref, {
   required bool isMohaffez,
@@ -126,27 +149,27 @@ PreferredSizeWidget buildAppBar(
 }) {
   final currentPath = GoRouterState.of(context).uri.path;
   const rootShellPaths = {
-    '/home',
-    '/notifications',
-    '/profile',
-    '/mohaffez-home',
-    '/admin-home',
+    '/home', '/notifications', '/profile',
+    '/mohaffez-home', '/admin-home',
   };
   final showBackButton = !rootShellPaths.contains(currentPath);
+
+  // Gradient: teal for all roles — cohesive identity
+  const gradient = LinearGradient(
+    colors: [_ShellDS.teal800, _ShellDS.teal600],
+    begin: Alignment.topRight,
+    end: Alignment.bottomLeft,
+  );
 
   return PreferredSize(
     preferredSize: const Size.fromHeight(60),
     child: Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: gradient,
         boxShadow: [
           BoxShadow(
-            color: Colors.black26,
-            blurRadius: 6,
+            color: Color(0x22000000),
+            blurRadius: 8,
             offset: Offset(0, 2),
           ),
         ],
@@ -154,21 +177,17 @@ PreferredSizeWidget buildAppBar(
       child: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ),
         leading: showBackButton
             ? IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white, size: 20),
                 tooltip: 'رجوع',
                 onPressed: () {
-                  // WHY: GoRouter's context.canPop can return true even on
-                  // empty stacks inside a ShellRoute → fallback to /home.
                   try {
                     context.pop();
                   } catch (_) {
@@ -178,11 +197,8 @@ PreferredSizeWidget buildAppBar(
               )
             : Builder(
                 builder: (ctx) => IconButton(
-                  icon: const Icon(
-                    Icons.menu_rounded,
-                    color: Colors.white,
-                    size: 26,
-                  ),
+                  icon: const Icon(Icons.menu_rounded,
+                      color: Colors.white, size: 26),
                   tooltip: ArabicLabels.menu,
                   onPressed: () => Scaffold.of(ctx).openDrawer(),
                 ),
@@ -190,33 +206,36 @@ PreferredSizeWidget buildAppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // App logo pill
             Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(6),
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25), width: 1),
               ),
-              child: ClipOval(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
                 child: Image.asset(
                   'assets/images/icon.png',
-                  height: 40,
-                  width: 40,
+                  height: 32, width: 32,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(
-                    Icons.school,
-                    color: Colors.white,
-                    size: 22,
+                    Icons.menu_book_rounded,
+                    color: Colors.white, size: 20,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(
-              getScreenTitle(isMohaffez, isAdmin, currentIndex),
+              _screenTitle(isMohaffez, isAdmin, currentIndex),
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
               ),
             ),
           ],
@@ -224,101 +243,94 @@ PreferredSizeWidget buildAppBar(
         titleSpacing: 0,
         actions: [
           if (!isAdmin)
-            buildNotificationBell(
-              context,
-              ref,
+            _NotificationBell(
               isMohaffez: isMohaffez,
               userId: userId,
               unreadCount: unreadCount,
+              ref: ref,
             ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
         ],
       ),
     ),
   );
 }
 
-// ── Screen title helper ───────────────────────────────────────
-String getScreenTitle(bool isMohaffez, bool isAdmin, int currentIndex) {
+String _screenTitle(bool isMohaffez, bool isAdmin, int currentIndex) {
   if (isMohaffez) {
-    const titles = [
-      ArabicLabels.home,
-      ArabicLabels.notifications,
-      ArabicLabels.profile,
-    ];
-    return currentIndex < titles.length ? titles[currentIndex] : ArabicLabels.home;
+    const t = [ArabicLabels.home, ArabicLabels.notifications, ArabicLabels.profile];
+    return currentIndex < t.length ? t[currentIndex] : ArabicLabels.home;
   } else if (isAdmin) {
-    const titles = ['لوحة التحكم', 'الإشعارات', 'الملف الشخصي'];
-    return currentIndex < titles.length ? titles[currentIndex] : 'لوحة التحكم';
+    const t = ['لوحة التحكم', 'الإشعارات', 'الملف الشخصي'];
+    return currentIndex < t.length ? t[currentIndex] : 'لوحة التحكم';
   } else {
-    const titles = [
-      ArabicLabels.home,
-      ArabicLabels.search,
-      ArabicLabels.notifications,
-      ArabicLabels.profile,
-    ];
-    return currentIndex < titles.length ? titles[currentIndex] : ArabicLabels.home;
+    const t = [ArabicLabels.home, ArabicLabels.notifications, ArabicLabels.profile];
+    return currentIndex < t.length ? t[currentIndex] : ArabicLabels.home;
   }
 }
 
-// ── Notification bell with badge ─────────────────────────────
-Widget buildNotificationBell(
-  BuildContext context,
-  WidgetRef ref, {
-  required bool isMohaffez,
-  required String userId,
-  required int unreadCount,
-}) {
-  return Stack(
-    clipBehavior: Clip.none,
-    children: [
-      IconButton(
-        icon: Icon(
-          unreadCount > 0
-              ? Icons.notifications_active_rounded
-              : Icons.notifications_outlined,
-          color: Colors.white,
-          size: 26,
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOTIFICATION BELL
+// ═══════════════════════════════════════════════════════════════════════════════
+class _NotificationBell extends ConsumerWidget {
+  final bool isMohaffez;
+  final String userId;
+  final int unreadCount;
+  final WidgetRef ref;
+
+  const _NotificationBell({
+    required this.isMohaffez,
+    required this.userId,
+    required this.unreadCount,
+    required this.ref,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: Icon(
+            unreadCount > 0
+                ? Icons.notifications_active_rounded
+                : Icons.notifications_outlined,
+            color: Colors.white, size: 26,
+          ),
+          tooltip: ArabicLabels.notifications,
+          onPressed: () {
+            ref.read(bottomNavIndexProvider.notifier).setIndex(isMohaffez ? 1 : 2);
+            context.go('/notifications');
+          },
         ),
-        tooltip: ArabicLabels.notifications,
-        onPressed: () {
-          ref
-              .read(bottomNavIndexProvider.notifier)
-              .setIndex(isMohaffez ? 1 : 2);
-          context.go('/notifications');
-        },
-      ),
-      if (unreadCount > 0)
-        Positioned(
-          right: 6,
-          top: 6,
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: Colors.red.shade600,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 1.5),
-            ),
-            constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-            child: Text(
-              unreadCount > 99 ? '99+' : '$unreadCount',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
+        if (unreadCount > 0)
+          Positioned(
+            right: 6, top: 6,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.red.shade600,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
               ),
-              textAlign: TextAlign.center,
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              child: Text(
+                unreadCount > 99 ? '99+' : '$unreadCount',
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
             ),
           ),
-        ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
-// ============================================================
-// BOTTOM NAVIGATION BAR
-// ============================================================
-Widget buildBottomNavBar(
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOTTOM NAVIGATION — teal background, white selected, white60 unselected
+// ═══════════════════════════════════════════════════════════════════════════════
+Widget _buildBottomNavBar(
   BuildContext context,
   WidgetRef ref, {
   required bool isMohaffez,
@@ -327,198 +339,130 @@ Widget buildBottomNavBar(
   required int unreadCount,
   int bundleCount = 0,
 }) {
-  // ── Shared styling ──────────────────────────────────────────
-  const selectedColor = AppTheme.primaryAmber;
-  const unselectedColor = Colors.grey;
-
-  // ── Notification badge item builder ────────────────────────
-  BottomNavigationBarItem notifItem() => BottomNavigationBarItem(
-        icon: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const Icon(Icons.notifications_outlined),
-            if (unreadCount > 0)
-              Positioned(
-                right: -4,
-                top: -4,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade600,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1),
-                  ),
-                  constraints:
-                      const BoxConstraints(minWidth: 14, minHeight: 14),
-                  child: Text(
-                    unreadCount > 9 ? '9+' : '$unreadCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        activeIcon: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const Icon(Icons.notifications_rounded),
-            if (unreadCount > 0)
-              Positioned(
-                right: -4,
-                top: -4,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade600,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1),
-                  ),
-                  constraints:
-                      const BoxConstraints(minWidth: 14, minHeight: 14),
-                  child: Text(
-                    unreadCount > 9 ? '9+' : '$unreadCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-          ],
-        ),
+  // Notification badge item
+  BottomNavigationBarItem _notifItem() => BottomNavigationBarItem(
+        icon: _NavBadge(
+            child: const Icon(Icons.notifications_outlined),
+            count: unreadCount),
+        activeIcon: _NavBadge(
+            child: const Icon(Icons.notifications_rounded),
+            count: unreadCount),
         label: ArabicLabels.notifications,
       );
 
-  // ── Student ─────────────────────────────────────────────────
-  if (!isMohaffez && !isAdmin) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
-      unselectedItemColor: const Color.fromARGB(255, 255, 255, 255),
-      type: BottomNavigationBarType.fixed,
-      selectedLabelStyle: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-      ),
-      unselectedLabelStyle: const TextStyle(fontSize: 11),
-      elevation: 12,
-      onTap: (index) {
-        ref.read(bottomNavIndexProvider.notifier).setIndex(index);
-        switch (index) {
-          case 0:
-            context.go('/home');
-          case 1:
-            context.go('/notifications');
-          case 2:
-            context.go('/profile');
-        }
-      },
-      items: [
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home_rounded),
-          label: ArabicLabels.home,
-        ),
-        notifItem(),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline_rounded),
-          activeIcon: Icon(Icons.person_rounded),
-          label: ArabicLabels.profile,
-        ),
-      ],
-    );
+  void _onTap(int index, String mohaffezRoute, String studentRoute,
+      String adminRoute) {
+    ref.read(bottomNavIndexProvider.notifier).setIndex(index);
+    final route = isMohaffez
+        ? [mohaffezRoute, '/notifications', '/profile'][index]
+        : isAdmin
+            ? [adminRoute, '/notifications', '/profile'][index]
+            : [studentRoute, '/notifications', '/profile'][index];
+    context.go(route);
   }
 
-  // ── Mohaffez ────────────────────────────────────────────────
-  if (isMohaffez) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
-      unselectedItemColor: const Color.fromARGB(255, 255, 255, 255),
-      type: BottomNavigationBarType.fixed,
-      selectedLabelStyle: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-      ),
-      unselectedLabelStyle: const TextStyle(fontSize: 11),
-      elevation: 12,
-      onTap: (index) {
-        ref.read(bottomNavIndexProvider.notifier).setIndex(index);
-        switch (index) {
-          case 0:
-            context.go('/mohaffez-home');
-          case 1:
-            context.go('/notifications');
-          case 2:
-            context.go('/profile');
-        }
-      },
-      items: [
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home_rounded),
-          label: ArabicLabels.home,
-        ),
-        notifItem(),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline_rounded),
-          activeIcon: Icon(Icons.person_rounded),
-          label: ArabicLabels.profile,
-        ),
+  return Container(
+    decoration: const BoxDecoration(
+      color: _ShellDS.teal700,
+      boxShadow: [
+        BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, -3)),
       ],
-    );
-  }
-
-  // ── Admin ───────────────────────────────────────────────────
-  return BottomNavigationBar(
-    currentIndex: currentIndex,
-    selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
-    unselectedItemColor: unselectedColor,
-    type: BottomNavigationBarType.fixed,
-    selectedLabelStyle: const TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
     ),
-    unselectedLabelStyle: const TextStyle(fontSize: 11),
-    elevation: 12,
-    onTap: (index) {
-      ref.read(bottomNavIndexProvider.notifier).setIndex(index);
-      switch (index) {
-        case 0:
-          context.go('/admin-home');
-        case 1:
-          context.go('/notifications');
-        case 2:
-          context.go('/profile');
-      }
-    },
-    items: [
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.dashboard_outlined),
-        activeIcon: Icon(Icons.dashboard_rounded),
-        label: 'لوحة التحكم',
+    child: SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 64,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            splashColor: Colors.white.withValues(alpha: 0.1),
+            highlightColor: Colors.transparent,
+          ),
+          child: BottomNavigationBar(
+            currentIndex: currentIndex,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedItemColor: Colors.white,
+            unselectedItemColor: Colors.white.withValues(alpha: 0.55),
+            type: BottomNavigationBarType.fixed,
+            selectedLabelStyle: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700),
+            unselectedLabelStyle: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w500),
+            onTap: (index) => _onTap(index, '/mohaffez-home', '/home', '/admin-home'),
+            items: isMohaffez || !isAdmin
+                ? [
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.home_outlined),
+                      activeIcon: Icon(Icons.home_rounded),
+                      label: ArabicLabels.home,
+                    ),
+                    _notifItem(),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline_rounded),
+                      activeIcon: Icon(Icons.person_rounded),
+                      label: ArabicLabels.profile,
+                    ),
+                  ]
+                : [
+                    // Admin
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.dashboard_outlined),
+                      activeIcon: Icon(Icons.dashboard_rounded),
+                      label: 'لوحة التحكم',
+                    ),
+                    _notifItem(),
+                    const BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline_rounded),
+                      activeIcon: Icon(Icons.person_rounded),
+                      label: ArabicLabels.profile,
+                    ),
+                  ],
+          ),
+        ),
       ),
-      notifItem(),
-      const BottomNavigationBarItem(
-        icon: Icon(Icons.person_outline_rounded),
-        activeIcon: Icon(Icons.person_rounded),
-        label: ArabicLabels.profile,
-      ),
-    ],
+    ),
   );
 }
 
-// ============================================================
-// DRAWER
-// ============================================================
-Widget buildDrawer(
+class _NavBadge extends StatelessWidget {
+  final Widget child;
+  final int count;
+  const _NavBadge({required this.child, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    if (count == 0) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          right: -5, top: -4,
+          child: Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: Colors.red.shade600,
+              shape: BoxShape.circle,
+              border: Border.all(color: _ShellDS.teal700, width: 1.5),
+            ),
+            constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+            child: Text(
+              count > 9 ? '9+' : '$count',
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DRAWER — teal header, consistent with app identity
+// ═══════════════════════════════════════════════════════════════════════════════
+Widget _buildDrawer(
   BuildContext context,
   WidgetRef ref, {
   required bool isMohaffez,
@@ -529,125 +473,92 @@ Widget buildDrawer(
   return Drawer(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(20),
-        bottomLeft: Radius.circular(20),
+        topLeft: Radius.circular(24),
+        bottomLeft: Radius.circular(24),
       ),
     ),
     child: Column(
       children: [
-        buildDrawerHeader(user, isMohaffez: isMohaffez, isAdmin: isAdmin),
+        _DrawerHeader(user: user, isMohaffez: isMohaffez, isAdmin: isAdmin),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.only(top: 8, bottom: 16),
+            padding: const EdgeInsets.only(top: 8, bottom: 24),
             children: [
-              // ── Common ──────────────────────────────────────
-              drawerTile(
-                context,
-                title: ArabicLabels.profile,
-                icon: Icons.person_rounded,
-                route: 'profile',
-              ),
-              drawerTile(
-                context,
-                title: 'الإعدادات',
-                icon: Icons.settings_rounded,
-                route: 'settings',
-              ),
-              drawerTile(
-                context,
-                title: 'إعدادات الخصوصية',
-                icon: Icons.privacy_tip_rounded,
-                route: 'privacy-settings',
-              ),
+              // ── Common ──────────────────────────────────────────────────
+              _drawerTile(context, title: ArabicLabels.profile,
+                  icon: Icons.person_rounded, route: 'profile',
+                  color: _ShellDS.teal500),
+              _drawerTile(context, title: 'الإعدادات',
+                  icon: Icons.settings_rounded, route: 'settings',
+                  color: Colors.grey.shade600),
+              _drawerTile(context, title: 'إعدادات الخصوصية',
+                  icon: Icons.privacy_tip_rounded, route: 'privacy-settings',
+                  color: Colors.grey.shade600),
 
-              // ── Admin ────────────────────────────────────────
+              // ── Admin ────────────────────────────────────────────────────
               if (isAdmin) ...[
-                drawerSectionLabel('إدارة النظام'),
-                drawerTile(context,
-                    title: 'لوحة التحكم',
-                    icon: Icons.dashboard_rounded,
-                    route: 'admin-home'),
-                drawerTile(context,
-                    title: 'المستخدمون',
-                    icon: Icons.people_alt_rounded,
-                    route: 'admin/users'),
-                drawerTile(context,
-                    title: 'الاعتمادات',
-                    icon: Icons.verified_rounded,
-                    route: 'admin/credentials'),
-                drawerTile(context,
-                    title: 'العمليات الفاشلة',
-                    icon: Icons.warning_amber_rounded,
-                    route: 'admin/failed-ops',
+                _drawerSection('إدارة النظام'),
+                _drawerTile(context, title: 'لوحة التحكم',
+                    icon: Icons.dashboard_rounded, route: 'admin-home',
+                    color: _ShellDS.teal500),
+                _drawerTile(context, title: 'المستخدمون',
+                    icon: Icons.people_alt_rounded, route: 'admin/users',
+                    color: _ShellDS.teal500),
+                _drawerTile(context, title: 'الاعتمادات',
+                    icon: Icons.verified_rounded, route: 'admin/credentials',
+                    color: _ShellDS.teal500),
+                _drawerTile(context, title: 'العمليات الفاشلة',
+                    icon: Icons.warning_amber_rounded, route: 'admin/failed-ops',
                     color: Colors.orange),
-                drawerTile(context,
-                    title: 'أكواد الخصم',
-                    icon: Icons.discount_rounded,
-                    route: 'admin/promo-codes'),
-                drawerTile(context,
-                    title: 'قفل المواعيد',
-                    icon: Icons.lock_clock_rounded,
-                    route: 'admin/slot-locks'),
-                drawerTile(context,
-                    title: 'أحداث الدفع',
-                    icon: Icons.payment_rounded,
-                    route: 'admin/payment-events'),
-                drawerTile(context,
-                    title: 'العمولات',
-                    icon: Icons.analytics_rounded,
-                    route: 'admin/commissions'),
-                drawerTile(context,
-                    title: 'الإشعارات الجماعية',
-                    icon: Icons.campaign_rounded,
-                    route: 'admin/broadcast'),
-                drawerTile(context,
-                    title: 'إعدادات النظام',
-                    icon: Icons.settings_rounded,
-                    route: 'admin/settings'),
+                _drawerTile(context, title: 'أكواد الخصم',
+                    icon: Icons.discount_rounded, route: 'admin/promo-codes',
+                    color: _ShellDS.teal600),
+                _drawerTile(context, title: 'قفل المواعيد',
+                    icon: Icons.lock_clock_rounded, route: 'admin/slot-locks',
+                    color: Colors.blueGrey),
+                _drawerTile(context, title: 'أحداث الدفع',
+                    icon: Icons.payment_rounded, route: 'admin/payment-events',
+                    color: _ShellDS.teal600),
+                _drawerTile(context, title: 'العمولات',
+                    icon: Icons.analytics_rounded, route: 'admin/commissions',
+                    color: _ShellDS.teal500),
+                _drawerTile(context, title: 'الإشعارات الجماعية',
+                    icon: Icons.campaign_rounded, route: 'admin/broadcast',
+                    color: Colors.orange),
+                _drawerTile(context, title: 'إعدادات النظام',
+                    icon: Icons.settings_rounded, route: 'admin/settings',
+                    color: Colors.grey.shade600),
                 if (isDevModeActive)
-                  drawerTile(context,
-                      title: 'وضع المطوّر',
-                      icon: Icons.bug_report_rounded,
-                      route: 'admin/dev-mode',
+                  _drawerTile(context, title: 'وضع المطوّر',
+                      icon: Icons.bug_report_rounded, route: 'admin/dev-mode',
                       color: Colors.red),
-                drawerTile(context,
-                    title: 'عمولات المحافظين',
+                _drawerTile(context, title: 'عمولات المحافظين',
                     icon: Icons.account_balance_rounded,
-                    route: 'admin/teacher-commissions'),
-                drawerTile(context,
-                    title: 'أرقام محافظ المنصة',
+                    route: 'admin/teacher-commissions', color: _ShellDS.teal600),
+                _drawerTile(context, title: 'أرقام محافظ المنصة',
                     icon: Icons.account_balance_wallet_rounded,
-                    route: 'admin/wallet-numbers'),
-                drawerTile(context,
-                    title: 'سجل العمليات',
-                    icon: Icons.history_rounded,
-                    route: 'admin/audit-log'),
+                    route: 'admin/wallet-numbers', color: _ShellDS.teal500),
+                _drawerTile(context, title: 'سجل العمليات',
+                    icon: Icons.history_rounded, route: 'admin/audit-log',
+                    color: Colors.grey.shade600),
               ],
 
-              // ── Mohaffez ─────────────────────────────────────
+              // ── Mohaffez ─────────────────────────────────────────────────
               if (isMohaffez) ...[
-                drawerSectionLabel('أدوات المحفظ'),
-                drawerTile(context,
-                    title: 'بيانات الاعتماد',
-                    icon: Icons.verified_user_rounded,
-                    route: 'credentials',
-                    color: Colors.purple),
-                drawerTile(context,
-                    title: 'إدارة الجدول',
-                    icon: Icons.schedule_rounded,
-                    route: 'availability',
-                    color: Colors.blue),
-                drawerTile(context,
-                    title: 'إدارة الأسعار',
-                    icon: Icons.price_change_rounded,
-                    route: 'pricing-management',
-                    color: Colors.teal),
-                drawerTile(context,
-                    title: 'إعدادات المحفظة',
+                _drawerSection('أدوات المحفظ'),
+                _drawerTile(context, title: 'بيانات الاعتماد',
+                    icon: Icons.verified_user_rounded, route: 'credentials',
+                    color: _ShellDS.teal500),
+                _drawerTile(context, title: 'إدارة الجدول',
+                    icon: Icons.schedule_rounded, route: 'availability',
+                    color: _ShellDS.teal600),
+                _drawerTile(context, title: 'إدارة الأسعار',
+                    icon: Icons.sell_rounded, route: 'pricing-management',
+                    color: _ShellDS.teal500),
+                _drawerTile(context, title: 'إعدادات المحفظة',
                     icon: Icons.account_balance_wallet_rounded,
-                    route: 'wallet-settings',
-                    color: Colors.green),
-                drawerCustomTile(
+                    route: 'wallet-settings', color: _ShellDS.teal600),
+                _drawerCustomTile(
                   context,
                   title: 'تأكيد المدفوعات',
                   icon: Icons.payments_rounded,
@@ -657,44 +568,48 @@ Widget buildDrawer(
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            const DirectPaymentConfirmationsScreen(),
-                      ),
+                          builder: (_) => const DirectPaymentConfirmationsScreen()),
                     );
                   },
                 ),
               ],
 
-              // ── Student extras ───────────────────────────────
+              // ── Student extras ────────────────────────────────────────────
               if (!isMohaffez && !isAdmin) ...[
-                drawerSectionLabel('باقاتي'),
-                drawerCustomTile(
+                _drawerSection('باقاتي'),
+                _drawerCustomTile(
                   context,
                   title: 'باقاتي النشطة',
                   icon: Icons.collections_bookmark_rounded,
-                  color: AppTheme.primaryAmber,
+                  color: _ShellDS.teal500,
                   onTap: () {
                     Navigator.pop(context);
                     context.push('/active-subscriptions');
                   },
                 ),
-                drawerTile(context,
-                    title: 'طلباتي',
-                    icon: Icons.pending_actions_rounded,
-                    route: 'requests',
+                _drawerTile(context, title: 'طلباتي',
+                    icon: Icons.pending_actions_rounded, route: 'requests',
                     color: Colors.orange),
               ],
 
-              const Divider(height: 24),
+              const Divider(height: 28, indent: 16, endIndent: 16),
 
-              // ── Logout ───────────────────────────────────────
+              // ── Logout ───────────────────────────────────────────────────
               ListTile(
-                leading: const Icon(Icons.logout_rounded, color: Colors.red),
-                title: const Text(
+                leading: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.logout_rounded, color: Colors.red.shade600, size: 20),
+                ),
+                title: Text(
                   'تسجيل الخروج',
                   style: TextStyle(
-                    color: Colors.red,
+                    color: Colors.red.shade600,
                     fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
                 onTap: () async {
@@ -710,146 +625,134 @@ Widget buildDrawer(
   );
 }
 
-// ── Drawer header ─────────────────────────────────────────────
-Widget buildDrawerHeader(
-  dynamic user, {
-  required bool isMohaffez,
-  required bool isAdmin,
-}) {
-  final name = (user?.name as String?) ?? 'المستخدم';
-  final email = (user?.email as String?) ?? '';
-  final roleLabel = isAdmin
-      ? 'مدير النظام'
-      : isMohaffez
-          ? 'محفظ معتمد'
-          : 'طالب';
+// ═══════════════════════════════════════════════════════════════════════════════
+// DRAWER HEADER — teal gradient, matches AppBar exactly
+// ═══════════════════════════════════════════════════════════════════════════════
+class _DrawerHeader extends StatelessWidget {
+  final dynamic user;
+  final bool isMohaffez;
+  final bool isAdmin;
 
-  return Container(
-    width: double.infinity,
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+  const _DrawerHeader({required this.user, required this.isMohaffez, required this.isAdmin});
+
+  @override
+  Widget build(BuildContext context) {
+    final name  = (user?.name as String?) ?? 'المستخدم';
+    final email = (user?.email as String?) ?? '';
+    final roleLabel = isAdmin
+        ? 'مدير النظام'
+        : isMohaffez
+            ? 'محفظ معتمد'
+            : 'طالب';
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_ShellDS.teal800, _ShellDS.teal600],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.only(topLeft: Radius.circular(24)),
       ),
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(20),
-      ),
-    ),
-    child: SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Avatar
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.25),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  width: 2,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          child: Row(
+            children: [
+              // Avatar
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.4), width: 2),
                 ),
-              ),
-              child: Center(
-                child: Text(
-                  name.isNotEmpty ? name[0] : '؟',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
+                child: Center(
+                  child: Text(
+                    name.isNotEmpty ? name[0] : '؟',
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 2),
-            if (email.isNotEmpty)
-              Text(
-                email,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.75),
-                  fontSize: 12,
+              const SizedBox(width: 14),
+              // Name + email + role
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
+                    ),
+                    if (email.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        email,
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72), fontSize: 11),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28), width: 1),
+                      ),
+                      child: Text(
+                        roleLabel,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            const SizedBox(height: 8),
-            // Role chip
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                roleLabel,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-// ============================================================
+// ═══════════════════════════════════════════════════════════════════════════════
 // DRAWER TILE HELPERS
-// ============================================================
-Widget drawerTile(
+// ═══════════════════════════════════════════════════════════════════════════════
+Widget _drawerTile(
   BuildContext context, {
   required String title,
   required IconData icon,
   required String route,
   Color? color,
 }) {
-  final tileColor = color ?? Colors.grey.shade700;
+  final c = color ?? Colors.grey.shade700;
   return ListTile(
+    dense: true,
     leading: Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: tileColor.withValues(alpha: 0.1),
+        color: c.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, size: 20, color: tileColor),
+      child: Icon(icon, size: 20, color: c),
     ),
     title: Text(
       title,
       style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        color: Colors.grey.shade800,
-      ),
+          fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey.shade800),
     ),
-    trailing: Icon(
-      Icons.arrow_back_ios_new_rounded,
-      size: 14,
-      color: Colors.grey.shade400,
-    ),
+    trailing: Icon(Icons.arrow_back_ios_new_rounded,
+        size: 13, color: Colors.grey.shade400),
     onTap: () {
       Navigator.pop(context);
       context.go('/$route');
@@ -857,41 +760,36 @@ Widget drawerTile(
   );
 }
 
-Widget drawerCustomTile(
+Widget _drawerCustomTile(
   BuildContext context, {
   required String title,
   required IconData icon,
   Color? color,
   required VoidCallback onTap,
 }) {
-  final tileColor = color ?? Colors.grey.shade700;
+  final c = color ?? Colors.grey.shade700;
   return ListTile(
+    dense: true,
     leading: Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: tileColor.withValues(alpha: 0.1),
+        color: c.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, size: 20, color: tileColor),
+      child: Icon(icon, size: 20, color: c),
     ),
     title: Text(
       title,
       style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        color: Colors.grey.shade800,
-      ),
+          fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey.shade800),
     ),
-    trailing: Icon(
-      Icons.arrow_back_ios_new_rounded,
-      size: 14,
-      color: Colors.grey.shade400,
-    ),
+    trailing: Icon(Icons.arrow_back_ios_new_rounded,
+        size: 13, color: Colors.grey.shade400),
     onTap: onTap,
   );
 }
 
-Widget drawerSectionLabel(String label) {
+Widget _drawerSection(String label) {
   return Padding(
     padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
     child: Text(
@@ -905,3 +803,75 @@ Widget drawerSectionLabel(String label) {
     ),
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PUBLIC HELPERS kept for backward compatibility with any remaining call-sites
+// ═══════════════════════════════════════════════════════════════════════════════
+PreferredSizeWidget buildAppBar(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required bool isAdmin,
+  required int currentIndex,
+  required String userId,
+  required int unreadCount,
+}) =>
+    _buildAppBar(context, ref,
+        isMohaffez: isMohaffez,
+        isAdmin: isAdmin,
+        currentIndex: currentIndex,
+        userId: userId,
+        unreadCount: unreadCount);
+
+Widget buildBottomNavBar(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required bool isAdmin,
+  required int currentIndex,
+  required int unreadCount,
+  int bundleCount = 0,
+}) =>
+    _buildBottomNavBar(context, ref,
+        isMohaffez: isMohaffez,
+        isAdmin: isAdmin,
+        currentIndex: currentIndex,
+        unreadCount: unreadCount,
+        bundleCount: bundleCount);
+
+Widget buildDrawer(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required bool isAdmin,
+  required bool isDevModeActive,
+  required dynamic user,
+}) =>
+    _buildDrawer(context, ref,
+        isMohaffez: isMohaffez,
+        isAdmin: isAdmin,
+        isDevModeActive: isDevModeActive,
+        user: user);
+
+String getScreenTitle(bool isMohaffez, bool isAdmin, int currentIndex) =>
+    _screenTitle(isMohaffez, isAdmin, currentIndex);
+
+Widget buildNotificationBell(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isMohaffez,
+  required String userId,
+  required int unreadCount,
+}) =>
+    _NotificationBell(
+        isMohaffez: isMohaffez,
+        userId: userId,
+        unreadCount: unreadCount,
+        ref: ref);
+
+Widget buildDrawerHeader(
+  dynamic user, {
+  required bool isMohaffez,
+  required bool isAdmin,
+}) =>
+    _DrawerHeader(user: user, isMohaffez: isMohaffez, isAdmin: isAdmin);
