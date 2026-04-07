@@ -83,6 +83,7 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
+  image_cropper: ^9.0.0
 
   # Image Processing
   flutter_image_compress: ^2.1.0

@@ -39,7 +39,6 @@ class _DS {
   static const darkTealBg= Color(0xFFE0F2F1);
 
   static const bg      = Color(0xFFF4F7F6);
-  static const surface = Colors.white;
   static const text1   = Color(0xFF111827);
   static const text2   = Color(0xFF4B5563);
   static const text3   = Color(0xFF9CA3AF);
@@ -195,6 +194,13 @@ class MohaffezHomeContent extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 36),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
+                      if (pendingCount > 0) ...[
+                        _PendingAlertBanner(
+                          count: pendingCount,
+                          onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                       _ActionsSection(mohaffezId: mohaffezId),
                       const SizedBox(height: 28),
                       _UpcomingSection(mohaffezId: mohaffezId),
@@ -314,19 +320,20 @@ class _HomeHeader extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
+                  // Full-width greeting pill
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.13),
                       borderRadius: _DS.r12,
                       border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
                         const SizedBox(width: 8),
-                        Flexible(
+                        Expanded(
                           child: Text(
                             greeting,
                             style: TextStyle(
@@ -378,6 +385,79 @@ class _PendingBadge extends StatelessWidget {
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PENDING ALERT BANNER
+// ═══════════════════════════════════════════════════════════════════════════════
+class _PendingAlertBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+  const _PendingAlertBanner({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: _DS.r16,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: _DS.amberBg,
+            borderRadius: _DS.r16,
+            border: Border.all(color: _DS.amber.withValues(alpha: 0.35), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: _DS.amber.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: _DS.amber.withValues(alpha: 0.15),
+                    borderRadius: _DS.r12,
+                  ),
+                  child: const Icon(Icons.pending_actions_rounded, color: _DS.amber, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'لديك $count ${count == 1 ? "طلب معلق" : "طلبات معلقة"}',
+                        style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700, color: _DS.text1,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'اضغط لمراجعة الطلبات والرد عليها',
+                        style: TextStyle(fontSize: 12, color: _DS.text2),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: _DS.amber),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -495,41 +575,72 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: data.onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: _DS.r16,
-          border: Border.all(
-            color: data.isAlert ? data.color.withValues(alpha: 0.45) : _DS.border,
-            width: data.isAlert ? 1.5 : 1,
-          ),
-          boxShadow: _DS.cardShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r8),
-              child: Icon(data.icon, color: data.color, size: 18),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              data.value,
-              style: TextStyle(
-                fontSize: 22, fontWeight: FontWeight.w900, color: data.color, height: 1,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: _DS.r16,
+        boxShadow: _DS.cardShadow,
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: _DS.r16,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            data.onTap();
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: data.isAlert ? data.color.withValues(alpha: 0.45) : _DS.border,
+                width: data.isAlert ? 1.5 : 1,
               ),
+              borderRadius: _DS.r16,
             ),
-            const SizedBox(height: 3),
-            Text(
-              data.label,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _DS.text2),
-              maxLines: 1, overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Colored top stripe
+                Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: data.color.withValues(alpha: data.isAlert ? 1.0 : 0.5),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 32, height: 32,
+                        decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r8),
+                        child: Icon(data.icon, color: data.color, size: 18),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        data.value,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: data.color,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        data.label,
+                        style: const TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w600, color: _DS.text2,
+                        ),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -619,7 +730,10 @@ class _ActionCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: data.onTap,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          data.onTap();
+        },
         borderRadius: _DS.r16,
         child: Ink(
           decoration: BoxDecoration(
@@ -668,12 +782,22 @@ class _UpcomingSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(upcomingSessionsProvider(mohaffezId));
 
+    final subtitle = sessionsAsync.when(
+      data: (s) {
+        if (s.isEmpty) return 'لا توجد جلسات قادمة حالياً';
+        final count = s.length.clamp(1, 3);
+        return 'أقرب $count ${count == 1 ? "جلسة تحتاج" : "جلسات تحتاج"} انتباهك';
+      },
+      loading: () => 'جارٍ التحميل…',
+      error: (_, __) => 'تعذر التحميل',
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionLabel(
           title: ArabicLabels.upcomingSessions,
-          subtitle: 'أقرب ٣ جلسات تحتاج انتباهك',
+          subtitle: subtitle,
           trailing: TextButton.icon(
             onPressed: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 11),
@@ -705,6 +829,7 @@ class _UpcomingSection extends ConsumerWidget {
                     sessionDate: s['sessionDate'] as DateTime?,
                     timeSlot: s['preferredTimeSlot'] as String? ?? '08:00',
                     colorIndex: i,
+                    onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
                   ),
                 );
               }),
@@ -731,11 +856,27 @@ class _SessionCard extends StatelessWidget {
   final DateTime? sessionDate;
   final String timeSlot;
   final int colorIndex;
+  final VoidCallback? onTap;
 
   const _SessionCard({
-    required this.studentName, required this.sessionDate,
-    required this.timeSlot, required this.colorIndex,
+    required this.studentName,
+    required this.sessionDate,
+    required this.timeSlot,
+    required this.colorIndex,
+    this.onTap,
   });
+
+  static String _relativeDate(DateTime? date) {
+    if (date == null) return '';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = target.difference(today).inDays;
+    if (diff == 0) return 'اليوم';
+    if (diff == 1) return 'غداً';
+    if (diff > 1 && diff <= 6) return 'بعد $diff أيام';
+    return DateFormat('dd/MM', 'ar').format(date);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -750,86 +891,114 @@ class _SessionCard extends StatelessWidget {
         sessionDate!.month == now.month &&
         sessionDate!.day == now.day;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    final relDate = _relativeDate(sessionDate);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap != null
+            ? () {
+                HapticFeedback.lightImpact();
+                onTap!();
+              }
+            : null,
         borderRadius: _DS.r16,
-        border: Border.all(color: _DS.border),
-        boxShadow: _DS.subtleShadow,
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: _DS.r16,
+            border: Border.all(color: isToday ? color.withValues(alpha: 0.3) : _DS.border),
+            boxShadow: _DS.subtleShadow,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Container(
-              width: 44, height: 44,
-              margin: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(color: bg, borderRadius: _DS.r12),
-              child: Icon(Icons.person_rounded, color: color, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                const SizedBox(width: 14),
+                Container(
+                  width: 44, height: 44,
+                  margin: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(color: bg, borderRadius: _DS.r12),
+                  child: Icon(Icons.person_rounded, color: color, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            studentName,
-                            style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w700, color: _DS.text1,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                studentName,
+                                style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w700, color: _DS.text1,
+                                ),
+                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                          ),
+                            if (relDate.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isToday ? color.withValues(alpha: 0.1) : _DS.teal50,
+                                  borderRadius: _DS.r8,
+                                  border: Border.all(
+                                    color: isToday ? color.withValues(alpha: 0.35) : _DS.teal100,
+                                  ),
+                                ),
+                                child: Text(
+                                  relDate,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: isToday ? color : _DS.teal600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        if (isToday) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _DS.teal50, borderRadius: _DS.r8,
-                              border: Border.all(color: _DS.teal100),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 12,
+                          children: [
+                            _InfoPill(
+                              icon: Icons.calendar_today_rounded,
+                              text: sessionDate == null
+                                  ? ArabicLabels.notSpecified
+                                  : DateFormat('dd/MM/yyyy', 'ar').format(sessionDate!),
                             ),
-                            child: const Text(
-                              'اليوم',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _DS.teal600),
-                            ),
-                          ),
-                        ],
+                            _InfoPill(icon: Icons.access_time_rounded, text: timeSlot),
+                          ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 12,
-                      children: [
-                        _InfoPill(
-                          icon: Icons.calendar_today_rounded,
-                          text: sessionDate == null
-                              ? ArabicLabels.notSpecified
-                              : DateFormat('dd/MM/yyyy', 'ar').format(sessionDate!),
-                        ),
-                        _InfoPill(icon: Icons.access_time_rounded, text: timeSlot),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 12),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 13,
+                    color: _DS.text3,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-          ],
+          ),
         ),
       ),
     );
@@ -870,18 +1039,36 @@ class _SectionLabel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w800,
-                  color: _DS.text1, letterSpacing: -0.3,
+              // Decorative teal accent dot aligned to title
+              Padding(
+                padding: const EdgeInsets.only(top: 5, left: 8),
+                child: Container(
+                  width: 6, height: 6,
+                  decoration: const BoxDecoration(
+                    color: _DS.teal500,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(subtitle, style: const TextStyle(fontSize: 12, color: _DS.text2)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800,
+                        color: _DS.text1, letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(fontSize: 12, color: _DS.text2)),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

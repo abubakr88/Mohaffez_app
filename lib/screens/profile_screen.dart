@@ -1,18 +1,59 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:url_launcher/url_launcher.dart'; // ✅ ADD THIS
-import 'package:go_router/go_router.dart'; // ✅ ADD THIS
 
-import '../shared/constants/app_theme.dart';
-import '../shared/widgets/cached_avatar.dart';
-import '../providers/user_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../providers/auth_provider.dart';
+import '../providers/user_provider.dart';
 import '../repositories/user_repository.dart';
+import '../shared/widgets/cached_avatar.dart';
 import '../utils/arabic_labels.dart';
 import 'location_settings_screen.dart';
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// DESIGN TOKENS (consistent with home screens)
+// ═══════════════════════════════════════════════════════════════════════════════
+class _DS {
+  static const teal800  = Color(0xFF095752);
+  static const teal700  = Color(0xFF0C6F6A);
+  static const teal600  = Color(0xFF0E8278);
+  static const teal500  = Color(0xFF1A9E84);
+  static const teal50   = Color(0xFFEAF6F3);
+
+  static const amber  = Color(0xFFE67E22);
+  static const purple = Color(0xFF7A5AF8);
+  static const green  = Color(0xFF2E8B57);
+  static const blue   = Color(0xFF2563EB);
+  static const red    = Color(0xFFDC2626);
+  static const redBg  = Color(0xFFFFEBEE);
+
+  static const bg     = Color(0xFFF4F7F6);
+  static const text1  = Color(0xFF111827);
+  static const text2  = Color(0xFF4B5563);
+  static const text3  = Color(0xFF9CA3AF);
+  static const border = Color(0xFFE5EDE9);
+
+  static const r8  = BorderRadius.all(Radius.circular(8));
+  static const r12 = BorderRadius.all(Radius.circular(12));
+  static const r16 = BorderRadius.all(Radius.circular(16));
+
+  static List<BoxShadow> subtleShadow = [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 8,
+      offset: const Offset(0, 2),
+    ),
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ═══════════════════════════════════════════════════════════════════════════════
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -21,59 +62,46 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool isEditingBio = false;
-  bool isEditingYoutubeLink = false;
-  final bioController = TextEditingController();
-  final youtubeController = TextEditingController();
+  bool _isEditingBio = false;
+  final _bioController = TextEditingController();
+  final _youtubeController = TextEditingController();
 
   @override
   void dispose() {
-    bioController.dispose();
-    youtubeController.dispose();
+    _bioController.dispose();
+    _youtubeController.dispose();
     super.dispose();
   }
 
-  // ✅ ADD: Helper to make phone call
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
   Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    final uri = Uri(scheme: 'tel', path: phoneNumber);
     try {
-      if (await canLaunchUrl(launchUri)) {
-        await launchUrl(launchUri);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('لا يمكن فتح تطبيق الهاتف')),
-          );
-        }
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else if (mounted) {
+        _showSnackBar('لا يمكن فتح تطبيق الهاتف');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${ArabicLabels.error}: $e')),
-        );
-      }
+      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
     }
   }
 
-  // ✅ ADD: Helper to send email
   Future<void> _sendEmail(String email) async {
-    final Uri launchUri = Uri(scheme: 'mailto', path: email);
+    final uri = Uri(scheme: 'mailto', path: email);
     try {
-      if (await canLaunchUrl(launchUri)) {
-        await launchUrl(launchUri);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('لا يمكن فتح تطبيق البريد')),
-          );
-        }
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else if (mounted) {
+        _showSnackBar('لا يمكن فتح تطبيق البريد');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${ArabicLabels.error}: $e')),
-        );
-      }
+      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
     }
   }
 
@@ -84,32 +112,154 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return host.contains('youtube.com') || host.contains('youtu.be');
   }
 
-  Future<void> _openYoutubeVideo(String url) async {
-    final uri = Uri.tryParse(url.trim());
-    if (uri == null) return;
-
+  Future<void> _pickAndUploadPhoto(String userId) async {
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لا يمكن فتح رابط الفيديو')),
-        );
-      }
+      final picker = ImagePicker();
+      final image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      if (!mounted) return;
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: image.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 85,
+        compressFormat: ImageCompressFormat.jpg,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'اقتصاص الصورة',
+            toolbarColor: const Color(0xFF095752),
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: const Color(0xFF1A9E84),
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            hideBottomControls: false,
+          ),
+          IOSUiSettings(
+            title: 'اقتصاص الصورة',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+          ),
+        ],
+      );
+      if (cropped == null) return;
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final repository = ref.read(userRepositoryProvider);
+      await repository.uploadProfilePhoto(userId, File(cropped.path));
+      ref.invalidate(currentUserProvider);
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${ArabicLabels.error}: $e')),
-        );
-      }
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      _showSnackBar('${ArabicLabels.error}: $e');
     }
   }
 
-  // ✅ ADD: Helper to show change password dialog
+  Future<void> _saveBio(String userId) async {
+    try {
+      final repository = ref.read(userRepositoryProvider);
+      await repository.updateUser(userId, {'bio': _bioController.text.trim()});
+      ref.invalidate(currentUserProvider);
+      setState(() => _isEditingBio = false);
+      if (mounted) _showSnackBar('تم حفظ النبذة بنجاح', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    }
+  }
+
+  Future<void> _saveYoutubeLink(String userId) async {
+    try {
+      final trimmed = _youtubeController.text.trim();
+      if (trimmed.isNotEmpty && !_isValidYoutubeUrl(trimmed)) {
+        throw Exception('يرجى إدخال رابط YouTube صحيح');
+      }
+      final repository = ref.read(userRepositoryProvider);
+      await repository.updateUser(userId, {
+        'youtubeVideoUrl': trimmed.isEmpty ? null : trimmed,
+      });
+      ref.invalidate(currentUserProvider);
+      if (mounted) _showSnackBar('تم حفظ رابط الفيديو بنجاح', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    }
+  }
+
+  void _showSnackBar(String message, {bool isSuccess = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isSuccess ? _DS.green : null,
+        behavior: SnackBarBehavior.floating,
+        shape: const RoundedRectangleBorder(borderRadius: _DS.r12),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
+    );
+  }
+
+  // ─── Dialogs ───────────────────────────────────────────────────────────────
+  Future<void> _showYoutubeLinkDialog(String userId) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
+          title: const Text('رابط فيديو التلاوة',
+              style: TextStyle(fontWeight: FontWeight.w700, color: _DS.text1)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _youtubeController,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  hintText: 'https://youtube.com/...',
+                  border: OutlineInputBorder(borderRadius: _DS.r12),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'أضف رابط YouTube لفيديو تلاوة مسجل بصوتك.',
+                style: TextStyle(fontSize: 12, color: _DS.text3),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(ArabicLabels.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _saveYoutubeLink(userId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DS.teal500,
+                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+              ),
+              child: const Text(ArabicLabels.save),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showChangePasswordDialog() async {
-    final currentPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
+    final currentPwCtrl = TextEditingController();
+    final newPwCtrl = TextEditingController();
+    final confirmPwCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     await showDialog(
@@ -117,28 +267,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: const Text('تغيير كلمة المرور'),
+          shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
+          title: const Text('تغيير كلمة المرور',
+              style: TextStyle(fontWeight: FontWeight.w700, color: _DS.text1)),
           content: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
-                  controller: currentPasswordController,
+                  controller: currentPwCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(
                     labelText: 'كلمة المرور الحالية',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: _DS.r12),
                   ),
                   validator: (val) => val?.isEmpty ?? true ? 'مطلوب' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: newPasswordController,
+                  controller: newPwCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(
                     labelText: 'كلمة المرور الجديدة',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: _DS.r12),
                   ),
                   validator: (val) {
                     if (val?.isEmpty ?? true) return 'مطلوب';
@@ -148,16 +300,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: confirmPasswordController,
+                  controller: confirmPwCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(
                     labelText: 'تأكيد كلمة المرور',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: _DS.r12),
                   ),
                   validator: (val) {
-                    if (val != newPasswordController.text) {
-                      return 'كلمة المرور غير متطابقة';
-                    }
+                    if (val != newPwCtrl.text) return 'كلمة المرور غير متطابقة';
                     return null;
                   },
                 ),
@@ -173,24 +323,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(ctx);
-                  try {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تم تغيير كلمة المرور بنجاح'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('خطأ: $e')),
-                      );
-                    }
+                  if (mounted) {
+                    _showSnackBar('تم تغيير كلمة المرور بنجاح', isSuccess: true);
                   }
                 }
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DS.teal500,
+                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+              ),
               child: const Text(ArabicLabels.save),
             ),
           ],
@@ -198,11 +339,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     );
 
-    currentPasswordController.dispose();
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
+    currentPwCtrl.dispose();
+    newPwCtrl.dispose();
+    confirmPwCtrl.dispose();
   }
 
+  Future<void> _showLogoutDialog() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
+          title: const Text('تسجيل الخروج',
+              style: TextStyle(fontWeight: FontWeight.w700, color: _DS.text1)),
+          content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text(ArabicLabels.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DS.red,
+                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+              ),
+              child: const Text('تسجيل الخروج'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm == true) {
+      await ref.read(authNotifierProvider.notifier).logout();
+    }
+  }
+
+  // ─── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
@@ -215,670 +390,459 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         final isMohaffez = user.role == 'mohaffez';
 
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Scaffold(
-            body: RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(currentUserProvider);
-                await ref
-                    .read(currentUserProvider.future)
-                    .catchError((_) => null);
-              },
-              child: CustomScrollView(
-                slivers: [
-                  // Profile Header
-                  SliverAppBar(
-                    expandedHeight: 300,
-                    pinned: true,
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Gradient Background
-                          Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppTheme.primaryAmber,
-                                  AppTheme.lightAmber,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                          ),
-                          // Profile Content
-                          SafeArea(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                // Avatar with edit button
-                                Stack(
-                                  children: [
-                                    Hero(
-                                      tag: 'profile-avatar',
-                                      child: CachedAvatar(
-                                        imageUrl: user.photoUrl,
-                                        radius: 60,
-                                        semanticLabel: user.name,
-                                      ),
-                                    ),
-                                    Positioned(
-                                      bottom: 0,
-                                      right: 0,
-                                      child: GestureDetector(
-                                        onTap: () =>
-                                            _pickAndUploadPhoto(user.uid),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primaryAmber,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.white,
-                                              width: 3,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black
-                                                    .withValues(alpha: 0.2),
-                                                blurRadius: 8,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          child: const Icon(
-                                            Icons.camera_alt,
-                                            color: Colors.white,
-                                            size: 20,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                // Name
-                                Text(
-                                  user.name,
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                // Role
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    isMohaffez ? 'محفّظ' : 'طالب',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                // Stats (if mohaffez)
-                                if (isMohaffez)
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _StatItem(
-                                        label: 'المتابعون',
-                                        value: user.followerCount.toString(),
-                                      ),
-                                      const SizedBox(width: 32),
-                                      _StatItem(
-                                        label: 'التقييم',
-                                        value: user.rating.toStringAsFixed(1),
-                                      ),
-                                    ],
-                                  ),
-                                const SizedBox(height: 16),
-                              ],
-                            ),
-                          ),
-                        ],
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+          ),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              backgroundColor: _DS.bg,
+              body: RefreshIndicator(
+                color: _DS.teal500,
+                backgroundColor: Colors.white,
+                onRefresh: () async {
+                  ref.invalidate(currentUserProvider);
+                  await ref.read(currentUserProvider.future).catchError((_) => null);
+                },
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    // ─── Header ──────────────────────────────────────────
+                    SliverAppBar(
+                      expandedHeight: isMohaffez ? 240 : 200,
+                      pinned: true,
+                      elevation: 0,
+                      scrolledUnderElevation: 0,
+                      backgroundColor: _DS.teal700,
+                      surfaceTintColor: Colors.transparent,
+                      automaticallyImplyLeading: false,
+                      flexibleSpace: FlexibleSpaceBar(
+                        collapseMode: CollapseMode.pin,
+                        background: _ProfileHeader(
+                          name: user.name,
+                          photoUrl: user.photoUrl,
+                          isMohaffez: isMohaffez,
+                          followerCount: isMohaffez ? user.followerCount : 0,
+                          rating: isMohaffez ? user.rating : 0,
+                          onEditPhoto: () => _pickAndUploadPhoto(user.uid),
+                        ),
                       ),
                     ),
-                  ),
-                  // Content
-                  SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        // Bio Section
-                        _ProfileSection(
-                          title: 'نبذة تعريفية',
-                          icon: Icons.info_outline,
-                          color: Colors.blue,
-                          child: isEditingBio
-                              ? Column(
-                                  children: [
-                                    TextField(
-                                      controller: bioController,
-                                      maxLines: 4,
-                                      maxLength: 200,
-                                      decoration: const InputDecoration(
-                                        hintText: 'أضف نبذة عنك...',
-                                        border: OutlineInputBorder(),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              isEditingBio = false;
-                                            });
-                                          },
-                                          child:
-                                              const Text(ArabicLabels.cancel),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        ElevatedButton(
-                                          onPressed: () => _saveBio(user.uid),
-                                          child: const Text(ArabicLabels.save),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                )
-                              : Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        (user.bio?.isEmpty ?? true)
-                                            ? 'لا توجد نبذة'
-                                            : user.bio!,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color: (user.bio?.isEmpty ?? true)
-                                              ? Colors.grey.shade500
-                                              : Colors.black87,
-                                          height: 1.5,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 20),
-                                      onPressed: () {
-                                        setState(() {
-                                          bioController.text = user.bio ?? '';
-                                          isEditingBio = true;
-                                        });
-                                      },
-                                    ),
-                                  ],
-                                ),
-                        ),
-                        const SizedBox(height: 16),
 
-                        // ✅ FIXED: Contact Info - Now Clickable
-                        _ProfileSection(
-                          title: 'معلومات التواصل',
-                          icon: Icons.contact_page,
-                          color: Colors.green,
-                          child: Column(
-                            children: [
-                              // Email - Clickable
-                              InkWell(
-                                onTap: () => _sendEmail(user.email),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 8,
+                    // ─── Body ────────────────────────────────────────────
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 36),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          // Bio
+                          _SectionCard(
+                            title: 'نبذة تعريفية',
+                            icon: Icons.info_outline_rounded,
+                            color: _DS.blue,
+                            child: _isEditingBio
+                                ? _BioEditor(
+                                    controller: _bioController,
+                                    onSave: () => _saveBio(user.uid),
+                                    onCancel: () => setState(() => _isEditingBio = false),
+                                  )
+                                : _BioDisplay(
+                                    bio: user.bio,
+                                    onEdit: () {
+                                      _bioController.text = user.bio ?? '';
+                                      setState(() => _isEditingBio = true);
+                                    },
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.email,
-                                        size: 20,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'البريد الإلكتروني',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              user.email,
-                                              style: const TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.blue,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 14,
-                                        color: Colors.blue,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              // Phone - Clickable
-                              if (user.phoneNumber?.isNotEmpty ?? false) ...[
-                                const Divider(height: 24),
-                                InkWell(
-                                  onTap: () =>
-                                      _makePhoneCall(user.phoneNumber!),
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                      horizontal: 8,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.phone,
-                                          size: 20,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'رقم الهاتف',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                user.phoneNumber!,
-                                                style: const TextStyle(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.green,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const Icon(
-                                          Icons.arrow_forward_ios,
-                                          size: 14,
-                                          color: Colors.green,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
                           ),
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 12),
 
-                        // ✅ FIXED: Mohaffez-only sections - Now Clickable
-                        if (isMohaffez) ...[
-                          _ProfileSection(
-                            title: 'إدارة الحساب',
-                            icon: Icons.verified_user,
-                            color: Colors.purple,
+                          // Contact info
+                          _SectionCard(
+                            title: 'معلومات التواصل',
+                            icon: Icons.contact_mail_rounded,
+                            color: _DS.green,
                             child: Column(
                               children: [
-                                _ManagementTile(
-                                  icon: Icons.verified_user,
-                                  title: 'الاعتمادات',
-                                  subtitle: 'شهاداتك وتخصصاتك',
-                                  color: Colors.purple,
-                                  onTap: () => context.push('/credentials'),
+                                _ContactRow(
+                                  icon: Icons.email_rounded,
+                                  label: 'البريد الإلكتروني',
+                                  value: user.email,
+                                  color: _DS.blue,
+                                  onTap: () => _sendEmail(user.email),
                                 ),
-                                const SizedBox(height: 12),
-                                _ManagementTile(
-                                  icon: Icons.schedule,
-                                  title: 'إدارة المواعيد',
-                                  subtitle: 'أوقات الجلسات المتاحة',
-                                  color: Colors.blue,
-                                  onTap: () => context.push('/availability'),
+                                if (user.phoneNumber?.isNotEmpty ?? false) ...[
+                                  const Divider(height: 1, color: _DS.border),
+                                  _ContactRow(
+                                    icon: Icons.phone_rounded,
+                                    label: 'رقم الهاتف',
+                                    value: user.phoneNumber!,
+                                    color: _DS.green,
+                                    onTap: () => _makePhoneCall(user.phoneNumber!),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Mohaffez account management
+                          if (isMohaffez) ...[
+                            _SectionCard(
+                              title: 'إدارة الحساب',
+                              icon: Icons.verified_user_rounded,
+                              color: _DS.purple,
+                              child: Column(
+                                children: [
+                                  _ActionTile(
+                                    icon: Icons.verified_user_rounded,
+                                    title: 'الاعتمادات',
+                                    subtitle: 'شهاداتك وتخصصاتك',
+                                    color: _DS.purple,
+                                    onTap: () => context.push('/credentials'),
+                                  ),
+                                  _ActionTile(
+                                    icon: Icons.schedule_rounded,
+                                    title: 'إدارة المواعيد',
+                                    subtitle: 'أوقات الجلسات المتاحة',
+                                    color: _DS.blue,
+                                    onTap: () => context.push('/availability'),
+                                  ),
+                                  _ActionTile(
+                                    icon: Icons.account_balance_wallet_rounded,
+                                    title: 'محافظ الدفع المباشر',
+                                    subtitle: 'InstaPay، فودافون كاش، أورانج موني',
+                                    color: _DS.green,
+                                    onTap: () => context.push('/wallet-settings'),
+                                  ),
+                                  _ActionTile(
+                                    icon: Icons.ondemand_video_rounded,
+                                    title: 'رابط فيديو التلاوة',
+                                    subtitle: (user.youtubeVideoUrl?.isNotEmpty ?? false)
+                                        ? 'تمت إضافة رابط YouTube'
+                                        : 'أضف رابط YouTube لتلاوة مسجلة',
+                                    color: _DS.red,
+                                    isLast: true,
+                                    onTap: () {
+                                      _youtubeController.text = user.youtubeVideoUrl ?? '';
+                                      _showYoutubeLinkDialog(user.uid);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
+                          // Settings
+                          _SectionCard(
+                            title: 'الإعدادات',
+                            icon: Icons.settings_rounded,
+                            color: _DS.amber,
+                            child: Column(
+                              children: [
+                                _ActionTile(
+                                  icon: Icons.lock_rounded,
+                                  title: 'تغيير كلمة المرور',
+                                  subtitle: 'تحديث كلمة المرور الحالية',
+                                  color: _DS.amber,
+                                  onTap: _showChangePasswordDialog,
                                 ),
-                                const SizedBox(height: 12), // ← ADD THIS
-                                _ManagementTile(
-                                  // ← ADD THIS TILE
-                                  icon: Icons.account_balance_wallet,
-                                  title: 'محافظ الدفع المباشر',
-                                  subtitle:
-                                      'InstaPay، فودافون كاش، أورانج موني، ...',
-                                  color: Colors.green,
-                                  onTap: () => context.push('/wallet-settings'),
+                                _ActionTile(
+                                  icon: Icons.privacy_tip_rounded,
+                                  title: 'إعدادات الخصوصية',
+                                  subtitle: 'التحكم في بيانات حسابك',
+                                  color: _DS.purple,
+                                  onTap: () => context.push('/privacy-settings'),
                                 ),
-                                const SizedBox(height: 12),
-                                _ManagementTile(
-                                  icon: Icons.ondemand_video_outlined,
-                                  title: 'رابط فيديو التلاوة',
-                                  subtitle:
-                                      (user.youtubeVideoUrl?.isNotEmpty ??
-                                              false)
-                                          ? 'تمت إضافة رابط YouTube'
-                                          : 'أضف رابط YouTube لتلاوة مسجلة',
-                                  color: Colors.red,
+                                _ActionTile(
+                                  icon: Icons.location_on_rounded,
+                                  title: 'إعدادات الموقع',
+                                  subtitle: 'حدد موقعك للظهور في البحث',
+                                  color: _DS.teal500,
+                                  isLast: true,
                                   onTap: () {
-                                    youtubeController.text =
-                                        user.youtubeVideoUrl ?? '';
-                                    _showYoutubeLinkDialog(user.uid);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const LocationSettingsScreen(),
+                                      ),
+                                    );
                                   },
                                 ),
                               ],
                             ),
                           ),
-                        ],
+                          const SizedBox(height: 24),
 
-                        // ✅ FIXED: Settings - Now Clickable
-                        _ProfileSection(
-                          title: 'الإعدادات',
-                          icon: Icons.settings,
-                          color: Colors.orange,
-                          child: Column(
-                            children: [
-                              _SettingsTile(
-                                icon: Icons.lock,
-                                title: 'تغيير كلمة المرور',
-                                onTap: _showChangePasswordDialog, // ✅ FIXED
+                          // Logout
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.mediumImpact();
+                                _showLogoutDialog();
+                              },
+                              borderRadius: _DS.r16,
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  color: _DS.redBg,
+                                  borderRadius: _DS.r16,
+                                  border: Border.all(color: _DS.red.withValues(alpha: 0.25)),
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.logout_rounded, color: _DS.red, size: 20),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'تسجيل الخروج',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: _DS.red,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              const Divider(height: 1),
-                              _SettingsTile(
-                                icon: Icons.privacy_tip,
-                                title: 'إعدادات الخصوصية',
-                                onTap: () => context
-                                    .push('/privacy-settings'), // ✅ FIXED
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const SizedBox(height: 12),
-                        _ManagementTile(
-                          icon: Icons.location_on,
-                          title: 'إعدادات الموقع',
-                          subtitle: 'حدد موقعك للظهور في البحث',
-                          color: Colors.red,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const LocationSettingsScreen(),
-                              ),
-                            );
-                          },
-                        ),
-
-                        // Logout Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showLogoutDialog(context),
-                            icon: const Icon(Icons.logout),
-                            label: const Text('تسجيل الخروج'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              side:
-                                  const BorderSide(color: Colors.red, width: 2),
-                              foregroundColor: Colors.red,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 32),
-                      ]),
+                          const SizedBox(height: 32),
+                        ]),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        body: Center(child: Text('${ArabicLabels.error}: $e')),
-      ),
-    );
-  }
-
-  Future<void> _pickAndUploadPhoto(String userId) async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 85,
-      );
-
-      if (image == null) return;
-
-      // Show loading
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
-
-      // Upload photo
-      final repository = ref.read(userRepositoryProvider);
-      await repository.uploadProfilePhoto(userId, File(image.path));
-
-      // Refresh user data
-      ref.invalidate(currentUserProvider);
-
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحديث الصورة بنجاح')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${ArabicLabels.error}: $e')),
-      );
-    }
-  }
-
-  Future<void> _saveBio(String userId) async {
-    try {
-      final repository = ref.read(userRepositoryProvider);
-      // ✅ FIXED: Pass bio as a Map entry, not a named parameter
-      await repository.updateUser(userId, {
-        'bio': bioController.text.trim(),
-      });
-      ref.invalidate(currentUserProvider);
-
-      setState(() {
-        isEditingBio = false;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حفظ النبذة بنجاح')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${ArabicLabels.error}: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _showYoutubeLinkDialog(String userId) async {
-    await showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('رابط فيديو التلاوة'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: youtubeController,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  hintText: 'https://youtube.com/...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'أضف رابط YouTube لفيديو تلاوة مسجل بصوتك.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(ArabicLabels.cancel),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _saveYoutubeLink(userId);
-              },
-              child: const Text(ArabicLabels.save),
-            ),
-          ],
+        body: ErrorDisplay(
+          message: '${ArabicLabels.error}: $e',
+          onRetry: () => ref.invalidate(currentUserProvider),
         ),
       ),
     );
-  }
-
-  Future<void> _saveYoutubeLink(String userId) async {
-    try {
-      final trimmed = youtubeController.text.trim();
-      if (trimmed.isNotEmpty && !_isValidYoutubeUrl(trimmed)) {
-        throw Exception('يرجى إدخال رابط YouTube صحيح');
-      }
-
-      final repository = ref.read(userRepositoryProvider);
-      await repository.updateUser(userId, {
-        'youtubeVideoUrl': trimmed.isEmpty ? null : trimmed,
-      });
-      ref.invalidate(currentUserProvider);
-
-      if (mounted) {
-        setState(() {
-          isEditingYoutubeLink = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حفظ رابط الفيديو بنجاح')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${ArabicLabels.error}: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _showLogoutDialog(BuildContext context) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تسجيل الخروج'),
-          content: const Text('هل أنت متأكد من تسجيل الخروج؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text(ArabicLabels.cancel),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('تسجيل الخروج'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (confirm == true) {
-      await ref.read(authNotifierProvider.notifier).logout();
-    }
   }
 }
 
-class _StatItem extends StatelessWidget {
-  final String label;
-  final String value;
+// ═══════════════════════════════════════════════════════════════════════════════
+// HEADER
+// ═══════════════════════════════════════════════════════════════════════════════
+class _ProfileHeader extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+  final bool isMohaffez;
+  final int followerCount;
+  final double rating;
+  final VoidCallback onEditPhoto;
 
-  const _StatItem({required this.label, required this.value});
+  const _ProfileHeader({
+    required this.name,
+    required this.photoUrl,
+    required this.isMohaffez,
+    required this.followerCount,
+    required this.rating,
+    required this.onEditPhoto,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_DS.teal800, _DS.teal600],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Decorative circles
+          Positioned(
+            top: -50, left: -50,
+            child: Container(
+              width: 220, height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.04),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -20, right: -20,
+            child: Container(
+              width: 130, height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.03),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    // Avatar with edit overlay
+                    Stack(
+                      children: [
+                        Hero(
+                          tag: 'profile-avatar',
+                          child: CachedAvatar(
+                            imageUrl: photoUrl,
+                            radius: 46,
+                            semanticLabel: name,
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0, right: 0,
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              onEditPhoto();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _DS.teal500,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Name
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.w800,
+                        color: Colors.white, letterSpacing: -0.3,
+                      ),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    // Role chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: _DS.r12,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      child: Text(
+                        isMohaffez ? 'محفّظ' : 'طالب',
+                        style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.95),
+                        ),
+                      ),
+                    ),
+                    // Mohaffez stats
+                    if (isMohaffez) ...[
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _HeaderStat(
+                            icon: Icons.people_rounded,
+                            label: 'المتابعون',
+                            value: followerCount.toString(),
+                          ),
+                          Container(
+                            width: 1, height: 24,
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
+                          _HeaderStat(
+                            icon: Icons.star_rounded,
+                            label: 'التقييم',
+                            value: rating.toStringAsFixed(1),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.white.withValues(alpha: 0.9),
-          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _HeaderStat({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 16),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10, color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _ProfileSection extends StatelessWidget {
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION CARD
+// ═══════════════════════════════════════════════════════════════════════════════
+class _SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
   final Widget child;
 
-  const _ProfileSection({
+  const _SectionCard({
     required this.title,
     required this.icon,
     required this.color,
@@ -887,106 +851,210 @@ class _ProfileSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: _DS.r16,
+        border: Border.all(color: _DS.border),
+        boxShadow: _DS.subtleShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 34, height: 34,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: _DS.r8,
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: color, size: 18),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 15, fontWeight: FontWeight.w700, color: _DS.text1,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
+          ),
+          const Divider(height: 1, color: _DS.border),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: child,
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ManagementTile extends StatelessWidget {
+// ═══════════════════════════════════════════════════════════════════════════════
+// BIO WIDGETS
+// ═══════════════════════════════════════════════════════════════════════════════
+class _BioDisplay extends StatelessWidget {
+  final String? bio;
+  final VoidCallback onEdit;
+
+  const _BioDisplay({required this.bio, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasBio = bio != null && bio!.isNotEmpty;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            hasBio ? bio! : 'لا توجد نبذة',
+            style: TextStyle(
+              fontSize: 14,
+              color: hasBio ? _DS.text1 : _DS.text3,
+              height: 1.5,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onEdit();
+            },
+            borderRadius: _DS.r8,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: _DS.teal50,
+                borderRadius: _DS.r8,
+              ),
+              child: const Icon(Icons.edit_rounded, size: 16, color: _DS.teal500),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BioEditor extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+
+  const _BioEditor({
+    required this.controller,
+    required this.onSave,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TextField(
+          controller: controller,
+          maxLines: 4,
+          maxLength: 200,
+          decoration: const InputDecoration(
+            hintText: 'أضف نبذة عنك...',
+            hintStyle: TextStyle(color: _DS.text3),
+            border: OutlineInputBorder(borderRadius: _DS.r12),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: _DS.r12,
+              borderSide: BorderSide(color: _DS.teal500, width: 1.5),
+            ),
+            contentPadding: EdgeInsets.all(14),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: onCancel,
+              style: TextButton.styleFrom(foregroundColor: _DS.text2),
+              child: const Text(ArabicLabels.cancel),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: onSave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DS.teal500,
+                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+              ),
+              child: const Text(ArabicLabels.save),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTACT ROW
+// ═══════════════════════════════════════════════════════════════════════════════
+class _ContactRow extends StatelessWidget {
   final IconData icon;
-  final String title;
-  final String subtitle;
+  final String label;
+  final String value;
   final Color color;
   final VoidCallback onTap;
 
-  const _ManagementTile({
+  const _ContactRow({
     required this.icon,
-    required this.title,
-    required this.subtitle,
+    required this.label,
+    required this.value,
     required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: _DS.r8,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 34, height: 34,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: _DS.r8,
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(icon, size: 16, color: color),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(label,
+                        style: const TextStyle(fontSize: 11, color: _DS.text3)),
+                    const SizedBox(height: 2),
                     Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
+                      value,
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
+                        fontSize: 14, fontWeight: FontWeight.w600, color: color,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Colors.grey.shade400,
-              ),
+              Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: color.withValues(alpha: 0.5)),
             ],
           ),
         ),
@@ -995,24 +1063,121 @@ class _ManagementTile extends StatelessWidget {
   }
 }
 
-class _SettingsTile extends StatelessWidget {
+// ═══════════════════════════════════════════════════════════════════════════════
+// ACTION TILE (used in Account Management & Settings sections)
+// ═══════════════════════════════════════════════════════════════════════════════
+class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String subtitle;
+  final Color color;
   final VoidCallback onTap;
+  final bool isLast;
 
-  const _SettingsTile({
+  const _ActionTile({
     required this.icon,
     required this.title,
+    required this.subtitle,
+    required this.color,
     required this.onTap,
+    this.isLast = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey.shade700),
-      title: Text(title),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: onTap,
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onTap();
+            },
+            borderRadius: _DS.r12,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.08),
+                      borderRadius: _DS.r12,
+                    ),
+                    child: Icon(icon, color: color, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700, color: _DS.text1,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(fontSize: 12, color: _DS.text2),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: _DS.text3),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (!isLast) const Divider(height: 1, color: _DS.border),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ERROR DISPLAY (fallback for this screen)
+// ═══════════════════════════════════════════════════════════════════════════════
+class ErrorDisplay extends StatelessWidget {
+  final String message;
+  final VoidCallback? onRetry;
+
+  const ErrorDisplay({super.key, required this.message, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: _DS.red, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: const TextStyle(fontSize: 15, color: _DS.text1),
+              textAlign: TextAlign.center,
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: onRetry,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _DS.teal500,
+                  shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+                ),
+                child: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

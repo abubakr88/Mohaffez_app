@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -11,6 +12,63 @@ import '../services/app_version_service.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/error_widgets.dart';
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// DESIGN TOKENS (consistent with mohaffez_home)
+// ═══════════════════════════════════════════════════════════════════════════════
+class _DS {
+  static const teal800   = Color(0xFF095752);
+  static const teal700   = Color(0xFF0C6F6A);
+  static const teal600   = Color(0xFF0E8278);
+  static const teal500   = Color(0xFF1A9E84);
+  static const teal100   = Color(0xFFD4EDE7);
+  static const teal50    = Color(0xFFEAF6F3);
+
+  static const amber     = Color(0xFFE67E22);
+  static const amberBg   = Color(0xFFFFF3E0);
+  static const purple    = Color(0xFF7A5AF8);
+  static const purpleBg  = Color(0xFFF0EEFF);
+  static const green     = Color(0xFF2E8B57);
+  static const greenBg   = Color(0xFFE8F5E9);
+  static const gold      = Color(0xFFB7791F);
+  static const goldBg    = Color(0xFFFFF8E1);
+  static const darkTeal  = Color(0xFF0F766E);
+  static const darkTealBg= Color(0xFFE0F2F1);
+
+  static const bg      = Color(0xFFF4F7F6);
+  static const text1   = Color(0xFF111827);
+  static const text2   = Color(0xFF4B5563);
+  static const text3   = Color(0xFF9CA3AF);
+  static const border  = Color(0xFFE5EDE9);
+
+  static const r8  = BorderRadius.all(Radius.circular(8));
+  static const r12 = BorderRadius.all(Radius.circular(12));
+  static const r16 = BorderRadius.all(Radius.circular(16));
+
+  static List<BoxShadow> cardShadow = [
+    BoxShadow(
+      color: const Color(0xFF0C6F6A).withValues(alpha: 0.07),
+      blurRadius: 14,
+      offset: const Offset(0, 4),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.03),
+      blurRadius: 4,
+      offset: const Offset(0, 1),
+    ),
+  ];
+
+  static List<BoxShadow> subtleShadow = [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 8,
+      offset: const Offset(0, 2),
+    ),
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ═══════════════════════════════════════════════════════════════════════════════
 class StudentHome extends ConsumerStatefulWidget {
   const StudentHome({super.key});
 
@@ -33,380 +91,717 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: Text('لم يتم تسجيل الدخول')));
         }
         return StudentHomeContent(studentId: user.uid);
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        body: ErrorDisplay.dataLoad(
-          onRetry: () => ref.invalidate(currentUserProvider),
-        ),
+        body: ErrorDisplay.dataLoad(onRetry: () => ref.invalidate(currentUserProvider)),
       ),
     );
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTENT
+// ═══════════════════════════════════════════════════════════════════════════════
 class StudentHomeContent extends ConsumerWidget {
   final String studentId;
-
   const StudentHomeContent({super.key, required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider).value;
-    final theme = Theme.of(context);
-    final primary = theme.primaryColor;
-    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
-    final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
+    final user              = ref.watch(currentUserProvider).value;
+    final sessionsAsync     = ref.watch(studentSessionsFirstPageProvider(studentId));
+    final requestsAsync     = ref.watch(studentRequestsFirstPageProvider(studentId));
     final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
+    final now               = DateTime.now();
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: AppThemeConstants.background,
-        body: RefreshIndicator(
-          displacement: 20,
-          color: primary,
-          onRefresh: () async {
-            ref.invalidate(currentUserProvider);
-            ref.invalidate(studentSessionsFirstPageProvider(studentId));
-            ref.invalidate(studentRequestsFirstPageProvider(studentId));
-            ref.invalidate(activeSubscriptionsProvider(studentId));
-            await ref
-                .read(studentSessionsFirstPageProvider(studentId).future)
-                .catchError((_) => <Map<String, dynamic>>[]);
-          },
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverAppBar(
-                expandedHeight: 282,
-                pinned: true,
-                elevation: 0,
-                backgroundColor: primary,
-                surfaceTintColor: Colors.transparent,
-                flexibleSpace: FlexibleSpaceBar(
-                  collapseMode: CollapseMode.pin,
-                  background: _DashboardHeader(
-                    name: user?.name ?? 'الطالب',
-                    photoUrl: user?.photoUrl,
-                    roleLabel: 'لوحة الطالب',
-                    subtitle: _greetingMessage(),
-                    dateText: DateFormat('EEEE، d MMMM', 'ar')
-                        .format(DateTime.now()),
-                    secondaryValue: requestsAsync.when(
-                      data: (requests) => requests
-                          .where((request) {
-                            final status =
-                                (request['status'] as String?)?.toLowerCase();
-                            return status == 'pending' ||
-                                status == 'awaitingpayment';
-                          })
-                          .length
-                          .toString(),
-                      loading: () => '...',
-                      error: (_, __) => '0',
-                    ),
-                    tertiaryValue: subscriptionsAsync.when(
-                      data: (subscriptions) => subscriptions.length.toString(),
-                      loading: () => '...',
-                      error: (_, __) => '0',
-                    ),
-                    quaternaryValue: sessionsAsync.when(
-                      data: (sessions) => sessions
-                          .where((session) {
-                            final status =
-                                (session['status'] as String?)?.toLowerCase();
-                            return status == 'accepted' || status == 'completed';
-                          })
-                          .length
-                          .toString(),
-                      loading: () => '...',
-                      error: (_, __) => '0',
+    // Compute stat values
+    final sessionsCount = sessionsAsync.when(
+      data: (sessions) => sessions.where((s) {
+        final status = (s['status'] as String?)?.toLowerCase();
+        return status == 'accepted' || status == 'completed';
+      }).length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final activeRequestsCount = requestsAsync.when(
+      data: (requests) => requests.where((r) {
+        final status = (r['status'] as String?)?.toLowerCase();
+        return status == 'pending' || status == 'awaitingpayment';
+      }).length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final awaitingPaymentCount = requestsAsync.when(
+      data: (requests) => requests.where((r) {
+        final status = (r['status'] as String?)?.toLowerCase();
+        return status == 'awaitingpayment';
+      }).length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final subscriptionsCount = subscriptionsAsync.when(
+      data: (subs) => subs.length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final remainingSessions = subscriptionsAsync.when(
+      data: (subs) => subs.fold<int>(0, (total, s) => total + s.remainingSessions),
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final sessionsLoading     = sessionsAsync is AsyncLoading;
+    final requestsLoading     = requestsAsync is AsyncLoading;
+    final subscriptionsLoading = subscriptionsAsync is AsyncLoading;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: _DS.bg,
+          body: RefreshIndicator(
+            color: _DS.teal500,
+            backgroundColor: Colors.white,
+            onRefresh: () async {
+              ref.invalidate(currentUserProvider);
+              ref.invalidate(studentSessionsFirstPageProvider(studentId));
+              ref.invalidate(studentRequestsFirstPageProvider(studentId));
+              ref.invalidate(activeSubscriptionsProvider(studentId));
+              await ref
+                  .read(studentSessionsFirstPageProvider(studentId).future)
+                  .catchError((_) => <Map<String, dynamic>>[]);
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // ─── Header ──────────────────────────────────────────────
+                SliverAppBar(
+                  expandedHeight: 170,
+                  pinned: true,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  backgroundColor: _DS.teal700,
+                  surfaceTintColor: Colors.transparent,
+                  automaticallyImplyLeading: false,
+                  flexibleSpace: FlexibleSpaceBar(
+                    collapseMode: CollapseMode.pin,
+                    background: _HomeHeader(
+                      name:     user?.name ?? 'الطالب',
+                      photoUrl: user?.photoUrl,
+                      dateText: DateFormat('EEEE، d MMMM', 'ar').format(now),
+                      greeting: _greeting(now),
                     ),
                   ),
                 ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    QuickStatsSection(studentId: studentId),
-                    const SizedBox(height: 24),
-                    QuickActionsSection(studentId: studentId),
-                    const SizedBox(height: 24),
-                    RecentAssignmentsSection(studentId: studentId),
-                    const SizedBox(height: 24),
-                  ]),
+
+                // ─── Stats row ───────────────────────────────────────────
+                SliverToBoxAdapter(
+                  child: _StatsRow(
+                    studentId:         studentId,
+                    sessionsCount:     sessionsCount,
+                    activeRequests:    activeRequestsCount,
+                    subscriptionsCount: subscriptionsCount,
+                    remainingSessions: remainingSessions,
+                    sessionsLoading:     sessionsLoading,
+                    requestsLoading:     requestsLoading,
+                    subscriptionsLoading: subscriptionsLoading,
+                  ),
                 ),
-              ),
-            ],
+
+                // ─── Body ────────────────────────────────────────────────
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 36),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      if (awaitingPaymentCount > 0) ...[
+                        _PaymentAlertBanner(
+                          count: awaitingPaymentCount,
+                          onTap: () => context.go('/requests'),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      _ActionsSection(studentId: studentId),
+                      const SizedBox(height: 28),
+                      _AssignmentsSection(studentId: studentId),
+                      const SizedBox(height: 16),
+                    ]),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  String _greetingMessage() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'صباح الخير، جاهز لرحلة الحفظ اليوم؟';
-    if (hour < 17) return 'يوم جميل لمراجعة ما أنجزته .';
-    return 'مساء هادئ لمتابعة الجلسات والواجبات.';
+  static String _greeting(DateTime now) {
+    final h = now.hour;
+    if (h < 12) return 'صباح الخير — جاهز لرحلة الحفظ اليوم؟';
+    if (h < 17) return 'يوم جميل لمراجعة ما أنجزته';
+    return 'مساء هادئ لمتابعة الجلسات والواجبات';
   }
 }
 
-class QuickStatsSection extends ConsumerWidget {
-  final String studentId;
+// ═══════════════════════════════════════════════════════════════════════════════
+// HEADER
+// ═══════════════════════════════════════════════════════════════════════════════
+class _HomeHeader extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+  final String dateText;
+  final String greeting;
 
-  const QuickStatsSection({super.key, required this.studentId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
-    final requestsAsync = ref.watch(studentRequestsFirstPageProvider(studentId));
-    final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
-    final primary = Theme.of(context).primaryColor;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _DashboardSectionHeader(
-          title: 'إحصائيات سريعة',
-          subtitle: 'ملخص سريع لنشاطك الحالي',
-          trailing: _SectionChip(
-            label: 'محدث الآن',
-            color: primary,
-            icon: Icons.bolt_rounded,
-          ),
-        ),
-        const SizedBox(height: 14),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 360;
-            final stats = [
-              _DashboardStatData(
-                title: 'إجمالي الجلسات',
-                subtitle: 'الجلسات المكتملة والمقبولة',
-                value: sessionsAsync.when(
-                  data: (sessions) => sessions
-                      .where((session) {
-                        final status =
-                            (session['status'] as String?)?.toLowerCase();
-                        return status == 'accepted' || status == 'completed';
-                      })
-                      .length
-                      .toString(),
-                  loading: () => '...',
-                  error: (_, __) => '0',
-                ),
-                icon: Icons.calendar_today,
-                accent: primary,
-                onTap: () => context.go('/my-sessions'),
-              ),
-              _DashboardStatData(
-                title: 'الطلبات النشطة',
-                subtitle: 'طلبات بانتظار المتابعة',
-                value: requestsAsync.when(
-                  data: (requests) => requests
-                      .where((request) {
-                        final status =
-                            (request['status'] as String?)?.toLowerCase();
-                        return status == 'pending' ||
-                            status == 'awaitingpayment';
-                      })
-                      .length
-                      .toString(),
-                  loading: () => '...',
-                  error: (_, __) => '0',
-                ),
-                icon: Icons.history_edu,
-                accent: const Color(0xFFE67E22),
-                onTap: () => context.go('/requests'),
-              ),
-              _DashboardStatData(
-                title: 'الباقات النشطة',
-                subtitle: 'اشتراكات متاحة للحجز',
-                value: subscriptionsAsync.when(
-                  data: (subscriptions) => subscriptions.length.toString(),
-                  loading: () => '...',
-                  error: (_, __) => '0',
-                ),
-                icon: Icons.workspace_premium,
-                accent: const Color(0xFF2E8B57),
-                onTap: () => context.push('/active-subscriptions'),
-              ),
-              _DashboardStatData(
-                title: 'الجلسات المتبقية',
-                subtitle: 'إجمالي الرصيد المتبقي',
-                value: subscriptionsAsync.when(
-                  data: (subscriptions) => subscriptions
-                      .fold<int>(
-                        0,
-                        (sum, subscription) =>
-                            sum + subscription.remainingSessions,
-                      )
-                      .toString(),
-                  loading: () => '...',
-                  error: (_, __) => '0',
-                ),
-                icon: Icons.stars_rounded,
-                accent: const Color(0xFF7A5AF8),
-                onTap: () => context.push('/active-subscriptions'),
-              ),
-            ];
-
-            return GridView.builder(
-              itemCount: stats.length,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: isNarrow ? 1 : 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: isNarrow ? 1.95 : 1.18,
-              ),
-              itemBuilder: (context, index) {
-                final stat = stats[index];
-                return _DashboardStatCard(data: stat);
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class QuickActionsSection extends StatelessWidget {
-  final String studentId;
-
-  const QuickActionsSection({super.key, required this.studentId});
+  const _HomeHeader({
+    required this.name,
+    required this.photoUrl,
+    required this.dateText,
+    required this.greeting,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
-    final actions = [
-      _DashboardActionData(
-        title: 'احجز جلسة',
-        subtitle: 'ابحث عن محفظ مناسب وابدأ الحجز',
-        icon: Icons.calendar_month_rounded,
-        accent: primary,
-        height: 142,
-        onTap: () => context.go('/nearby'),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_DS.teal800, _DS.teal600],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
       ),
-      _DashboardActionData(
-        title: 'جدولي الدراسي',
-        subtitle: 'راجع مواعيدك القادمة بسرعة',
-        icon: Icons.event_note_rounded,
-        accent: const Color(0xFF0F766E),
-        height: 142,
-        onTap: () => context.go('/my-schedule'),
+      child: Stack(
+        children: [
+          // Decorative circles
+          Positioned(
+            top: -50, left: -50,
+            child: Container(
+              width: 220, height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.04),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -20, right: -20,
+            child: Container(
+              width: 130, height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.03),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _Avatar(name: name, photoUrl: photoUrl, size: 50),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w800,
+                                color: Colors.white, letterSpacing: -0.3,
+                              ),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today_rounded, size: 11,
+                                    color: Colors.white.withValues(alpha: 0.7)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  dateText,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Full-width greeting pill
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.13),
+                      borderRadius: _DS.r12,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            greeting,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withValues(alpha: 0.95),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-      _DashboardActionData(
-        title: 'جلساتي',
-        subtitle: 'تابع الجلسات المكتملة والقادمة',
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAYMENT ALERT BANNER
+// ═══════════════════════════════════════════════════════════════════════════════
+class _PaymentAlertBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+  const _PaymentAlertBanner({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: _DS.r16,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: _DS.amberBg,
+            borderRadius: _DS.r16,
+            border: Border.all(color: _DS.amber.withValues(alpha: 0.35), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: _DS.amber.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: _DS.amber.withValues(alpha: 0.15),
+                    borderRadius: _DS.r12,
+                  ),
+                  child: const Icon(Icons.payment_rounded, color: _DS.amber, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'لديك $count ${count == 1 ? "طلب بانتظار الدفع" : "طلبات بانتظار الدفع"}',
+                        style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700, color: _DS.text1,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'اضغط لمراجعة الطلبات وإتمام الدفع',
+                        style: TextStyle(fontSize: 12, color: _DS.text2),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: _DS.amber),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATS ROW
+// ═══════════════════════════════════════════════════════════════════════════════
+class _StatsRow extends StatelessWidget {
+  final String studentId;
+  final int sessionsCount;
+  final int activeRequests;
+  final int subscriptionsCount;
+  final int remainingSessions;
+  final bool sessionsLoading;
+  final bool requestsLoading;
+  final bool subscriptionsLoading;
+
+  const _StatsRow({
+    required this.studentId,
+    required this.sessionsCount,
+    required this.activeRequests,
+    required this.subscriptionsCount,
+    required this.remainingSessions,
+    required this.sessionsLoading,
+    required this.requestsLoading,
+    required this.subscriptionsLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = [
+      _StatData(
         icon: Icons.local_library_rounded,
-        accent: const Color(0xFF2E8B57),
-        height: 142,
+        label: 'الجلسات',
+        value: sessionsLoading ? '…' : '$sessionsCount',
+        color: _DS.teal500,
+        bg: _DS.teal50,
         onTap: () => context.go('/my-sessions'),
       ),
-      _DashboardActionData(
-        title: 'واجباتي',
-        subtitle: 'آخر التكليفات من محفظك',
-        icon: Icons.task_alt_rounded,
-        accent: const Color(0xFFE67E22),
-        height: 142,
-        onTap: () => context.go('/assignments'),
-      ),
-      _DashboardActionData(
-        title: 'طلباتي',
-        subtitle: 'راجع حالة الطلبات والمدفوعات',
-        icon: Icons.hourglass_top_rounded,
-        accent: const Color(0xFF7A5AF8),
-        height: 142,
-        onTap: () => context.go('/requests'),
-      ),
-      _DashboardActionData(
-        title: 'اشتراكاتي',
-        subtitle: 'إدارة الباقات والجلسات المتبقية',
-        icon: Icons.wallet_rounded,
-        accent: const Color(0xFFB7791F),
-        height: 142,
+      _StatData(
+        icon: Icons.stars_rounded,
+        label: 'المتبقية',
+        value: subscriptionsLoading ? '…' : '$remainingSessions',
+        color: _DS.purple,
+        bg: _DS.purpleBg,
         onTap: () => context.push('/active-subscriptions'),
       ),
+      _StatData(
+        icon: Icons.workspace_premium_rounded,
+        label: 'الباقات',
+        value: subscriptionsLoading ? '…' : '$subscriptionsCount',
+        color: _DS.green,
+        bg: _DS.greenBg,
+        onTap: () => context.push('/active-subscriptions'),
+      ),
+      _StatData(
+        icon: Icons.hourglass_top_rounded,
+        label: 'الطلبات',
+        value: requestsLoading ? '…' : '$activeRequests',
+        color: _DS.amber,
+        bg: _DS.amberBg,
+        isAlert: activeRequests > 0,
+        onTap: () => context.go('/requests'),
+      ),
+    ];
+
+    return Container(
+      color: _DS.bg,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: _DS.teal700,
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(28),
+            bottomRight: Radius.circular(28),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        child: Row(
+          children: List.generate(stats.length, (i) {
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: i < stats.length - 1 ? 8 : 0),
+                child: _StatCard(data: stats[i]),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatData {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final Color bg;
+  final bool isAlert;
+  final VoidCallback onTap;
+
+  const _StatData({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.bg,
+    this.isAlert = false,
+    required this.onTap,
+  });
+}
+
+class _StatCard extends StatelessWidget {
+  final _StatData data;
+  const _StatCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: _DS.r16,
+        boxShadow: _DS.cardShadow,
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: _DS.r16,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            data.onTap();
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: data.isAlert ? data.color.withValues(alpha: 0.45) : _DS.border,
+                width: data.isAlert ? 1.5 : 1,
+              ),
+              borderRadius: _DS.r16,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Colored top stripe
+                Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: data.color.withValues(alpha: data.isAlert ? 1.0 : 0.5),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 32, height: 32,
+                        decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r8),
+                        child: Icon(data.icon, color: data.color, size: 18),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        data.value,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: data.color,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        data.label,
+                        style: const TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w600, color: _DS.text2,
+                        ),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ACTIONS SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+class _ActionsSection extends StatelessWidget {
+  final String studentId;
+  const _ActionsSection({required this.studentId});
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = [
+      _ActionData(icon: Icons.calendar_month_rounded, label: 'احجز\nجلسة',
+          color: _DS.teal500, bg: _DS.teal50,
+          onTap: () => context.go('/nearby')),
+      _ActionData(icon: Icons.event_note_rounded, label: 'جدولي\nالدراسي',
+          color: _DS.darkTeal, bg: _DS.darkTealBg,
+          onTap: () => context.go('/my-schedule')),
+      _ActionData(icon: Icons.local_library_rounded, label: 'جلساتي',
+          color: _DS.green, bg: _DS.greenBg,
+          onTap: () => context.go('/my-sessions')),
+      _ActionData(icon: Icons.task_alt_rounded, label: 'واجباتي',
+          color: _DS.amber, bg: _DS.amberBg,
+          onTap: () => context.go('/assignments')),
+      _ActionData(icon: Icons.hourglass_top_rounded, label: 'طلباتي',
+          color: _DS.purple, bg: _DS.purpleBg,
+          onTap: () => context.go('/requests')),
+      _ActionData(icon: Icons.wallet_rounded, label: 'اشتراكاتي',
+          color: _DS.gold, bg: _DS.goldBg,
+          onTap: () => context.push('/active-subscriptions')),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _DashboardSectionHeader(
+        const _SectionLabel(
           title: 'الإجراءات الرئيسية',
           subtitle: 'كل ما تحتاجه في مكان واحد',
         ),
         const SizedBox(height: 14),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 360) {
-              return Column(
-                children: actions
-                    .map(
-                      (action) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _DashboardActionCard(data: action),
-                      ),
-                    )
-                    .toList(),
-              );
-            }
-            return GridView.builder(
-              itemCount: actions.length,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.0,
-              ),
-              itemBuilder: (context, index) {
-                return _DashboardActionCard(data: actions[index]);
-              },
-            );
-          },
+        GridView.builder(
+          itemCount: actions.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 0.88,
+          ),
+          itemBuilder: (_, i) => _ActionCard(data: actions[i]),
         ),
       ],
     );
   }
 }
 
-class RecentAssignmentsSection extends ConsumerWidget {
-  final String studentId;
+class _ActionData {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color bg;
+  final VoidCallback onTap;
 
-  const RecentAssignmentsSection({super.key, required this.studentId});
+  const _ActionData({
+    required this.icon, required this.label, required this.color,
+    required this.bg, required this.onTap,
+  });
+}
+
+class _ActionCard extends StatelessWidget {
+  final _ActionData data;
+  const _ActionCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          data.onTap();
+        },
+        borderRadius: _DS.r16,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: _DS.r16,
+            border: Border.all(color: _DS.border),
+            boxShadow: _DS.subtleShadow,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r12),
+                  child: Icon(data.icon, color: data.color, size: 26),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  data.label,
+                  style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700,
+                    color: _DS.text1, height: 1.3,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ASSIGNMENTS SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+class _AssignmentsSection extends ConsumerWidget {
+  final String studentId;
+  const _AssignmentsSection({required this.studentId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
-    final primary = Theme.of(context).primaryColor;
+
+    final subtitle = sessionsAsync.when(
+      data: (sessions) {
+        final count = sessions
+            .where((s) =>
+                ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
+                ((s['murajaAssignment'] as String?) ?? '').isNotEmpty)
+            .take(3)
+            .length;
+        if (count == 0) return 'لا توجد واجبات حالياً';
+        return 'أحدث $count ${count == 1 ? "واجب من" : "واجبات من"} محفظك';
+      },
+      loading: () => 'جارٍ التحميل…',
+      error: (_, __) => 'تعذر التحميل',
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _DashboardSectionHeader(
+        _SectionLabel(
           title: 'آخر الواجبات',
-          subtitle: 'مراجعة سريعة لأحدث التكليفات',
+          subtitle: subtitle,
           trailing: TextButton.icon(
             onPressed: () => context.go('/assignments'),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 11),
             label: const Text('عرض الكل'),
             style: TextButton.styleFrom(
-              foregroundColor: primary,
+              foregroundColor: _DS.teal500,
               padding: EdgeInsets.zero,
+              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -414,57 +809,54 @@ class RecentAssignmentsSection extends ConsumerWidget {
         sessionsAsync.when(
           data: (sessions) {
             final assignments = sessions
-                .where(
-                  (session) =>
-                      ((session['hifzAssignment'] as String?) ?? '').isNotEmpty ||
-                      ((session['murajaAssignment'] as String?) ?? '')
-                          .isNotEmpty,
-                )
+                .where((s) =>
+                    ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
+                    ((s['murajaAssignment'] as String?) ?? '').isNotEmpty)
                 .take(3)
                 .toList();
 
             if (assignments.isEmpty) {
-              return _DashboardEmptyCard(
+              return const _EmptyCard(
                 icon: Icons.assignment_late_outlined,
                 title: 'لا توجد واجبات جديدة حالياً',
                 subtitle: 'عند إضافة تكليف جديد سيظهر هنا مباشرة.',
-                accent: primary,
               );
             }
 
             return Column(
-              children: assignments.map((session) {
-                final mohaffezName =
-                    (session['mohaffezName'] as String?) ?? 'محفظ';
-                final hifz = (session['hifzAssignment'] as String?) ?? '';
-                final muraja = (session['murajaAssignment'] as String?) ?? '';
-                final sessionDateRaw = session['sessionDate'];
+              children: List.generate(assignments.length, (i) {
+                final s = assignments[i];
+                final mohaffezName = (s['mohaffezName'] as String?) ?? 'محفظ';
+                final hifz = (s['hifzAssignment'] as String?) ?? '';
+                final muraja = (s['murajaAssignment'] as String?) ?? '';
+                final sessionDateRaw = s['sessionDate'];
                 final sessionDate = sessionDateRaw is Timestamp
                     ? sessionDateRaw.toDate()
                     : sessionDateRaw as DateTime?;
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _DashboardAssignmentCard(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _AssignmentCard(
                     mohaffezName: mohaffezName,
                     hifz: hifz,
                     muraja: muraja,
                     sessionDate: sessionDate,
+                    colorIndex: i,
                     onTap: () => context.go('/assignments'),
                   ),
                 );
-              }).toList(),
+              }),
             );
           },
           loading: () => const Padding(
             padding: EdgeInsets.all(32),
             child: Center(child: CircularProgressIndicator()),
           ),
-          error: (e, _) => _DashboardEmptyCard(
-            icon: Icons.error_outline,
+          error: (_, __) => const _EmptyCard(
+            icon: Icons.error_outline_rounded,
             title: 'تعذر تحميل الواجبات',
-            subtitle: 'حاول التحديث مرة أخرى.',
-            accent: AppThemeConstants.error,
+            subtitle: 'اسحب للأسفل للمحاولة مرة أخرى.',
+            isError: true,
           ),
         ),
       ],
@@ -472,753 +864,136 @@ class RecentAssignmentsSection extends ConsumerWidget {
   }
 }
 
-class _DashboardHeader extends StatelessWidget {
-  final String name;
-  final String? photoUrl;
-  final String roleLabel;
-  final String subtitle;
-  final String dateText;
-  final String secondaryValue;
-  final String tertiaryValue;
-  final String quaternaryValue;
-
-  const _DashboardHeader({
-    required this.name,
-    required this.photoUrl,
-    required this.roleLabel,
-    required this.subtitle,
-    required this.dateText,
-    required this.secondaryValue,
-    required this.tertiaryValue,
-    required this.quaternaryValue,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            primary,
-            AppThemeConstants.midTeal,
-            AppThemeConstants.deepTeal,
-          ],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 360),
-                  child: _SummaryBoard(
-                    topRightTitle: roleLabel,
-                    topRightIcon: Icons.auto_stories_rounded,
-                    topLeftLabel: 'اسم الطالب',
-                    topLeftValue: name,
-                    topLeftPhotoUrl: photoUrl,
-                    bottomRightLabel: 'التاريخ',
-                    bottomRightValue: dateText,
-                    bottomRightIcon: Icons.event_note_rounded,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.92),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryBoard extends StatelessWidget {
-  final String topRightTitle;
-  final IconData topRightIcon;
-  final String topLeftLabel;
-  final String topLeftValue;
-  final String? topLeftPhotoUrl;
-  final String bottomRightLabel;
-  final String bottomRightValue;
-  final IconData bottomRightIcon;
-
-  const _SummaryBoard({
-    required this.topRightTitle,
-    required this.topRightIcon,
-    required this.topLeftLabel,
-    required this.topLeftValue,
-    required this.topLeftPhotoUrl,
-    required this.bottomRightLabel,
-    required this.bottomRightValue,
-    required this.bottomRightIcon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 188,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.74),
-            Colors.white.withValues(alpha: 0.56),
-          ],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 5,
-            child: Column(
-              children: [
-                Expanded(
-                  child: _BoardCell(
-                    title: topRightTitle,
-                    value: '',
-                    icon: topRightIcon,
-                    alignEnd: true,
-                  ),
-                ),
-                _BoardDivider.horizontal(),
-                Expanded(
-                  child: _BoardCell(
-                    title: bottomRightLabel,
-                    value: bottomRightValue,
-                    icon: bottomRightIcon,
-                    alignEnd: true,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _BoardDivider.vertical(),
-          Expanded(
-            flex: 9,
-            child: _BoardProfileCell(
-              title: topLeftLabel,
-              value: topLeftValue,
-              photoUrl: topLeftPhotoUrl,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BoardDivider extends StatelessWidget {
-  final Axis axis;
-
-  const _BoardDivider.vertical() : axis = Axis.vertical;
-
-  const _BoardDivider.horizontal() : axis = Axis.horizontal;
-
-  @override
-  Widget build(BuildContext context) {
-    if (axis == Axis.vertical) {
-      return Container(
-        width: 3,
-        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0C6F6A).withValues(alpha: 0.42),
-          borderRadius: BorderRadius.circular(999),
-        ),
-      );
-    }
-
-    return Container(
-      height: 3,
-      margin: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0C6F6A).withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(999),
-      ),
-    );
-  }
-}
-
-class _BoardCell extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData? icon;
-  final bool alignEnd;
-
-  const _BoardCell({
-    required this.title,
-    required this.value,
-    required this.icon,
-    this.alignEnd = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textAlign = alignEnd ? TextAlign.right : TextAlign.left;
-    final alignment =
-        alignEnd ? Alignment.centerRight : Alignment.centerLeft;
-
-    return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Align(
-          alignment: alignment,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (alignEnd && icon != null) ...[
-                Icon(icon, color: const Color(0xFF0C6F6A), size: 28),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0C6F6A),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: textAlign,
-                ),
-              ),
-              if (!alignEnd && icon != null) ...[
-                const SizedBox(width: 8),
-                Icon(icon, color: const Color(0xFF0C6F6A), size: 28),
-              ],
-            ],
-          ),
-        ),
-        if (value.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: alignment,
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0C6F6A),
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: textAlign,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _BoardProfileCell extends StatelessWidget {
-  final String title;
-  final String value;
-  final String? photoUrl;
-
-  const _BoardProfileCell({
-    required this.title,
-    required this.value,
-    required this.photoUrl,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Title at top
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0C6F6A),
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        // Avatar at top center
-        _ProfileAvatar(
-          name: value,
-          photoUrl: photoUrl,
-          size: 68,
-          isCircular: true,
-          foregroundColor: const Color(0xFF0C6F6A),
-          backgroundColor:
-              const Color(0xFF0C6F6A).withValues(alpha: 0.12),
-        ),
-        const SizedBox(height: 12),
-        // Name at bottom
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0C6F6A),
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-}
-
-class _BoardMetricCell extends StatelessWidget {
-  final String primaryLabel;
-  final String primaryValue;
-  final String secondaryLabel;
-  final String secondaryValue;
-
-  const _BoardMetricCell({
-    required this.primaryLabel,
-    required this.primaryValue,
-    required this.secondaryLabel,
-    required this.secondaryValue,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          '$primaryLabel: $primaryValue',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0C6F6A),
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.right,
-        ),
-        const SizedBox(height: 10),
-        Text(
-          '$secondaryLabel: $secondaryValue',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0C6F6A),
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.right,
-        ),
-      ],
-    );
-  }
-}
-
-class _DashboardSectionHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget? trailing;
-
-  const _DashboardSectionHeader({
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppThemeConstants.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppThemeConstants.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (trailing != null) ...[
-          const SizedBox(width: 12),
-          trailing!,
-        ],
-      ],
-    );
-  }
-}
-
-class _SectionChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final IconData icon;
-
-  const _SectionChip({
-    required this.label,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DashboardStatData {
-  final String title;
-  final String subtitle;
-  final String value;
-  final IconData icon;
-  final Color accent;
-  final VoidCallback onTap;
-
-  const _DashboardStatData({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.icon,
-    required this.accent,
-    required this.onTap,
-  });
-}
-
-class _DashboardStatCard extends StatelessWidget {
-  final _DashboardStatData data;
-
-  const _DashboardStatCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: data.onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: data.accent.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: data.accent.withValues(alpha: 0.12)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      height: 42,
-                      width: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(data.icon, color: data.accent),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: data.accent.withValues(alpha: 0.7),
-                    ),
-                  ],
-                ),
-                Text(
-                  data.value,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: data.accent,
-                    height: 1.1,
-                  ),
-                ),
-                Text(
-                  data.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppThemeConstants.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardActionData {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accent;
-  final double height;
-  final VoidCallback onTap;
-
-  const _DashboardActionData({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accent,
-    required this.height,
-    required this.onTap,
-  });
-}
-
-class _DashboardActionCard extends StatelessWidget {
-  final _DashboardActionData data;
-
-  const _DashboardActionCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: data.height,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: data.onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                colors: [
-                  data.accent.withValues(alpha: 0.18),
-                  data.accent.withValues(alpha: 0.08),
-                ],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-              ),
-              border: Border.all(color: data.accent.withValues(alpha: 0.14)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    height: 56,
-                    width: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.82),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(data.icon, color: data.accent, size: 32),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    data.title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppThemeConstants.textPrimary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardAssignmentCard extends StatelessWidget {
+class _AssignmentCard extends StatelessWidget {
   final String mohaffezName;
   final String hifz;
   final String muraja;
   final DateTime? sessionDate;
+  final int colorIndex;
   final VoidCallback onTap;
 
-  const _DashboardAssignmentCard({
+  const _AssignmentCard({
     required this.mohaffezName,
     required this.hifz,
     required this.muraja,
     required this.sessionDate,
+    required this.colorIndex,
     required this.onTap,
   });
 
+  static String _relativeDate(DateTime? date) {
+    if (date == null) return '';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = today.difference(target).inDays;
+    if (diff == 0) return 'اليوم';
+    if (diff == 1) return 'أمس';
+    if (diff > 1 && diff <= 6) return 'قبل $diff أيام';
+    return DateFormat('dd/MM', 'ar').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).primaryColor;
+    const colors = [_DS.teal500, _DS.green, _DS.purple];
+    const bgs    = [_DS.teal50,  _DS.greenBg, _DS.purpleBg];
+    final color  = colors[colorIndex % colors.length];
+    final bg     = bgs[colorIndex % bgs.length];
+
+    final relDate = _relativeDate(sessionDate);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: _DS.r16,
         child: Ink(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: primary.withValues(alpha: 0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            borderRadius: _DS.r16,
+            border: Border.all(color: _DS.border),
+            boxShadow: _DS.subtleShadow,
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: IntrinsicHeight(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      height: 44,
-                      width: 44,
-                      decoration: BoxDecoration(
-                        color: primary.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(Icons.person_rounded, color: primary),
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            mohaffezName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppThemeConstants.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            sessionDate == null
-                                ? 'تاريخ غير محدد'
-                                : DateFormat('d MMMM yyyy', 'ar')
-                                    .format(sessionDate!),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AppThemeConstants.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: primary.withValues(alpha: 0.7),
-                    ),
-                  ],
+                  ),
                 ),
-                if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Divider(height: 1),
-                  const SizedBox(height: 14),
-                  if (hifz.isNotEmpty)
-                    AssignmentRow(
-                      label: 'حفظ',
-                      text: hifz,
-                      color: primary,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header row: mohaffez name + relative date
+                        Row(
+                          children: [
+                            Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(color: bg, borderRadius: _DS.r12),
+                              child: Icon(Icons.person_rounded, color: color, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                mohaffezName,
+                                style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w700, color: _DS.text1,
+                                ),
+                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (relDate.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _DS.teal50,
+                                  borderRadius: _DS.r8,
+                                  border: Border.all(color: _DS.teal100),
+                                ),
+                                child: Text(
+                                  relDate,
+                                  style: const TextStyle(
+                                    fontSize: 10, fontWeight: FontWeight.w700, color: _DS.teal600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        // Assignment rows
+                        if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          if (hifz.isNotEmpty)
+                            _AssignmentRow(label: 'حفظ', text: hifz, color: _DS.teal500),
+                          if (muraja.isNotEmpty)
+                            _AssignmentRow(label: 'مراجعة', text: muraja, color: _DS.green),
+                        ],
+                      ],
                     ),
-                  if (muraja.isNotEmpty)
-                    AssignmentRow(
-                      label: 'مراجعة',
-                      text: muraja,
-                      color: const Color(0xFF2E8B57),
-                    ),
-                ],
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 12),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 13,
+                    color: _DS.text3,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1228,125 +1003,12 @@ class _DashboardAssignmentCard extends StatelessWidget {
   }
 }
 
-class _DashboardEmptyCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color accent;
-
-  const _DashboardEmptyCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accent.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            height: 56,
-            width: 56,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(icon, color: accent, size: 28),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppThemeConstants.textPrimary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppThemeConstants.textSecondary,
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  final String name;
-  final String? photoUrl;
-  final double size;
-  final double borderRadius;
-  final bool isCircular;
-  final Color foregroundColor;
-  final Color backgroundColor;
-
-  const _ProfileAvatar({
-    required this.name,
-    required this.photoUrl,
-    this.size = 56,
-    this.borderRadius = 18,
-    this.isCircular = false,
-    this.foregroundColor = Colors.white,
-    this.backgroundColor = const Color(0x2EFFFFFF),
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final trimmedName = name.trim();
-    final initials = trimmedName.isEmpty ? 'ط' : trimmedName.substring(0, 1);
-
-    return Container(
-      height: size,
-      width: size,
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius:
-            BorderRadius.circular(isCircular ? size / 2 : borderRadius),
-      ),
-      child: ClipRRect(
-        borderRadius:
-            BorderRadius.circular(isCircular ? size / 2 : borderRadius),
-        child: photoUrl != null && photoUrl!.isNotEmpty
-            ? Image.network(photoUrl!, fit: BoxFit.cover)
-            : Center(
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    fontSize: size * 0.4,
-                    fontWeight: FontWeight.bold,
-                    color: foregroundColor,
-                  ),
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-class AssignmentRow extends StatelessWidget {
+class _AssignmentRow extends StatelessWidget {
   final String label;
   final String text;
   final Color color;
 
-  const AssignmentRow({
-    super.key,
+  const _AssignmentRow({
     required this.label,
     required this.text,
     required this.color,
@@ -1355,40 +1017,165 @@ class AssignmentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
+              color: color.withValues(alpha: 0.1),
+              borderRadius: _DS.r8,
               border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppThemeConstants.textPrimary,
-                height: 1.5,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: _DS.text1, height: 1.4),
+              maxLines: 2, overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHARED WIDGETS
+// ═══════════════════════════════════════════════════════════════════════════════
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+
+  const _SectionLabel({required this.title, required this.subtitle, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Decorative teal accent dot aligned to title
+              Padding(
+                padding: const EdgeInsets.only(top: 5, left: 8),
+                child: Container(
+                  width: 6, height: 6,
+                  decoration: const BoxDecoration(
+                    color: _DS.teal500,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800,
+                        color: _DS.text1, letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(fontSize: 12, color: _DS.text2)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+class _EmptyCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isError;
+
+  const _EmptyCard({
+    required this.icon, required this.title, required this.subtitle, this.isError = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isError ? AppThemeConstants.error : _DS.teal500;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: _DS.r16,
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white, borderRadius: _DS.r16,
+              border: Border.all(color: color.withValues(alpha: 0.2)),
+            ),
+            child: Icon(icon, color: color, size: 26),
+          ),
+          const SizedBox(height: 12),
+          Text(title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _DS.text1),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 4),
+          Text(subtitle,
+              style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.5),
+              textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+  final double size;
+
+  const _Avatar({required this.name, required this.photoUrl, this.size = 50});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name.trim().isEmpty ? 'ط' : name.trim().substring(0, 1);
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(size / 2),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(size / 2),
+        child: photoUrl != null && photoUrl!.isNotEmpty
+            ? Image.network(photoUrl!, fit: BoxFit.cover)
+            : Center(
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    fontSize: size * 0.38, fontWeight: FontWeight.w800, color: Colors.white,
+                  ),
+                ),
+              ),
       ),
     );
   }
