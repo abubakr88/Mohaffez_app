@@ -121,7 +121,6 @@ class MohaffezHomeContent extends ConsumerWidget {
     final user             = ref.watch(currentUserProvider).value;
     final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
     final pendingCount     = ref.watch(pendingRequestsCountProvider(mohaffezId));
-    final acceptedCount    = ref.watch(acceptedSessionsCountProvider(mohaffezId));
     final now              = DateTime.now();
 
     final todayCount = upcomingSessions.when(
@@ -149,7 +148,6 @@ class MohaffezHomeContent extends ConsumerWidget {
               ref.invalidate(currentUserProvider);
               ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
               ref.invalidate(upcomingSessionsProvider(mohaffezId));
-              ref.invalidate(acceptedSessionsCountProvider(mohaffezId));
               await ref
                   .read(upcomingSessionsProvider(mohaffezId).future)
                   .catchError((_) => <Map<String, dynamic>>[]);
@@ -159,7 +157,7 @@ class MohaffezHomeContent extends ConsumerWidget {
               slivers: [
                 // ─── Header SliverAppBar ──────────────────────────────────
                 SliverAppBar(
-                  expandedHeight: 170,
+                  expandedHeight: 188,
                   pinned: true,
                   elevation: 0,
                   scrolledUnderElevation: 0,
@@ -185,7 +183,6 @@ class MohaffezHomeContent extends ConsumerWidget {
                     todayCount:       todayCount,
                     upcomingSessions: upcomingSessions,
                     pendingCount:     pendingCount,
-                    acceptedCount:    acceptedCount,
                   ),
                 ),
 
@@ -278,13 +275,14 @@ class _HomeHeader extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _Avatar(name: name, photoUrl: photoUrl, size: 50),
+                      _Avatar(name: name, photoUrl: photoUrl, size: 92),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -293,12 +291,29 @@ class _HomeHeader extends StatelessWidget {
                             Text(
                               name,
                               style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w800,
+                                fontSize: 20, fontWeight: FontWeight.w800,
                                 color: Colors.white, letterSpacing: -0.3,
                               ),
                               maxLines: 1, overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: _DS.r8,
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                              ),
+                              child: const Text(
+                                'معلم',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
                                 Icon(Icons.calendar_today_rounded, size: 11,
@@ -307,7 +322,7 @@ class _HomeHeader extends StatelessWidget {
                                 Text(
                                   dateText,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     color: Colors.white.withValues(alpha: 0.75),
                                   ),
                                 ),
@@ -319,25 +334,25 @@ class _HomeHeader extends StatelessWidget {
                       if (pendingCount > 0) _PendingBadge(count: pendingCount),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  // Full-width greeting pill
+                  const SizedBox(height: 12),
+                  // Compact greeting chip
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.13),
                       borderRadius: _DS.r12,
                       border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
-                        const SizedBox(width: 8),
-                        Expanded(
+                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 12),
+                        const SizedBox(width: 6),
+                        Flexible(
                           child: Text(
                             greeting,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: Colors.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w500,
                             ),
@@ -471,19 +486,26 @@ class _StatsRow extends StatelessWidget {
   final int todayCount;
   final AsyncValue<List<Map<String, dynamic>>> upcomingSessions;
   final int pendingCount;
-  final AsyncValue<int> acceptedCount;
 
   const _StatsRow({
     required this.mohaffezId,
     required this.todayCount,
     required this.upcomingSessions,
     required this.pendingCount,
-    required this.acceptedCount,
   });
 
   @override
   Widget build(BuildContext context) {
     final stats = [
+      _StatData(
+        icon: Icons.pending_actions_rounded,
+        label: 'معلقة',
+        value: '$pendingCount',
+        color: _DS.amber,
+        bg: _DS.amberBg,
+        isAlert: pendingCount > 0,
+        onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
+      ),
       _StatData(
         icon: Icons.today_rounded,
         label: 'اليوم',
@@ -502,25 +524,6 @@ class _StatsRow extends StatelessWidget {
         bg: _DS.greenBg,
         onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
       ),
-      _StatData(
-        icon: Icons.verified_rounded,
-        label: 'مؤكدة',
-        value: acceptedCount.when(
-          data: (c) => '$c', loading: () => '…', error: (_, __) => '0',
-        ),
-        color: _DS.purple,
-        bg: _DS.purpleBg,
-        onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
-      ),
-      _StatData(
-        icon: Icons.pending_actions_rounded,
-        label: 'معلقة',
-        value: '$pendingCount',
-        color: _DS.amber,
-        bg: _DS.amberBg,
-        isAlert: pendingCount > 0,
-        onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
-      ),
     ];
 
     return Container(
@@ -533,7 +536,7 @@ class _StatsRow extends StatelessWidget {
             bottomRight: Radius.circular(28),
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
         child: Row(
           children: List.generate(stats.length, (i) {
             return Expanded(
@@ -608,7 +611,7 @@ class _StatCard extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -631,7 +634,7 @@ class _StatCard extends StatelessWidget {
                       Text(
                         data.label,
                         style: const TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w600, color: _DS.text2,
+                          fontSize: 13, fontWeight: FontWeight.w600, color: _DS.text2,
                         ),
                         maxLines: 1, overflow: TextOverflow.ellipsis,
                       ),
@@ -657,16 +660,16 @@ class _ActionsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      _ActionData(icon: Icons.pending_actions_rounded, label: 'الطلبات\nالمعلقة',
+      _ActionData(icon: Icons.pending_actions_rounded, label: 'الطلبات',
           color: _DS.amber, bg: _DS.amberBg,
           onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId')),
       _ActionData(icon: Icons.calendar_month_rounded, label: 'الجدول',
           color: _DS.teal500, bg: _DS.teal50,
           onTap: () => context.go('/teacher-schedule')),
-      _ActionData(icon: Icons.event_note_rounded, label: 'الجلسات\nالقادمة',
+      _ActionData(icon: Icons.event_note_rounded, label: 'القادمة',
           color: _DS.green, bg: _DS.greenBg,
           onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId')),
-      _ActionData(icon: Icons.sell_rounded, label: 'إدارة\nالأسعار',
+      _ActionData(icon: Icons.sell_rounded, label: 'الأسعار',
           color: _DS.purple, bg: _DS.purpleBg,
           onTap: () => context.push('/pricing-management')),
       _ActionData(icon: Icons.receipt_long_rounded, label: 'المستحقات',
@@ -678,7 +681,7 @@ class _ActionsSection extends StatelessWidget {
       _ActionData(icon: Icons.workspace_premium_rounded, label: 'الشهادات',
           color: _DS.blue, bg: _DS.blueBg,
           onTap: () => context.push('/credentials')),
-      _ActionData(icon: Icons.calendar_view_week_rounded, label: 'الأوقات\nالمتاحة',
+      _ActionData(icon: Icons.calendar_view_week_rounded, label: 'التوفر',
           color: _DS.red, bg: _DS.redBg,
           onTap: () => context.push('/availability')),
     ];
@@ -696,10 +699,10 @@ class _ActionsSection extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
+            crossAxisCount: 3,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
-            childAspectRatio: 0.78,
+            childAspectRatio: 0.88,
           ),
           itemBuilder: (_, i) => _ActionCard(data: actions[i]),
         ),
@@ -756,11 +759,11 @@ class _ActionCard extends StatelessWidget {
                 Text(
                   data.label,
                   style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700,
-                    color: _DS.text1, height: 1.3,
+                    fontSize: 14, fontWeight: FontWeight.w700,
+                    color: _DS.text1, height: 1.4,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -1015,9 +1018,9 @@ class _InfoPill extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 11, color: _DS.text3),
+        Icon(icon, size: 12, color: _DS.text3),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 11, color: _DS.text2)),
+        Text(text, style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.4)),
       ],
     );
   }
@@ -1065,7 +1068,7 @@ class _SectionLabel extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 12, color: _DS.text2)),
+                    Text(subtitle, style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.4)),
                   ],
                 ),
               ),

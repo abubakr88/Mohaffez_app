@@ -32,6 +32,9 @@ class RoleGuard implements RouteGuard {
     '/notifications',
     '/profile',
     '/session', // session details
+    '/teacher-pending',
+    '/teacher-rejected',
+    '/teacher-certificates',
   ];
 
   // Mohaffez-only routes.
@@ -88,7 +91,7 @@ class RoleGuard implements RouteGuard {
       final user = userState.value;
       if (user == null) return null;
 
-      final destination = _homeForRole(user.role);
+      final destination = _homeForUser(user.role, user.status);
       if (destination == null) return loginPath; // defensive: unknown role
       return destination;
     }
@@ -134,11 +137,15 @@ class RoleGuard implements RouteGuard {
     return prefixes.any((p) => path == p || path.startsWith('$p/'));
   }
 
-  static String? _homeForRole(String role) {
+  static String? _homeForUser(String role, String status) {
     final normalized = role.trim().toLowerCase();
     if (normalized == 'admin') return adminHomePath;
-    if (normalized == 'mohaffez') return mohaffezHomePath;
     if (normalized == 'student') return studentHomePath;
+    if (normalized == 'mohaffez') {
+      if (status == 'pending_approval') return '/teacher-pending';
+      if (status == 'rejected') return '/teacher-rejected';
+      return mohaffezHomePath;
+    }
     return null;
   }
 }

@@ -25,6 +25,9 @@ class SetupGuard implements RouteGuard {
     '/suspended',
     '/exam-result',
     setupPath,
+    '/teacher-certificates',
+    '/teacher-pending',
+    '/teacher-rejected',
   };
 
   @override
@@ -56,10 +59,16 @@ class SetupGuard implements RouteGuard {
 
     // If user hasn't completed setup and isn't on an exempt route → redirect
     if (!user.setupCompleted && !exemptRoutes.contains(currentPath)) {
+      // Mohaffez who already passed the exam should go to the certificates
+      // step, not back to /setup (which would show the exam/profile form again).
+      if (user.role == 'mohaffez' && user.examPassed) {
+        return '/teacher-certificates';
+      }
       return setupPath;
     }
 
     // If user IS on /setup but already completed → redirect to role home
+    // (RoleGuard will handle pending_approval / rejected routing from there.)
     if (user.setupCompleted && currentPath == setupPath) {
       if (user.role == 'mohaffez') return '/mohaffez-home';
       return '/home';

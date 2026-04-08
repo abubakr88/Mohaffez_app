@@ -53,6 +53,7 @@ service cloud.firestore {
             'fcmTokenUpdatedAt', 'photoUrl', 'bio',
             'phoneNumber', 'addressText', 'addressLat',
             'addressLng', 'specialization', 'name',
+            'youtubeVideoUrl',
             'walletNumbers',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
@@ -61,6 +62,22 @@ service cloud.firestore {
             'examQuestionCount', 'examCorrectCount',
             'examPassed', 'examRetryCount', 'examNextRetryAt'
           ]);
+
+      // Mohaffez submitting for admin approval (registration step 3)
+      // Separated so that 'status' is tightly constrained to 'pending_approval' only —
+      // prevents self-escalation (e.g. user can never set status to 'active' or 'admin').
+      allow update: if isOwner(userId) &&
+        resource.data.role == 'mohaffez' &&
+        request.resource.data.status == 'pending_approval' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'bio', 'specialization', 'youtubeVideoUrl',
+            'status', 'setupCompleted',
+            'approvalSubmittedAt', 'updatedAt'
+          ]);
+
+      // Admin can update any user doc (approve/reject, suspend, etc.)
+      allow update: if isAdmin();
 
       allow delete: if isOwner(userId);
 

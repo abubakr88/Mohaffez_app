@@ -368,9 +368,9 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
 
         const weekNumber  = getWeekNumber(sessionDateObj);
         const year        = sessionDateObj.getFullYear();
-        const commissionId = `${mohaffezId}${year}W${weekNumber}`;
-        const commissionRef  = db.collection('weeklyCommissions').doc(commissionId);
-        const commissionSnap = await tx.get(commissionRef);
+        const summaryId = `${mohaffezId}_${year}_w${weekNumber}`;
+        const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
+        const summarySnap = await tx.get(summaryRef);
 
         // ── WRITES ──
         const sessionRef = db.collection('hafizSessions').doc();
@@ -427,15 +427,15 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
         const weekEnd   = getWeekEnd(sessionDateObj);
         const dueDate   = getNextMonday(sessionDateObj);
 
-        if (commissionSnap.exists) {
-          tx.update(commissionRef, {
+        if (summarySnap.exists) {
+          tx.update(summaryRef, {
             totalSessions:   FieldValue.increment(1),
             totalRevenue:    FieldValue.increment(dp.amount as number),
             commissionAmount: FieldValue.increment(commissionAmount),
             updatedAt:       FieldValue.serverTimestamp(),
           });
         } else {
-          tx.set(commissionRef, {
+          tx.set(summaryRef, {
             mohaffezId,
             mohaffezName:    dp.mohaffezName,
             weekNumber,

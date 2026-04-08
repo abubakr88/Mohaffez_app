@@ -5,6 +5,62 @@ import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 
+function deriveWeeklySummaryId(data: FirebaseFirestore.DocumentData): string {
+  const year =
+    typeof data.year === 'number'
+      ? data.year
+      : data.weekStart instanceof admin.firestore.Timestamp
+        ? data.weekStart.toDate().getFullYear()
+        : new Date().getFullYear();
+  return `${data.mohaffezId}_${year}_w${data.weekNumber}`;
+}
+
+async function resolveWeeklySummaryRef(inputId: string): Promise<FirebaseFirestore.DocumentReference> {
+  const summaryRef = db.collection('weeklyCommissionSummaries').doc(inputId);
+  const summarySnap = await summaryRef.get();
+  if (summarySnap.exists) return summaryRef;
+
+  const legacyRef = db.collection('weeklyCommissions').doc(inputId);
+  const legacySnap = await legacyRef.get();
+  if (!legacySnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'لم يتم العثور على الملخص');
+  }
+
+  const legacy = legacySnap.data()!;
+  const migratedSummaryRef = db
+    .collection('weeklyCommissionSummaries')
+    .doc(deriveWeeklySummaryId(legacy));
+
+  await db.runTransaction(async (tx) => {
+    const migratedSnap = await tx.get(migratedSummaryRef);
+    if (!migratedSnap.exists) {
+      tx.set(
+        migratedSummaryRef,
+        {
+          mohaffezId: legacy.mohaffezId,
+          mohaffezName: legacy.mohaffezName ?? '',
+          weekNumber: legacy.weekNumber ?? 0,
+          year: legacy.year ?? new Date().getFullYear(),
+          totalSessions: legacy.totalSessions ?? 0,
+          totalRevenue: legacy.totalRevenue ?? 0,
+          commissionAmount: legacy.commissionAmount ?? 0,
+          commissionRate: legacy.commissionRate ?? 0.05,
+          status: legacy.status ?? 'pending',
+          weekStart: legacy.weekStart ?? null,
+          weekEnd: legacy.weekEnd ?? null,
+          dueDate: legacy.dueDate ?? null,
+          createdAt: legacy.createdAt ?? FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          migratedFromLegacyId: legacySnap.id,
+        },
+        { merge: true }
+      );
+    }
+  });
+
+  return migratedSummaryRef;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL HELPER — also imported by adminActions.ts
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,9 +171,8 @@ export const markCommissionPaid = functions.https.onCall(async (data, context) =
     throw new functions.https.HttpsError('invalid-argument', 'معرّف الملخص مطلوب');
   }
 
-  const summaryRef = db
-    .collection('weeklyCommissionSummaries')
-    .doc(weeklyCommissionSummaryId);
+  const summaryRef = await resolveWeeklySummaryRef(weeklyCommissionSummaryId);
+  const resolvedSummaryId = summaryRef.id;
 
   // FIX: Use transaction with idempotency guard to prevent double-pay
   let summaryData: FirebaseFirestore.DocumentData | undefined;
@@ -177,7 +232,7 @@ export const markCommissionPaid = functions.https.onCall(async (data, context) =
     body: `تم تحويل عمولة الأسبوع ${s.weekNumber}: ${s.commissionAmount.toFixed(2)} ج.م`,
     type: 'commission_paid',
     isRead: false,
-    data: { weeklyCommissionSummaryId },
+    data: { weeklyCommissionSummaryId: resolvedSummaryId },
   });
 
   return { success: true };
@@ -210,9 +265,8 @@ export const mohaffezReportCommissionPayment = functions.https.onCall(
       throw new functions.https.HttpsError('invalid-argument', 'معرّف الملخص مطلوب');
     }
 
-    const summaryRef = db
-      .collection('weeklyCommissionSummaries')
-      .doc(weeklyCommissionSummaryId);
+    const summaryRef = await resolveWeeklySummaryRef(weeklyCommissionSummaryId);
+    const resolvedSummaryId = summaryRef.id;
 
     // BUG-FIX-C: wrap status check + update atomically to prevent TOCTOU double-notify
     let summaryForNotification: FirebaseFirestore.DocumentData | undefined;
@@ -275,7 +329,7 @@ export const mohaffezReportCommissionPayment = functions.https.onCall(
           isRead: false,
           highPriority: true,
           data: {
-            weeklyCommissionSummaryId,
+            weeklyCommissionSummaryId: resolvedSummaryId,
             mohaffezId,
             commissionAmount: summaryForNotification!.commissionAmount?.toString(),
           },
@@ -287,7 +341,7 @@ export const mohaffezReportCommissionPayment = functions.https.onCall(
     );
 
     functions.logger.info('Commission payment reported by mohaffez', {
-      weeklyCommissionSummaryId,
+      weeklyCommissionSummaryId: resolvedSummaryId,
       mohaffezId,
       weekNumber: summaryForNotification!.weekNumber,
       amount: summaryForNotification!.commissionAmount,

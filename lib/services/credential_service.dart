@@ -75,16 +75,17 @@ class CredentialService {
 
     await credentialRef.set({
       'id': credentialRef.id,
+      'userId': user.uid, // required by Firestore security rule
       'type': type,
       'title': sanitizedTitle,
       'organization': sanitizedOrg,
       'issueDate': Timestamp.fromDate(issueDate),
       'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
-      'imageUrls': imageUrls, // ✅ Can be empty array
-      'status': 'approved', // ✅ CHANGED: Direct approval (was 'pending')
+      'imageUrls': imageUrls,
+      'status': 'pending', // admin must review before activation
       'uploadedAt': FieldValue.serverTimestamp(),
-      'reviewedAt': FieldValue.serverTimestamp(), // ✅ Auto-reviewed timestamp
-      'reviewedBy': 'system', // ✅ System auto-approval
+      'reviewedAt': null,
+      'reviewedBy': null,
       'rejectionReason': null,
     });
   }

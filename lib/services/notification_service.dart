@@ -409,6 +409,84 @@ class NotificationService {
     }
   }
 
+  /// Send Teacher Account Approved Notification
+  static Future<void> sendTeacherApprovedNotification({
+    required String teacherId,
+    required String teacherName,
+  }) async {
+    try {
+      const title = 'تهانينا! تم قبول طلبك';
+      const body = 'تم مراجعة ملفك والموافقة على انضمامك كمحفظ. يمكنك الآن البدء في استقبال الطلبات.';
+
+      await _firestore.collection('notifications').add({
+        'userId': teacherId,
+        'recipientId': teacherId,
+        'title': title,
+        'body': body,
+        'type': 'teacher_approved',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': {'teacherName': teacherName},
+      });
+
+      await _sendFCMNotification(
+        userId: teacherId,
+        title: title,
+        body: body,
+        data: {
+          'type': 'teacher_approved',
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      if (kDebugMode) debugPrint('✅ Teacher approved notification sent to $teacherId');
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ Error sending teacher approved notification: $e');
+    }
+  }
+
+  /// Send Teacher Account Rejected Notification
+  static Future<void> sendTeacherRejectedNotification({
+    required String teacherId,
+    required String teacherName,
+    required String rejectionNote,
+  }) async {
+    try {
+      const title = 'بشأن طلب انضمامك';
+      final body = rejectionNote.isNotEmpty
+          ? 'لم يتم قبول طلبك حالياً. السبب: $rejectionNote'
+          : 'لم يتم قبول طلبك حالياً. يمكنك التواصل مع الدعم للاستفسار.';
+
+      await _firestore.collection('notifications').add({
+        'userId': teacherId,
+        'recipientId': teacherId,
+        'title': title,
+        'body': body,
+        'type': 'teacher_rejected',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': {
+          'teacherName': teacherName,
+          'rejectionNote': rejectionNote,
+        },
+      });
+
+      await _sendFCMNotification(
+        userId: teacherId,
+        title: title,
+        body: body,
+        data: {
+          'type': 'teacher_rejected',
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      if (kDebugMode) debugPrint('✅ Teacher rejected notification sent to $teacherId');
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ Error sending teacher rejected notification: $e');
+    }
+  }
+
   /// Private method to send FCM notification
   static Future<void> _sendFCMNotification({
     required String userId,

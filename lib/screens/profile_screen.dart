@@ -152,15 +152,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       final repository = ref.read(userRepositoryProvider);
       await repository.uploadProfilePhoto(userId, File(cropped.path));
-      ref.invalidate(currentUserProvider);
 
       if (!mounted) return;
-      Navigator.of(context).pop();
-      _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pop();
+          ref.invalidate(currentUserProvider);
+          _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
+        }
+      });
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context).pop();
-      _showSnackBar('${ArabicLabels.error}: $e');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pop();
+          _showSnackBar('${ArabicLabels.error}: $e');
+        }
+      });
     }
   }
 

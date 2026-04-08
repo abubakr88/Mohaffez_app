@@ -417,7 +417,7 @@ class ArabicLabels {
   static const String slotLocksManagement = 'إدارة قفل الفترات';
   static const String paymentEvents = 'أحداث المدفوعات';
   static const String commissionsBoard = 'لوحة العمولات';
-  static const String teacherCommissions = 'عمولات المحافظين';
+  static const String teacherCommissions = 'عمولات المحفظين';
   static const String adminWalletNumbers = 'أرقام محافظ المنصة';
 
   // ============================================

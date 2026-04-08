@@ -66,6 +66,10 @@ import '../screens/booking_method_screen.dart'; // Booking method screen
 import '../screens/confirm_bundle_session_screen.dart'; // Path A: Confirm bundle session
 import '../screens/direct_booking_request_screen.dart'; // Path C — Request First
 import '../screens/direct_payment_confirmations_screen.dart'; // Direct payment confirmations
+import '../screens/teacher_certificates_screen.dart';
+import '../screens/teacher_pending_screen.dart';
+import '../screens/teacher_rejected_screen.dart';
+import '../screens/admin_teacher_requests_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {
@@ -174,6 +178,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             totalQuestions: extra?['totalQuestions'] ?? 0,
           );
         },
+      ),
+      // ── Teacher registration flow (outside HomeShell — no bottom nav) ──
+      GoRoute(
+        path: '/teacher-certificates',
+        name: 'teacher-certificates',
+        builder: (context, state) => const TeacherCertificatesScreen(),
+      ),
+      GoRoute(
+        path: '/teacher-pending',
+        name: 'teacher-pending',
+        builder: (context, state) => const TeacherPendingScreen(),
+      ),
+      GoRoute(
+        path: '/teacher-rejected',
+        name: 'teacher-rejected',
+        builder: (context, state) => const TeacherRejectedScreen(),
       ),
 
       // ============================================
@@ -573,6 +593,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/admin/audit-log',
             name: 'admin-audit-log',
             builder: (context, state) => const AdminAuditLogScreen(),
+          ),
+          GoRoute(
+            path: '/admin/teacher-requests',
+            name: 'admin-teacher-requests',
+            builder: (context, state) =>
+                const AdminTeacherRequestsScreen(),
           ),
         ],
       ),

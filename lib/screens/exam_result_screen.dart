@@ -148,7 +148,7 @@ class ExamResultScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'يمكنك الآن البدء في استقبال طلبات التحفيظ.',
+                  'الخطوة التالية: أضف شهاداتك ونبذتك المهنية لإرسال طلب الانضمام.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.grey,
@@ -158,18 +158,19 @@ class ExamResultScreen extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   height: 56,
-                  child: ElevatedButton(
-                    onPressed: () => context.go('/mohaffez-home'),
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.go('/teacher-certificates'),
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: const Text(
+                      'متابعة — رفع الشهادات',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                    child: const Text(
-                      'الانتقال للصفحة الرئيسية',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),

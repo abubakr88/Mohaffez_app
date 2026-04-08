@@ -113,20 +113,9 @@ class StudentHomeContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user              = ref.watch(currentUserProvider).value;
-    final sessionsAsync     = ref.watch(studentSessionsFirstPageProvider(studentId));
     final requestsAsync     = ref.watch(studentRequestsFirstPageProvider(studentId));
     final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
     final now               = DateTime.now();
-
-    // Compute stat values
-    final sessionsCount = sessionsAsync.when(
-      data: (sessions) => sessions.where((s) {
-        final status = (s['status'] as String?)?.toLowerCase();
-        return status == 'accepted' || status == 'completed';
-      }).length,
-      loading: () => 0,
-      error: (_, __) => 0,
-    );
 
     final activeRequestsCount = requestsAsync.when(
       data: (requests) => requests.where((r) {
@@ -158,7 +147,6 @@ class StudentHomeContent extends ConsumerWidget {
       error: (_, __) => 0,
     );
 
-    final sessionsLoading     = sessionsAsync is AsyncLoading;
     final requestsLoading     = requestsAsync is AsyncLoading;
     final subscriptionsLoading = subscriptionsAsync is AsyncLoading;
 
@@ -188,7 +176,7 @@ class StudentHomeContent extends ConsumerWidget {
               slivers: [
                 // ─── Header ──────────────────────────────────────────────
                 SliverAppBar(
-                  expandedHeight: 170,
+                  expandedHeight: 188,
                   pinned: true,
                   elevation: 0,
                   scrolledUnderElevation: 0,
@@ -209,12 +197,9 @@ class StudentHomeContent extends ConsumerWidget {
                 // ─── Stats row ───────────────────────────────────────────
                 SliverToBoxAdapter(
                   child: _StatsRow(
-                    studentId:         studentId,
-                    sessionsCount:     sessionsCount,
                     activeRequests:    activeRequestsCount,
                     subscriptionsCount: subscriptionsCount,
                     remainingSessions: remainingSessions,
-                    sessionsLoading:     sessionsLoading,
                     requestsLoading:     requestsLoading,
                     subscriptionsLoading: subscriptionsLoading,
                   ),
@@ -307,13 +292,14 @@ class _HomeHeader extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _Avatar(name: name, photoUrl: photoUrl, size: 50),
+                      _Avatar(name: name, photoUrl: photoUrl, size: 92),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -322,12 +308,29 @@ class _HomeHeader extends StatelessWidget {
                             Text(
                               name,
                               style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w800,
+                                fontSize: 20, fontWeight: FontWeight.w800,
                                 color: Colors.white, letterSpacing: -0.3,
                               ),
                               maxLines: 1, overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: _DS.r8,
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                              ),
+                              child: const Text(
+                                'طالب',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             Row(
                               children: [
                                 Icon(Icons.calendar_today_rounded, size: 11,
@@ -336,7 +339,7 @@ class _HomeHeader extends StatelessWidget {
                                 Text(
                                   dateText,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     color: Colors.white.withValues(alpha: 0.75),
                                   ),
                                 ),
@@ -347,25 +350,25 @@ class _HomeHeader extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  // Full-width greeting pill
+                  const SizedBox(height: 12),
+                  // Compact greeting chip
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.13),
                       borderRadius: _DS.r12,
                       border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
-                        const SizedBox(width: 8),
-                        Expanded(
+                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 12),
+                        const SizedBox(width: 6),
+                        Flexible(
                           child: Text(
                             greeting,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: Colors.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w500,
                             ),
@@ -462,22 +465,16 @@ class _PaymentAlertBanner extends StatelessWidget {
 // STATS ROW
 // ═══════════════════════════════════════════════════════════════════════════════
 class _StatsRow extends StatelessWidget {
-  final String studentId;
-  final int sessionsCount;
   final int activeRequests;
   final int subscriptionsCount;
   final int remainingSessions;
-  final bool sessionsLoading;
   final bool requestsLoading;
   final bool subscriptionsLoading;
 
   const _StatsRow({
-    required this.studentId,
-    required this.sessionsCount,
     required this.activeRequests,
     required this.subscriptionsCount,
     required this.remainingSessions,
-    required this.sessionsLoading,
     required this.requestsLoading,
     required this.subscriptionsLoading,
   });
@@ -485,14 +482,6 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = [
-      _StatData(
-        icon: Icons.local_library_rounded,
-        label: 'الجلسات',
-        value: sessionsLoading ? '…' : '$sessionsCount',
-        color: _DS.teal500,
-        bg: _DS.teal50,
-        onTap: () => context.go('/my-sessions'),
-      ),
       _StatData(
         icon: Icons.stars_rounded,
         label: 'المتبقية',
@@ -530,7 +519,7 @@ class _StatsRow extends StatelessWidget {
             bottomRight: Radius.circular(28),
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
         child: Row(
           children: List.generate(stats.length, (i) {
             return Expanded(
@@ -605,7 +594,7 @@ class _StatCard extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -628,7 +617,7 @@ class _StatCard extends StatelessWidget {
                       Text(
                         data.label,
                         style: const TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w600, color: _DS.text2,
+                          fontSize: 13, fontWeight: FontWeight.w600, color: _DS.text2,
                         ),
                         maxLines: 1, overflow: TextOverflow.ellipsis,
                       ),
@@ -654,10 +643,10 @@ class _ActionsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      _ActionData(icon: Icons.calendar_month_rounded, label: 'احجز\nجلسة',
+      _ActionData(icon: Icons.calendar_month_rounded, label: 'احجز جلسة',
           color: _DS.teal500, bg: _DS.teal50,
           onTap: () => context.go('/nearby')),
-      _ActionData(icon: Icons.event_note_rounded, label: 'جدولي\nالدراسي',
+      _ActionData(icon: Icons.event_note_rounded, label: 'جدولي',
           color: _DS.darkTeal, bg: _DS.darkTealBg,
           onTap: () => context.go('/my-schedule')),
       _ActionData(icon: Icons.local_library_rounded, label: 'جلساتي',
@@ -747,11 +736,11 @@ class _ActionCard extends StatelessWidget {
                 Text(
                   data.label,
                   style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700,
-                    color: _DS.text1, height: 1.3,
+                    fontSize: 14, fontWeight: FontWeight.w700,
+                    color: _DS.text1, height: 1.4,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -1030,14 +1019,14 @@ class _AssignmentRow extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 12, color: _DS.text1, height: 1.4),
+              style: const TextStyle(fontSize: 14, color: _DS.text1, height: 1.4),
               maxLines: 2, overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1089,7 +1078,7 @@ class _SectionLabel extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 12, color: _DS.text2)),
+                    Text(subtitle, style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.4)),
                   ],
                 ),
               ),

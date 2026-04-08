@@ -114,7 +114,10 @@ class SetupService {
       'examPassed': passed,
       'examRetryCount': newRetryCount,
       'examNextRetryAt': nextRetryAt != null ? Timestamp.fromDate(nextRetryAt) : null,
-      'setupCompleted': passed,
+      // setupCompleted remains false after exam — it is set to true in
+      // TeacherCertificatesScreen after the teacher uploads certificates.
+      // status remains 'active' here; it becomes 'pending_approval' in
+      // TeacherCertificatesScreen after the full registration is submitted.
       'updatedAt': FieldValue.serverTimestamp(),
     });
 

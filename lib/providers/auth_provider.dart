@@ -71,6 +71,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
 
       // ✅ FIX: Check suspension BEFORE caching — prevents white screen.
       // Check 1: users doc status field.
+      // pending_approval / rejected are allowed to sign in so they can
+      // be routed to /teacher-pending or /teacher-rejected by RoleGuard.
       final status = data['status'] as String? ?? 'active';
       if (status == 'suspended') {
         await _authService.logout();

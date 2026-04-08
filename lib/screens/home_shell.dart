@@ -532,7 +532,7 @@ Widget _buildDrawer(
                   _drawerTile(context, title: 'وضع المطوّر',
                       icon: Icons.bug_report_rounded, route: 'admin/dev-mode',
                       color: Colors.red),
-                _drawerTile(context, title: 'عمولات المحافظين',
+                _drawerTile(context, title: 'عمولات المحفظين',
                     icon: Icons.account_balance_rounded,
                     route: 'admin/teacher-commissions', color: _ShellDS.teal600),
                 _drawerTile(context, title: 'أرقام محافظ المنصة',

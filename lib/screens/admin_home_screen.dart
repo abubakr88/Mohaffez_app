@@ -122,7 +122,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                 crossAxisCount: 2,
                 crossAxisSpacing: AppThemeConstants.spaceMd,
                 mainAxisSpacing: AppThemeConstants.spaceMd,
-                childAspectRatio: 1.3,
+                childAspectRatio: 1.5,
                 physics: const NeverScrollableScrollPhysics(),
                 shrinkWrap: true,
                 children: cards,
@@ -131,6 +131,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
               Expanded(
                 child: ListView(
                   children: const [
+                    _AdminNavTile(
+                        title: 'طلبات انضمام المحفظين',
+                        icon: Icons.how_to_reg_rounded,
+                        routeName: 'admin-teacher-requests'),
                     _AdminNavTile(
                         title: ArabicLabels.manageUsers,
                         icon: Icons.people,
@@ -172,7 +176,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                         icon: Icons.analytics,
                         routeName: 'admin-commissions'),
                     _AdminNavTile(
-                        title: 'عمولات المحافظين',
+                        title: 'عمولات المحفظين',
                         icon: Icons.people_alt,
                         routeName: 'admin-teacher-commissions'),
                     _AdminNavTile(

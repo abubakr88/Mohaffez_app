@@ -63,7 +63,7 @@ class _AdminTeacherCommissionsScreenState
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: const AdminAppBar(title: 'عمولات المحافظين'),
+        appBar: const AdminAppBar(title: 'عمولات المحفظين'),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchAllCommissions(),
           builder: (context, snap) {
