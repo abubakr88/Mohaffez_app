@@ -21,7 +21,6 @@ import 'direct_payment_confirmations_screen.dart';
 class _ShellDS {
   // Teal brand (teacher / mohaffez)
   static const teal800 = Color(0xFF095752);
-  static const teal700 = Color(0xFF0C6F6A);
   static const teal600 = Color(0xFF0E8278);
   static const teal500 = Color(0xFF1A9E84);
   static const teal50  = Color(0xFFEAF6F3);
@@ -328,7 +327,7 @@ class _NotificationBell extends ConsumerWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// BOTTOM NAVIGATION — teal background, white selected, white60 unselected
+// BOTTOM NAVIGATION — custom design with active pill, clear icons, readable badge
 // ═══════════════════════════════════════════════════════════════════════════════
 Widget _buildBottomNavBar(
   BuildContext context,
@@ -339,122 +338,203 @@ Widget _buildBottomNavBar(
   required int unreadCount,
   int bundleCount = 0,
 }) {
-  // Notification badge item
-  BottomNavigationBarItem _notifItem() => BottomNavigationBarItem(
-        icon: _NavBadge(
-            child: const Icon(Icons.notifications_outlined),
-            count: unreadCount),
-        activeIcon: _NavBadge(
-            child: const Icon(Icons.notifications_rounded),
-            count: unreadCount),
-        label: ArabicLabels.notifications,
-      );
-
-  void _onTap(int index, String mohaffezRoute, String studentRoute,
-      String adminRoute) {
+  void onTap(int index) {
     ref.read(bottomNavIndexProvider.notifier).setIndex(index);
     final route = isMohaffez
-        ? [mohaffezRoute, '/notifications', '/profile'][index]
+        ? ['/mohaffez-home', '/notifications', '/profile'][index]
         : isAdmin
-            ? [adminRoute, '/notifications', '/profile'][index]
-            : [studentRoute, '/notifications', '/profile'][index];
+            ? ['/admin-home', '/notifications', '/profile'][index]
+            : ['/home', '/notifications', '/profile'][index];
     context.go(route);
   }
 
+  final homeIcon = isAdmin ? Icons.dashboard_rounded : Icons.home_rounded;
+  final homeIconOutlined =
+      isAdmin ? Icons.dashboard_outlined : Icons.home_outlined;
+  final homeLabel = isAdmin ? 'لوحة التحكم' : ArabicLabels.home;
+
   return Container(
     decoration: const BoxDecoration(
-      color: _ShellDS.teal700,
+      gradient: LinearGradient(
+        colors: [_ShellDS.teal800, _ShellDS.teal600],
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+      ),
       boxShadow: [
-        BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, -3)),
+        BoxShadow(
+            color: Color(0x40000000), blurRadius: 16, offset: Offset(0, -4)),
       ],
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(22),
+        topRight: Radius.circular(22),
+      ),
     ),
     child: SafeArea(
       top: false,
-      child: SizedBox(
-        height: 64,
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            splashColor: Colors.white.withValues(alpha: 0.1),
-            highlightColor: Colors.transparent,
-          ),
-          child: BottomNavigationBar(
-            currentIndex: currentIndex,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.white.withValues(alpha: 0.55),
-            type: BottomNavigationBarType.fixed,
-            selectedLabelStyle: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700),
-            unselectedLabelStyle: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w500),
-            onTap: (index) => _onTap(index, '/mohaffez-home', '/home', '/admin-home'),
-            items: isMohaffez || !isAdmin
-                ? [
-                    const BottomNavigationBarItem(
-                      icon: Icon(Icons.home_outlined),
-                      activeIcon: Icon(Icons.home_rounded),
-                      label: ArabicLabels.home,
-                    ),
-                    _notifItem(),
-                    const BottomNavigationBarItem(
-                      icon: Icon(Icons.person_outline_rounded),
-                      activeIcon: Icon(Icons.person_rounded),
-                      label: ArabicLabels.profile,
-                    ),
-                  ]
-                : [
-                    // Admin
-                    const BottomNavigationBarItem(
-                      icon: Icon(Icons.dashboard_outlined),
-                      activeIcon: Icon(Icons.dashboard_rounded),
-                      label: 'لوحة التحكم',
-                    ),
-                    _notifItem(),
-                    const BottomNavigationBarItem(
-                      icon: Icon(Icons.person_outline_rounded),
-                      activeIcon: Icon(Icons.person_rounded),
-                      label: ArabicLabels.profile,
-                    ),
-                  ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavItem(
+              icon: homeIconOutlined,
+              activeIcon: homeIcon,
+              label: homeLabel,
+              selected: currentIndex == 0,
+              onTap: () => onTap(0),
+            ),
+            _NavItem(
+              icon: Icons.notifications_outlined,
+              activeIcon: Icons.notifications_rounded,
+              label: ArabicLabels.notifications,
+              selected: currentIndex == 1,
+              badgeCount: unreadCount,
+              onTap: () => onTap(1),
+            ),
+            _NavItem(
+              icon: Icons.person_outline_rounded,
+              activeIcon: Icons.person_rounded,
+              label: ArabicLabels.profile,
+              selected: currentIndex == 2,
+              onTap: () => onTap(2),
+            ),
+          ],
         ),
       ),
     ),
   );
 }
 
-class _NavBadge extends StatelessWidget {
-  final Widget child;
-  final int count;
-  const _NavBadge({required this.child, required this.count});
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final bool selected;
+  final int badgeCount;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (count == 0) return child;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        child,
-        Positioned(
-          right: -5, top: -4,
-          child: Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: Colors.red.shade600,
-              shape: BoxShape.circle,
-              border: Border.all(color: _ShellDS.teal700, width: 1.5),
-            ),
-            constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
-            child: Text(
-              count > 9 ? '9+' : '$count',
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+    // Selection accent: amber — stands out on teal, keeps labels readable.
+    const accent = _ShellDS.amberLight;
+    final iconColor = selected ? accent : Colors.white;
+    final labelColor =
+        selected ? accent : Colors.white.withValues(alpha: 0.78);
+
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          splashColor: Colors.white.withValues(alpha: 0.12),
+          highlightColor: Colors.white.withValues(alpha: 0.06),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? Colors.white.withValues(alpha: 0.14)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: selected
+                              ? accent.withValues(alpha: 0.55)
+                              : Colors.transparent,
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Icon(
+                        selected ? activeIcon : icon,
+                        size: 24,
+                        color: iconColor,
+                      ),
+                    ),
+                    if (badgeCount > 0)
+                      Positioned(
+                        right: -2,
+                        top: -4,
+                        child: _NavBadge(count: badgeCount),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 220),
+                  style: TextStyle(
+                    color: labelColor,
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    height: 1.0,
+                  ),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _NavBadge extends StatelessWidget {
+  final int count;
+  const _NavBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = count > 99 ? '99+' : '$count';
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: text.length > 1 ? 5 : 0, vertical: 0),
+      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+      decoration: BoxDecoration(
+        color: Colors.red.shade600,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withValues(alpha: 0.4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          height: 1.1,
+        ),
+        textAlign: TextAlign.center,
+      ),
     );
   }
 }

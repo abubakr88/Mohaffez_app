@@ -2,14 +2,16 @@ import 'dart:ui' as ui;
 import 'package:cloud_functions/cloud_functions.dart'; // FIXED: FIX-COMMISSION — added for CF call
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../models/direct_payment_model.dart';
+import '../providers/system_config_provider.dart';
 import '../services/direct_payment_service.dart';
 
 
-class MohaffezCommissionScreen extends StatefulWidget {
+class MohaffezCommissionScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
 
   const MohaffezCommissionScreen({
@@ -18,14 +20,21 @@ class MohaffezCommissionScreen extends StatefulWidget {
   });
 
   @override
-  State<MohaffezCommissionScreen> createState() =>
+  ConsumerState<MohaffezCommissionScreen> createState() =>
       _MohaffezCommissionScreenState();
 }
 
 class _MohaffezCommissionScreenState
-    extends State<MohaffezCommissionScreen> {
+    extends ConsumerState<MohaffezCommissionScreen> {
   @override
   Widget build(BuildContext context) {
+    final configAsync = ref.watch(systemConfigProvider);
+    final commissionRate = configAsync.when(
+      data: (config) => config.commissionRate,
+      loading: () => 0.05,
+      error: (_, __) => 0.05,
+    );
+
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
@@ -91,8 +100,8 @@ class _MohaffezCommissionScreenState
                         fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  const Text('معدل العمولة: 5%',
-                      style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text('معدل العمولة: ${(commissionRate * 100).toInt()}%',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 ]),
               ),
 
@@ -167,11 +176,11 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
         : '';
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 8),
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -206,7 +215,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -225,7 +234,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -233,7 +242,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                   Text(
                     'الاستحقاق: $due',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color:
                           summary.isOverdue ? Colors.red : Colors.grey,
                     ),
@@ -243,7 +252,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                 Text(
                   '${summary.commissionAmount.toStringAsFixed(2)} ج.م',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: _statusColor,
                   ),
@@ -251,18 +260,18 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
               ],
             ),
             if (summary.isActionable) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
+                height: 36,
                 child: ElevatedButton.icon(
                   onPressed: onPayNow,
-                  icon: const Icon(Icons.payment, size: 18),
-                  label: const Text('ادفع الآن'),
+                  icon: const Icon(Icons.payment, size: 16),
+                  label: const Text('ادفع الآن', style: TextStyle(fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primaryAmber,
                     foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 12),
+                    padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -272,7 +281,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
             ],
             if (summary.isAwaitingConfirmation)
               Container(
-                margin: const EdgeInsets.only(top: 12),
+                margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(

@@ -150,82 +150,92 @@ class _AdminFailedOperationsScreenState
                     horizontal: AppThemeConstants.spaceMd,
                     vertical: AppThemeConstants.spaceSm,
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: AppThemeConstants.spaceMd,
                       vertical: AppThemeConstants.spaceSm,
                     ),
-                    leading: Icon(
-                      _iconForOperationType(operationType),
-                      color: AppThemeConstants.primaryAmber,
-                    ),
-                    title: Text(
-                      operationType,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppThemeConstants.primaryAmber,
-                      ),
-                    ),
-                    subtitle: Text(
-                      op['error']?.toString() ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppThemeConstants.textSecondary,
-                      ),
-                    ),
-                    // WHY: Keep status plus retry/dismiss controls visible at glance.
-                    trailing: SizedBox(
-                      width: 152,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Chip(
-                            backgroundColor: statusColor.withValues(alpha: 0.14),
-                            side: BorderSide(color: statusColor.withValues(alpha: 0.35)),
-                            visualDensity: VisualDensity.compact,
-                            label: Text(
-                              status,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: statusColor,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _iconForOperationType(operationType),
+                              color: AppThemeConstants.primaryAmber,
+                            ),
+                            const SizedBox(width: AppThemeConstants.spaceSm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    operationType,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppThemeConstants.primaryAmber,
+                                    ),
+                                  ),
+                                  Text(
+                                    op['error']?.toString() ?? '',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppThemeConstants.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.replay,
-                                  color: AppThemeConstants.primaryAmber,
+                            Chip(
+                              backgroundColor: statusColor.withValues(alpha: 0.14),
+                              side: BorderSide(color: statusColor.withValues(alpha: 0.35)),
+                              visualDensity: VisualDensity.compact,
+                              label: Text(
+                                status,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: statusColor,
                                 ),
-                                tooltip: ArabicLabels.retryOperation,
-                                onPressed: () => _run(actions.triggerCleanupJob),
                               ),
-                              isDismissing
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : IconButton(
-                                      icon: const Icon(
-                                        Icons.check_circle_outline,
-                                        color: AppThemeConstants.accentGreen,
-                                      ),
-                                      tooltip: ArabicLabels.dismissOperation,
-                                      onPressed: id == null
-                                          ? null
-                                          : () => _dismissOperation(id),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.replay,
+                                color: AppThemeConstants.primaryAmber,
+                                size: 20,
+                              ),
+                              tooltip: ArabicLabels.retryOperation,
+                              onPressed: () => _run(actions.triggerCleanupJob),
+                            ),
+                            isDismissing
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : IconButton(
+                                    icon: const Icon(
+                                      Icons.check_circle_outline,
+                                      color: AppThemeConstants.accentGreen,
+                                      size: 20,
                                     ),
-                            ],
-                          ),
-                        ],
-                      ),
+                                    tooltip: ArabicLabels.dismissOperation,
+                                    onPressed: id == null
+                                        ? null
+                                        : () => _dismissOperation(id),
+                                  ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 );

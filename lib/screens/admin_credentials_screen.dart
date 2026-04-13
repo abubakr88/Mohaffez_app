@@ -99,11 +99,24 @@ class _AdminCredentialsScreenState
           error: (e, _) => Center(child: Text(e.toString())),
           data: (list) {
             if (list.isEmpty) {
-              return const Center(
-                  child: Text(ArabicLabels.noCredentialsPending));
+              return RefreshIndicator(
+                onRefresh: () async => ref.invalidate(pendingCredentialsProvider),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: const Center(
+                        child: Text(ArabicLabels.noCredentialsPending)),
+                    ),
+                  ),
+                ),
+              );
             }
 
-            return ListView.builder(
+            return RefreshIndicator(
+              onRefresh: () async => ref.invalidate(pendingCredentialsProvider),
+              child: ListView.builder(
               itemCount: list.length,
               itemBuilder: (_, i) {
                 final c = list[i];
@@ -121,121 +134,150 @@ class _AdminCredentialsScreenState
 
                 return Card(
                   margin: const EdgeInsets.all(AppThemeConstants.spaceSm),
-                  child: ListTile(
-                    title: Text(c['title']?.toString() ?? ArabicLabels.noData),
-                    subtitle: Text(
-                        '${ArabicLabels.userId}: $userId\n${ArabicLabels.submittedAt}: $ts'),
-                    leading: GestureDetector(
-                      onTap: () {
-                        final urls = c['imageUrls'];
-                        if (urls is List && urls.isNotEmpty) {
-                          showDialog(
-                            context: context,
-                            builder: (_) => Dialog(
-                              child: InteractiveViewer(
-                                child: Image.network(urls.first.toString()),
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      child: (c['imageUrls'] is List &&
-                              (c['imageUrls'] as List).isNotEmpty)
-                          ? ClipRRect(
-                              borderRadius:
-                                  AppThemeConstants.borderRadiusSm,
-                              child: Image.network(
-                                (c['imageUrls'] as List).first.toString(),
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    const Icon(Icons.image_not_supported),
-                              ),
-                            )
-                          : const Icon(Icons.image_not_supported),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppThemeConstants.spaceSm),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppThemeConstants.success,
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: isApproving
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.check_circle),
-                          label: const Text('اعتماد ✅'),
-                          onPressed: isLoading
-                              ? null
-                              : () => _approveCredential(userId, credentialId),
-                        ),
-                        const SizedBox(width: AppThemeConstants.spaceXs),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppThemeConstants.error,
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: isRejecting
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.cancel),
-                          label: const Text('رفض ❌'),
-                          onPressed: isLoading
-                              ? null
-                              : () async {
-                                  final ctrl = TextEditingController();
-                                  final ok = await showDialog<bool>(
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                final urls = c['imageUrls'];
+                                if (urls is List && urls.isNotEmpty) {
+                                  showDialog(
                                     context: context,
-                                    builder: (dialogContext) => AlertDialog(
-                                      title: const Text(
-                                          ArabicLabels.rejectCredential),
-                                      content: TextField(
-                                          controller: ctrl,
-                                          decoration: const InputDecoration(
-                                              labelText: ArabicLabels
-                                                  .rejectionReason)),
-                                      actions: [
-                                        TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(dialogContext, false),
-                                            child:
-                                                const Text(ArabicLabels.cancel)),
-                                        ElevatedButton(
-                                            onPressed: () =>
-                                                Navigator.pop(dialogContext, true),
-                                            child:
-                                                const Text(ArabicLabels.reject)),
-                                      ],
+                                    builder: (_) => Dialog(
+                                      child: InteractiveViewer(
+                                        child: Image.network(urls.first.toString()),
+                                      ),
                                     ),
                                   );
-                                  if (ok == true &&
-                                      ctrl.text.trim().isNotEmpty) {
-                                    await _rejectCredential(userId,
-                                        credentialId, ctrl.text.trim());
-                                  }
-                                },
+                                }
+                              },
+                              child: (c['imageUrls'] is List &&
+                                      (c['imageUrls'] as List).isNotEmpty)
+                                  ? ClipRRect(
+                                      borderRadius:
+                                          AppThemeConstants.borderRadiusSm,
+                                      child: Image.network(
+                                        (c['imageUrls'] as List).first.toString(),
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(Icons.image_not_supported),
+                                      ),
+                                    )
+                                  : const Icon(Icons.image_not_supported, size: 48),
+                            ),
+                            const SizedBox(width: AppThemeConstants.spaceSm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(c['title']?.toString() ?? ArabicLabels.noData,
+                                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${ArabicLabels.userId}: $userId\n${ArabicLabels.submittedAt}: $ts',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceSm),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppThemeConstants.success,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: isApproving
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_circle, size: 16),
+                              label: const Text('اعتماد', style: TextStyle(fontSize: 12)),
+                              onPressed: isLoading
+                                  ? null
+                                  : () => _approveCredential(userId, credentialId),
+                            ),
+                            const SizedBox(width: AppThemeConstants.spaceSm),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppThemeConstants.error,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: isRejecting
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Icons.cancel, size: 16),
+                              label: const Text('رفض', style: TextStyle(fontSize: 12)),
+                              onPressed: isLoading
+                                  ? null
+                                  : () async {
+                                      final ctrl = TextEditingController();
+                                      final ok = await showDialog<bool>(
+                                        context: context,
+                                        builder: (dialogContext) => AlertDialog(
+                                          title: const Text(
+                                              ArabicLabels.rejectCredential),
+                                          content: TextField(
+                                              controller: ctrl,
+                                              decoration: const InputDecoration(
+                                                  labelText: ArabicLabels
+                                                      .rejectionReason)),
+                                          actions: [
+                                            TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(dialogContext, false),
+                                                child:
+                                                    const Text(ArabicLabels.cancel)),
+                                            ElevatedButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(dialogContext, true),
+                                                child:
+                                                    const Text(ArabicLabels.reject)),
+                                          ],
+                                        ),
+                                      );
+                                      if (ok == true &&
+                                          ctrl.text.trim().isNotEmpty) {
+                                        await _rejectCredential(userId,
+                                            credentialId, ctrl.text.trim());
+                                      }
+                                    },
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 );
               },
-            );
+            ),
+          );
           },
         ),
       ),

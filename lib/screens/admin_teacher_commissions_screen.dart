@@ -20,6 +20,14 @@ class AdminTeacherCommissionsScreen extends ConsumerStatefulWidget {
 class _AdminTeacherCommissionsScreenState
     extends ConsumerState<AdminTeacherCommissionsScreen> {
   final Map<String, bool> _markingPaid = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _markAsPaid(String commissionId) async {
     setState(() => _markingPaid[commissionId] = true);
@@ -77,9 +85,18 @@ class _AdminTeacherCommissionsScreenState
               );
             }
 
+            // Filter by search query
+            final filteredList = _searchQuery.isEmpty
+                ? list
+                : list.where((item) {
+                    final query = _searchQuery.toLowerCase();
+                    return item.mohaffezName.toLowerCase().contains(query) ||
+                        item.mohaffezId.toLowerCase().contains(query);
+                  }).toList();
+
             // Group by mohaffezId
             final grouped = <String, List<WeeklyCommissionSummary>>{};
-            for (final item in list) {
+            for (final item in filteredList) {
               grouped.putIfAbsent(item.mohaffezId, () => []).add(item);
             }
 
@@ -90,6 +107,40 @@ class _AdminTeacherCommissionsScreenState
 
             return Column(
               children: [
+                // Search field
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppThemeConstants.spaceMd,
+                    AppThemeConstants.spaceMd,
+                    AppThemeConstants.spaceMd,
+                    0,
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    textDirection: ui.TextDirection.rtl,
+                    decoration: InputDecoration(
+                      hintText: 'ابحث باسم المحفظ أو المعرف...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: AppThemeConstants.borderRadiusMd,
+                      ),
+                      filled: true,
+                      fillColor: AppThemeConstants.background,
+                    ),
+                    onChanged: (value) =>
+                        setState(() => _searchQuery = value),
+                  ),
+                ),
+                const SizedBox(height: AppThemeConstants.spaceMd),
                 // Header card with total pending
                 Container(
                   width: double.infinity,
@@ -102,13 +153,17 @@ class _AdminTeacherCommissionsScreenState
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'إجمالي المستحقات غير المدفوعة:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: const Text(
+                          'إجمالي المستحقات غير المدفوعة:',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         '${totalPending.toStringAsFixed(2)} ج.م',
                         style: TextStyle(
@@ -124,7 +179,28 @@ class _AdminTeacherCommissionsScreenState
                 ),
                 // List of teachers
                 Expanded(
-                  child: ListView.builder(
+                  child: grouped.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.search_off,
+                                size: 64,
+                                color: AppThemeConstants.textSecondary,
+                              ),
+                              const SizedBox(height: AppThemeConstants.spaceMd),
+                              Text(
+                                'لا توجد نتائج لـ "$_searchQuery"',
+                                style: const TextStyle(
+                                  color: AppThemeConstants.textSecondary,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppThemeConstants.spaceMd,
                     ),
@@ -423,63 +499,66 @@ class _WeekSummaryCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         title: Text(weekLabel,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 4),
             Text(
               '${summary.totalSessions} جلسة • '
               'إجمالي: ${summary.totalRevenue.toStringAsFixed(0)} ج.م',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
             ),
             if (due.isNotEmpty && !summary.isPaid)
               Text('الاستحقاق: $due',
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color:
                           summary.isOverdue ? Colors.red : Colors.grey)),
           ],
         ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('${summary.commissionAmount.toStringAsFixed(2)} ج.م',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _statusColor)),
-            const SizedBox(height: 4),
-            Text(_statusLabel,
-                style: TextStyle(fontSize: 11, color: _statusColor)),
-            if (showAdminActions && !summary.isPaid) ...[
-              const SizedBox(height: 4),
-              SizedBox(
-                height: 24,
-                child: ElevatedButton(
-                  onPressed: isMarkingPaid ? null : onMarkAsPaid,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+        trailing: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 90),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${summary.commissionAmount.toStringAsFixed(2)} ج.م',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _statusColor)),
+              Text(_statusLabel,
+                  style: TextStyle(fontSize: 10, color: _statusColor)),
+              if (showAdminActions && !summary.isPaid)
+                SizedBox(
+                  height: 20,
+                  child: ElevatedButton(
+                    onPressed: isMarkingPaid ? null : onMarkAsPaid,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: isMarkingPaid
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('تم الدفع',
+                            style: TextStyle(fontSize: 9)),
                   ),
-                  child: isMarkingPaid
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('تم الدفع',
-                          style: TextStyle(fontSize: 10)),
                 ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

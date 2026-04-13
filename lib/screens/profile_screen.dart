@@ -144,31 +144,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (cropped == null) return;
 
       if (!mounted) return;
+      BuildContext? loadingCtx;
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
+        builder: (dialogCtx) {
+          loadingCtx = dialogCtx;
+          return const Center(child: CircularProgressIndicator());
+        },
       );
 
       final repository = ref.read(userRepositoryProvider);
       await repository.uploadProfilePhoto(userId, File(cropped.path));
 
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(context).pop();
-          ref.invalidate(currentUserProvider);
-          _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
-        }
-      });
+      final ctx = loadingCtx;
+      if (ctx != null && ctx.mounted && Navigator.canPop(ctx)) {
+        Navigator.of(ctx).pop();
+      }
+      ref.invalidate(currentUserProvider);
+      _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
     } catch (e) {
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(context).pop();
-          _showSnackBar('${ArabicLabels.error}: $e');
-        }
-      });
+      Navigator.of(context, rootNavigator: true).maybePop();
+      _showSnackBar('${ArabicLabels.error}: $e');
     }
   }
 

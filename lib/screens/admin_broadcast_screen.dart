@@ -164,103 +164,112 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: const AdminAppBar(title: ArabicLabels.broadcastNotifications),
-        body: Padding(
-          padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                  controller: titleCtrl,
-                  decoration: const InputDecoration(
-                      labelText: ArabicLabels.notificationTitle)),
-              const SizedBox(height: AppThemeConstants.spaceSm),
-              TextField(
-                controller: bodyCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                    labelText: ArabicLabels.notificationBody),
-              ),
-              const SizedBox(height: AppThemeConstants.spaceSm),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'all', label: Text(ArabicLabels.all)),
-                  ButtonSegment(
-                      value: 'student', label: Text(ArabicLabels.students)),
-                  ButtonSegment(
-                      value: 'mohaffez', label: Text(ArabicLabels.mohaffezin)),
-                ],
-                selected: {targetRole},
-                onSelectionChanged: (v) {
-                  setState(() => targetRole = v.first);
-                  _fetchAudienceCount();
-                },
-              ),
-              const SizedBox(height: AppThemeConstants.spaceSm),
-              // Audience count preview
-              if (_isLoadingCount)
-                const Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+        body: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  TextField(
+                      controller: titleCtrl,
+                      decoration: const InputDecoration(
+                          labelText: ArabicLabels.notificationTitle)),
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                  TextField(
+                    controller: bodyCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                        labelText: ArabicLabels.notificationBody),
                   ),
-                )
-              else if (_audienceCount != null)
-                Text(
-                  'سيصل الإشعار إلى $_audienceCount مستخدم',
-                  style: const TextStyle(
-                    color: AppThemeConstants.primaryAmber,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'all', label: Text(ArabicLabels.all)),
+                      ButtonSegment(
+                          value: 'student', label: Text(ArabicLabels.students)),
+                      ButtonSegment(
+                          value: 'mohaffez', label: Text(ArabicLabels.mohaffezin)),
+                    ],
+                    selected: {targetRole},
+                    onSelectionChanged: (v) {
+                      setState(() => targetRole = v.first);
+                      _fetchAudienceCount();
+                    },
                   ),
-                ),
-              const SizedBox(height: AppThemeConstants.spaceSm),
-              ElevatedButton.icon(
-                onPressed: actionState.isLoading ? null : _showConfirmDialog,
-                icon: actionState.isLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.send),
-                label: const Text(ArabicLabels.send),
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                  // Audience count preview
+                  if (_isLoadingCount)
+                    const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else if (_audienceCount != null)
+                    Text(
+                      'سيصل الإشعار إلى $_audienceCount مستخدم',
+                      style: const TextStyle(
+                        color: AppThemeConstants.primaryAmber,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                  ElevatedButton.icon(
+                    onPressed: actionState.isLoading ? null : _showConfirmDialog,
+                    icon: actionState.isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.send),
+                    label: const Text(ArabicLabels.send),
+                  ),
+                  const SizedBox(height: AppThemeConstants.spaceMd),
+                  const Text(ArabicLabels.sendHistory,
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                ]),
               ),
-              const SizedBox(height: AppThemeConstants.spaceMd),
-              const Text(ArabicLabels.sendHistory,
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: AppThemeConstants.spaceSm),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            ),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
                       .collection('broadcastHistory')
                       .orderBy('sentAt', descending: true)
                       .snapshots(),
                   builder: (_, snap) {
                     if (!snap.hasData) {
-                      return const Center(child: CircularProgressIndicator());
+                      return const SliverFillRemaining(
+                        child: Center(child: CircularProgressIndicator()),
+                      );
                     }
                     final docs = snap.data!.docs;
-                    return ListView.builder(
-                      itemCount: docs.length,
-                      itemBuilder: (_, i) {
-                        final d = docs[i].data();
-                        final sentAt = d['sentAt'];
-                        return Card(
-                          child: ListTile(
-                            title: Text(d['title']?.toString() ?? '-'),
-                            subtitle: Text(
-                              '${ArabicLabels.filterByRole}: ${d['targetRole'] ?? 'all'}\n'
-                              '${ArabicLabels.sentToCount} ${d['recipientCount'] ?? 0} ${ArabicLabels.recipients}\n'
-                              '${ArabicLabels.operationAt}: ${sentAt is Timestamp ? sentAt.toDate().toString().split('.').first : '-'}',
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) {
+                          final d = docs[i].data();
+                          final sentAt = d['sentAt'];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: AppThemeConstants.spaceMd,
+                              vertical: AppThemeConstants.spaceXs,
                             ),
-                          ),
-                        );
-                      },
+                            child: ListTile(
+                              title: Text(d['title']?.toString() ?? '-'),
+                              subtitle: Text(
+                                '${ArabicLabels.filterByRole}: ${d['targetRole'] ?? 'all'}\n'
+                                '${ArabicLabels.sentToCount} ${d['recipientCount'] ?? 0} ${ArabicLabels.recipients}\n'
+                                '${ArabicLabels.operationAt}: ${sentAt is Timestamp ? sentAt.toDate().toString().split('.').first : '-'}',
+                              ),
+                            ),
+                          );
+                        },
+                        childCount: docs.length,
+                      ),
                     );
                   },
                 ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );

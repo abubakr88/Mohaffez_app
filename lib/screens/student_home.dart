@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -115,7 +117,26 @@ class StudentHomeContent extends ConsumerWidget {
     final user              = ref.watch(currentUserProvider).value;
     final requestsAsync     = ref.watch(studentRequestsFirstPageProvider(studentId));
     final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
+    final studentUpcomingAsync = ref.watch(studentUpcomingSessionsProvider(studentId));
     final now               = DateTime.now();
+
+    final nextSessionDate = studentUpcomingAsync.when(
+      data: (sessions) {
+        debugPrint('👨‍🎓 Student upcoming sessions: ${sessions.length}');
+        for (final s in sessions) {
+          final d = s['sessionDate'] as DateTime?;
+          debugPrint('📅 Student session: $d | isAfter(now): ${d?.isAfter(now)}');
+        }
+        final future = sessions.where((s) {
+          final d = s['sessionDate'] as DateTime?;
+          return d != null && d.isAfter(now);
+        });
+        debugPrint('⏰ Student future sessions: ${future.length}');
+        return future.isEmpty ? null : future.first['sessionDate'] as DateTime?;
+      },
+      loading: () => null,
+      error: (_, __) => null,
+    );
 
     final activeRequestsCount = requestsAsync.when(
       data: (requests) => requests.where((r) {
@@ -141,8 +162,11 @@ class StudentHomeContent extends ConsumerWidget {
       error: (_, __) => 0,
     );
 
-    final remainingSessions = subscriptionsAsync.when(
-      data: (subs) => subs.fold<int>(0, (total, s) => total + s.remainingSessions),
+    final upcomingSessionsCount = studentUpcomingAsync.when(
+      data: (sessions) => sessions.where((s) {
+        final d = s['sessionDate'] as DateTime?;
+        return d != null && d.isAfter(now);
+      }).length,
       loading: () => 0,
       error: (_, __) => 0,
     );
@@ -176,7 +200,7 @@ class StudentHomeContent extends ConsumerWidget {
               slivers: [
                 // ─── Header ──────────────────────────────────────────────
                 SliverAppBar(
-                  expandedHeight: 188,
+                  expandedHeight: 196,
                   pinned: true,
                   elevation: 0,
                   scrolledUnderElevation: 0,
@@ -199,7 +223,7 @@ class StudentHomeContent extends ConsumerWidget {
                   child: _StatsRow(
                     activeRequests:    activeRequestsCount,
                     subscriptionsCount: subscriptionsCount,
-                    remainingSessions: remainingSessions,
+                    upcomingSessions:  upcomingSessionsCount,
                     requestsLoading:     requestsLoading,
                     subscriptionsLoading: subscriptionsLoading,
                   ),
@@ -217,6 +241,8 @@ class StudentHomeContent extends ConsumerWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
+                      _NextSessionCountdown(nextSessionDate: nextSessionDate),
+                      if (nextSessionDate != null) const SizedBox(height: 20),
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 28),
                       _AssignmentsSection(studentId: studentId),
@@ -292,30 +318,31 @@ class _HomeHeader extends StatelessWidget {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _Avatar(name: name, photoUrl: photoUrl, size: 92),
-                      const SizedBox(width: 14),
-                      Expanded(
+                      _Avatar(name: name, photoUrl: photoUrl, size: 112),
+                      const SizedBox(width: 16),
+                      Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               name,
                               style: const TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.w800,
+                                fontSize: 22, fontWeight: FontWeight.w800,
                                 color: Colors.white, letterSpacing: -0.3,
                               ),
                               maxLines: 1, overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.15),
                                 borderRadius: _DS.r8,
@@ -330,12 +357,12 @@ class _HomeHeader extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(Icons.calendar_today_rounded, size: 11,
+                                Icon(Icons.calendar_today_rounded, size: 12,
                                     color: Colors.white.withValues(alpha: 0.7)),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 5),
                                 Text(
                                   dateText,
                                   style: TextStyle(
@@ -467,14 +494,14 @@ class _PaymentAlertBanner extends StatelessWidget {
 class _StatsRow extends StatelessWidget {
   final int activeRequests;
   final int subscriptionsCount;
-  final int remainingSessions;
+  final int upcomingSessions;
   final bool requestsLoading;
   final bool subscriptionsLoading;
 
   const _StatsRow({
     required this.activeRequests,
     required this.subscriptionsCount,
-    required this.remainingSessions,
+    required this.upcomingSessions,
     required this.requestsLoading,
     required this.subscriptionsLoading,
   });
@@ -483,12 +510,12 @@ class _StatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final stats = [
       _StatData(
-        icon: Icons.stars_rounded,
-        label: 'المتبقية',
-        value: subscriptionsLoading ? '…' : '$remainingSessions',
-        color: _DS.purple,
-        bg: _DS.purpleBg,
-        onTap: () => context.push('/active-subscriptions'),
+        icon: Icons.event_note_rounded,
+        label: 'القادمة',
+        value: subscriptionsLoading ? '…' : '$upcomingSessions',
+        color: _DS.teal500,
+        bg: _DS.teal50,
+        onTap: () => context.push('/my-sessions'),
       ),
       _StatData(
         icon: Icons.workspace_premium_rounded,
@@ -643,18 +670,20 @@ class _ActionsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
+      // ── Row 1: Daily actions ──
       _ActionData(icon: Icons.calendar_month_rounded, label: 'احجز جلسة',
           color: _DS.teal500, bg: _DS.teal50,
           onTap: () => context.go('/nearby')),
-      _ActionData(icon: Icons.event_note_rounded, label: 'جدولي',
-          color: _DS.darkTeal, bg: _DS.darkTealBg,
-          onTap: () => context.go('/my-schedule')),
       _ActionData(icon: Icons.local_library_rounded, label: 'جلساتي',
           color: _DS.green, bg: _DS.greenBg,
           onTap: () => context.go('/my-sessions')),
       _ActionData(icon: Icons.task_alt_rounded, label: 'واجباتي',
           color: _DS.amber, bg: _DS.amberBg,
           onTap: () => context.go('/assignments')),
+      // ── Row 2: Occasional ──
+      _ActionData(icon: Icons.event_note_rounded, label: 'جدولي',
+          color: _DS.darkTeal, bg: _DS.darkTealBg,
+          onTap: () => context.go('/my-schedule')),
       _ActionData(icon: Icons.hourglass_top_rounded, label: 'طلباتي',
           color: _DS.purple, bg: _DS.purpleBg,
           onTap: () => context.go('/requests')),
@@ -1031,6 +1060,210 @@ class _AssignmentRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEXT SESSION COUNTDOWN (IMPROVED)
+// ═══════════════════════════════════════════════════════════════════════════════
+class _NextSessionCountdown extends StatefulWidget {
+  final DateTime? nextSessionDate;
+  const _NextSessionCountdown({required this.nextSessionDate});
+
+  @override
+  State<_NextSessionCountdown> createState() => _NextSessionCountdownState();
+}
+
+class _NextSessionCountdownState extends State<_NextSessionCountdown> {
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _recalculate();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(_recalculate);
+    });
+  }
+
+  @override
+  void didUpdateWidget(_NextSessionCountdown old) {
+    super.didUpdateWidget(old);
+    if (old.nextSessionDate != widget.nextSessionDate) _recalculate();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _recalculate() {
+    final d = widget.nextSessionDate;
+    if (d == null) { _remaining = Duration.zero; return; }
+    final diff = d.difference(DateTime.now());
+    _remaining = diff.isNegative ? Duration.zero : diff;
+  }
+
+  String _formatSessionDate(DateTime date) {
+    final weekdays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    final dayName = weekdays[date.weekday % 7];
+    final hour = date.hour > 12 ? date.hour - 12 : date.hour;
+    final period = date.hour >= 12 ? 'م' : 'ص';
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$dayName ${hour}:${minute} $period';
+  }
+
+  Widget _buildTimeUnit(String value, String label, bool isUrgent) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: isUrgent
+                ? const Color(0xFFFEE2E2)
+                : const Color(0xFFFDF5E6),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isUrgent
+                  ? const Color(0xFFEF4444).withValues(alpha: 0.3)
+                  : _DS.gold.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: isUrgent ? const Color(0xFFDC2626) : _DS.gold,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: isUrgent ? const Color(0xFFDC2626) : _DS.text3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.nextSessionDate == null) return const SizedBox.shrink();
+
+    final days = _remaining.inDays;
+    final hours = _remaining.inHours % 24;
+    final minutes = _remaining.inMinutes % 60;
+    final seconds = _remaining.inSeconds % 60;
+
+    final isUrgent = _remaining.inHours < 1 && days == 0;
+    final accentColor = isUrgent ? const Color(0xFFDC2626) : _DS.gold;
+    final bgColor = isUrgent ? const Color(0xFFFEF2F2) : _DS.goldBg;
+    final borderColor = isUrgent
+        ? const Color(0xFFFCA5A5)
+        : _DS.gold.withValues(alpha: 0.35);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: _DS.r16,
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.15),
+                  borderRadius: _DS.r12,
+                ),
+                child: Icon(
+                  isUrgent ? Icons.notification_important_rounded : Icons.timer_rounded,
+                  color: accentColor,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'الجلسة القادمة',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _DS.text2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatSessionDate(widget.nextSessionDate!),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: _DS.text3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              if (days > 0) ...[
+                _buildTimeUnit(days.toString().padLeft(2, '0'), 'يوم', isUrgent),
+                _buildSeparator(isUrgent),
+              ],
+              _buildTimeUnit(hours.toString().padLeft(2, '0'), 'ساعة', isUrgent),
+              _buildSeparator(isUrgent),
+              _buildTimeUnit(minutes.toString().padLeft(2, '0'), 'دقيقة', isUrgent),
+              if (days == 0) ...[
+                _buildSeparator(isUrgent),
+                _buildTimeUnit(seconds.toString().padLeft(2, '0'), 'ثانية', isUrgent),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeparator(bool isUrgent) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        ':',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w900,
+          color: isUrgent ? const Color(0xFFDC2626) : _DS.gold,
+        ),
       ),
     );
   }

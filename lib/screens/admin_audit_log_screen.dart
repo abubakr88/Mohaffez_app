@@ -8,8 +8,18 @@ import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
-class AdminAuditLogScreen extends ConsumerWidget {
+/// Cache for user names to avoid repeated fetches
+final _userNameCache = <String, String>{};
+
+class AdminAuditLogScreen extends ConsumerStatefulWidget {
   const AdminAuditLogScreen({super.key});
+
+  @override
+  ConsumerState<AdminAuditLogScreen> createState() => _AdminAuditLogScreenState();
+}
+
+class _AdminAuditLogScreenState extends ConsumerState<AdminAuditLogScreen> {
+  final Map<String, String> _userNames = {};
 
   String _truncateUid(String? uid) {
     if (uid == null || uid.isEmpty) return '-';
@@ -25,8 +35,38 @@ class AdminAuditLogScreen extends ConsumerWidget {
     return '${dateFormat.format(date)} ${timeFormat.format(date)}';
   }
 
+  Future<String> _getUserName(String userId) async {
+    if (userId.isEmpty) return '-';
+    // Check cache first
+    if (_userNameCache.containsKey(userId)) {
+      return _userNameCache[userId]!;
+    }
+    // Check local state
+    if (_userNames.containsKey(userId)) {
+      return _userNames[userId]!;
+    }
+    // Fetch from Firestore
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      final name = doc.data()?['displayName'] ??
+          doc.data()?['name'] ??
+          doc.data()?['email'] ??
+          _truncateUid(userId);
+      _userNameCache[userId] = name;
+      if (mounted) {
+        setState(() => _userNames[userId] = name);
+      }
+      return name;
+    } catch (e) {
+      return _truncateUid(userId);
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final auditLog = ref.watch(auditLogProvider);
 
     return Directionality(
@@ -78,10 +118,21 @@ class AdminAuditLogScreen extends ConsumerWidget {
               itemBuilder: (_, i) {
                 final entry = list[i];
                 final action = entry['action']?.toString() ?? '-';
-                final performedBy = entry['performedBy']?.toString();
-                final targetUserId = entry['targetUserId']?.toString();
+                final performedBy = entry['performedBy']?.toString() ?? '';
+                final targetUserId = entry['targetUserId']?.toString() ?? '';
                 final timestamp = entry['timestamp'] as Timestamp?;
                 final data = entry['data'] as Map<String, dynamic>?;
+
+                // Fetch user names asynchronously
+                if (performedBy.isNotEmpty && !_userNames.containsKey(performedBy)) {
+                  _getUserName(performedBy);
+                }
+                if (targetUserId.isNotEmpty && !_userNames.containsKey(targetUserId)) {
+                  _getUserName(targetUserId);
+                }
+
+                final performedByName = _userNames[performedBy] ?? _truncateUid(performedBy);
+                final targetUserName = _userNames[targetUserId] ?? _truncateUid(targetUserId);
 
                 return Card(
                   margin: const EdgeInsets.symmetric(
@@ -103,7 +154,7 @@ class AdminAuditLogScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: AppThemeConstants.spaceXs),
-                        // performedBy UID (truncated)
+                        // performedBy with name (or truncated UID)
                         Row(
                           children: [
                             const Icon(
@@ -112,16 +163,25 @@ class AdminAuditLogScreen extends ConsumerWidget {
                               color: AppThemeConstants.textSecondary,
                             ),
                             const SizedBox(width: AppThemeConstants.spaceXs),
-                            Text(
-                              '${ArabicLabels.performedBy}: ${_truncateUid(performedBy)}',
-                              style: const TextStyle(
-                                color: AppThemeConstants.textSecondary,
+                            Expanded(
+                              child: Text(
+                                '${ArabicLabels.performedBy}: $performedByName',
+                                style: const TextStyle(
+                                  color: AppThemeConstants.textSecondary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (_userNames[performedBy] == null && performedBy.isNotEmpty)
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
                           ],
                         ),
-                        // targetUserId if present (grey, smaller)
-                        if (targetUserId != null && targetUserId.isNotEmpty) ...[
+                        // targetUserId if present
+                        if (targetUserId.isNotEmpty) ...[
                           const SizedBox(height: AppThemeConstants.spaceXs),
                           Row(
                             children: [
@@ -131,13 +191,21 @@ class AdminAuditLogScreen extends ConsumerWidget {
                                 color: AppThemeConstants.textSecondary,
                               ),
                               const SizedBox(width: AppThemeConstants.spaceXs),
-                              Text(
-                                '${ArabicLabels.targetUser}: ${_truncateUid(targetUserId)}',
-                                style: const TextStyle(
-                                  color: AppThemeConstants.textSecondary,
-                                  fontSize: 12,
+                              Expanded(
+                                child: Text(
+                                  '${ArabicLabels.targetUser}: $targetUserName',
+                                  style: const TextStyle(
+                                    color: AppThemeConstants.textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              if (_userNames[targetUserId] == null)
+                                const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
                             ],
                           ),
                         ],

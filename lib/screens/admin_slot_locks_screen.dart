@@ -9,11 +9,50 @@ import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
 import '../utils/arabic_labels.dart';
 
-class AdminSlotLocksScreen extends ConsumerWidget {
+/// Cache for user names to avoid repeated fetches
+final _userNameCache = <String, String>{};
+
+class AdminSlotLocksScreen extends ConsumerStatefulWidget {
   const AdminSlotLocksScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminSlotLocksScreen> createState() => _AdminSlotLocksScreenState();
+}
+
+class _AdminSlotLocksScreenState extends ConsumerState<AdminSlotLocksScreen> {
+  final Map<String, String> _userNames = {};
+
+  Future<String> _getUserName(String userId) async {
+    // Check cache first
+    if (_userNameCache.containsKey(userId)) {
+      return _userNameCache[userId]!;
+    }
+    // Check local state
+    if (_userNames.containsKey(userId)) {
+      return _userNames[userId]!;
+    }
+    // Fetch from Firestore
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      final name = doc.data()?['displayName'] ??
+          doc.data()?['name'] ??
+          doc.data()?['email'] ??
+          userId.substring(0, 8);
+      _userNameCache[userId] = name;
+      if (mounted) {
+        setState(() => _userNames[userId] = name);
+      }
+      return name;
+    } catch (e) {
+      return userId.substring(0, 8);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final locks = ref.watch(activeSlotLocksProvider);
     final actions = ref.read(adminActionsProvider.notifier);
 
@@ -49,11 +88,37 @@ class AdminSlotLocksScreen extends ConsumerWidget {
             itemCount: list.length,
             itemBuilder: (_, i) {
               final l = list[i];
+              final mohaffezId = l['mohaffezId']?.toString() ?? '';
+              final cachedName = _userNames[mohaffezId];
+
+              // Fetch name if not cached
+              if (cachedName == null && mohaffezId.isNotEmpty) {
+                _getUserName(mohaffezId).then((name) {
+                  if (mounted) setState(() => _userNames[mohaffezId] = name);
+                });
+              }
+
               return Card(
                 margin: const EdgeInsets.all(AppThemeConstants.spaceSm),
                 child: ListTile(
-                  title:
-                      Text('${ArabicLabels.slotOf}: ${l['mohaffezId'] ?? '-'}'),
+                  title: Row(
+                    children: [
+                      Text('${ArabicLabels.slotOf}: '),
+                      Expanded(
+                        child: Text(
+                          cachedName ?? mohaffezId.substring(0, 8),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (cachedName == null)
+                        const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                    ],
+                  ),
                   subtitle: Text(
                       '${ArabicLabels.time}: ${l['timeSlot'] ?? '-'}\n${ArabicLabels.type}: ${l['sessionType'] ?? '-'}'),
                   trailing: _Countdown(expiresAt: l['expiresAt']),

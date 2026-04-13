@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/direct_payment_model.dart';
 import '../providers/admin_provider.dart';
+import '../providers/system_config_provider.dart';
 import '../services/direct_payment_service.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
@@ -20,6 +21,24 @@ class _CommissionDashboardScreenState
     extends ConsumerState<CommissionDashboardScreen> {
   bool _isRunningJob = false;
   final Map<String, bool> _markingPaid = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Get dynamic commission rate from system config, defaulting to 5%
+  double get _commissionRate {
+    final configAsync = ref.watch(systemConfigProvider);
+    return configAsync.when(
+      data: (config) => config.commissionRate,
+      loading: () => 0.05,
+      error: (_, __) => 0.05,
+    );
+  }
 
   Future<void> _triggerCommissionJob() async {
     setState(() => _isRunningJob = true);
@@ -73,7 +92,8 @@ class _CommissionDashboardScreenState
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: const AdminAppBar(title: 'عمولات التطبيق (5%)'),
+        appBar: AdminAppBar(
+            title: 'عمولات التطبيق (${(_commissionRate * 100).toInt()}%)'),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchAllCommissions(),
           builder: (context, snap) {
@@ -87,12 +107,50 @@ class _CommissionDashboardScreenState
               );
             }
 
+            // Filter by search query
+            final filteredList = _searchQuery.isEmpty
+                ? list
+                : list.where((item) {
+                    final query = _searchQuery.toLowerCase();
+                    return item.mohaffezName.toLowerCase().contains(query) ||
+                        item.mohaffezId.toLowerCase().contains(query);
+                  }).toList();
+
             // Stats at top
             final totalPending = list
                 .where((w) => w.isPending || w.isOverdue)
                 .fold(0.0, (s, w) => s + w.commissionAmount);
 
             return Column(children: [
+              // Search field
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: TextField(
+                  controller: _searchController,
+                  textDirection: ui.TextDirection.rtl,
+                  decoration: InputDecoration(
+                    hintText: 'ابحث باسم المحفظ أو المعرف...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: AppThemeConstants.background,
+                  ),
+                  onChanged: (value) =>
+                      setState(() => _searchQuery = value),
+                ),
+              ),
+              const SizedBox(height: 16),
               // Summary card
               Container(
                 margin: const EdgeInsets.all(16),
@@ -119,20 +177,42 @@ class _CommissionDashboardScreenState
                         fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  const Text('5% من إجمالي المدفوعات المباشرة',
-                      style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text(
+                      '${(_commissionRate * 100).toInt()}% من إجمالي المدفوعات المباشرة',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
                 ]),
               ),
 
               // List
               Expanded(
-                child: ListView.builder(
+                child: filteredList.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: AppThemeConstants.textSecondary,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'لا توجد نتائج لـ "$_searchQuery"',
+                              style: const TextStyle(
+                                color: AppThemeConstants.textSecondary,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: list.length,
+                  itemCount: filteredList.length,
                   itemBuilder: (_, i) => _WeekSummaryCard(
-                    summary: list[i],
-                    isMarkingPaid: _markingPaid[list[i].id] == true,
-                    onMarkAsPaid: () => _markAsPaid(list[i].id),
+                    summary: filteredList[i],
+                    isMarkingPaid: _markingPaid[filteredList[i].id] == true,
+                    onMarkAsPaid: () => _markAsPaid(filteredList[i].id),
                   ),
                 ),
               ),
@@ -218,42 +298,46 @@ class _WeekSummaryCard extends StatelessWidget {
                       color: summary.isOverdue ? Colors.red : Colors.grey)),
           ],
         ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('${summary.commissionAmount.toStringAsFixed(2)} ج.م',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _statusColor)),
-            const SizedBox(height: 4),
-            Text(_statusLabel,
-                style: TextStyle(fontSize: 11, color: _statusColor)),
-            if (showAdminActions && !summary.isPaid) ...[
-              const SizedBox(height: 4),
-              SizedBox(
-                height: 24,
-                child: ElevatedButton(
-                  onPressed: isMarkingPaid ? null : onMarkAsPaid,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+        trailing: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 90),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${summary.commissionAmount.toStringAsFixed(2)} ج.م',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _statusColor)),
+              Text(_statusLabel,
+                  style: TextStyle(fontSize: 10, color: _statusColor)),
+              if (showAdminActions && !summary.isPaid)
+                SizedBox(
+                  height: 20,
+                  child: ElevatedButton(
+                    onPressed: isMarkingPaid ? null : onMarkAsPaid,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: isMarkingPaid
+                        ? const SizedBox(
+                            width: 10,
+                            height: 10,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('تم الدفع', style: TextStyle(fontSize: 9, height: 1)),
                   ),
-                  child: isMarkingPaid
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('تم الدفع', style: TextStyle(fontSize: 10)),
                 ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

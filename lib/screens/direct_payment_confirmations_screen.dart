@@ -19,13 +19,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../models/direct_payment_model.dart';
+import '../providers/system_config_provider.dart';
 import '../services/direct_payment_service.dart';
 
-class DirectPaymentConfirmationsScreen extends StatelessWidget {
+class DirectPaymentConfirmationsScreen extends ConsumerWidget {
   final String? directPaymentRequestId;
 
   const DirectPaymentConfirmationsScreen({
@@ -34,7 +36,7 @@ class DirectPaymentConfirmationsScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final mohaffezId = FirebaseAuth.instance.currentUser!.uid;
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -58,13 +60,13 @@ class DirectPaymentConfirmationsScreen extends StatelessWidget {
             ),
           ],
         ),
-        body: _buildBody(mohaffezId),
+        body: _buildBody(mohaffezId, ref),
       ),
     );
   }
 
   // ── Build body ─────────────────────────────────────────────────────────────
-  Widget _buildBody(String mohaffezId) {
+  Widget _buildBody(String mohaffezId, WidgetRef ref) {
     if (directPaymentRequestId != null &&
         directPaymentRequestId!.isNotEmpty) {
       return StreamBuilder<DirectPaymentModel?>(
@@ -110,7 +112,10 @@ class DirectPaymentConfirmationsScreen extends StatelessWidget {
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: 1,
-            itemBuilder: (_, i) => _PaymentConfirmationCard(payment: payment),
+            itemBuilder: (_, i) => _PaymentConfirmationCard(
+              payment: payment,
+              commissionRate: _getCommissionRate(ref),
+            ),
           );
         },
       );
@@ -158,7 +163,10 @@ class DirectPaymentConfirmationsScreen extends StatelessWidget {
         return ListView.builder(
           padding: const EdgeInsets.all(12),
           itemCount: items.length,
-          itemBuilder: (_, i) => _PaymentConfirmationCard(payment: items[i]),
+          itemBuilder: (_, i) => _PaymentConfirmationCard(
+              payment: items[i],
+              commissionRate: _getCommissionRate(ref),
+            ),
         );
       },
     );
@@ -167,9 +175,23 @@ class DirectPaymentConfirmationsScreen extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Get dynamic commission rate from system config, defaulting to 5%
+double _getCommissionRate(WidgetRef ref) {
+  final configAsync = ref.watch(systemConfigProvider);
+  return configAsync.when(
+    data: (config) => config.commissionRate,
+    loading: () => 0.05,
+    error: (_, __) => 0.05,
+  );
+}
+
 class _PaymentConfirmationCard extends StatefulWidget {
   final DirectPaymentModel payment;
-  const _PaymentConfirmationCard({required this.payment});
+  final double commissionRate;
+  const _PaymentConfirmationCard({
+    required this.payment,
+    required this.commissionRate,
+  });
 
   @override
   State<_PaymentConfirmationCard> createState() =>
@@ -231,10 +253,12 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         'planType=${widget.payment.planType}, '
         'sessionsCount=${widget.payment.sessionsCount}');
 
-    if (!mounted) return;
-    setState(() => _loading = true);
+    debugPrint('🔵 [BUNDLE_FLOW] Step5_PostDialog mounted=$mounted');
+    if (mounted) setState(() => _loading = true);
 
     try {
+      debugPrint('🔵 [BUNDLE_FLOW] Step5_CALLING_CF '
+          'isBundleOrSubscription=$isBundleOrSubscription');
       if (isBundleOrSubscription) {
         await DirectPaymentService.mohaffezConfirmBundlePayment(
           paymentId: widget.payment.id,
@@ -242,8 +266,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         debugPrint('✅ [BUNDLE_FLOW] Step5_BundleConfirm_SUCCESS: '
             'paymentId=${widget.payment.id}, '
             'sessionsCount=${widget.payment.sessionsCount}');
-        if (!mounted) return;
-        setState(() => _confirmed = true);
+        if (mounted) setState(() => _confirmed = true);
         messenger.showSnackBar(
           const SnackBar(
             content: Text(
@@ -261,8 +284,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         await DirectPaymentService.mohaffezConfirm(widget.payment.id);
         debugPrint('✅ [BUNDLE_FLOW] Step5_SingleConfirm_SUCCESS: '
             'paymentId=${widget.payment.id}');
-        if (!mounted) return;
-        setState(() => _confirmed = true);
+        if (mounted) setState(() => _confirmed = true);
         messenger.showSnackBar(
           const SnackBar(
             content: Text('✅ تم قبول الجلسة وإشعار الطالب!'),
@@ -281,8 +303,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
       // Handle already-confirmed case (idempotency)
       if (e.code == 'already-exists') {
-        if (!mounted) return;
-        setState(() => _confirmed = true);
+        if (mounted) setState(() => _confirmed = true);
         messenger.showSnackBar(
           const SnackBar(
             content: Text('تم تأكيد هذه الدفعية من قبل'),
@@ -292,7 +313,6 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         return;
       }
 
-      if (!mounted) return;
       final msg = switch (e.code) {
         'resource-exhausted' =>
             e.message != null && e.message!.isNotEmpty
@@ -311,7 +331,6 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
     } on Exception catch (e) {
       debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_ERROR: '
           'paymentId=${widget.payment.id}, error=$e');
-      if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
       );
@@ -330,7 +349,6 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_UNHANDLED_ERROR: '
           'paymentId=${widget.payment.id}, error=$e');
       debugPrintStack(stackTrace: stack);
-      if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
           content: Text('خطأ غير متوقع — يرجى المحاولة مجدداً: $e'),
@@ -543,7 +561,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'عمولة التطبيق (5%): '
+                    'عمولة التطبيق (${(widget.commissionRate * 100).toInt()}%): '
                     '${p.commissionAmount.toStringAsFixed(2)} ج.م  —  '
                     'يصلك صافي: '
                     '${(p.amount - p.commissionAmount).toStringAsFixed(2)} ج.م',

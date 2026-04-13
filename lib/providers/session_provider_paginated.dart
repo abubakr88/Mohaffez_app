@@ -9,6 +9,26 @@ import '../models/quran_mistake_model.dart';
 import '../models/mohaffez_student_summary.dart';
 import '../models/subscription_model.dart';
 
+/// Parses time from timeSlot (e.g., "15:30 - 16:15" → 15:30) and combines with date
+DateTime? _parseSessionDateTime(DateTime? date, String? timeSlot) {
+  if (date == null) return null;
+  if (timeSlot == null || timeSlot.isEmpty) return date;
+  
+  try {
+    // Extract start time from "15:30 - 16:15" format
+    final startTimeStr = timeSlot.split('-').first.trim();
+    final parts = startTimeStr.split(':');
+    if (parts.length >= 2) {
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      return DateTime(date.year, date.month, date.day, hour, minute);
+    }
+  } catch (_) {
+    // Fallback to original date if parsing fails
+  }
+  return date;
+}
+
 // ============================================================================
 // FILTER ENUM AND PROVIDER
 // ============================================================================
@@ -158,7 +178,10 @@ final upcomingSessionsProvider =
           'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
               data['timeSlot'] as String? ??
               '08:00',
-          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'sessionDate': _parseSessionDateTime(
+            (data['sessionDate'] as Timestamp?)?.toDate(),
+            data['preferredTimeSlot'] as String? ?? data['timeSlot'] as String?,
+          ),
           'location': data['location'] as String? ??
               data['imamAddressText'] as String? ??
               '',
@@ -173,6 +196,42 @@ final upcomingSessionsProvider =
         };
       }).toList();
     });
+  },
+);
+
+// ============================================================================
+// STUDENT UPCOMING SESSIONS (for countdown)
+// ============================================================================
+final studentUpcomingSessionsProvider =
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
+  (ref, studentId) {
+    final lifecycleListener = AppLifecycleListener(
+      onResume: () => ref.invalidateSelf(),
+    );
+    ref.onDispose(lifecycleListener.dispose);
+
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    return FirebaseFirestore.instance
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: studentId)
+        .where('status', isEqualTo: 'accepted')
+        .where('isPaid', isEqualTo: true)
+        .where('sessionDate', isGreaterThanOrEqualTo: startOfDay)
+        .orderBy('sessionDate', descending: false)
+        .limit(20)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              return <String, dynamic>{
+                'id': doc.id,
+                'sessionDate': _parseSessionDateTime(
+                  (data['sessionDate'] as Timestamp?)?.toDate(),
+                  data['preferredTimeSlot'] as String? ?? data['timeSlot'] as String?,
+                ),
+                'mohaffezName': data['mohaffezName'] as String? ?? '',
+              };
+            }).toList());
   },
 );
 

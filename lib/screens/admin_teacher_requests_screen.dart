@@ -38,7 +38,7 @@ class AdminTeacherRequestsScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F7F6),
+        backgroundColor: AppThemeConstants.background,
         appBar: const AdminAppBar(title: 'طلبات الانضمام — المحافظون'),
         body: requestsAsync.when(
           loading: () =>
@@ -137,7 +137,7 @@ class _RequestCardState extends State<_RequestCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم قبول المحفظ بنجاح'),
-            backgroundColor: Color(0xFF2E8B57),
+            backgroundColor: AppThemeConstants.success,
           ),
         );
       }
@@ -159,7 +159,7 @@ class _RequestCardState extends State<_RequestCard> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('يرجى كتابة سبب الرفض'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppThemeConstants.warning,
         ),
       );
       return;
@@ -183,7 +183,7 @@ class _RequestCardState extends State<_RequestCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم رفض الطلب'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -203,14 +203,14 @@ class _RequestCardState extends State<_RequestCard> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.all(Radius.circular(16)),
-        border: Border.all(color: const Color(0xFFE5EDE9)),
-        boxShadow: [
+        color: AppThemeConstants.surface,
+        borderRadius: AppThemeConstants.borderRadiusLg,
+        border: Border.all(color: AppThemeConstants.divider),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: AppThemeConstants.shadow,
             blurRadius: 10,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -220,7 +220,7 @@ class _RequestCardState extends State<_RequestCard> {
           // ── Header row ─────────────────────────────────────────
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: const BorderRadius.all(Radius.circular(16)),
+            borderRadius: AppThemeConstants.borderRadiusLg,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -228,8 +228,8 @@ class _RequestCardState extends State<_RequestCard> {
                   // Avatar
                   Container(
                     width: 48, height: 48,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFEAF6F3),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.accentBackground,
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -238,7 +238,7 @@ class _RequestCardState extends State<_RequestCard> {
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0C6F6A),
+                          color: AppThemeConstants.primary,
                         ),
                       ),
                     ),
@@ -367,14 +367,14 @@ class _RequestCardState extends State<_RequestCard> {
                       child: Row(
                         children: [
                           const Icon(Icons.play_circle_outline_rounded,
-                              size: 18, color: Color(0xFF0C6F6A)),
+                              size: 18, color: AppThemeConstants.primary),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _videoUrl!,
                               style: const TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFF0C6F6A),
+                                  color: AppThemeConstants.primary,
                                   decoration: TextDecoration.underline),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -431,9 +431,9 @@ class _RequestCardState extends State<_RequestCard> {
                                     size: 18),
                                 label: const Text('رفض'),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
+                                  foregroundColor: AppThemeConstants.error,
                                   side: const BorderSide(
-                                      color: Colors.red),
+                                      color: AppThemeConstants.error),
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 12),
                                   shape: const RoundedRectangleBorder(
@@ -454,7 +454,7 @@ class _RequestCardState extends State<_RequestCard> {
                                 label: const Text('قبول وتفعيل'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
-                                      const Color(0xFF0C6F6A),
+                                      AppThemeConstants.primary,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 12),
@@ -614,7 +614,7 @@ class _InfoChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF0C6F6A)),
+          Icon(icon, size: 14, color: AppThemeConstants.primary),
           const SizedBox(width: 6),
           Text(label,
               style: const TextStyle(

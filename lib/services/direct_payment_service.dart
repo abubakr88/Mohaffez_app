@@ -276,7 +276,7 @@ class DirectPaymentService {
     return _db
         .collection('directPaymentRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .where('status', isEqualTo: 'pending_confirmation')
+        .where('status', isEqualTo: 'pendingconfirmation')
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()

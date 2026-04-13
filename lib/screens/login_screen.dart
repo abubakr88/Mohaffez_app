@@ -332,7 +332,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             
             // ── Primary Button ────────────────────────────
             SizedBox(
-              height: 54,
+              height: 68,
               child: ElevatedButton(
                 onPressed: isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(

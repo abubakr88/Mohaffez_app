@@ -47,10 +47,6 @@ class GuardManager {
       return '/home';
     }
 
-    if (kDebugMode) {
-      debugPrint('🔍 GuardManager: checking ${current.path}${_query(current)}');
-    }
-
     for (final guard in _guards) {
       final redirect = guard.check(ref, state);
 
@@ -83,8 +79,6 @@ class GuardManager {
     // Compare both path and query for correctness.
     return target.path == current.path && target.query == current.query;
   }
-
-  static String _query(Uri uri) => uri.hasQuery ? '?${uri.query}' : '';
 
   /// Add custom guard (feature-specific).
   static void addGuard(RouteGuard guard) {

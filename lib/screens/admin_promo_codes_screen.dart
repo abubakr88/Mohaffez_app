@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/admin_provider.dart';
@@ -53,7 +54,9 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
         body: codes.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text(e.toString())),
-          data: (list) => ListView.builder(
+          data: (list) => RefreshIndicator(
+            onRefresh: () async => ref.invalidate(allPromoCodesProvider),
+            child: ListView.builder(
             itemCount: list.length,
             itemBuilder: (_, i) {
               final p = list[i];
@@ -70,12 +73,49 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
               return Card(
                 margin: const EdgeInsets.all(AppThemeConstants.spaceSm),
                 child: ListTile(
-                  title: Text(p['code']?.toString() ?? '-'),
+                  title: InkWell(
+                    onTap: () async {
+                      final code = p['code']?.toString() ?? '';
+                      await Clipboard.setData(ClipboardData(text: code));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('تم نسخ الكود'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(p['code']?.toString() ?? '-'),
+                        const SizedBox(width: 4),
+                        Icon(Icons.copy, size: 16, color: AppThemeConstants.primary),
+                      ],
+                    ),
+                  ),
                   subtitle: Text(
                       '${ArabicLabels.discountPercent}: ${p['discountPercent'] ?? 0}%\n${ArabicLabels.usedCount}: ${p['usedCount'] ?? 0}/${p['usageLimit'] ?? 0}\n${ArabicLabels.expiryDate}: $expiryText'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      IconButton(
+                        icon: Icon(Icons.copy, color: AppThemeConstants.primary),
+                        tooltip: 'نسخ الكود',
+                        onPressed: () async {
+                          final code = p['code']?.toString() ?? '';
+                          await Clipboard.setData(ClipboardData(text: code));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('تم نسخ الكود'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                      ),
                       if (isDeleting)
                         const SizedBox(
                           width: 20,
@@ -137,7 +177,8 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Future<void> _showCreateSheet(
