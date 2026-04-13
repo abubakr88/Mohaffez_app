@@ -83,6 +83,7 @@ class _AdminSystemSettingsScreenState
         appBar: AdminAppBar(
           title: ArabicLabels.systemSettings,
           bottom: TabBar(
+            isScrollable: true,
             controller: _tabController,
             tabs: const [
               Tab(text: ArabicLabels.paymentSettings),

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
+import '../shared/widgets/admin_empty_state.dart';
 import '../utils/arabic_labels.dart';
 
 /// Cache for user names to avoid repeated fetches
@@ -84,7 +85,12 @@ class _AdminSlotLocksScreenState extends ConsumerState<AdminSlotLocksScreen> {
         body: locks.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text(e.toString())),
-          data: (list) => ListView.builder(
+          data: (list) => list.isEmpty
+              ? const AdminEmptyState(
+                  icon: Icons.lock_open_outlined,
+                  message: 'لا توجد أقفال نشطة',
+                )
+              : ListView.builder(
             itemCount: list.length,
             itemBuilder: (_, i) {
               final l = list[i];

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
+import '../shared/widgets/admin_empty_state.dart';
 import '../utils/arabic_labels.dart';
 
 /// Cache for user names to avoid repeated fetches
@@ -90,25 +91,9 @@ class _AdminAuditLogScreenState extends ConsumerState<AdminAuditLogScreen> {
           ),
           data: (list) {
             if (list.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.history,
-                      size: AppThemeConstants.icon3xl,
-                      color: AppThemeConstants.textSecondary,
-                    ),
-                    SizedBox(height: AppThemeConstants.spaceMd),
-                    Text(
-                      ArabicLabels.noAuditLogs,
-                      style: TextStyle(
-                        color: AppThemeConstants.textSecondary,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+              return const AdminEmptyState(
+                icon: Icons.history,
+                message: ArabicLabels.noAuditLogs,
               );
             }
 

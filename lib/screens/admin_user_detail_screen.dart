@@ -119,6 +119,7 @@ class _AdminUserDetailScreenState
                   _ActionButton(
                     label: ArabicLabels.banUser,
                     isLoading: _isLoadingSuspend,
+                    backgroundColor: AppThemeConstants.warning,
                     onPressed: () => _onSuspendPressed(actions),
                   ),
 
@@ -127,6 +128,7 @@ class _AdminUserDetailScreenState
                   _ActionButton(
                     label: ArabicLabels.unbanUser,
                     isLoading: _isLoadingUnsuspend,
+                    backgroundColor: AppThemeConstants.success,
                     onPressed: () => _onUnsuspendPressed(actions),
                   ),
 
@@ -134,6 +136,7 @@ class _AdminUserDetailScreenState
                 _ActionButton(
                   label: 'تغيير الدور',
                   isLoading: _isLoadingRoleChange,
+                  backgroundColor: AppThemeConstants.primary,
                   onPressed: () => _onRoleChangePressed(actions),
                 ),
 
@@ -141,6 +144,7 @@ class _AdminUserDetailScreenState
                 _ActionButton(
                   label: 'إعادة تعيين كلمة المرور',
                   isLoading: _isLoadingResetPassword,
+                  backgroundColor: AppThemeConstants.secondary,
                   onPressed: _onResetPasswordPressed,
                 ),
 
@@ -459,7 +463,10 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton(
       style: backgroundColor != null
-          ? ElevatedButton.styleFrom(backgroundColor: backgroundColor)
+          ? ElevatedButton.styleFrom(
+              backgroundColor: backgroundColor,
+              foregroundColor: Colors.white,
+            )
           : null,
       onPressed: isLoading ? null : onPressed,
       child: isLoading

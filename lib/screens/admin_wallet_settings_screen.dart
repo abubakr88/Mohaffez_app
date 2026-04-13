@@ -18,7 +18,20 @@ class _AdminWalletSettingsScreenState
   final _instapayController = TextEditingController();
   final _vodafoneController = TextEditingController();
   final _orangeController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+
+  /// Validates an Egyptian phone number (starts with 0, 10-11 digits)
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null; // Allow empty (optional field)
+    }
+    final phone = value.trim();
+    if (!RegExp(r'^0\d{9,10}$').hasMatch(phone)) {
+      return 'أدخل رقم هاتف مصري صحيح (يبدأ بـ 0، 10-11 رقم)';
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -88,9 +101,11 @@ class _AdminWalletSettingsScreenState
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: const AdminAppBar(title: 'أرقام محافظ المنصة'),
-        body: ListView(
-          padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
-          children: [
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+            children: [
             // Info header card
             Container(
               padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
@@ -133,6 +148,7 @@ class _AdminWalletSettingsScreenState
             TextFormField(
               controller: _instapayController,
               keyboardType: TextInputType.phone,
+              validator: _validatePhone,
               decoration: const InputDecoration(
                 labelText: 'InstaPay',
                 hintText: 'رقم InstaPay',
@@ -148,6 +164,7 @@ class _AdminWalletSettingsScreenState
             TextFormField(
               controller: _vodafoneController,
               keyboardType: TextInputType.phone,
+              validator: _validatePhone,
               decoration: InputDecoration(
                 labelText: 'Vodafone Cash',
                 hintText: 'رقم Vodafone Cash',
@@ -166,6 +183,7 @@ class _AdminWalletSettingsScreenState
             TextFormField(
               controller: _orangeController,
               keyboardType: TextInputType.phone,
+              validator: _validatePhone,
               decoration: InputDecoration(
                 labelText: 'Orange Money',
                 hintText: 'رقم Orange Money',
@@ -185,7 +203,13 @@ class _AdminWalletSettingsScreenState
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _saveWallets,
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        if (_formKey.currentState!.validate()) {
+                          _saveWallets();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppThemeConstants.primaryAmber,
                   foregroundColor: Colors.white,
@@ -206,7 +230,8 @@ class _AdminWalletSettingsScreenState
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

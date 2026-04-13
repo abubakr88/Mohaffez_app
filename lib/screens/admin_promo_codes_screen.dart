@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
+import '../shared/widgets/admin_empty_state.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminPromoCodesScreen extends ConsumerStatefulWidget {
@@ -54,7 +55,12 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
         body: codes.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text(e.toString())),
-          data: (list) => RefreshIndicator(
+          data: (list) => list.isEmpty
+              ? const AdminEmptyState(
+                  icon: Icons.local_offer_outlined,
+                  message: 'لا توجد أكواد خصم',
+                )
+              : RefreshIndicator(
             onRefresh: () async => ref.invalidate(allPromoCodesProvider),
             child: ListView.builder(
             itemCount: list.length,

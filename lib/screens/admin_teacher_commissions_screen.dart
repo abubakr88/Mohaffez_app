@@ -8,6 +8,7 @@ import '../providers/admin_provider.dart';
 import '../services/direct_payment_service.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
+import '../shared/widgets/admin_empty_state.dart';
 
 class AdminTeacherCommissionsScreen extends ConsumerStatefulWidget {
   const AdminTeacherCommissionsScreen({super.key});
@@ -80,8 +81,9 @@ class _AdminTeacherCommissionsScreenState
             }
             final list = snap.data!;
             if (list.isEmpty) {
-              return const Center(
-                child: Text('لا توجد عمولات بعد'),
+              return const AdminEmptyState(
+                icon: Icons.payments_outlined,
+                message: 'لا توجد عمولات بعد',
               );
             }
 

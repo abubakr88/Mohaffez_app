@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
+import '../shared/widgets/admin_empty_state.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminCredentialsScreen extends ConsumerStatefulWidget {
@@ -106,8 +107,10 @@ class _AdminCredentialsScreenState
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                      child: const Center(
-                        child: Text(ArabicLabels.noCredentialsPending)),
+                      child: const AdminEmptyState(
+                        icon: Icons.verified_user_outlined,
+                        message: ArabicLabels.noCredentialsPending,
+                      ),
                     ),
                   ),
                 ),

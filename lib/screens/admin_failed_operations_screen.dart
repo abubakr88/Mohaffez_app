@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/admin_app_bar.dart';
+import '../shared/widgets/admin_empty_state.dart';
 import '../utils/arabic_labels.dart';
 
 class AdminFailedOperationsScreen extends ConsumerStatefulWidget {
@@ -116,22 +117,9 @@ class _AdminFailedOperationsScreenState
           data: (list) {
             // WHY: Explicit success state helps admins confirm queue is healthy.
             if (list.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 64,
-                      color: AppThemeConstants.accentGreen,
-                    ),
-                    SizedBox(height: AppThemeConstants.spaceMd),
-                    Text(
-                      ArabicLabels.noFailedOperations,
-                      style: TextStyle(color: AppThemeConstants.textSecondary),
-                    ),
-                  ],
-                ),
+              return const AdminEmptyState(
+                icon: Icons.check_circle_outline,
+                message: ArabicLabels.noFailedOperations,
               );
             }
 

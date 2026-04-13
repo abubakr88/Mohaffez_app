@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../shared/widgets/admin_app_bar.dart';
+import '../shared/widgets/admin_empty_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -230,22 +231,9 @@ class _AdminPaymentEventsScreenState
                   final filteredDocs = _filterEvents(docs);
 
                   if (filteredDocs.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.receipt_long_outlined,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'لا توجد أحداث مطابقة للفلتر الحالي',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
+                    return const AdminEmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      message: 'لا توجد أحداث مطابقة للفلتر الحالي',
                     );
                   }
 
