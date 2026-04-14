@@ -694,7 +694,33 @@ Widget _buildDrawer(
                 ),
                 onTap: () async {
                   Navigator.pop(context);
-                  await FirebaseAuth.instance.signOut();
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: AlertDialog(
+                        title: const Text('تسجيل الخروج'),
+                        content: const Text('هل أنت متأكد أنك تريد تسجيل الخروج؟'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('إلغاء'),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('تسجيل الخروج'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  if (confirmed == true) {
+                    await FirebaseAuth.instance.signOut();
+                  }
                 },
               ),
             ],

@@ -166,8 +166,23 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                     ),
                   );
                 },
-                loading: () => const SliverToBoxAdapter(
-                  child: SkeletonList(itemCount: 6, itemHeight: 90),
+                loading: () => SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      const SkeletonList(itemCount: 6, itemHeight: 90),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 16),
+                        child: Text(
+                          'جاري البحث عن محفظين بالقرب منك...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 error: (error, stack) => SliverFillRemaining(
                   child: ErrorDisplay.dataLoad(

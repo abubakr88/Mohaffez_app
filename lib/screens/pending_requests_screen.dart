@@ -71,7 +71,7 @@ class _PendingRequestsScreenState
                     });
                   },
                   decoration: InputDecoration(
-                    hintText: 'ابحث عن طالب...',
+                    hintText: ArabicLabels.searchStudents,
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -416,6 +416,8 @@ class _PendingRequestsScreenState
 
       if (!mounted) return;
 
+      final mohaffezId = ref.read(currentUserProvider).value?.uid ?? '';
+      ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم قبول الطلب بنجاح ✓'),

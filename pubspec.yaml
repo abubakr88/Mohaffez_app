@@ -18,7 +18,6 @@ dependencies:
   url_launcher: ^6.3.1
   package_info_plus: ^8.1.0
   cupertino_icons: ^1.0.8
-  flutter_dotenv: ^5.1.0
 
   # Quran data
   quran: ^1.2.9
@@ -158,7 +157,6 @@ flutter:
     - assets/images/mastercard.png
     - assets/images/visa.png
     - assets/quran_data.json
-    - .env
 
 
 flutter_launcher_icons:

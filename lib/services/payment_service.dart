@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:crypto/crypto.dart';
 
 final paymentServiceProvider = Provider((ref) {
@@ -13,10 +12,10 @@ final paymentServiceProvider = Provider((ref) {
 
 class PaymentService {
   // Paymob credentials (store in .env file)
-  final String _paymobApiKey = dotenv.env['PAYMOB_API_KEY'] ?? '';
-  final String _paymobIntegrationId = dotenv.env['PAYMOB_INTEGRATION_ID'] ?? '';
-  final String _paymobIframeId = dotenv.env['PAYMOB_IFRAME_ID'] ?? '';
-  final String _paymobHmacSecret = dotenv.env['PAYMOB_HMAC_SECRET'] ?? '';
+  static const String _paymobApiKey = String.fromEnvironment('PAYMOB_API_KEY');
+  static const String _paymobIntegrationId = String.fromEnvironment('PAYMOB_INTEGRATION_ID');
+  static const String _paymobIframeId = String.fromEnvironment('PAYMOB_IFRAME_ID');
+  static const String _paymobHmacSecret = String.fromEnvironment('PAYMOB_HMAC_SECRET');
 
   static const String _baseUrl = 'https://accept.paymob.com/api';
 

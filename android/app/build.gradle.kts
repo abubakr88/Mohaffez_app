@@ -19,9 +19,26 @@ val mapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY")?.takeIf { it.isNotBlank() 
     ?: dotenv.getProperty("GOOGLE_MAPS_API_KEY")?.takeIf { it.isNotBlank() }
     ?: ""
 
+// Load release signing config from android/key.properties (never commit this file)
+val keystoreProperties = Properties().apply {
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     namespace = "com.imam.mohaffez_app"
     compileSdk = 36
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
+            keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
+            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+            storePassword = keystoreProperties.getProperty("storePassword") ?: ""
+        }
+    }
 
     defaultConfig {
         applicationId = "com.imam.mohaffez_app"
@@ -35,7 +52,7 @@ android {
 
     buildTypes {
         getByName("release") {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

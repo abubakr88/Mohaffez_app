@@ -192,6 +192,19 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                 controller: notesController,
                 maxLines: 5,
                 maxLength: 500,
+                buildCounter: (context,
+                    {required currentLength,
+                    required isFocused,
+                    maxLength}) =>
+                    Text(
+                      '$currentLength / $maxLength',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: currentLength > (maxLength ?? 500) * 0.9
+                            ? Colors.orange
+                            : Colors.grey.shade500,
+                      ),
+                    ),
                 decoration: InputDecoration(
                   hintText: 'شاركنا رأيك حول الجلسة...',
                   border: OutlineInputBorder(

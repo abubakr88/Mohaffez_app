@@ -86,7 +86,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             child: Form(
               key: _formKey,
               autovalidateMode: _autoValidate
-                  ? AutovalidateMode.onUserInteraction
+                  ? AutovalidateMode.onUnfocus
                   : AutovalidateMode.disabled,
               child: Column(
                 children: [

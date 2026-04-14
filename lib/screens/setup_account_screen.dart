@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/exam_question_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/auth_provider.dart';
 import '../providers/setup_provider.dart';
 import '../providers/system_config_provider.dart';
@@ -440,7 +441,38 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
               _currentStep == 2 ? 'اختبار المهارات' : 'إعداد الحساب',
             ),
             centerTitle: true,
-            automaticallyImplyLeading: false, // no back arrow
+            automaticallyImplyLeading: false,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'تسجيل الخروج',
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: AlertDialog(
+                        title: const Text('تسجيل الخروج'),
+                        content: const Text('هل تريد تسجيل الخروج والعودة لاحقاً؟'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('إلغاء'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('تسجيل الخروج'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  if (confirmed == true) {
+                    await FirebaseAuth.instance.signOut();
+                  }
+                },
+              ),
+            ],
           ),
           body: PageView(
             controller: _pageController,

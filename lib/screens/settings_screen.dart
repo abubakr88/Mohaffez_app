@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -143,8 +144,8 @@ class SettingsScreen extends ConsumerWidget {
   }) {
     return ListTile(
       leading: Icon(icon, color: AppThemeConstants.primaryAmber),
-      title: Text(title),
-      subtitle: Text(subtitle),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: onTap,
     );
@@ -186,6 +187,7 @@ class SettingsScreen extends ConsumerWidget {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
@@ -193,40 +195,48 @@ class SettingsScreen extends ConsumerWidget {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('تغيير كلمة المرور'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'كلمة المرور الحالية',
-                  border: OutlineInputBorder(),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: currentPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'كلمة المرور الحالية',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'يرجى إدخال كلمة المرور الحالية' : null,
                 ),
-              ),
-              const SizedBox(
-                  height:
-                      AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
-              TextField(
-                controller: newPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'كلمة المرور الجديدة',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
+                TextFormField(
+                  controller: newPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'كلمة المرور الجديدة',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'يرجى إدخال كلمة مرور جديدة';
+                    if (v.length < 6) return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                    return null;
+                  },
                 ),
-              ),
-              const SizedBox(
-                  height:
-                      AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
-              TextField(
-                controller: confirmPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'تأكيد كلمة المرور',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
+                TextFormField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'تأكيد كلمة المرور',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) =>
+                      v != newPasswordController.text ? 'كلمتا المرور غير متطابقتين' : null,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -234,11 +244,36 @@ class SettingsScreen extends ConsumerWidget {
               child: const Text('إلغاء'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('تم تغيير كلمة المرور بنجاح')),
-                );
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null || user.email == null) return;
+                  final cred = EmailAuthProvider.credential(
+                    email: user.email!,
+                    password: currentPasswordController.text,
+                  );
+                  await user.reauthenticateWithCredential(cred);
+                  await user.updatePassword(newPasswordController.text);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('تم تغيير كلمة المرور بنجاح'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } on FirebaseAuthException catch (e) {
+                  if (context.mounted) {
+                    final msg = e.code == 'wrong-password'
+                        ? 'كلمة المرور الحالية غير صحيحة'
+                        : 'حدث خطأ: ${e.message}';
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+                    );
+                  }
+                }
               },
               child: const Text('حفظ'),
             ),

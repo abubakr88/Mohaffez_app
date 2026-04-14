@@ -27,6 +27,7 @@ class DirectBookingRequestScreen extends ConsumerStatefulWidget {
 class _DirectBookingRequestScreenState
     extends ConsumerState<DirectBookingRequestScreen> {
   bool _submitting = false;
+  bool _acknowledged = false;
 
   // True only after a successful request is sent.
   // Prevents dispose from resetting the provider too early during navigation.
@@ -228,12 +229,40 @@ class _DirectBookingRequestScreenState
                 body:
                     '١. ترسل الطلب.\n٢. يقبل المحفظ.\n٣. تستلم إشعار بالقبول.\n٤. تحوّل المبلغ مباشرة.\n٥. يؤكد المحفظ الاستلام.',
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+              // Acknowledgment checkbox
+              Container(
+                decoration: BoxDecoration(
+                  color: _acknowledged
+                      ? AppThemeConstants.primaryAmber.withValues(alpha: 0.08)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _acknowledged
+                        ? AppThemeConstants.primaryAmber.withValues(alpha: 0.4)
+                        : Colors.grey.shade300,
+                  ),
+                ),
+                child: CheckboxListTile(
+                  value: _acknowledged,
+                  onChanged: _submitting
+                      ? null
+                      : (v) => setState(() => _acknowledged = v ?? false),
+                  activeColor: AppThemeConstants.primaryAmber,
+                  title: const Text(
+                    'أتفهم أنني سأحوّل المبلغ مباشرةً بعد قبول المحفظ للطلب',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+              const SizedBox(height: 20),
               // Send button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _submitting ? null : sendRequest,
+                  onPressed: (_submitting || !_acknowledged) ? null : sendRequest,
                   icon: _submitting
                       ? const SizedBox(
                           width: 20,

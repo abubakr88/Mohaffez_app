@@ -21,8 +21,8 @@ class _AdminFailedOperationsScreenState
 
   Future<void> _run(Future<void> Function() op) async {
     await op();
-    final st = ref.read(adminActionsProvider);
     if (!mounted) return;
+    final st = ref.read(adminActionsProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor:

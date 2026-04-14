@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_google_maps_webservices/places.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this import
+import '../config/env_config.dart';
 
 class PickLocationScreen extends StatefulWidget {
   final double? initialLat;
@@ -44,11 +44,10 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
   void initState() {
     super.initState();
 
-    // Load API key from .env file
-    _googleApiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    _googleApiKey = EnvConfig.googleMapsApiKey;
 
     if (_googleApiKey.isEmpty) {
-      throw Exception('GOOGLE_MAPS_API_KEY not found in .env file');
+      throw Exception('GOOGLE_MAPS_API_KEY not set. Build with --dart-define-from-file=.env');
     }
 
     _places = GoogleMapsPlaces(apiKey: _googleApiKey);

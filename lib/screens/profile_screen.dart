@@ -63,6 +63,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isEditingBio = false;
+  bool _isUploadingPhoto = false;
   final _bioController = TextEditingController();
   final _youtubeController = TextEditingController();
 
@@ -113,10 +114,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(String userId) async {
+    if (_isUploadingPhoto) return;
+    setState(() => _isUploadingPhoto = true);
     try {
       final picker = ImagePicker();
       final image = await picker.pickImage(source: ImageSource.gallery);
-      if (image == null) return;
+      if (image == null) {
+        if (mounted) setState(() => _isUploadingPhoto = false);
+        return;
+      }
 
       if (!mounted) return;
       final cropped = await ImageCropper().cropImage(
@@ -168,6 +174,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop();
       _showSnackBar('${ArabicLabels.error}: $e');
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 

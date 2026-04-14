@@ -219,12 +219,19 @@ class UpcomingSessionsScreen extends ConsumerWidget {
               sessionsAsync.when(
                 data: (allSessions) {
                   if (allSessions.isEmpty) {
-                    return const SliverFillRemaining(
+                    return SliverFillRemaining(
                       child: EmptyState(
                         icon: Icons.event_busy,
                         title: 'لا توجد جلسات قادمة',
                         message: 'لم يتم جدولة أي جلسات بعد',
                         animated: true,
+                        action: TextButton.icon(
+                          onPressed: () {
+                            ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('تحديث'),
+                        ),
                       ),
                     );
                   }

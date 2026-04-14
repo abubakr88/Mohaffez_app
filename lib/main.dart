@@ -8,7 +8,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'firebase_options.dart';
@@ -35,13 +34,7 @@ void main() async {
 
   try {
     // ============================================
-    // 1. Load Environment Variables
-    // ============================================
-    await dotenv.load(fileName: '.env');
-    debugPrint('✅ Environment variables loaded');
-
-    // ============================================
-    // 2. Initialize Firebase
+    // 1. Initialize Firebase
     // ============================================
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
