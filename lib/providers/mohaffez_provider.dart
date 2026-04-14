@@ -33,6 +33,22 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       }).toList();
     }
 
+    // تصفية حسب البحث بالاسم
+    if (params.searchQuery != null && params.searchQuery!.isNotEmpty) {
+      final query = params.searchQuery!.toLowerCase();
+      mohaffezList = mohaffezList.where((mohaffez) {
+        return mohaffez.name.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    // تصفية حسب التخصص
+    if (params.specialization != null && params.specialization!.isNotEmpty) {
+      mohaffezList = mohaffezList.where((mohaffez) {
+        final spec = mohaffez.specialization?.toLowerCase() ?? '';
+        return spec.contains(params.specialization!.toLowerCase());
+      }).toList();
+    }
+
     // ترتيب حسب نوع الفلتر
     switch (params.sortBy) {
       case SortType.distance:
@@ -64,12 +80,16 @@ class NearbyParams {
   final double? userLng;
   final double radiusKm;
   final SortType sortBy;
+  final String? searchQuery;
+  final String? specialization;
 
   NearbyParams({
     this.userLat,
     this.userLng,
     this.radiusKm = 50.0, // 50 كم افتراضياً
     this.sortBy = SortType.distance,
+    this.searchQuery,
+    this.specialization,
   });
 
   @override
@@ -80,10 +100,30 @@ class NearbyParams {
           userLat == other.userLat &&
           userLng == other.userLng &&
           radiusKm == other.radiusKm &&
-          sortBy == other.sortBy;
+          sortBy == other.sortBy &&
+          searchQuery == other.searchQuery &&
+          specialization == other.specialization;
 
   @override
-  int get hashCode => Object.hash(userLat, userLng, radiusKm, sortBy);
+  int get hashCode => Object.hash(
+      userLat, userLng, radiusKm, sortBy, searchQuery, specialization);
 }
 
 enum SortType { distance, rating, followers }
+
+/// Provider for mohaffez session counts (for search results)
+final mohaffezSessionCountProvider = FutureProvider.family<int, String>(
+  (ref, mohaffezId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('status', isEqualTo: 'completed')
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+);

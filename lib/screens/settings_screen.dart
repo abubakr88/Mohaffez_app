@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
 
@@ -80,6 +81,13 @@ class SettingsScreen extends ConsumerWidget {
               title: 'معلومات',
               children: [
                 buildSettingTile(
+                  icon: Icons.privacy_tip,
+                  title: 'سياسة الخصوصية',
+                  subtitle: 'كيف نحمي بياناتك',
+                  onTap: () => _openPrivacyPolicy(context),
+                ),
+                const Divider(height: 1),
+                buildSettingTile(
                   icon: Icons.info,
                   title: 'عن التطبيق',
                   subtitle: '1.0.0',
@@ -141,14 +149,44 @@ class SettingsScreen extends ConsumerWidget {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    Color? iconColor,
   }) {
     return ListTile(
-      leading: Icon(icon, color: AppThemeConstants.primaryAmber),
+      leading: Icon(icon, color: iconColor ?? AppThemeConstants.primaryAmber),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: onTap,
     );
+  }
+
+  void _openPrivacyPolicy(BuildContext context) async {
+    const privacyPolicyUrl = 'https://mohaffez-ba2ec.web.app/privacy-policy';
+    final uri = Uri.parse(privacyPolicyUrl);
+    
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('لا يمكن فتح رابط سياسة الخصوصية'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void showLanguageDialog(BuildContext context) {

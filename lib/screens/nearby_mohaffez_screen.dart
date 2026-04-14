@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/skeleton_card.dart';
 import '../shared/widgets/cached_avatar.dart';
 import '../shared/widgets/empty_state.dart';
@@ -27,6 +28,26 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
   bool isLoadingLocation = true;
   String? locationError;
   double radiusKm = 50.0;
+  String searchQuery = '';
+  String? selectedSpecialization;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  final List<String> specializations = [
+    'حفظ القرآن',
+    'تجويد',
+    'قراءات',
+    'تفسير',
+    'تعليم الأطفال',
+    'اللغة العربية',
+  ];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -96,6 +117,13 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
     }
   }
 
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      searchQuery = '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final params = NearbyParams(
@@ -103,6 +131,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
       userLng: userLng,
       radiusKm: radiusKm,
       sortBy: selectedFilter,
+      searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
+      specialization: selectedSpecialization,
     );
 
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
@@ -124,6 +154,12 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                 SliverToBoxAdapter(
                   child: _buildLocationBanner(),
                 ),
+              SliverToBoxAdapter(
+                child: _buildSearchBar(),
+              ),
+              SliverToBoxAdapter(
+                child: _buildSpecializationChips(),
+              ),
               SliverToBoxAdapter(
                 child: _buildRadiusSlider(),
               ),
@@ -203,7 +239,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
     NearbyParams params,
   ) {
     return SliverAppBar(
-      expandedHeight: 120,
+      expandedHeight: 100,
       floating: true,
       pinned: true,
       flexibleSpace: FlexibleSpaceBar(
@@ -217,62 +253,146 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.location_searching,
+                      size: 24,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'ابحث عن محفظ',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.location_searching,
-                          size: 28,
-                          color: Colors.white,
+                        SizedBox(height: 2),
+                        Text(
+                          'محفظون معتمدون بالقرب منك',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white70,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ArabicLabels.nearby,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              ArabicLabels.searchForMohaffez,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon:
-                            const Icon(Icons.my_location, color: Colors.white),
-                        onPressed: _getCurrentLocation,
-                        tooltip: 'تحديث الموقع',
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.my_location, color: Colors.white),
+                    onPressed: _getCurrentLocation,
+                    tooltip: 'تحديث الموقع',
                   ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: TextField(
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        textDirection: TextDirection.rtl,
+        decoration: InputDecoration(
+          hintText: 'ابحث باسم المحفظ...',
+          hintTextDirection: TextDirection.rtl,
+          prefixIcon: const Icon(Icons.search, color: AppThemeConstants.textSecondary),
+          suffixIcon: searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, color: AppThemeConstants.textSecondary),
+                  onPressed: _clearSearch,
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppTheme.primaryAmber, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        onChanged: (value) {
+          setState(() {
+            searchQuery = value.trim();
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildSpecializationChips() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'التخصص',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _SpecializationChip(
+                  label: 'الكل',
+                  isSelected: selectedSpecialization == null,
+                  onTap: () {
+                    setState(() {
+                      selectedSpecialization = null;
+                    });
+                  },
+                ),
+                ...specializations.map((spec) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _SpecializationChip(
+                    label: spec,
+                    isSelected: selectedSpecialization == spec,
+                    onTap: () {
+                      setState(() {
+                        selectedSpecialization = spec;
+                      });
+                    },
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -486,7 +606,47 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class MohaffezCard extends StatelessWidget {
+class _SpecializationChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SpecializationChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        margin: const EdgeInsets.only(left: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppThemeConstants.primary.withValues(alpha: 0.15) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class MohaffezCard extends ConsumerWidget {
   final MohaffezModel mohaffez;
   final double? distance;
   final VoidCallback onTap;
@@ -499,7 +659,9 @@ class MohaffezCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionCountAsync = ref.watch(mohaffezSessionCountProvider(mohaffez.id));
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 3,
@@ -566,6 +728,15 @@ class MohaffezCard extends StatelessWidget {
                           icon: Icons.people,
                           label: '${mohaffez.followerCount}',
                           color: Colors.green,
+                        ),
+                        sessionCountAsync.when(
+                          data: (count) => _InfoBadge(
+                            icon: Icons.check_circle,
+                            label: '$count جلسة',
+                            color: AppThemeConstants.primary,
+                          ),
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, __) => const SizedBox.shrink(),
                         ),
                       ],
                     ),

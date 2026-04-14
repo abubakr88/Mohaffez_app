@@ -78,3 +78,53 @@ final availabilityProvider = StreamProvider.family<List<Map<String, dynamic>>, S
         });
   },
 );
+
+/// Provider for mohaffez statistics (sessions count, students count)
+final mohaffezStatsProvider = FutureProvider.family<Map<String, dynamic>, String>(
+  (ref, mohaffezId) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+
+      // Get total sessions count (all statuses)
+      final totalSessionsSnapshot = await firestore
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .count()
+          .get();
+      final totalSessions = totalSessionsSnapshot.count ?? 0;
+
+      // Get completed sessions count
+      final completedSessionsSnapshot = await firestore
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .where('status', isEqualTo: 'completed')
+          .count()
+          .get();
+      final completedSessions = completedSessionsSnapshot.count ?? 0;
+
+      // Get unique students count using aggregation
+      final sessionsSnapshot = await firestore
+          .collection('hafizSessions')
+          .where('mohaffezId', isEqualTo: mohaffezId)
+          .get();
+
+      final uniqueStudents = sessionsSnapshot.docs
+          .map((doc) => doc.data()['studentId'] as String?)
+          .where((id) => id != null)
+          .toSet()
+          .length;
+
+      return {
+        'totalSessions': totalSessions,
+        'completedSessions': completedSessions,
+        'uniqueStudents': uniqueStudents,
+      };
+    } catch (e) {
+      return {
+        'totalSessions': 0,
+        'completedSessions': 0,
+        'uniqueStudents': 0,
+      };
+    }
+  },
+);

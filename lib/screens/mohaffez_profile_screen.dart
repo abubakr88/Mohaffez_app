@@ -153,7 +153,7 @@ class _MohaffezProfileScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildBasicInfo(profile),
+                      _buildBasicInfo(ref, profile),
                       const SizedBox(height: 16),
                       _buildPricingPreviewBanner(plansAsync),
                       const SizedBox(height: 16),
@@ -804,67 +804,186 @@ class _MohaffezProfileScreenState
     );
   }
 
-  // ─── Basic info ───────────────────────────────────────────────────────────
+  // ─── Basic info with statistics ───────────────────────────────────────────
 
-  Widget _buildBasicInfo(Map<String, dynamic> profile) {
+  Widget _buildBasicInfo(WidgetRef ref, Map<String, dynamic> profile) {
     final rating = profile['rating'] as num? ?? 0.0;
     final reviewCount = profile['reviewCount'] as int? ?? 0;
-    final ratingText = reviewCount > 0 ? '${rating.toStringAsFixed(1)}/10' : 'جديد';
-    
+    final ratingText = reviewCount > 0 ? '${rating.toStringAsFixed(1)}' : 'جديد';
+    final statsAsync = ref.watch(mohaffezStatsProvider(widget.mohaffezId));
+
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildInfoCard(
-            icon: Icons.star,
-            label: 'التقييم',
-            value: ratingText,
-            color: Colors.amber,
+      child: statsAsync.when(
+        data: (stats) {
+          final completedSessions = stats['completedSessions'] as int? ?? 0;
+          final uniqueStudents = stats['uniqueStudents'] as int? ?? 0;
+
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Stats Grid
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatItem(
+                        icon: Icons.star_rounded,
+                        value: ratingText,
+                        label: 'التقييم',
+                        color: Colors.amber,
+                      ),
+                    ),
+                    Container(width: 1, height: 50, color: Colors.grey.shade200),
+                    Expanded(
+                      child: _buildStatItem(
+                        icon: Icons.check_circle_rounded,
+                        value: '$completedSessions',
+                        label: 'جلسة منجزة',
+                        color: AppThemeConstants.success,
+                      ),
+                    ),
+                  ],
+                ),
+                Divider(color: Colors.grey.shade200, height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatItem(
+                        icon: Icons.people_rounded,
+                        value: '${profile['followerCount'] ?? 0}',
+                        label: 'المتابعون',
+                        color: AppThemeConstants.primary,
+                      ),
+                    ),
+                    Container(width: 1, height: 50, color: Colors.grey.shade200),
+                    Expanded(
+                      child: _buildStatItem(
+                        icon: Icons.school_rounded,
+                        value: '$uniqueStudents',
+                        label: 'طالب',
+                        color: AppThemeConstants.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+        loading: () => Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-          _buildInfoCard(
-            icon: Icons.people_rounded,
-            label: 'المتابعون',
-            value: '${profile['followerCount'] ?? 0}',
-            color: AppThemeConstants.secondary,
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  icon: Icons.star_rounded,
+                  value: ratingText,
+                  label: 'التقييم',
+                  color: Colors.amber,
+                ),
+              ),
+              Container(width: 1, height: 50, color: Colors.grey.shade200),
+              const Expanded(
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
+        error: (_, __) {
+          final followerCount = profile['followerCount'] ?? 0;
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    icon: Icons.star_rounded,
+                    value: ratingText,
+                    label: 'التقييم',
+                    color: Colors.amber,
+                  ),
+                ),
+                Container(width: 1, height: 50, color: Colors.grey.shade200),
+                Expanded(
+                  child: _buildStatItem(
+                    icon: Icons.people_rounded,
+                    value: '$followerCount',
+                    label: 'المتابعون',
+                    color: AppThemeConstants.primary,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildInfoCard({
+  Widget _buildStatItem({
     required IconData icon,
-    required String label,
     required String value,
+    required String label,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 32),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade800,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 

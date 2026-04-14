@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy / سياسة الخصوصية - Mohaffez</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.8;
+            color: #333;
+            background: linear-gradient(135deg, #0B7A75 0%, #14B8A6 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        body[dir="ltr"] { direction: ltr; text-align: left; }
+        body[dir="rtl"] { direction: rtl; text-align: right; }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .lang-switcher {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .lang-btn {
+            background: #0B7A75;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            margin: 0 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .lang-btn:hover { background: #14B8A6; }
+        .lang-btn.active { background: #D4A44A; }
+        .lang-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        h1 {
+            color: #0B7A75;
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .date {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #0B7A75;
+            font-size: 1.3rem;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #E8F4F3;
+        }
+        h3 {
+            color: #D4A44A;
+            font-size: 1.1rem;
+            margin: 20px 0 10px 0;
+        }
+        p, li {
+            margin-bottom: 12px;
+            color: #444;
+        }
+        ul {
+            margin: 15px 0;
+            padding-right: 25px;
+            padding-left: 25px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+        }
+        th {
+            background: #0B7A75;
+            color: white;
+        }
+        tr:nth-child(even) { background: #F5FAF9; }
+        .highlight {
+            background: #FDF5E6;
+            padding: 20px;
+            border-radius: 12px;
+            border-right: 4px solid #D4A44A;
+            border-left: 4px solid #D4A44A;
+            margin: 20px 0;
+        }
+        .contact {
+            background: #E8F4F3;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        .contact a {
+            color: #0B7A75;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .lang-section { display: none; }
+        .lang-section.active { display: block; }
+        @media (max-width: 600px) {
+            .container { padding: 25px; }
+            h1 { font-size: 1.5rem; }
+            table { font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body dir="rtl">
+    <div class="container">
+        <!-- Language Switcher -->
+        <div class="lang-switcher">
+            <button class="lang-btn active" onclick="switchLang('ar')" id="btn-ar">
+                🇸🇦 العربية
+            </button>
+            <button class="lang-btn" onclick="switchLang('en')" id="btn-en">
+                🇬🇧 English
+            </button>
+        </div>
+
+        <!-- Arabic Version -->
+        <div id="ar-content" class="lang-section active">
+            <h1>📖 سياسة الخصوصية - تطبيق محفظ</h1>
+            <p class="date">تاريخ آخر تحديث: 14 أبريل 2026</p>
+
+            <div class="highlight">
+                <strong>ملخص سريع:</strong> نحن نحمي خصوصيتك. نستخدم بياناتك فقط لتوفير خدمة تعلم القرآن، ولا نبيع بياناتك لأي طرف ثالث.
+            </div>
+
+            <h2>1. المعلومات التي نجمعها</h2>
+            
+            <h3>🔐 معلومات الحساب</h3>
+            <ul>
+                <li>الاسم الكامل</li>
+                <li>رقم الهاتف</li>
+                <li>البريد الإلكتروني (اختياري)</li>
+                <li>صورة الملف الشخصي (اختياري)</li>
+            </ul>
+
+            <h3>📍 معلومات الموقع</h3>
+            <ul>
+                <li><strong>الموقع الجغرافي الدقيق</strong> - لمساعدتك في العثور على المحفظين القريبين</li>
+                <li>العنوان (يدخله المحفظون يدوياً)</li>
+            </ul>
+
+            <h3>📸 الملفات والصور</h3>
+            <ul>
+                <li>صور الملف الشخصي</li>
+                <li>صور الشهادات والمؤهلات (للمحفظين)</li>
+                <li>إيصالات الدفع</li>
+            </ul>
+
+            <h2>2. كيف نستخدم معلوماتك</h2>
+            <table>
+                <tr>
+                    <th>الغرض</th>
+                    <th>الوصف</th>
+                </tr>
+                <tr>
+                    <td>العثور على محفظ</td>
+                    <td>عرض المحفظين القريبين من موقعك</td>
+                </tr>
+                <tr>
+                    <td>حجز الجلسات</td>
+                    <td>إدارة المواعيد والحجوزات</td>
+                </tr>
+                <tr>
+                    <td>التواصل</td>
+                    <td>إرسال إشعارات التذكير والتحديثات</td>
+                </tr>
+                <tr>
+                    <td>الدفع</td>
+                    <td>معالجة المدفوعات والاشتراكات</td>
+                </tr>
+            </table>
+
+            <h2>3. 🔒 حماية البيانات</h2>
+            <ul>
+                <li>تشفير البيانات أثناء النقل (SSL/TLS)</li>
+                <li>قواعد أمان Firebase للتحكم في الوصول</li>
+                <li>مصادقة قوية عبر Firebase Auth</li>
+                <li>التحقق من شهادات المحفظين</li>
+            </ul>
+
+            <h2>4. 🛡️ صلاحيات التطبيق</h2>
+            <table>
+                <tr>
+                    <th>الصلاحية</th>
+                    <th>السبب</th>
+                </tr>
+                <tr>
+                    <td>ACCESS_FINE_LOCATION</td>
+                    <td>العثور على المحفظين القريبين</td>
+                </tr>
+                <tr>
+                    <td>INTERNET</td>
+                    <td>الاتصال بقاعدة البيانات</td>
+                </tr>
+                <tr>
+                    <td>READ_EXTERNAL_STORAGE</td>
+                    <td>اختيار صور الملف الشخصي</td>
+                </tr>
+                <tr>
+                    <td>CAMERA</td>
+                    <td>التقاط صور مباشرة (اختياري)</td>
+                </tr>
+            </table>
+
+            <h2>5. ✋ حقوقك</h2>
+            <ul>
+                <li>الوصول إلى بياناتك الشخصية</li>
+                <li>تصحيح المعلومات غير الدقيقة</li>
+                <li>حذف حسابك وبياناتك</li>
+                <li>إلغاء الموافقة على استخدام الموقع</li>
+            </ul>
+
+            <div class="contact">
+                <h3>📧 للتواصل معنا</h3>
+                <p>إذا كان لديك أي استفسار حول سياسة الخصوصية:</p>
+                <p><a href="mailto:privacy@mohaffez.app">privacy@mohaffez.app</a></p>
+            </div>
+
+            <p style="text-align: center; margin-top: 30px; color: #666;">
+                <strong>محفظ - تعلم القرآن بثقة وأمان 🕌</strong>
+            </p>
+        </div>
+
+        <!-- English Version -->
+        <div id="en-content" class="lang-section">
+            <h1>📖 Privacy Policy - Mohaffez App</h1>
+            <p class="date">Last Updated: April 14, 2026</p>
+
+            <div class="highlight">
+                <strong>Quick Summary:</strong> We protect your privacy. We use your data only to provide Quran learning services, and we do not sell your data to any third parties.
+            </div>
+
+            <h2>1. Information We Collect</h2>
+            
+            <h3>🔐 Account Information</h3>
+            <ul>
+                <li>Full name</li>
+                <li>Phone number</li>
+                <li>Email address (optional)</li>
+                <li>Profile photo (optional)</li>
+            </ul>
+
+            <h3>📍 Location Information</h3>
+            <ul>
+                <li><strong>Precise geographic location</strong> - To help you find nearby teachers</li>
+                <li>Address (manually entered by teachers)</li>
+            </ul>
+
+            <h3>📸 Files and Photos</h3>
+            <ul>
+                <li>Profile photos</li>
+                <li>Certificate and credential photos (for teachers)</li>
+                <li>Payment receipts</li>
+            </ul>
+
+            <h2>2. How We Use Your Information</h2>
+            <table>
+                <tr>
+                    <th>Purpose</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>Find a Teacher</td>
+                    <td>Display teachers near your location</td>
+                </tr>
+                <tr>
+                    <td>Book Sessions</td>
+                    <td>Manage appointments and bookings</td>
+                </tr>
+                <tr>
+                    <td>Communication</td>
+                    <td>Send reminder notifications and updates</td>
+                </tr>
+                <tr>
+                    <td>Payments</td>
+                    <td>Process payments and subscriptions</td>
+                </tr>
+            </table>
+
+            <h2>3. 🔒 Data Protection</h2>
+            <ul>
+                <li>Data encryption in transit (SSL/TLS)</li>
+                <li>Firebase Security Rules for access control</li>
+                <li>Strong authentication via Firebase Auth</li>
+                <li>Teacher credential verification</li>
+            </ul>
+
+            <h2>4. 🛡️ App Permissions</h2>
+            <table>
+                <tr>
+                    <th>Permission</th>
+                    <th>Reason</th>
+                </tr>
+                <tr>
+                    <td>ACCESS_FINE_LOCATION</td>
+                    <td>Find nearby teachers</td>
+                </tr>
+                <tr>
+                    <td>INTERNET</td>
+                    <td>Connect to cloud database</td>
+                </tr>
+                <tr>
+                    <td>READ_EXTERNAL_STORAGE</td>
+                    <td>Select profile photos</td>
+                </tr>
+                <tr>
+                    <td>CAMERA</td>
+                    <td>Take photos directly (optional)</td>
+                </tr>
+            </table>
+
+            <h2>5. ✋ Your Rights</h2>
+            <ul>
+                <li>Access your personal data</li>
+                <li>Correct inaccurate information</li>
+                <li>Delete your account and data</li>
+                <li>Withdraw consent for location usage</li>
+            </ul>
+
+            <h2>6. Sharing Information</h2>
+            <p><strong>We do not sell your personal information to any third parties.</strong></p>
+            <p>We only share information in these cases:</p>
+            <ul>
+                <li>With other teachers/students as part of app functionality</li>
+                <li>With service providers (Firebase, Google Cloud)</li>
+                <li>Legal compliance if required by law</li>
+            </ul>
+
+            <h2>7. Data Retention</h2>
+            <ul>
+                <li><strong>Account data:</strong> Retained until user deletes their account</li>
+                <li><strong>Session data:</strong> Retained for records and reports</li>
+                <li><strong>Photos:</strong> Can be deleted via profile editing</li>
+            </ul>
+
+            <h2>8. Children's Privacy</h2>
+            <p>Our app is designed for users of all ages learning the Quran. For users under 13, we recommend parental guidance and account management by parents or guardians.</p>
+
+            <h2>9. Changes to This Policy</h2>
+            <p>We may update this policy from time to time. You will be notified of any significant changes through:</p>
+            <ul>
+                <li>In-app notifications</li>
+                <li>Updated "Last Updated" date above</li>
+            </ul>
+
+            <h2>10. Contact Us</h2>
+            <div class="contact">
+                <h3>📧 Contact Us</h3>
+                <p>If you have any questions about this Privacy Policy:</p>
+                <p><a href="mailto:privacy@mohaffez.app">privacy@mohaffez.app</a></p>
+            </div>
+
+            <p style="text-align: center; margin-top: 30px; color: #666;">
+                <strong>Mohaffez - Learn Quran with Confidence and Security 🕌</strong>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function switchLang(lang) {
+            // Update buttons
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById('btn-' + lang).classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.lang-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(lang + '-content').classList.add('active');
+            
+            // Update page direction
+            document.body.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+            document.documentElement.setAttribute('lang', lang);
+        }
+    </script>
+</body>
+</html>
