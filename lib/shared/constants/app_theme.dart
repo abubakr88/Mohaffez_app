@@ -16,40 +16,9 @@ class AppTheme {
   /// @deprecated Use AppThemeConstants.secondary (0xFFD4A44A)
   static const Color softGold = Color(0xFFD4A44A);
 
-  // Legacy aliases for backward compatibility
-  /// @deprecated Use AppThemeConstants.primary (0xFF0B7A75)
-  static const Color primaryAmber = Color(0xFF0B7A75);
-
-  /// @deprecated Use AppThemeConstants.primaryVariant (0xFF14B8A6)
-  static const Color lightAmber = Color(0xFF14B8A6);
-
-  /// @deprecated Use AppThemeConstants.secondary (0xFFD4A44A)
-  static const Color accentGreen = Color(0xFFD4A44A);
-
-  /// @deprecated Use AppThemeConstants.textPrimary
-  static const Color textPrimary = Color(0xFF1E2933);
-
-  /// @deprecated Use AppThemeConstants.textSecondary
-  static const Color textSecondary = Color(0xFF6B7280);
-
-  /// @deprecated Use AppThemeConstants.textMuted (0xFF9CA3AF)
-  static const Color textMuted = Color(0xFF9CA3AF);
-
   /// Notification badge color
   static const Color notificationRed = Color(0xFFDC2626);
   static const Color surfaceColor = Colors.white;
-
-  /// @deprecated Use AppThemeConstants.success
-  static const Color success = Color(0xFF16A34A);
-
-  /// @deprecated Use AppThemeConstants.warning
-  static const Color warning = Color(0xFFEA580C);
-
-  /// @deprecated Use AppThemeConstants.background
-  static const Color backgroundLight = Color(0xFFF5FAF9);
-
-  /// @deprecated Use AppThemeConstants.surface
-  static const Color cardBackground = Colors.white;
 
   /// @deprecated Use direct semantic token from AppThemeConstants
   static const Color complementaryBlue = Color(0xFF0B7A75);

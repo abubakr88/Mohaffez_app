@@ -112,15 +112,15 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                         calendarStyle: CalendarStyle(
                           todayDecoration: BoxDecoration(
                             color:
-                                AppThemeConstants.primaryAmber.withValues(alpha: 0.5),
+                                AppThemeConstants.primary.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           selectedDecoration: const BoxDecoration(
-                            color: AppThemeConstants.accentGreen,
+                            color: AppThemeConstants.secondary,
                             shape: BoxShape.circle,
                           ),
                           markerDecoration: const BoxDecoration(
-                            color: AppThemeConstants.accentGreen,
+                            color: AppThemeConstants.secondary,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -297,12 +297,12 @@ class _SessionCard extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+            color: AppThemeConstants.secondary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(
             Icons.event,
-            color: AppThemeConstants.accentGreen,
+            color: AppThemeConstants.secondary,
           ),
         ),
         title: Text(

@@ -43,7 +43,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
               child: const Text('حذف'),
             ),
           ],
@@ -103,8 +103,8 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppThemeConstants.primaryAmber,
-                        AppThemeConstants.primaryAmberLight,
+                        AppThemeConstants.primary,
+                        AppThemeConstants.primaryVariant,
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -122,13 +122,13 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
+                                  color: AppThemeConstants.surface.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
                                   Icons.verified_user,
                                   size: 28,
-                                  color: Colors.white,
+                                  color: AppThemeConstants.onPrimary,
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -175,27 +175,33 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
+                  return SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height - 200,
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
                   );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return SliverFillRemaining(
-                    child: EmptyState(
-                      icon: Icons.workspace_premium,
-                      title: 'لا توجد شهادات',
-                      message: 'أضف شهاداتك لتعزيز مصداقيتك.',
-                      animated: true,
-                      action: ElevatedButton.icon(
-                        onPressed: _showAddCredentialDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('إضافة شهادة'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 14,
+                  return SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height - 200,
+                      child: EmptyState(
+                        icon: Icons.workspace_premium,
+                        title: 'لا توجد شهادات',
+                        message: 'أضف شهاداتك لتعزيز مصداقيتك.',
+                        animated: true,
+                        action: ElevatedButton.icon(
+                          onPressed: _showAddCredentialDialog,
+                          icon: const Icon(Icons.add),
+                          label: const Text('إضافة شهادة'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -418,8 +424,9 @@ class _CredentialCard extends StatelessWidget {
                       scrollDirection: Axis.horizontal,
                       itemCount: imageUrls.length,
                       itemBuilder: (context, index) {
-                        return GestureDetector(
+                        return InkWell(
                           onTap: () => onImageTap(imageUrls, index),
+                          borderRadius: BorderRadius.circular(12),
                           child: Hero(
                             tag: '${credentialId}_$index',
                             child: Container(
@@ -795,11 +802,11 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
       );
 
       if (mounted) {
-        Navigator.pop(context);
+        context.pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تمت إضافة الشهادة بنجاح ✅'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
       }
@@ -830,7 +837,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                 )
               : null,
           title: const Text('إضافة شهادة'),
-          backgroundColor: AppThemeConstants.primaryAmber,
+          backgroundColor: AppThemeConstants.primary,
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -1001,7 +1008,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                   child: ElevatedButton(
                     onPressed: uploading ? null : _submitCredential,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.primaryAmber,
+                      backgroundColor: AppThemeConstants.primary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: uploading

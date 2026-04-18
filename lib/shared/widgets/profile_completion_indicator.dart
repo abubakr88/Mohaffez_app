@@ -22,9 +22,10 @@ class ProfileCompletionIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _getColor();
-    
-    return GestureDetector(
+
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Card(
         elevation: 2,
         shape: RoundedRectangleBorder(

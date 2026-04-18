@@ -3,15 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 
 import '../providers/booking_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
-import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
-import 'student_payment_screen.dart';
 import 'direct_payment_screen.dart';
 
 // ============================================================================
@@ -85,11 +84,6 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       }
 
       final mohaffezName = request['mohaffezName'] as String? ?? '';
-      final sessionType = request['sessionType'] as String?;
-      final location = request['imamAddressText'] as String?;
-      final mohaffezPhone = request['mohaffezPhone'] as String?;
-      final lat = (request['imamAddressLat'] as num?)?.toDouble();
-      final lng = (request['imamAddressLng'] as num?)?.toDouble();
 
       // Fetch fresh Firestore data to get selectedPaymentMethod and latest
       // slot details written by the teacher on acceptance.
@@ -127,26 +121,16 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       }
 
       // ── Original flow: plan selection + Paymob / online gateway ─────────
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => StudentPaymentScreen(
-            mohaffezId: mohaffezId,
-            mohaffezName: mohaffezName,
-            requestId: requestId,
-            preselectedSessionType: sessionType,
-            location: location,
-            mohaffezAddress: location,
-            mohaffezLat: lat,
-            mohaffezLng: lng,
-            mohaffezPhone: mohaffezPhone,
-            lockedRequest: lockedRequest,
-          ),
-        ),
+      if (!mounted) return;
+      context.push(
+        '/payment/$mohaffezId',
+        extra: {
+          'lockedRequest': lockedRequest,
+        },
       );
     } catch (e, st) {
       debugPrint('navigateToPayment error: $e\n$st');
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('حدث خطأ: $e'),
@@ -172,35 +156,31 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       return null;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => DirectPaymentScreen(
-          requestId: requestId,
-          mohaffezId: mohaffezId,
-          mohaffezName: mohaffezName,
-          sessionType: lockedRequest['sessionType'] as String?,
-          preferredTimeSlot: lockedRequest['preferredTimeSlot'] as String? ??
-              lockedRequest['timeSlot'] as String?,
-          slotDate: toDate(lockedRequest['slotDate']),
-          slotStart: toDate(lockedRequest['slotStart']),
-          slotEnd: toDate(lockedRequest['slotEnd']),
-          imamAddressText: lockedRequest['imamAddressText'] as String? ??
-              lockedRequest['location'] as String?,
-          imamAddressLat:
-              (lockedRequest['imamAddressLat'] as num?)?.toDouble(),
-          imamAddressLng:
-              (lockedRequest['imamAddressLng'] as num?)?.toDouble(),
-          mohaffezPhone: lockedRequest['mohaffezPhone'] as String?,
-          // amount = null → DirectPaymentScreen auto-fetches single-session
-          // price from the teacher's pricing plans
-          planType: lockedRequest['planType'] as String?,
-          planId: lockedRequest['planId'] as String?,
-          planTitle: lockedRequest['planTitle'] as String?,
-          sessionsCount: lockedRequest['sessionsCount'] as int?,
-          validityDays: lockedRequest['validityDays'] as int?,
-        ),
-      ),
+    context.push(
+      '/booking/direct-payment',
+      extra: {
+        'requestId': requestId,
+        'mohaffezId': mohaffezId,
+        'mohaffezName': mohaffezName,
+        'sessionType': lockedRequest['sessionType'] as String?,
+        'preferredTimeSlot': lockedRequest['preferredTimeSlot'] as String? ??
+            lockedRequest['timeSlot'] as String?,
+        'slotDate': toDate(lockedRequest['slotDate']),
+        'slotStart': toDate(lockedRequest['slotStart']),
+        'slotEnd': toDate(lockedRequest['slotEnd']),
+        'imamAddressText': lockedRequest['imamAddressText'] as String? ??
+            lockedRequest['location'] as String?,
+        'imamAddressLat':
+            (lockedRequest['imamAddressLat'] as num?)?.toDouble(),
+        'imamAddressLng':
+            (lockedRequest['imamAddressLng'] as num?)?.toDouble(),
+        'mohaffezPhone': lockedRequest['mohaffezPhone'] as String?,
+        'planType': lockedRequest['planType'] as String?,
+        'planId': lockedRequest['planId'] as String?,
+        'planTitle': lockedRequest['planTitle'] as String?,
+        'sessionsCount': lockedRequest['sessionsCount'] as int?,
+        'validityDays': lockedRequest['validityDays'] as int?,
+      },
     );
   }
 
@@ -281,7 +261,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppTheme.primaryAmber, Color(0xFFFFB74D)],
+              colors: [AppThemeConstants.primary, Color(0xFFFFB74D)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -403,7 +383,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
               selected: isSelected,
               onSelected: (_) =>
                   ref.read(requestFilterProvider.notifier).state = filter,
-              selectedColor: AppTheme.primaryAmber,
+              selectedColor: AppThemeConstants.primary,
               labelStyle: TextStyle(
                 color: isSelected ? Colors.white : Colors.grey.shade700,
                 fontWeight:
@@ -793,7 +773,7 @@ class _RequestCard extends StatelessWidget {
                   icon: const Icon(Icons.payment, size: 18),
                   label: const Text('ادفع الآن'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeConstants.accentGreen,
+                    backgroundColor: AppThemeConstants.secondary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
@@ -890,10 +870,10 @@ class _RequestCard extends StatelessWidget {
         return ('قيد الانتظار', Colors.orange, Icons.pending);
       case 'awaitingpayment':
       case 'awaiting_payment':
-        return ('في انتظار الدفع', AppThemeConstants.primaryAmber,
+        return ('في انتظار الدفع', AppThemeConstants.primary,
             Icons.payment);
       case 'awaitingdirectpayment':
-        return ('في انتظار الدفع', AppThemeConstants.primaryAmber,
+        return ('في انتظار الدفع', AppThemeConstants.primary,
             Icons.payment);
       case 'awaitingdirectpaymentconfirmation':
       case 'awaiting_direct_payment_confirmation':
@@ -1046,23 +1026,23 @@ class _RejectedRequestCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primaryAmber
+                  color: AppThemeConstants.primary
                       .withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: AppThemeConstants.primaryAmber
+                      color: AppThemeConstants.primary
                           .withValues(alpha: 0.4)),
                 ),
                 child: Row(children: [
                   const Icon(Icons.info_outline,
-                      color: AppThemeConstants.primaryAmber, size: 20),
+                      color: AppThemeConstants.primary, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'السبب: $rejectionReason',
                       style: const TextStyle(
                           fontSize: 13,
-                          color: AppThemeConstants.primaryAmber),
+                          color: AppThemeConstants.primary),
                     ),
                   ),
                 ]),

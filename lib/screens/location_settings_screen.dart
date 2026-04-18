@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../shared/constants/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../providers/user_provider.dart';
 import '../repositories/user_repository.dart';
-import 'pick_location_screen.dart';
 
 class LocationSettingsScreen extends ConsumerStatefulWidget {
   const LocationSettingsScreen({super.key});
@@ -39,7 +38,7 @@ class _LocationSettingsScreenState
           child: Scaffold(
             appBar: AppBar(
               title: const Text('إعدادات الموقع'),
-              backgroundColor: AppTheme.primaryAmber,
+              backgroundColor: AppThemeConstants.primary,
             ),
             body: Padding(
               padding: const EdgeInsets.all(16),
@@ -48,14 +47,14 @@ class _LocationSettingsScreenState
                 children: [
                   // Info Card
                   Card(
-                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.06),
+                    color: AppThemeConstants.primary.withValues(alpha: 0.06),
                     child: const Padding(
                       padding: EdgeInsets.all(16),
                       child: Row(
                         children: [
                           Icon(
                             Icons.info_outline,
-                            color: AppThemeConstants.primaryAmber,
+                            color: AppThemeConstants.primary,
                             size: 28,
                           ),
                           SizedBox(width: 12),
@@ -76,12 +75,12 @@ class _LocationSettingsScreenState
                   const SizedBox(height: 24),
 
                   // Current Location Section
-                  Text(
+                  const Text(
                     'الموقع الحالي',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade800,
+                      color: AppThemeConstants.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -103,12 +102,12 @@ class _LocationSettingsScreenState
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: Colors.green.shade100,
+                                        color: AppThemeConstants.success.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: Icon(
+                                      child: const Icon(
                                         Icons.check_circle,
-                                        color: Colors.green.shade700,
+                                        color: AppThemeConstants.success,
                                         size: 24,
                                       ),
                                     ),
@@ -127,10 +126,10 @@ class _LocationSettingsScreenState
                                 const Divider(height: 24),
                                 Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.location_on,
                                       size: 20,
-                                      color: Colors.grey.shade600,
+                                      color: AppThemeConstants.textSecondary,
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
@@ -187,12 +186,12 @@ class _LocationSettingsScreenState
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                                        color: AppThemeConstants.primary.withValues(alpha: 0.08),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                     child: const Icon(
                                       Icons.warning_amber,
-                                      color: AppThemeConstants.primaryAmber,
+                                      color: AppThemeConstants.primary,
                                       size: 24,
                                     ),
                                 ),
@@ -241,7 +240,7 @@ class _LocationSettingsScreenState
                       ),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: AppTheme.accentGreen,
+                        backgroundColor: AppThemeConstants.secondary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -301,18 +300,8 @@ class _LocationSettingsScreenState
 
   Future<void> _pickLocation(String userId) async {
     try {
-      final user = ref.read(currentUserProvider).value;
-
       // Navigate to location picker
-      final result = await Navigator.push<Map<String, dynamic>>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PickLocationScreen(
-            initialLat: user?.addressLat,
-            initialLng: user?.addressLng,
-          ),
-        ),
-      );
+      final result = await context.push<Map<String, dynamic>>('/pick-location');
 
       if (result == null || !mounted) return;
 

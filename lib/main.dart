@@ -128,7 +128,7 @@ void main() async {
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: AppThemeConstants.surfaceWhite,
+      systemNavigationBarColor: AppThemeConstants.surface,
       systemNavigationBarIconBrightness: Brightness.dark,
     ));
 
@@ -217,7 +217,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                     child: ElevatedButton.icon(
                       onPressed: () => SystemNavigator.pop(),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppThemeConstants.primaryAmber,
+                        backgroundColor: AppThemeConstants.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(

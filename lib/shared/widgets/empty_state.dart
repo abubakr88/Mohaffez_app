@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../constants/app_theme.dart';
+import '../theme/app_theme_constants.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
@@ -55,7 +55,7 @@ class EmptyState extends StatelessWidget {
                 child: Icon(
                   icon,
                   size: iconSize,
-                  color: iconColor ?? AppTheme.primaryAmber,
+                  color: iconColor ?? AppThemeConstants.primary,
                 ),
               )
             else

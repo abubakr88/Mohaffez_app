@@ -77,7 +77,7 @@ class _AdminSlotLocksScreenState extends ConsumerState<AdminSlotLocksScreen> {
       child: Scaffold(
         appBar: const AdminAppBar(title: ArabicLabels.slotLocksManagement),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppThemeConstants.primaryAmber,
+          backgroundColor: AppThemeConstants.primary,
           onPressed: () => run(actions.releaseAllExpiredLocks),
           label: const Text(ArabicLabels.releaseExpiredLocks),
           icon: const Icon(Icons.lock_open),
@@ -109,7 +109,7 @@ class _AdminSlotLocksScreenState extends ConsumerState<AdminSlotLocksScreen> {
                 child: ListTile(
                   title: Row(
                     children: [
-                      Text('${ArabicLabels.slotOf}: '),
+                      const Text('${ArabicLabels.slotOf}: '),
                       Expanded(
                         child: Text(
                           cachedName ?? mohaffezId.substring(0, 8),

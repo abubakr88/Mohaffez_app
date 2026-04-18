@@ -6,6 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../models/session_model.dart';
 import '../models/user_model.dart';
+import '../models/mohaffez_student_summary.dart';
+import '../models/quran_mistake_model.dart';
+import '../models/pricing_plan_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/suspension_provider.dart';
 import '../providers/user_provider.dart';
@@ -20,19 +23,26 @@ import '../screens/mohaffez_credentials_screen.dart';
 import '../screens/mohaffez_home.dart';
 import '../screens/mohaffez_profile_screen.dart';
 import '../screens/mohaffez_students_screen.dart';
+import '../screens/mohaffez_student_detail_screen.dart';
 import '../screens/mohaffez_wallet_settings_screen.dart';
 import '../screens/nearby_mohaffez_screen.dart';
 import '../screens/notifications_screen.dart';
+import '../screens/payment_webview_screen.dart';
+import '../screens/pick_location_screen.dart';
 import '../screens/pending_requests_screen.dart';
 import '../screens/privacy_settings_screen.dart';
+import '../screens/location_settings_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/rate_session_screen.dart';
 import '../screens/session_completion_screen.dart';
 import '../screens/session_details_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/student_assignments_screen.dart';
 import '../screens/student_home.dart';
+import '../shared/widgets/interactive_quran_page.dart';
 import '../screens/student_requests_screen.dart';
 import '../screens/upcoming_sessions_screen.dart';
+import '../screens/splash_screen.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
@@ -259,6 +269,42 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const StudentAssignmentsScreen(),
           ),
           GoRoute(
+            path: '/rate-session/:sessionId',
+            name: 'rate-session',
+            builder: (context, state) {
+              final sessionId = state.pathParameters['sessionId'] ?? '';
+              final mohaffezName = state.uri.queryParameters['mohaffezName'] ?? 'المحفظ';
+              return RateSessionScreen(
+                sessionId: sessionId,
+                mohaffezName: mohaffezName,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/mushaf/:pageNumber',
+            name: 'mushaf-viewer',
+            builder: (context, state) {
+              final pageNumber = int.tryParse(state.pathParameters['pageNumber'] ?? '') ?? 1;
+              final extra = state.extra as Map<String, dynamic>?;
+              final mistakes = extra?['mistakes'] as List<QuranMistake>?;
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('مراجعة الأخطاء'),
+                    backgroundColor: AppThemeConstants.primary,
+                  ),
+                  body: InteractiveQuranPage(
+                    pageNumber: pageNumber,
+                    existingMistakes: mistakes ?? [],
+                    onMistakeAdded: (_) {}, // read-only no-op
+                    isEditable: false,
+                  ),
+                ),
+              );
+            },
+          ),
+          GoRoute(
             path: '/requests',
             name: 'requests',
             builder: (context, state) => const StudentRequestsScreen(),
@@ -285,7 +331,57 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/booking/direct-payment',
             name: 'booking-direct-payment',
-            builder: (context, state) => const DirectPaymentScreen(),
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return DirectPaymentScreen(
+                requestId: extra?['requestId'],
+                mohaffezId: extra?['mohaffezId'],
+                mohaffezName: extra?['mohaffezName'],
+                studentName: extra?['studentName'],
+                studentEmail: extra?['studentEmail'] ?? '',
+                studentPhone: extra?['studentPhone'] ?? '',
+                amount: extra?['amount'],
+                sessionType: extra?['sessionType'],
+                preferredTimeSlot: extra?['preferredTimeSlot'],
+                slotDate: extra?['slotDate'],
+                slotStart: extra?['slotStart'],
+                slotEnd: extra?['slotEnd'],
+                imamAddressText: extra?['imamAddressText'],
+                imamAddressLat: extra?['imamAddressLat'],
+                imamAddressLng: extra?['imamAddressLng'],
+                mohaffezPhone: extra?['mohaffezPhone'],
+                planType: extra?['planType'],
+                planId: extra?['planId'],
+                planTitle: extra?['planTitle'],
+                sessionsCount: extra?['sessionsCount'],
+                validityDays: extra?['validityDays'],
+                autoBookFirstSession: extra?['autoBookFirstSession'] ?? false,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/payment-webview',
+            name: 'payment-webview',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return PaymentWebViewScreen(
+                paymentUrl: extra?['paymentUrl'] ?? '',
+                paymentId: extra?['paymentId'] ?? '',
+                plan: extra?['plan'] as PricingPlanModel,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/pick-location',
+            name: 'pick-location',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              return PickLocationScreen(
+                initialLat: extra?['initialLat'],
+                initialLng: extra?['initialLng'],
+                initialSearchQuery: extra?['initialSearchQuery'],
+              );
+            },
           ),
           // ── Path C — Request First (direct payment, teacher must accept first) ──────
           GoRoute(
@@ -317,6 +413,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             name: 'settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/location-settings',
+            name: 'location-settings',
+            builder: (context, state) => const LocationSettingsScreen(),
           ),
           GoRoute(
             path: '/privacy-settings',
@@ -480,6 +581,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             redirect: (context, state) => '/my-students',
           ),
           GoRoute(
+            path: '/student/:studentId',
+            name: 'student-detail',
+            builder: (context, state) {
+              final mohaffezId = ref.read(currentUserIdProvider) ?? '';
+              final student = state.extra as MohaffezStudentSummary?;
+
+              if (student == null) {
+                return ErrorScreen(
+                  error: 'بيانات الطالب غير موجودة',
+                  onRetry: () => context.go('/my-students'),
+                );
+              }
+
+              return MohaffezStudentDetailScreen(
+                student: student,
+                mohaffezId: mohaffezId,
+              );
+            },
+          ),
+          GoRoute(
             path: '/complete-session/:sessionId',
             name: 'complete-session',
             builder: (context, state) {
@@ -609,263 +730,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
-
-// ============================================
-// SPLASH SCREEN
-// ============================================
-class SplashScreen extends ConsumerStatefulWidget {
-  const SplashScreen({super.key});
-
-  @override
-  ConsumerState<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends ConsumerState<SplashScreen> {
-  static const maxWaitDuration = Duration(seconds: 8);
-  bool hasTimedOut = false;
-  String? errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimeout();
-  }
-
-  void _startTimeout() {
-    Future.delayed(maxWaitDuration, () {
-      if (mounted) {
-        setState(() {
-          hasTimedOut = true;
-          errorMessage = 'انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.';
-        });
-      }
-    });
-  }
-
-  void _retry() {
-    setState(() {
-      hasTimedOut = false;
-      errorMessage = null;
-    });
-    _startTimeout();
-    ref.invalidate(authStateProvider);
-  }
-
-  void _goToLogin() {
-    context.go('/login');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authAsync = ref.watch(authStateProvider);
-
-    if (hasTimedOut && authAsync.isLoading) {
-      return _buildTimeoutScreen();
-    }
-
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppThemeConstants.primaryAmber,
-              AppThemeConstants.primaryAmberLight,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.all(AppThemeConstants.spaceLg),
-                decoration: BoxDecoration(
-                  color: AppThemeConstants.surfaceWhite,
-                  borderRadius: AppThemeConstants.borderRadiusXl,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/icon.png',
-                  width: AppThemeConstants.icon3xl,
-                  height: AppThemeConstants.icon3xl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.school,
-                    size: AppThemeConstants.icon3xl,
-                    color: AppThemeConstants.primaryAmber,
-                  ),
-                ),
-              ),
-              Spacing.vXl,
-              Text(
-                'محفظ',
-                style: context.textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppThemeConstants.surfaceWhite,
-                ),
-              ),
-              Spacing.vMd,
-              Text(
-                'تطبيق تحفيظ القرآن الكريم',
-                style: context.textTheme.bodyLarge?.copyWith(
-                  color: AppThemeConstants.surfaceWhite
-                      .withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: AppThemeConstants.space2xl),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    AppThemeConstants.surfaceWhite),
-                strokeWidth: 3,
-              ),
-              Spacing.vMd,
-              Text(
-                _getStatusText(authAsync),
-                style: context.textTheme.bodyMedium?.copyWith(
-                  color: AppThemeConstants.surfaceWhite
-                      .withValues(alpha: 0.7),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeoutScreen() {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppThemeConstants.primaryAmber,
-              AppThemeConstants.primaryAmberLight,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child: Padding(
-            padding:
-                const EdgeInsets.all(AppThemeConstants.spaceXl),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(
-                      AppThemeConstants.spaceLg),
-                  decoration: BoxDecoration(
-                    color: AppThemeConstants.surfaceWhite,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.wifi_off,
-                    size: AppThemeConstants.icon2xl,
-                    color: AppThemeConstants.warning,
-                  ),
-                ),
-                Spacing.vXl,
-                Text(
-                  'مشكلة في الاتصال',
-                  style: context.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppThemeConstants.surfaceWhite,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                Spacing.vMd,
-                Text(
-                  errorMessage ?? 'حدث خطأ في الاتصال',
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    color: AppThemeConstants.surfaceWhite
-                        .withValues(alpha: 0.7),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(
-                  height: AppThemeConstants.spaceXl +
-                      AppThemeConstants.spaceSm,
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _retry,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('إعادة المحاولة'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            AppThemeConstants.surfaceWhite,
-                        foregroundColor:
-                            AppThemeConstants.primaryAmber,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppThemeConstants.spaceLg,
-                          vertical: AppThemeConstants.spaceMd,
-                        ),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius:
-                              AppThemeConstants.borderRadiusMd,
-                        ),
-                      ),
-                    ),
-                    Spacing.hMd,
-                    OutlinedButton.icon(
-                      onPressed: _goToLogin,
-                      icon: const Icon(Icons.login),
-                      label: const Text('تسجيل الدخول'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor:
-                            AppThemeConstants.surfaceWhite,
-                        side: const BorderSide(
-                          color: AppThemeConstants.surfaceWhite,
-                          width: 2,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppThemeConstants.spaceLg,
-                          vertical: AppThemeConstants.spaceMd,
-                        ),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius:
-                              AppThemeConstants.borderRadiusMd,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  static String _getStatusText(AsyncValue authAsync) {
-    if (authAsync.isLoading) return 'جاري التحميل...';
-    if (authAsync.hasError) return 'حدث خطأ في تسجيل الدخول';
-    if (authAsync.value == null) return 'جاري التحقق...';
-    return 'مرحباً بك';
-  }
-}
 
 // ============================================
 // ERROR SCREEN

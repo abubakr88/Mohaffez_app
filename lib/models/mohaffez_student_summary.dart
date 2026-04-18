@@ -48,4 +48,42 @@ class MohaffezStudentSummary {
       performanceNotes: performanceNotes,
     );
   }
+
+  factory MohaffezStudentSummary.fromJson(Map<String, dynamic> json) {
+    return MohaffezStudentSummary(
+      studentId: json['studentId'] as String,
+      studentName: json['studentName'] as String,
+      lastSessionDate: json['lastSessionDate'] != null
+          ? DateTime.parse(json['lastSessionDate'] as String)
+          : null,
+      lastSessionStatus: json['lastSessionStatus'] as String? ?? 'accepted',
+      hifzAssignment: json['hifzAssignment'] as String? ?? '',
+      murajaAssignment: json['murajaAssignment'] as String? ?? '',
+      sessionRating: json['sessionRating'] as int? ?? 0,
+      sessionCount: json['sessionCount'] as int? ?? 0,
+      previousHifzCompleted: json['previousHifzCompleted'] as bool?,
+      previousHifzRating: json['previousHifzRating'] as int? ?? 0,
+      previousMurajaCompleted: json['previousMurajaCompleted'] as bool?,
+      previousMurajaRating: json['previousMurajaRating'] as int? ?? 0,
+      performanceNotes: json['performanceNotes'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'studentId': studentId,
+      'studentName': studentName,
+      'lastSessionDate': lastSessionDate?.toIso8601String(),
+      'lastSessionStatus': lastSessionStatus,
+      'hifzAssignment': hifzAssignment,
+      'murajaAssignment': murajaAssignment,
+      'sessionRating': sessionRating,
+      'sessionCount': sessionCount,
+      'previousHifzCompleted': previousHifzCompleted,
+      'previousHifzRating': previousHifzRating,
+      'previousMurajaCompleted': previousMurajaCompleted,
+      'previousMurajaRating': previousMurajaRating,
+      'performanceNotes': performanceNotes,
+    };
+  }
 }

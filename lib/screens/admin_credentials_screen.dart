@@ -199,7 +199,7 @@ class _AdminCredentialsScreenState
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppThemeConstants.success,
-                                foregroundColor: Colors.white,
+                                foregroundColor: AppThemeConstants.onPrimary,
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 visualDensity: VisualDensity.compact,
                               ),
@@ -209,7 +209,7 @@ class _AdminCredentialsScreenState
                                       height: 14,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: AppThemeConstants.onPrimary,
                                       ),
                                     )
                                   : const Icon(Icons.check_circle, size: 16),

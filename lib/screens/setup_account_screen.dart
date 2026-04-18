@@ -12,7 +12,6 @@ import '../providers/auth_provider.dart';
 import '../providers/setup_provider.dart';
 import '../providers/system_config_provider.dart';
 import '../providers/user_provider.dart';
-import 'pick_location_screen.dart';
 
 class SetupAccountScreen extends ConsumerStatefulWidget {
   const SetupAccountScreen({super.key});
@@ -243,17 +242,15 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
 
   // ─── Start exam ────────────────────────────────────────────────
   Future<void> _pickMainLocation() async {
-    final result = await Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PickLocationScreen(
-          initialLat: _mainLocationLat,
-          initialLng: _mainLocationLng,
-          initialSearchQuery: _cityController.text.trim().isEmpty
-              ? null
-              : _cityController.text.trim(),
-        ),
-      ),
+    final result = await context.push<Map<String, dynamic>>(
+      '/pick-location',
+      extra: {
+        'initialLat': _mainLocationLat,
+        'initialLng': _mainLocationLng,
+        'initialSearchQuery': _cityController.text.trim().isEmpty
+            ? null
+            : _cityController.text.trim(),
+      },
     );
 
     if (result == null || !mounted) return;

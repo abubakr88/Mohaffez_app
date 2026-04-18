@@ -84,7 +84,7 @@ class _AdminAuditLogScreenState extends ConsumerState<AdminAuditLogScreen> {
                 padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
                 child: Text(
                   e.toString(),
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: AppThemeConstants.onPrimary),
                 ),
               ),
             ),
@@ -134,7 +134,7 @@ class _AdminAuditLogScreenState extends ConsumerState<AdminAuditLogScreen> {
                           action,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: AppThemeConstants.primaryAmber,
+                            color: AppThemeConstants.primary,
                             fontSize: 16,
                           ),
                         ),
@@ -232,7 +232,7 @@ class _AdminAuditLogScreenState extends ConsumerState<AdminAuditLogScreen> {
                                   AppThemeConstants.spaceSm,
                                 ),
                                 decoration: const BoxDecoration(
-                                  color: AppThemeConstants.backgroundLight,
+                                  color: AppThemeConstants.background,
                                   borderRadius:
                                       AppThemeConstants.borderRadiusSm,
                                 ),

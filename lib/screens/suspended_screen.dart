@@ -88,7 +88,7 @@ class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
       child: PopScope(
         canPop: false,
         child: Scaffold(
-          backgroundColor: AppThemeConstants.backgroundLight,
+          backgroundColor: AppThemeConstants.background,
           body: SafeArea(
             child: suspensionAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -136,7 +136,7 @@ class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
                             padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
                             decoration: BoxDecoration(
                               // WHY: Use amber-tinted suspension reason card.
-                              color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                              color: AppThemeConstants.primary.withValues(alpha: 0.08),
                               borderRadius: AppThemeConstants.borderRadiusMd,
                             ),
                             child: Column(
@@ -145,7 +145,7 @@ class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
                                 Text(
                                   ArabicLabels.suspensionReason,
                                   style: theme.labelLarge?.copyWith(
-                                    color: AppThemeConstants.primaryAmber,
+                                    color: AppThemeConstants.primary,
                                   ),
                                 ),
                                 const SizedBox(height: AppThemeConstants.spaceXs),
@@ -186,7 +186,7 @@ class _SuspendedScreenState extends ConsumerState<SuspendedScreen> {
                               icon: const Icon(Icons.support_agent),
                               label: const Text(ArabicLabels.contactSupport),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppThemeConstants.primaryAmber,
+                                backgroundColor: AppThemeConstants.primary,
                                 foregroundColor: AppThemeConstants.textOnPrimary,
                               ),
                             ),

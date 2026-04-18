@@ -3,15 +3,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:go_router/go_router.dart';
 import '../providers/system_config_provider.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../providers/session_provider_paginated.dart';
 import '../utils/arabic_labels.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'session_completion_screen.dart';
 
 class UpcomingSessionsScreen extends ConsumerWidget {
   final String mohaffezId;
@@ -49,7 +49,7 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
+                        colors: [AppThemeConstants.secondary, Color(0xFF66BB6A)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -116,7 +116,7 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                                       style: const TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
-                                        color: AppTheme.accentGreen,
+                                        color: AppThemeConstants.secondary,
                                       ),
                                     ),
                                   ),
@@ -160,8 +160,8 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                                   .state = UpcomingFilter.all;
                             },
                             selectedColor:
-                                AppTheme.accentGreen.withValues(alpha: 0.2),
-                            checkmarkColor: AppTheme.accentGreen,
+                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            checkmarkColor: AppThemeConstants.secondary,
                           ),
                           FilterChip(
                             label: const Text('اليوم'),
@@ -172,8 +172,8 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                                   .state = UpcomingFilter.today;
                             },
                             selectedColor:
-                                AppTheme.accentGreen.withValues(alpha: 0.2),
-                            checkmarkColor: AppTheme.accentGreen,
+                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            checkmarkColor: AppThemeConstants.secondary,
                           ),
                           FilterChip(
                             label: const Text('هذا الأسبوع'),
@@ -184,8 +184,8 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                                   .state = UpcomingFilter.thisWeek;
                             },
                             selectedColor:
-                                AppTheme.accentGreen.withValues(alpha: 0.2),
-                            checkmarkColor: AppTheme.accentGreen,
+                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            checkmarkColor: AppThemeConstants.secondary,
                           ),
                           FilterChip(
                             label: const Text('هذا الشهر'),
@@ -196,8 +196,8 @@ class UpcomingSessionsScreen extends ConsumerWidget {
                                   .state = UpcomingFilter.thisMonth;
                             },
                             selectedColor:
-                                AppTheme.accentGreen.withValues(alpha: 0.2),
-                            checkmarkColor: AppTheme.accentGreen,
+                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            checkmarkColor: AppThemeConstants.secondary,
                           ),
                         ],
                       ),
@@ -645,8 +645,12 @@ class SessionCard extends ConsumerWidget {
         return 'اليوم';
       } else if (difference == 1) {
         return 'غداً';
-      } else if (difference <= 7) {
+      } else if (difference == 2) {
+        return 'بعد يومين';
+      } else if (difference >= 3 && difference <= 10) {
         return 'بعد $difference أيام';
+      } else if (difference > 10) {
+        return 'بعد $difference يوم';
       } else {
         return 'بعد ${(difference / 7).floor()} أسابيع';
       }
@@ -674,12 +678,12 @@ class SessionCard extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: AppTheme.accentGreen.withValues(alpha: 0.1),
+                      color: AppThemeConstants.secondary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
                       Icons.school,
-                      color: AppTheme.accentGreen,
+                      color: AppThemeConstants.secondary,
                       size: 22,
                     ),
                   ),
@@ -715,13 +719,13 @@ class SessionCard extends ConsumerWidget {
                       ),
                       decoration: BoxDecoration(
                         color: canComplete
-                            ? AppTheme.accentGreen.withValues(alpha: 0.1)
-                            : AppTheme.primaryAmber.withValues(alpha: 0.1),
+                            ? AppThemeConstants.secondary.withValues(alpha: 0.1)
+                            : AppThemeConstants.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: canComplete
-                              ? AppTheme.accentGreen.withValues(alpha: 0.3)
-                              : AppTheme.primaryAmber.withValues(alpha: 0.3),
+                              ? AppThemeConstants.secondary.withValues(alpha: 0.3)
+                              : AppThemeConstants.primary.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Text(
@@ -730,8 +734,8 @@ class SessionCard extends ConsumerWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: canComplete
-                              ? AppTheme.accentGreen
-                              : AppTheme.primaryAmber,
+                              ? AppThemeConstants.secondary
+                              : AppThemeConstants.primary,
                         ),
                       ),
                     ),
@@ -892,17 +896,14 @@ class SessionCard extends ConsumerWidget {
                           if (!context.mounted) return;
 
                           // Open completion screen
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SessionCompletionScreen(
-                                sessionId: session['id'] as String,
-                                studentName: studentName,
-                                previousHifz: previousAssignment['hifz'],
-                                previousMuraja: previousAssignment['muraja'],
-                                isLateCompletion: isLate,
-                              ),
-                            ),
+                          final result = await context.push<bool>(
+                            '/complete-session/${session['id'] as String}',
+                            extra: {
+                              'studentName': studentName,
+                              'previousHifz': previousAssignment['hifz'],
+                              'previousMuraja': previousAssignment['muraja'],
+                              'isLateCompletion': isLate,
+                            },
                           );
 
                           // Refresh lists if completed
@@ -923,7 +924,7 @@ class SessionCard extends ConsumerWidget {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                              isLate ? Colors.orange : AppTheme.accentGreen,
+                              isLate ? Colors.orange : AppThemeConstants.secondary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(

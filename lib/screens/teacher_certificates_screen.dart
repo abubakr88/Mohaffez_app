@@ -16,6 +16,7 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/user_provider.dart';
 import '../services/credential_service.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../utils/specialization_constants.dart';
 
 // ─── Design tokens (matching app teal theme) ─────────────────────────────────
 class _DS {
@@ -52,6 +53,28 @@ class _TeacherCertificatesScreenState
 
   final List<_CertEntry> _certificates = [];
   bool _submitting = false;
+
+  Widget _SpecializationChip({required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _DS.teal50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _DS.teal500.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: _DS.teal700,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -413,17 +436,51 @@ class _TeacherCertificatesScreenState
                       _SectionCard(
                         title: 'التخصص (اختياري)',
                         icon: Icons.auto_stories_rounded,
-                        child: TextField(
-                          controller: _specializationController,
-                          textDirection: TextDirection.rtl,
-                          decoration: const InputDecoration(
-                            hintText:
-                                'مثال: حفظ القرآن، تجويد، قراءات عشر...',
-                            border: OutlineInputBorder(
-                                borderRadius: _DS.r12),
-                            filled: true,
-                            fillColor: _DS.bg,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: _specializationController,
+                              textDirection: TextDirection.rtl,
+                              decoration: const InputDecoration(
+                                hintText:
+                                    'مثال: حفظ القرآن، تجويد، قراءات عشر...',
+                                border: OutlineInputBorder(
+                                    borderRadius: _DS.r12),
+                                filled: true,
+                                fillColor: _DS.bg,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'اختر من التخصصات الشائعة:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _DS.text2,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: SpecializationConstants.specializations
+                                  .map((spec) => _SpecializationChip(
+                                        label: spec,
+                                        onTap: () {
+                                          final currentText =
+                                              _specializationController.text.trim();
+                                          if (currentText.isEmpty) {
+                                            _specializationController.text = spec;
+                                          } else if (!currentText.contains(spec)) {
+                                            _specializationController.text =
+                                                '$currentText، $spec';
+                                          }
+                                        },
+                                      ))
+                                  .toList(),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),

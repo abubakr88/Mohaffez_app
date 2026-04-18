@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../models/payment_model.dart';
 import '../models/pricing_plan_model.dart';
 import '../providers/payment_provider.dart';
+import '../shared/theme/app_theme_constants.dart';
 
 class PaymentWebViewScreen extends ConsumerStatefulWidget {
   const PaymentWebViewScreen({
@@ -122,7 +123,7 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.access_time, color: Colors.orange),
+            Icon(Icons.access_time, color: AppThemeConstants.warning),
             SizedBox(width: 8),
             Text('انتهى الوقت'),
           ],
@@ -164,7 +165,7 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
                 return Transform.scale(scale: value, child: child);
               },
               child: const Icon(Icons.check_circle,
-                  color: Colors.green, size: 100),
+                  color: AppThemeConstants.success, size: 100),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -172,13 +173,13 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.green,
+                color: AppThemeConstants.success,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
               'سيتم تأكيد حجزك خلال ثوانٍ',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(fontSize: 14, color: AppThemeConstants.textSecondary),
             ),
           ],
         ),
@@ -211,7 +212,7 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pop(context, false);
+              context.pop(false);
             },
             child: const Text('إغلاق'),
           ),

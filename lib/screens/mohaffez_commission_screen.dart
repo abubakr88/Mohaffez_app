@@ -47,8 +47,8 @@ class _MohaffezCommissionScreenState
                 )
               : null,
           title: const Text('مستحقات المنصة'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
+          backgroundColor: AppThemeConstants.primary,
+          foregroundColor: AppThemeConstants.onPrimary,
         ),
         body: StreamBuilder<List<WeeklyCommissionSummary>>(
           stream: DirectPaymentService.watchCommissions(widget.mohaffezId),
@@ -75,8 +75,8 @@ class _MohaffezCommissionScreenState
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: totalPending > 0
-                        ? [Colors.amber.shade700, Colors.amber.shade400]
-                        : [Colors.green.shade700, Colors.green.shade400],
+                        ? [AppThemeConstants.warning, AppThemeConstants.warning.withValues(alpha: 0.6)]
+                        : [AppThemeConstants.success, AppThemeConstants.success.withValues(alpha: 0.6)],
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -85,8 +85,8 @@ class _MohaffezCommissionScreenState
                     totalPending > 0
                         ? 'إجمالي المستحق للمنصة'
                         : 'لا يوجد مستحقات 🎉',
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -95,13 +95,13 @@ class _MohaffezCommissionScreenState
                   Text(
                     '${totalPending.toStringAsFixed(2)} ج.م',
                     style: const TextStyle(
-                        color: Colors.white,
+                        color: AppThemeConstants.onPrimary,
                         fontSize: 32,
                         fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text('معدل العمولة: ${(commissionRate * 100).toInt()}%',
-                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      style: TextStyle(color: AppThemeConstants.onPrimary.withValues(alpha: 0.7), fontSize: 12)),
                 ]),
               ),
 
@@ -269,7 +269,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                   icon: const Icon(Icons.payment, size: 16),
                   label: const Text('ادفع الآن', style: TextStyle(fontSize: 13)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeConstants.primaryAmber,
+                    backgroundColor: AppThemeConstants.primary,
                     foregroundColor: Colors.white,
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
@@ -468,16 +468,16 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primaryAmber.withValues(alpha: 0.1),
+                  color: AppThemeConstants.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppThemeConstants.primaryAmber),
+                  border: Border.all(color: AppThemeConstants.primary),
                 ),
                 child: Text(
                   'المبلغ المستحق: ${widget.summary.commissionAmount.toStringAsFixed(2)} ج.م',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppThemeConstants.primaryAmber,
+                    color: AppThemeConstants.primary,
                   ),
                 ),
               ),
@@ -505,7 +505,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _submitPayment,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeConstants.primaryAmber,
+                    backgroundColor: AppThemeConstants.primary,
                     foregroundColor: Colors.white,
                     padding:
                         const EdgeInsets.symmetric(vertical: 16),
@@ -562,10 +562,10 @@ class _PayNowSheetState extends State<_PayNowSheet> {
       });
 
       if (!mounted) return; // FIXED: FIX-1 — mounted guard after await
-      Navigator.pop(context);
+      context.pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: Colors.green,
+          backgroundColor: AppThemeConstants.success,
           content: Text('تم إرسال تأكيد الدفع، سيتم المراجعة قريباً'),
         ),
       );
@@ -627,7 +627,7 @@ class _WalletTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(_icon, color: AppThemeConstants.primaryAmber),
+        leading: Icon(_icon, color: AppThemeConstants.primary),
         title: Text(_label),
         subtitle: Text(value),
         trailing: IconButton(

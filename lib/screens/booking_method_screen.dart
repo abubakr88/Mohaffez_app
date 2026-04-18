@@ -12,13 +12,6 @@ import '../providers/pricing_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
-
-// BUG FIX #1: Removed duplicate local activeBundleProvider definition.
-// It conflicted with the one in session_provider_paginated.dart (named-record
-// params vs positional tuple). The canonical version lives there; we just
-// import and use it below with the named-record syntax.
-
-// FIX 4: ref.watch instead of ref.read — consistent with provider best practice
 final teacherPlansProvider =
     FutureProvider.autoDispose.family<List<PricingPlanModel>, String>(
   (ref, mohaffezId) async {
@@ -38,13 +31,7 @@ class BookingMethodScreen extends ConsumerStatefulWidget {
 }
 
 class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
-  /// Tracks whether the user committed to a booking path by tapping an option.
-  /// Used in dispose() to decide whether to reset the provider.
-  /// Storing it here avoids reading ref inside dispose() which is unsafe.
   BookingPath? _committedPath;
-
-  // Prevents the null guard from firing a second navigation when we
-  // intentionally call reset() after a successful booking.
   bool _navigatingAway = false;
 
   late final BookingFlowNotifier _bookingNotifier;
@@ -72,30 +59,14 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     ref
         .read(bookingFlowProvider.notifier)
         .setBookingPath(BookingPath.useExistingBundle);
-    // BUG FIX #1: push instead of pushReplacement.
-    // pushReplacement removed this screen from the stack, which disposed the
-    // autoDispose bookingFlowProvider and wiped slotContext — causing the
-    // null guard in build() to fire and redirect to /home.
-    // push keeps this screen alive in the stack, preserving provider state.
     context.push('/booking/confirm-bundle-session');
   }
 
   void _onBuyNewBundle() {
-    final flow = ref.read(bookingFlowProvider);
-    final slotContext = flow.slotContext;
-    debugPrint('🔵 [BUNDLE_FLOW] Step1_BuyNewBundle: tapped, slotContext='
-        'mohaffezId=${slotContext?.mohaffezId}, '
-        'sessionType=${slotContext?.sessionType}, '
-        'slotDate=${slotContext?.slotDate}, '
-        'slotStart=${slotContext?.slotStart}, '
-        'slotEnd=${slotContext?.slotEnd}, '
-        'preferredTimeSlot=${slotContext?.preferredTimeSlot}');
-
     _committedPath = BookingPath.buyNewBundle;
     ref
         .read(bookingFlowProvider.notifier)
         .setBookingPath(BookingPath.buyNewBundle);
-    // BUG FIX #1: push instead of pushReplacement (same reason as above).
     context.push('/booking/select-bundle-plan');
   }
 
@@ -105,7 +76,6 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         .read(bookingFlowProvider.notifier)
         .setBookingPath(BookingPath.newDirectRequest);
     setState(() => _navigatingAway = true);
-    // BUG FIX #1: push instead of pushReplacement (same reason as above).
     context.push('/booking/direct-request');
   }
 
@@ -131,39 +101,29 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     final studentId = currentUser?.uid;
 
     if (studentId == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('الرجاء تسجيل الدخول'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.push('/auth'),
+                child: const Text('تسجيل الدخول'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
-    // BUG FIX #2: Use named-record params to match the canonical
-    // activeBundleProvider defined in session_provider_paginated.dart.
-    // The old positional tuple (studentId, mohaffezId, sessionType) caused
-    // a type mismatch and a duplicate-provider naming conflict.
     final activeBundleAsync = ref.watch(
       activeBundleProvider((
         studentId: studentId,
         mohaffezId: slotContext.mohaffezId,
         sessionType: slotContext.sessionType,
       )),
-    );
-
-    activeBundleAsync.when(
-      data: (activeBundle) {
-        if (activeBundle != null) {
-          debugPrint('✅ [BUNDLE_FLOW] Step6_ActiveBundle: found, '
-              'id=${activeBundle.id}, '
-              'remainingSessions=${activeBundle.remainingSessions}, '
-              'totalSessions=${activeBundle.totalSessions}, '
-              'sessionType=${activeBundle.sessionType}, '
-              'planTitle=${activeBundle.planTitle}, '
-              'status=${activeBundle.status}');
-        } else {
-          debugPrint('⚠️ [BUNDLE_FLOW] Step6_ActiveBundle: no active bundle');
-        }
-      },
-      loading: () => debugPrint('🔵 [BUNDLE_FLOW] Step6_ActiveBundle: loading...'),
-      error: (e, st) => debugPrint('❌ [BUNDLE_FLOW] Step6_ActiveBundle ERROR: $e'),
     );
 
     final teacherPlansAsync = ref.watch(
@@ -185,13 +145,27 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         body: activeBundleAsync.when(
           data: (activeBundle) => teacherPlansAsync.when(
             data: (plans) => _buildOptionsList(context, activeBundle, plans),
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('جاري تحميل خطط التسعير...'),
+              ],
+            )),
             error: (err, stack) =>
-                _buildErrorWidget('فشل في تحميل خطط التسعير'),
+                _buildErrorWidget('فشل في تحميل خطط التسعير', studentId, slotContext),
           ),
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('جاري تحميل الباقة النشطة...'),
+            ],
+          )),
           error: (err, stack) =>
-              _buildErrorWidget('فشل في تحميل الباقة النشطة'),
+              _buildErrorWidget('فشل في تحميل الباقة النشطة', studentId, slotContext),
         ),
       ),
     );
@@ -210,10 +184,17 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     );
     final canBuyNewBundle = hasBundlePlans && activeBundle == null;
 
+    final singleSessionPrices = plans
+        .where((p) => p.type == PlanType.single)
+        .map((p) => p.priceEGP)
+        .toList();
+    final lowestPrice = singleSessionPrices.isEmpty
+        ? null
+        : singleSessionPrices.reduce((a, b) => a < b ? a : b);
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
-        // ── Option 1: Use existing bundle ──────────────────────────────────
         _BookingOptionCard(
           icon: Icons.card_membership_rounded,
           backgroundColor: AppThemeConstants.successBackground,
@@ -222,12 +203,12 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           subtitle: activeBundle != null
               ? 'متبقي ${activeBundle.remainingSessions} جلسة من ${activeBundle.totalSessions}'
               : 'لا توجد باقة نشطة لهذا النوع',
+          hint: activeBundle == null ? 'اشترِ باقة أولاً' : null,
           isEnabled: activeBundle != null,
           onTap: activeBundle != null ? _onUseExistingBundle : null,
         ),
         const SizedBox(height: 16),
 
-        // ── Option 2: Buy new bundle ────────────────────────────────────
         _BookingOptionCard(
           icon: Icons.add_shopping_cart_rounded,
           backgroundColor: AppThemeConstants.accentBackground,
@@ -236,6 +217,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           subtitle: activeBundle != null
               ? 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات'
               : 'اختر باقة وابدأ على الفور',
+          hint: activeBundle != null ? 'يجب إنهاء الباقة الحالية أولاً' : null,
           isEnabled: canBuyNewBundle,
           onTap: canBuyNewBundle ? _onBuyNewBundle : null,
         ),
@@ -248,7 +230,9 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           iconColor: AppThemeConstants.primary,
           borderColor: AppThemeConstants.primary,
           title: 'إرسال طلب حجز جديد',
-          subtitle: 'دفع مباشر لجلسة واحدة',
+          subtitle: lowestPrice != null
+              ? 'دفع مباشر لجلسة واحدة • ${lowestPrice.toInt()} جنيه'
+              : 'دفع مباشر لجلسة واحدة',
           isEnabled: true,
           onTap: _onNewDirectRequest,
         ),
@@ -271,20 +255,14 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     );
   }
 
-  // ─── Error state ──────────────────────────────────────────────────────────
-
-  Widget _buildErrorWidget(String message) {
-    final flow = ref.read(bookingFlowProvider);
-    final slotContext = flow.slotContext;
-    final studentId = ref.read(currentUserProvider).value?.uid;
-
+  Widget _buildErrorWidget(String message, String? studentId, dynamic slotContext) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
             const SizedBox(height: 12),
             Text(
               message,
@@ -292,22 +270,30 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
               style: const TextStyle(fontSize: 15),
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () {
-                if (studentId != null && slotContext != null) {
-                  // BUG FIX #2: named-record params to match canonical provider
-                  ref.invalidate(activeBundleProvider((
-                    studentId: studentId,
-                    mohaffezId: slotContext.mohaffezId,
-                    sessionType: slotContext.sessionType,
-                  )));
-                  // BUG FIX #3: invalidate only this teacher's plan cache,
-                  // not every cached instance of the family provider.
-                  ref.invalidate(teacherPlansProvider(slotContext.mohaffezId));
-                }
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('رجوع'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    if (studentId != null && slotContext != null) {
+                      ref.invalidate(activeBundleProvider((
+                        studentId: studentId,
+                        mohaffezId: slotContext.mohaffezId,
+                        sessionType: slotContext.sessionType,
+                      )));
+                      ref.invalidate(teacherPlansProvider(slotContext.mohaffezId));
+                    }
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('إعادة المحاولة'),
+                ),
+              ],
             ),
           ],
         ),
@@ -322,6 +308,7 @@ class _BookingOptionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final String? hint;
   final bool isEnabled;
   final VoidCallback? onTap;
   final Color? backgroundColor;
@@ -332,6 +319,7 @@ class _BookingOptionCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.hint,
     required this.isEnabled,
     this.onTap,
     this.backgroundColor,
@@ -341,9 +329,6 @@ class _BookingOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
     return Opacity(
       opacity: isEnabled ? 1.0 : 0.5,
       child: Card(
@@ -366,14 +351,14 @@ class _BookingOptionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: (iconColor ?? colorScheme.primary).withOpacity(0.1),
+                    color: (iconColor ?? AppThemeConstants.primary).withValues(alpha: 0.1),
                     borderRadius: AppThemeConstants.borderRadiusSm,
                   ),
                   child: Icon(
                     icon,
                     size: 28,
                     color: isEnabled 
-                        ? (iconColor ?? colorScheme.primary)
+                        ? (iconColor ?? AppThemeConstants.primary)
                         : AppThemeConstants.textDisabled,
                   ),
                 ),
@@ -399,11 +384,22 @@ class _BookingOptionCard extends StatelessWidget {
                               : AppThemeConstants.textDisabled,
                         ),
                       ),
+                      if (hint != null && !isEnabled)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            hint!,
+                            style: AppThemeConstants.bodySmall.copyWith(
+                              color: AppThemeConstants.warning,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 Icon(
-                  Icons.chevron_left_rounded, 
+                  Icons.chevron_right_rounded, 
                   color: isEnabled 
                       ? AppThemeConstants.textSecondary
                       : AppThemeConstants.textDisabled,

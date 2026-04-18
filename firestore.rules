@@ -286,7 +286,7 @@ service cloud.firestore {
         (request.auth.uid == resource.data.mohaffezId)
         ||
         (request.auth.uid == resource.data.studentId &&
-         onlyUpdating(['studentFeedback', 'studentNotes', 'studentRating', 'updatedAt']))
+         onlyUpdating(['studentFeedback', 'teacherRating', 'reviewNotes', 'updatedAt']))
         ||
         (isAuthenticated() &&
          onlyUpdating([

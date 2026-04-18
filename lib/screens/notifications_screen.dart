@@ -4,7 +4,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../providers/notification_provider_paginated.dart';
 import '../providers/user_provider.dart';
@@ -70,7 +70,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                        colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
                       ),
                     ),
                     child: SafeArea(
@@ -91,7 +91,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                       style: TextStyle(
                                         fontSize: 28,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: AppThemeConstants.onPrimary,
                                       ),
                                     ),
                                     if (unreadCount > 0)
@@ -99,7 +99,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                         '$unreadCount غير مقروءة',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.white.withValues(alpha: 0.9),
+                                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.9),
                                         ),
                                       ),
                                   ],
@@ -107,13 +107,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                 if (paginatedState.items.isNotEmpty)
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
+                                      color: AppThemeConstants.surface.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: IconButton(
                                       icon: const Icon(
                                         Icons.done_all,
-                                        color: Colors.white,
+                                        color: AppThemeConstants.onPrimary,
                                       ),
                                       onPressed: () {
                                         ref
@@ -430,21 +430,22 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryAmber : Colors.white,
+          color: isSelected ? AppThemeConstants.primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
+            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.primaryAmber.withValues(alpha: 0.3),
+                    color: AppThemeConstants.primary.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -611,7 +612,7 @@ Color _getNotificationColor(String? type) {
       return Colors.green;
     case 'payment_required':
     case 'paymentrequired':
-      return AppTheme.primaryAmber;
+      return AppThemeConstants.primary;
     case 'session_rejected':
       return Colors.red;
     case 'assignment_updated':

@@ -473,6 +473,68 @@ export const onSessionCompleted = functions.firestore
     }
   });
 
+/**
+ * Firestore trigger: update teacher's rating average when a student submits a rating.
+ * Fires when teacherRating changes from 0 → non-zero on a hafizSessions document.
+ */
+export const onTeacherRated = functions.firestore
+  .document('hafizSessions/{sessionId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data() as Record<string, unknown>;
+    const after = change.after.data() as Record<string, unknown>;
+
+    const beforeRating = asNumber(before.teacherRating, 0);
+    const afterRating = asNumber(after.teacherRating, 0);
+
+    // Only process when a new rating is submitted (0 → non-zero)
+    if (beforeRating !== 0 || afterRating === 0) return;
+
+    const mohaffezId = asString(after.mohaffezId, '');
+    const sessionId = context.params.sessionId;
+
+    if (!mohaffezId) {
+      functions.logger.warn('onTeacherRated: missing mohaffezId', { sessionId });
+      return;
+    }
+
+    try {
+      const teacherRef = db.collection('users').doc(mohaffezId);
+
+      await db.runTransaction(async (transaction) => {
+        const teacherDoc = await transaction.get(teacherRef);
+        if (!teacherDoc.exists) {
+          functions.logger.warn('onTeacherRated: teacher doc not found', { mohaffezId });
+          return;
+        }
+
+        const data = teacherDoc.data() as Record<string, unknown>;
+        const oldRating = asNumber(data.rating, 0);
+        const oldCount = asNumber(data.reviewCount, 0);
+
+        const newCount = oldCount + 1;
+        const newAvg = (oldRating * oldCount + afterRating) / newCount;
+
+        transaction.update(teacherRef, {
+          rating: Math.round(newAvg * 10) / 10,
+          reviewCount: newCount,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+
+      functions.logger.info('Teacher rating updated', {
+        sessionId,
+        mohaffezId,
+        submittedRating: afterRating,
+      });
+    } catch (error) {
+      functions.logger.error('Failed to update teacher rating', {
+        sessionId,
+        mohaffezId,
+        error,
+      });
+    }
+  });
+
 const sessionEventStore = new SessionEventStore();
 
 export const onSessionRequestStatusChanged = functions.firestore

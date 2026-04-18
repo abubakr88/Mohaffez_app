@@ -289,7 +289,7 @@ class _AdminUserDetailScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('يرجى إدخال سبب الإيقاف'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -426,7 +426,7 @@ class _AdminUserDetailScreenState
     return Container(
       padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
       decoration: const BoxDecoration(
-        color: AppThemeConstants.surfaceWhite,
+        color: AppThemeConstants.surface,
         borderRadius: AppThemeConstants.borderRadiusMd,
       ),
       child: Column(
@@ -465,7 +465,7 @@ class _ActionButton extends StatelessWidget {
       style: backgroundColor != null
           ? ElevatedButton.styleFrom(
               backgroundColor: backgroundColor,
-              foregroundColor: Colors.white,
+              foregroundColor: AppThemeConstants.onPrimary,
             )
           : null,
       onPressed: isLoading ? null : onPressed,

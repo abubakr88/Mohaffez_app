@@ -56,18 +56,18 @@ class _DS {
       blurRadius: 14,
       offset: const Offset(0, 4),
     ),
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.03),
+    const BoxShadow(
+      color: AppThemeConstants.shadow,
       blurRadius: 4,
-      offset: const Offset(0, 1),
+      offset: Offset(0, 1),
     ),
   ];
 
   static List<BoxShadow> subtleShadow = [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.04),
+    const BoxShadow(
+      color: AppThemeConstants.shadow,
       blurRadius: 8,
-      offset: const Offset(0, 2),
+      offset: Offset(0, 2),
     ),
   ];
 }
@@ -164,7 +164,7 @@ class MohaffezHomeContent extends ConsumerWidget {
           backgroundColor: _DS.bg,
           body: RefreshIndicator(
             color: _DS.teal500,
-            backgroundColor: Colors.white,
+            backgroundColor: AppThemeConstants.surface,
             onRefresh: () async {
               ref.invalidate(currentUserProvider);
               ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
@@ -850,7 +850,7 @@ class _NextSessionCountdownState extends State<_NextSessionCountdown> {
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final period = date.hour >= 12 ? 'م' : 'ص';
     final minute = date.minute.toString().padLeft(2, '0');
-    return '$dayName ${hour}:${minute} $period';
+    return '$dayName $hour:$minute $period';
   }
 
   Widget _buildTimeUnit(String value, String label, bool isUrgent) {
@@ -1125,7 +1125,9 @@ class _SessionCard extends StatelessWidget {
     final diff = target.difference(today).inDays;
     if (diff == 0) return 'اليوم';
     if (diff == 1) return 'غداً';
-    if (diff > 1 && diff <= 6) return 'بعد $diff أيام';
+    if (diff == 2) return 'بعد يومين';
+    if (diff >= 3 && diff <= 10) return 'بعد $diff أيام';
+    if (diff > 10) return 'بعد $diff يوم';
     return DateFormat('dd/MM', 'ar').format(date);
   }
 

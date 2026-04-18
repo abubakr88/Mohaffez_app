@@ -23,7 +23,7 @@ class AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       title: Text(title),
-      backgroundColor: AppThemeConstants.primaryAmber,
+      backgroundColor: AppThemeConstants.primary,
       foregroundColor: Colors.white,
       elevation: 2,
       leading: leading,

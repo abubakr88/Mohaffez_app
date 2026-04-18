@@ -12,9 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../providers/booking_flow_provider.dart';
 import '../providers/user_provider.dart';
-import '../shared/theme/app_theme_constants.dart';
 
 class DirectBookingRequestScreen extends ConsumerStatefulWidget {
   const DirectBookingRequestScreen({super.key});
@@ -120,7 +120,7 @@ class _DirectBookingRequestScreenState
         messenger.showSnackBar(
           const SnackBar(
             content: Text('تم إرسال الطلب! سيتم إعلامك عندما يقبل المحفظ'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
             duration: Duration(seconds: 5),
           ),
         );
@@ -129,7 +129,7 @@ class _DirectBookingRequestScreenState
         messenger.showSnackBar(
           SnackBar(
             content: Text(data['message']?.toString() ?? 'فشل إرسال الطلب'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -191,7 +191,7 @@ class _DirectBookingRequestScreenState
       child: Scaffold(
         appBar: AppBar(
           title: const Text('إرسال طلب حجز'),
-          backgroundColor: AppThemeConstants.primaryAmber,
+          backgroundColor: AppThemeConstants.primary,
           foregroundColor: Colors.white,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios),
@@ -224,7 +224,7 @@ class _DirectBookingRequestScreenState
               // How it works
               const InfoCard(
                 icon: Icons.info_outline,
-                color: AppThemeConstants.primaryAmber,
+                color: AppThemeConstants.primary,
                 title: 'كيف يعمل؟',
                 body:
                     '١. ترسل الطلب.\n٢. يقبل المحفظ.\n٣. تستلم إشعار بالقبول.\n٤. تحوّل المبلغ مباشرة.\n٥. يؤكد المحفظ الاستلام.',
@@ -234,12 +234,12 @@ class _DirectBookingRequestScreenState
               Container(
                 decoration: BoxDecoration(
                   color: _acknowledged
-                      ? AppThemeConstants.primaryAmber.withValues(alpha: 0.08)
+                      ? AppThemeConstants.primary.withValues(alpha: 0.08)
                       : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: _acknowledged
-                        ? AppThemeConstants.primaryAmber.withValues(alpha: 0.4)
+                        ? AppThemeConstants.primary.withValues(alpha: 0.4)
                         : Colors.grey.shade300,
                   ),
                 ),
@@ -248,7 +248,7 @@ class _DirectBookingRequestScreenState
                   onChanged: _submitting
                       ? null
                       : (v) => setState(() => _acknowledged = v ?? false),
-                  activeColor: AppThemeConstants.primaryAmber,
+                  activeColor: AppThemeConstants.primary,
                   title: const Text(
                     'أتفهم أنني سأحوّل المبلغ مباشرةً بعد قبول المحفظ للطلب',
                     style: TextStyle(fontSize: 13),
@@ -279,9 +279,9 @@ class _DirectBookingRequestScreenState
                         color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeConstants.primaryAmber,
+                    backgroundColor: AppThemeConstants.primary,
                     disabledBackgroundColor:
-                        AppThemeConstants.primaryAmber.withValues(alpha: 0.5),
+                        AppThemeConstants.primary.withValues(alpha: 0.5),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -353,7 +353,7 @@ class SummaryCard extends StatelessWidget {
           children: [
             const Row(children: [
               Icon(Icons.assignment_outlined,
-                  color: AppThemeConstants.primaryAmber),
+                  color: AppThemeConstants.primary),
               SizedBox(width: 8),
               Text('تفاصيل الجلسة',
                   style: TextStyle(

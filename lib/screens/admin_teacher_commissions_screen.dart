@@ -132,7 +132,7 @@ class _AdminTeacherCommissionsScreenState
                               },
                             )
                           : null,
-                      border: OutlineInputBorder(
+                      border: const OutlineInputBorder(
                         borderRadius: AppThemeConstants.borderRadiusMd,
                       ),
                       filled: true,
@@ -149,14 +149,14 @@ class _AdminTeacherCommissionsScreenState
                   margin: const EdgeInsets.all(AppThemeConstants.spaceMd),
                   padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
+                    color: AppThemeConstants.warning.withValues(alpha: 0.1),
                     borderRadius: AppThemeConstants.borderRadiusMd,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: const Text(
+                      const Expanded(
+                        child: Text(
                           'إجمالي المستحقات غير المدفوعة:',
                           style: TextStyle(
                             fontSize: 15,
@@ -186,7 +186,7 @@ class _AdminTeacherCommissionsScreenState
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.search_off,
                                 size: 64,
                                 color: AppThemeConstants.textSecondary,
@@ -241,7 +241,7 @@ class _AdminTeacherCommissionsScreenState
                         elevation: 2,
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: AppThemeConstants.primaryAmber,
+                            backgroundColor: AppThemeConstants.primary,
                             child: Text(
                               mohaffezName.isNotEmpty
                                   ? mohaffezName[0]

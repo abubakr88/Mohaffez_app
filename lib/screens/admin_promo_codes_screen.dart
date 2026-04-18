@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../providers/admin_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
@@ -48,7 +49,7 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
       child: Scaffold(
         appBar: const AdminAppBar(title: ArabicLabels.promoCodes),
         floatingActionButton: FloatingActionButton(
-          backgroundColor: AppThemeConstants.primaryAmber,
+          backgroundColor: AppThemeConstants.primary,
           child: const Icon(Icons.add),
           onPressed: () => _showCreateSheet(context, actions, run),
         ),
@@ -97,7 +98,7 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
                       children: [
                         Text(p['code']?.toString() ?? '-'),
                         const SizedBox(width: 4),
-                        Icon(Icons.copy, size: 16, color: AppThemeConstants.primary),
+                        const Icon(Icons.copy, size: 16, color: AppThemeConstants.primary),
                       ],
                     ),
                   ),
@@ -107,7 +108,7 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.copy, color: AppThemeConstants.primary),
+                        icon: const Icon(Icons.copy, color: AppThemeConstants.primary),
                         tooltip: 'نسخ الكود',
                         onPressed: () async {
                           final code = p['code']?.toString() ?? '';
@@ -130,7 +131,7 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
                         )
                       else
                         IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          icon: const Icon(Icons.delete_outline, color: AppThemeConstants.error),
                           onPressed: isLoading ? null : () async {
                             final ok = await showDialog<bool>(
                               context: context,
@@ -273,7 +274,7 @@ class _AdminPromoCodesScreenState extends ConsumerState<AdminPromoCodesScreen> {
                                   : null,
                               'isActive': isActive,
                             }));
-                        if (context.mounted) Navigator.pop(context);
+                        if (context.mounted) context.pop();
                       } finally {
                         if (context.mounted) setSheetState(() => isLoading = false);
                       }

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../shared/widgets/admin_app_bar.dart';
 import '../shared/widgets/admin_empty_state.dart';
+import '../shared/theme/app_theme_constants.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -23,12 +24,12 @@ class _AdminPaymentEventsScreenState
   DateTime? _toDate;
 
   static const Map<String, Map<String, dynamic>> _eventTypeConfig = {
-    'paymentcompleted': {'label': 'مكتمل', 'color': Colors.green},
-    'paymentfailed': {'label': 'فشل', 'color': Colors.red},
-    'webhookreceived': {'label': 'Webhook', 'color': Colors.blue},
+    'paymentcompleted': {'label': 'مكتمل', 'color': AppThemeConstants.success},
+    'paymentfailed': {'label': 'فشل', 'color': AppThemeConstants.error},
+    'webhookreceived': {'label': 'Webhook', 'color': AppThemeConstants.info},
     'bookingconfirmed': {'label': 'حجز', 'color': Colors.teal},
     'subscriptioncreated': {'label': 'اشتراك', 'color': Colors.purple},
-    'paymentcreated': {'label': 'جديد', 'color': Colors.orange},
+    'paymentcreated': {'label': 'جديد', 'color': AppThemeConstants.warning},
   };
 
   static const List<Map<String, dynamic>> _filterChips = [
@@ -146,12 +147,12 @@ class _AdminPaymentEventsScreenState
                       label: Text(
                         chip['label'] as String,
                         style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
+                          color: isSelected ? AppThemeConstants.onPrimary : AppThemeConstants.textPrimary,
                         ),
                       ),
                       selected: isSelected,
-                      selectedColor: Colors.amber,
-                      checkmarkColor: Colors.white,
+                      selectedColor: AppThemeConstants.warning,
+                      checkmarkColor: AppThemeConstants.onPrimary,
                       onSelected: (selected) {
                         setState(() {
                           _selectedEventType = selected ? chip['value'] as String? : null;

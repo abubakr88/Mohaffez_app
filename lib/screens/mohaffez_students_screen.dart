@@ -3,15 +3,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:go_router/go_router.dart';
 
 import '../models/mohaffez_student_summary.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 import '../utils/arabic_labels.dart';
-import 'mohaffez_student_detail_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root widget: only resolves the authenticated user.
@@ -96,15 +96,12 @@ class _StudentsBody extends ConsumerWidget {
                           final student = students[index];
                           return StudentCard(
                             student: student,
-                            onTap: () => Navigator.push(
-                              ctx,
-                              MaterialPageRoute(
-                                builder: (_) => MohaffezStudentDetailScreen(
-                                  student: student,
-                                  mohaffezId: mohaffezId,
-                                ),
-                              ),
-                            ),
+                            onTap: () {
+                              context.push(
+                                '/student/${student.studentId}',
+                                extra: student,
+                              );
+                            },
                           );
                         },
                         childCount: students.length,
@@ -149,7 +146,7 @@ class _AppBarSliver extends ConsumerWidget {
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+              colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -166,30 +163,30 @@ class _AppBarSliver extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppThemeConstants.surface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.groups,
-                            size: 28, color: Colors.white),
+                            size: 28, color: AppThemeConstants.onPrimary),
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'طلابي',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppThemeConstants.onPrimary,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               'قائمة الطلاب',
                               style: TextStyle(
-                                  fontSize: 12, color: Colors.white70),
+                                  fontSize: 12, color: AppThemeConstants.onPrimary.withValues(alpha: 0.7)),
                             ),
                           ],
                         ),
@@ -244,9 +241,9 @@ class StudentCard extends StatelessWidget {
                   CircleAvatar(
                     radius: 28,
                     backgroundColor:
-                        AppTheme.accentGreen.withValues(alpha: 0.2),
+                        AppThemeConstants.secondary.withValues(alpha: 0.2),
                     child: const Icon(Icons.person,
-                        color: AppTheme.accentGreen, size: 28),
+                        color: AppThemeConstants.secondary, size: 28),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -278,7 +275,7 @@ class StudentCard extends StatelessWidget {
                   _StatChip(
                     icon: Icons.school,
                     label: '${student.sessionCount}',
-                    color: AppTheme.primaryAmber,
+                    color: AppThemeConstants.primary,
                   ),
                   const SizedBox(width: 8),
                   const Icon(Icons.arrow_forward_ios,

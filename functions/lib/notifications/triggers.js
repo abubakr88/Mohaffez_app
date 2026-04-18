@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onSessionRequestStatusChanged = exports.onSessionCompleted = exports.onPaymentCompleted = exports.onSessionCreated = exports.onSessionRequestAccepted = void 0;
+exports.onSessionRequestStatusChanged = exports.onTeacherRated = exports.onSessionCompleted = exports.onPaymentCompleted = exports.onSessionCreated = exports.onSessionRequestAccepted = void 0;
 const functions = require("firebase-functions");
 const admin_1 = require("../utils/admin");
 const notificationHelpers_1 = require("../utils/notificationHelpers");
@@ -400,6 +400,59 @@ exports.onSessionCompleted = functions.firestore
         functions.logger.error('Error sending session completed notification', {
             sessionId,
             studentId,
+            mohaffezId,
+            error,
+        });
+    }
+});
+/**
+ * Firestore trigger: update teacher's rating average when a student submits a rating.
+ * Fires when teacherRating changes from 0 → non-zero on a hafizSessions document.
+ */
+exports.onTeacherRated = functions.firestore
+    .document('hafizSessions/{sessionId}')
+    .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    const beforeRating = asNumber(before.teacherRating, 0);
+    const afterRating = asNumber(after.teacherRating, 0);
+    // Only process when a new rating is submitted (0 → non-zero)
+    if (beforeRating !== 0 || afterRating === 0)
+        return;
+    const mohaffezId = asString(after.mohaffezId, '');
+    const sessionId = context.params.sessionId;
+    if (!mohaffezId) {
+        functions.logger.warn('onTeacherRated: missing mohaffezId', { sessionId });
+        return;
+    }
+    try {
+        const teacherRef = admin_1.db.collection('users').doc(mohaffezId);
+        await admin_1.db.runTransaction(async (transaction) => {
+            const teacherDoc = await transaction.get(teacherRef);
+            if (!teacherDoc.exists) {
+                functions.logger.warn('onTeacherRated: teacher doc not found', { mohaffezId });
+                return;
+            }
+            const data = teacherDoc.data();
+            const oldRating = asNumber(data.rating, 0);
+            const oldCount = asNumber(data.reviewCount, 0);
+            const newCount = oldCount + 1;
+            const newAvg = (oldRating * oldCount + afterRating) / newCount;
+            transaction.update(teacherRef, {
+                rating: Math.round(newAvg * 10) / 10,
+                reviewCount: newCount,
+                updatedAt: admin_1.FieldValue.serverTimestamp(),
+            });
+        });
+        functions.logger.info('Teacher rating updated', {
+            sessionId,
+            mohaffezId,
+            submittedRating: afterRating,
+        });
+    }
+    catch (error) {
+        functions.logger.error('Failed to update teacher rating', {
+            sessionId,
             mohaffezId,
             error,
         });

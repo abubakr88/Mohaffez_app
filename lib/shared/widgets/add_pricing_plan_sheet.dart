@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/pricing_plan_model.dart';
 import '../../providers/pricing_provider.dart';
-import '../constants/app_theme.dart';
+import '../theme/app_theme_constants.dart';
 
 class AddPricingPlanSheet extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -177,7 +177,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           // FIX: Use withValues instead of withOpacity
-                          color: AppTheme.primaryAmber.withValues(alpha: 0.1),
+                          color: AppThemeConstants.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -265,7 +265,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   title: const Text('يتضمن جلسة تجريبية مجانية'),
                   subtitle: const Text('سيتمكن الطلاب من تجربة جلسة قبل الدفع'),
                   // FIX: Use activeThumbColor instead of activeColor
-                  activeThumbColor: AppTheme.accentGreen,
+                  activeThumbColor: AppThemeConstants.secondary,
                 ),
                 const SizedBox(height: 24),
                 

@@ -3,10 +3,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../models/mohaffez_student_summary.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
 
@@ -74,15 +75,15 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                 floating: true,
                 pinned: true,
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
                 ),
                 title: Text(student.studentName),
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                        colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -94,19 +95,6 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
               // ── Student summary card ───────────────────────────────────
               SliverToBoxAdapter(
                 child: _StudentSummaryCard(student: student),
-              ),
-
-              // ── Section header ─────────────────────────────────────────
-              SliverPadding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                sliver: SliverToBoxAdapter(
-                  child: Text(
-                    'سجل الجلسات (${student.sessionCount})',
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
               ),
 
               // ── Session list ───────────────────────────────────────────
@@ -125,8 +113,49 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (_, index) =>
-                            _SessionHistoryCard(session: sessions[index]),
+                        (_, index) {
+                          if (index == 0) {
+                            // Header row before first session
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'سجل الجلسات (${sessions.length})',
+                                      style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    if (student.sessionCount > 50) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppThemeConstants.warning.withValues(alpha: 0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: const Text(
+                                          'آخر 50',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppThemeConstants.warning,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _SessionHistoryCard(session: sessions[index]),
+                              ],
+                            );
+                          }
+                          return _SessionHistoryCard(session: sessions[index]);
+                        },
                         childCount: sessions.length,
                       ),
                     ),
@@ -172,9 +201,9 @@ class _StudentSummaryCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 32,
                   backgroundColor:
-                      AppTheme.accentGreen.withValues(alpha: 0.2),
+                      AppThemeConstants.secondary.withValues(alpha: 0.2),
                   child: const Icon(Icons.person,
-                      color: AppTheme.accentGreen, size: 32),
+                      color: AppThemeConstants.secondary, size: 32),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -190,7 +219,7 @@ class _StudentSummaryCard extends StatelessWidget {
                       Text(
                         '${student.sessionCount} جلسة',
                         style: const TextStyle(
-                            fontSize: 14, color: Colors.grey),
+                            fontSize: 14, color: AppThemeConstants.textSecondary),
                       ),
                     ],
                   ),
@@ -276,9 +305,13 @@ class _SessionHistoryCard extends StatelessWidget {
         : '—';
 
     final status = session['status'] as String? ?? 'accepted';
-    final isCompleted = status == 'completed';
-    final statusColor = isCompleted ? Colors.green : Colors.orange;
-    final statusLabel = isCompleted ? 'مكتملة' : 'مقبولة';
+    final (statusColor, statusLabel) = switch (status) {
+      'completed' => (Colors.green, 'مكتملة'),
+      'accepted' => (Colors.blue, 'مقبولة'),
+      'pending' => (Colors.orange, 'قيد الانتظار'),
+      'rejected' || 'cancelled' => (Colors.red, 'ملغية'),
+      _ => (Colors.grey, status),
+    };
 
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
@@ -342,7 +375,12 @@ class _SessionHistoryCard extends StatelessWidget {
                   const Icon(Icons.category, size: 14, color: Colors.grey),
                   const SizedBox(width: 4),
                   Text(
-                    session['sessionType'] as String? ?? '',
+                    switch (session['sessionType'] as String? ?? '') {
+                      'home' => 'بيت الطالب',
+                      'mosque' => 'المسجد',
+                      'online' => 'أونلاين',
+                      _ => session['sessionType'] as String? ?? '',
+                    },
                     style: const TextStyle(
                         fontSize: 13, color: Colors.black87),
                   ),
@@ -392,13 +430,15 @@ class _SessionHistoryCard extends StatelessWidget {
             // Rating
             if (rating > 0) ...[
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 2,
+                runSpacing: 4,
                 children: [
                   ...List.generate(
                     10,
                     (i) => Icon(
                       i < rating ? Icons.star : Icons.star_border,
-                      size: 14,
+                      size: 12,
                       color: Colors.amber,
                     ),
                   ),
@@ -424,7 +464,7 @@ class _SessionHistoryCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  session['performanceNotes'] as String,
+                  session['performanceNotes'] as String? ?? '',
                   style: const TextStyle(
                       fontSize: 12, color: Colors.black87),
                   maxLines: 3,

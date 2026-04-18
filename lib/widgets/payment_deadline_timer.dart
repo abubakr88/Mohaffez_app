@@ -1,7 +1,8 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../utils/arabic_labels.dart';
+import '../shared/theme/app_theme_constants.dart';
 
 class PaymentDeadlineTimer extends StatefulWidget {
   const PaymentDeadlineTimer({
@@ -35,19 +36,19 @@ class _PaymentDeadlineTimerState extends State<PaymentDeadlineTimer> {
           return Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.red.shade100,
+              color: AppThemeConstants.errorBackground,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
+            child: const Row(
               children: [
-                const Icon(Icons.error, color: Colors.red),
-                const SizedBox(width: 8),
+                Icon(Icons.error, color: AppThemeConstants.error),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     // CHANGED: Centralized Arabic label to avoid mojibake.
                     ArabicLabels.paymentExpired,
                     style: TextStyle(
-                      color: Colors.red.shade900,
+                      color: AppThemeConstants.error,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -64,16 +65,16 @@ class _PaymentDeadlineTimerState extends State<PaymentDeadlineTimer> {
         Color textColor;
         IconData icon;
         if (hours < 1) {
-          bgColor = Colors.red.shade100;
-          textColor = Colors.red.shade900;
+          bgColor = AppThemeConstants.errorBackground;
+          textColor = AppThemeConstants.error;
           icon = Icons.warning;
         } else if (hours < 3) {
-          bgColor = Colors.orange.shade100;
-          textColor = Colors.orange.shade900;
+          bgColor = AppThemeConstants.warningBackground;
+          textColor = AppThemeConstants.warning;
           icon = Icons.timer;
         } else {
-          bgColor = Colors.blue.shade50;
-          textColor = Colors.blue.shade900;
+          bgColor = AppThemeConstants.accentBackground;
+          textColor = AppThemeConstants.primary;
           icon = Icons.schedule;
         }
 
@@ -96,7 +97,7 @@ class _PaymentDeadlineTimerState extends State<PaymentDeadlineTimer> {
                       children: [
                         Text(
                           // CHANGED: Proper UTF-8 Arabic interpolation.
-                          '${ArabicLabels.timeRemaining}: $hours ساعة و $minutes دقيقة',
+                          '${ArabicLabels.timeRemaining}: $hours ${hours > 1 ? ArabicLabels.hours : ArabicLabels.hour} و $minutes ${minutes > 1 ? ArabicLabels.minutes : ArabicLabels.minute}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: textColor,
@@ -105,7 +106,7 @@ class _PaymentDeadlineTimerState extends State<PaymentDeadlineTimer> {
                         ),
                         if (hours < 3)
                           Text(
-                            'سيتم إلغاء الطلب تلقائياً بعد انتهاء المدة',
+                            'ادفع الآن لتجنب إلغاء الحجز',
                             style: TextStyle(
                               fontSize: 12,
                               color: textColor,
@@ -122,8 +123,8 @@ class _PaymentDeadlineTimerState extends State<PaymentDeadlineTimer> {
                 child: ElevatedButton(
                   onPressed: widget.onPayNow,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: hours < 1 ? Colors.red : Colors.green,
-                    foregroundColor: Colors.white,
+                    backgroundColor: hours < 1 ? AppThemeConstants.error : AppThemeConstants.success,
+                    foregroundColor: AppThemeConstants.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: const Text(

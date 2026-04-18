@@ -28,6 +28,7 @@ class SetupGuard implements RouteGuard {
     '/teacher-certificates',
     '/teacher-pending',
     '/teacher-rejected',
+    '/pick-location',
   };
 
   @override
@@ -45,17 +46,6 @@ class SetupGuard implements RouteGuard {
     if (user.role == 'admin') return null;
 
     final currentPath = state.uri.path;
-
-    // Backward compatibility: existing users created before feature deployment
-    // do NOT have setupCompleted in their doc. UserModel defaults it to false,
-    // which would force them into setup. Grandfather them by checking createdAt.
-    // TODO: Remove this after running the Firestore migration script.
-    if (!user.setupCompleted && user.createdAt != null) {
-      final cutoffDate = DateTime(2026, 3, 23); // deployment date — adjust
-      if (user.createdAt!.isBefore(cutoffDate)) {
-        return null; // grandfather existing users
-      }
-    }
 
     // If user hasn't completed setup and isn't on an exempt route → redirect
     if (!user.setupCompleted && !exemptRoutes.contains(currentPath)) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme_constants.dart';
 
 class StatusBadge extends StatelessWidget {
   final String status;
@@ -45,17 +46,17 @@ class StatusBadge extends StatelessWidget {
         return _StatusConfig(
           label: 'قيد الانتظار',
           icon: Icons.hourglass_empty,
-          bgColor: Colors.blue.shade50,
-          textColor: Colors.blue.shade700,
-          borderColor: Colors.blue.shade300,
+          bgColor: AppThemeConstants.info.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.info,
+          borderColor: AppThemeConstants.info.withValues(alpha: 0.3),
         );
       case 'awaitingpayment':
         return _StatusConfig(
           label: 'في انتظار الدفع',
           icon: Icons.payment,
-          bgColor: Colors.amber.shade50,
-          textColor: Colors.amber.shade800,
-          borderColor: Colors.amber.shade300,
+          bgColor: AppThemeConstants.warning.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.warning,
+          borderColor: AppThemeConstants.warning.withValues(alpha: 0.3),
         );
 
       // ── NEW ──────────────────────────────────────────────────────────────
@@ -63,9 +64,9 @@ class StatusBadge extends StatelessWidget {
         return _StatusConfig(
           label: 'في انتظار تأكيد الدفع المباشر',
           icon: Icons.payments_outlined,
-          bgColor: Colors.orange.shade50,
-          textColor: Colors.orange.shade800,
-          borderColor: Colors.orange.shade300,
+          bgColor: AppThemeConstants.warning.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.warning,
+          borderColor: AppThemeConstants.warning.withValues(alpha: 0.3),
         );
       // ─────────────────────────────────────────────────────────────────────
 
@@ -75,27 +76,27 @@ class StatusBadge extends StatelessWidget {
         return _StatusConfig(
           label: 'مؤكدة',
           icon: Icons.check_circle,
-          bgColor: Colors.green.shade50,
-          textColor: Colors.green.shade700,
-          borderColor: Colors.green.shade300,
+          bgColor: AppThemeConstants.success.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.success,
+          borderColor: AppThemeConstants.success.withValues(alpha: 0.3),
         );
 
       case 'completed':
         return _StatusConfig(
           label: 'مكتملة',
           icon: Icons.done_all,
-          bgColor: Colors.teal.shade50,
-          textColor: Colors.teal.shade700,
-          borderColor: Colors.teal.shade300,
+          bgColor: AppThemeConstants.success.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.success,
+          borderColor: AppThemeConstants.success.withValues(alpha: 0.3),
         );
 
       case 'cancelled':
         return _StatusConfig(
           label: 'ملغية',
           icon: Icons.cancel,
-          bgColor: Colors.grey.shade100,
-          textColor: Colors.grey.shade700,
-          borderColor: Colors.grey.shade400,
+          bgColor: AppThemeConstants.textMuted.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.textSecondary,
+          borderColor: AppThemeConstants.textMuted.withValues(alpha: 0.3),
         );
 
       // ── NEW ──────────────────────────────────────────────────────────────
@@ -103,9 +104,9 @@ class StatusBadge extends StatelessWidget {
         return _StatusConfig(
           label: 'مرفوضة',
           icon: Icons.do_not_disturb_alt,
-          bgColor: Colors.red.shade50,
-          textColor: Colors.red.shade700,
-          borderColor: Colors.red.shade300,
+          bgColor: AppThemeConstants.error.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.error,
+          borderColor: AppThemeConstants.error.withValues(alpha: 0.3),
         );
       // ─────────────────────────────────────────────────────────────────────
 
@@ -113,17 +114,17 @@ class StatusBadge extends StatelessWidget {
         return _StatusConfig(
           label: 'منتهية',
           icon: Icons.timer_off,
-          bgColor: Colors.red.shade50,
-          textColor: Colors.red.shade700,
-          borderColor: Colors.red.shade300,
+          bgColor: AppThemeConstants.error.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.error,
+          borderColor: AppThemeConstants.error.withValues(alpha: 0.3),
         );
       default:
         return _StatusConfig(
           label: status,
           icon: Icons.info_outline,
-          bgColor: Colors.grey.shade50,
-          textColor: Colors.grey.shade700,
-          borderColor: Colors.grey.shade300,
+          bgColor: AppThemeConstants.textMuted.withValues(alpha: 0.1),
+          textColor: AppThemeConstants.textSecondary,
+          borderColor: AppThemeConstants.textMuted.withValues(alpha: 0.3),
         );
     }
   }

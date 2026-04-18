@@ -11,9 +11,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../repositories/user_repository.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/cached_avatar.dart';
 import '../utils/arabic_labels.dart';
-import 'location_settings_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (consistent with home screens)
@@ -43,10 +43,10 @@ class _DS {
   static const r16 = BorderRadius.all(Radius.circular(16));
 
   static List<BoxShadow> subtleShadow = [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.04),
+    const BoxShadow(
+      color: AppThemeConstants.shadow,
       blurRadius: 8,
-      offset: const Offset(0, 2),
+      offset: Offset(0, 2),
     ),
   ];
 }
@@ -134,7 +134,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           AndroidUiSettings(
             toolbarTitle: 'اقتصاص الصورة',
             toolbarColor: const Color(0xFF095752),
-            toolbarWidgetColor: Colors.white,
+            toolbarWidgetColor: AppThemeConstants.onPrimary,
             activeControlsWidgetColor: const Color(0xFF1A9E84),
             initAspectRatio: CropAspectRatioPreset.square,
             lockAspectRatio: true,
@@ -416,7 +416,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               backgroundColor: _DS.bg,
               body: RefreshIndicator(
                 color: _DS.teal500,
-                backgroundColor: Colors.white,
+                backgroundColor: AppThemeConstants.surface,
                 onRefresh: () async {
                   ref.invalidate(currentUserProvider);
                   await ref.read(currentUserProvider.future).catchError((_) => null);
@@ -577,12 +577,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   color: _DS.teal500,
                                   isLast: true,
                                   onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const LocationSettingsScreen(),
-                                      ),
-                                    );
+                                    context.push('/location-settings');
                                   },
                                 ),
                               ],

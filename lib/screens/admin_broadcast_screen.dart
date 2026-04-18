@@ -210,7 +210,7 @@ class _AdminBroadcastScreenState extends ConsumerState<AdminBroadcastScreen> {
                     Text(
                       'سيصل الإشعار إلى $_audienceCount مستخدم',
                       style: const TextStyle(
-                        color: AppThemeConstants.primaryAmber,
+                        color: AppThemeConstants.primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),

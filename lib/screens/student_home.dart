@@ -213,7 +213,7 @@ class StudentHomeContent extends ConsumerWidget {
                       name:     user?.name ?? 'الطالب',
                       photoUrl: user?.photoUrl,
                       dateText: DateFormat('EEEE، d MMMM', 'ar').format(now),
-                      greeting: _greeting(now),
+                      greeting: _greeting(now, nextSessionDate),
                     ),
                   ),
                 ),
@@ -258,11 +258,26 @@ class StudentHomeContent extends ConsumerWidget {
     );
   }
 
-  static String _greeting(DateTime now) {
+  static String _greeting(DateTime now, DateTime? nextSession) {
+    if (nextSession != null) {
+      final today = DateTime(now.year, now.month, now.day);
+      final sessionDay = DateTime(nextSession.year, nextSession.month, nextSession.day);
+      final diff = sessionDay.difference(today).inDays;
+      if (diff == 0) {
+        final timeStr = DateFormat('h:mm a', 'ar').format(nextSession);
+        return 'جلستك اليوم الساعة $timeStr — استعد وراجع درسك';
+      }
+      if (diff == 1) return 'جلستك غداً — راجع سورة الأمس الآن';
+      if (diff <= 3) return 'جلستك بعد $diff أيام — واصل المراجعة اليومية';
+    }
     final h = now.hour;
+    if (h < 4)  return 'ختم يومك بتلاوة قبل النوم';
+    if (h < 7)  return 'وقت الفجر — ابدأ يومك بالحفظ';
     if (h < 12) return 'صباح الخير — جاهز لرحلة الحفظ اليوم؟';
-    if (h < 17) return 'يوم جميل لمراجعة ما أنجزته';
-    return 'مساء هادئ لمتابعة الجلسات والواجبات';
+    if (h < 14) return 'وقت الظهر — قليل من المراجعة يثبّت الحفظ';
+    if (h < 17) return 'بعد الظهر وقت مثالي للمراجعة';
+    if (h < 20) return 'بعد المغرب أفضل وقت لتثبيت الحفظ';
+    return 'ختم يومك بتلاوة آيات قبل النوم';
   }
 }
 
@@ -907,7 +922,9 @@ class _AssignmentCard extends StatelessWidget {
     final diff = today.difference(target).inDays;
     if (diff == 0) return 'اليوم';
     if (diff == 1) return 'أمس';
-    if (diff > 1 && diff <= 6) return 'قبل $diff أيام';
+    if (diff == 2) return 'قبل يومين';
+    if (diff >= 3 && diff <= 10) return 'قبل $diff أيام';
+    if (diff > 10) return 'قبل $diff يوم';
     return DateFormat('dd/MM', 'ar').format(date);
   }
 
@@ -1114,7 +1131,7 @@ class _NextSessionCountdownState extends State<_NextSessionCountdown> {
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final period = date.hour >= 12 ? 'م' : 'ص';
     final minute = date.minute.toString().padLeft(2, '0');
-    return '$dayName ${hour}:${minute} $period';
+    return '$dayName $hour:$minute $period';
   }
 
   Widget _buildTimeUnit(String value, String label, bool isUrgent) {

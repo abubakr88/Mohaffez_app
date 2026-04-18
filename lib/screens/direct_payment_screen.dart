@@ -416,7 +416,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ تم إرسال إشعار الدفع — بانتظار تأكيد المعلم'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
         context.go('/home');
@@ -471,7 +471,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.account_balance_wallet_outlined,
-                      size: 64, color: Colors.grey),
+                      size: 64, color: AppThemeConstants.textSecondary),
                   const SizedBox(height: 16),
                   const Text(
                     'لم يُضف المعلم أرقام محافظه بعد',
@@ -482,15 +482,15 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     'يرجى التواصل مع المعلم مباشرة أو انتظار إضافة أرقام الدفع',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: AppThemeConstants.textSecondary),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.primaryAmber,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppThemeConstants.primary,
+                      foregroundColor: AppThemeConstants.onPrimary,
                     ),
                     child: const Text('رجوع'),
                   ),
@@ -552,9 +552,9 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 child: ElevatedButton.icon(
                   onPressed: submitting ? null : _confirmPayment,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeConstants.accentGreen,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppThemeConstants.accentGreen
+                    backgroundColor: AppThemeConstants.secondary,
+                    foregroundColor: AppThemeConstants.onPrimary,
+                    disabledBackgroundColor: AppThemeConstants.secondary
                         .withValues(alpha: 0.5),
                     padding:
                         const EdgeInsets.symmetric(vertical: 16),
@@ -566,7 +566,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
+                              color: AppThemeConstants.onPrimary, strokeWidth: 2),
                         )
                       : const Icon(Icons.send_outlined),
                   label: Text(
@@ -589,8 +589,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   AppBar _buildAppBar(String title) {
     return AppBar(
       title: Text(title),
-      backgroundColor: AppThemeConstants.primaryAmber,
-      foregroundColor: Colors.white,
+      backgroundColor: AppThemeConstants.primary,
+      foregroundColor: AppThemeConstants.onPrimary,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios),
         tooltip: 'رجوع',
@@ -600,7 +600,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           if (context.canPop()) {
             context.pop();
           } else {
-            Navigator.of(context).pop();
+            context.pop();
           }
         },
       ),
@@ -621,7 +621,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           children: [
             const Row(children: [
               Icon(Icons.info_outline,
-                  color: AppThemeConstants.primaryAmber),
+                  color: AppThemeConstants.primary),
               SizedBox(width: 8),
               Text(
                 'تفاصيل الجلسة',
@@ -647,13 +647,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.access_time,
-                      size: 16, color: Colors.grey.shade600),
+                  const Icon(Icons.access_time,
+                      size: 16, color: AppThemeConstants.textSecondary),
                   const SizedBox(width: 8),
-                  Text('الوقت: ',
+                  const Text('الوقت: ',
                       style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade700,
+                          color: AppThemeConstants.textSecondary,
                           fontWeight: FontWeight.w600)),
                   Expanded(
                     child: Directionality(
@@ -687,11 +687,11 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primaryAmber
+                  color: AppThemeConstants.primary
                       .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                      color: AppThemeConstants.primaryAmber),
+                      color: AppThemeConstants.primary),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -699,7 +699,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                     const Icon(
                         Icons.collections_bookmark_outlined,
                         size: 14,
-                        color: AppThemeConstants.primaryAmber),
+                        color: AppThemeConstants.primary),
                     const SizedBox(width: 4),
                     Text(
                       widget.planType == 'bundle'
@@ -708,7 +708,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: AppThemeConstants.primaryAmberDark,
+                        color: AppThemeConstants.primaryVariant,
                       ),
                     ),
                   ],
@@ -727,10 +727,10 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color:
-            AppThemeConstants.accentGreen.withValues(alpha: 0.08),
+            AppThemeConstants.secondary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: AppThemeConstants.accentGreen
+            color: AppThemeConstants.secondary
                 .withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -746,7 +746,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: AppThemeConstants.accentGreen,
+              color: AppThemeConstants.secondary,
             ),
           ),
         ],
@@ -764,13 +764,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppThemeConstants.primaryAmber.withValues(alpha: 0.08)
-              : Colors.grey.shade50,
+              ? AppThemeConstants.primary.withValues(alpha: 0.08)
+              : AppThemeConstants.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? AppThemeConstants.primaryAmber
-                : Colors.grey.shade300,
+                ? AppThemeConstants.primary
+                : AppThemeConstants.divider,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -780,8 +780,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 ? Icons.radio_button_checked
                 : Icons.radio_button_unchecked,
             color: isSelected
-                ? AppThemeConstants.primaryAmber
-                : Colors.grey,
+                ? AppThemeConstants.primary
+                : AppThemeConstants.textSecondary,
           ),
           const SizedBox(width: 12),
           Text(method.label,
@@ -802,22 +802,22 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppThemeConstants.info.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
             const Icon(Icons.account_balance_wallet,
-                color: Colors.blue, size: 18),
+                color: AppThemeConstants.info, size: 18),
             const SizedBox(width: 6),
             Text(
               'رقم ${selectedMethod!.label}',
               style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  color: AppThemeConstants.info,
                   fontSize: 14),
             ),
           ]),
@@ -836,7 +836,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.copy_outlined,
-                    color: Colors.blue),
+                    color: AppThemeConstants.info),
                 tooltip: 'نسخ الرقم',
                 onPressed: () {
                   Clipboard.setData(

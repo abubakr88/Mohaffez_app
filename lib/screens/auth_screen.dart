@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../shared/widgets/offline_banner.dart';
 import '../services/cache_service.dart';
 import '../shared/utils/validation_utils.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 
 enum UserRole { mohaffez, student }
 
@@ -24,6 +24,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   bool _isLogin = true;
   bool _isLoading = false;
+  bool _obscurePassword = true;
   UserRole _selectedRole = UserRole.mohaffez;
 
   Future<void> _submit() async {
@@ -38,7 +39,7 @@ class _AuthScreenState extends State<AuthScreen> {
       if (_isLogin) {
         cred = await auth.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
+          password: _passwordController.text,
         );
 
         final doc = await FirebaseFirestore.instance
@@ -49,13 +50,13 @@ class _AuthScreenState extends State<AuthScreen> {
         if (doc.exists) {
           final data = doc.data()!;
           await CacheService.saveUserId(cred.user!.uid);
-          await CacheService.saveUserRole(data['role'] as String);
-          await CacheService.saveUserName(data['name'] as String);
+          await CacheService.saveUserRole(data['role'] as String? ?? 'student');
+          await CacheService.saveUserName(data['name'] as String? ?? 'مستخدم');
         }
       } else {
         cred = await auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
+          password: _passwordController.text,
         );
 
         final roleString =
@@ -85,37 +86,50 @@ class _AuthScreenState extends State<AuthScreen> {
         SnackBar(
           content: Text(
               _isLogin ? 'تم تسجيل الدخول بنجاح' : 'تم إنشاء الحساب بنجاح'),
-          backgroundColor: AppTheme.accentGreen,
+          backgroundColor: AppThemeConstants.secondary,
         ),
       );
 
-      // FIXED: Use GoRouter navigation
       context.go('/');
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
       String message;
-      if (e.code == 'user-not-found') {
-        message = 'المستخدم غير موجود';
-      } else if (e.code == 'wrong-password') {
-        message = 'كلمة المرور غير صحيحة';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'البريد الإلكتروني مستخدم بالفعل';
-      } else if (e.code == 'weak-password') {
-        message = 'كلمة المرور ضعيفة';
-      } else if (e.message != null) {
-        message = e.message!;
-      } else {
-        message = 'حدث خطأ';
+      switch (e.code) {
+        case 'invalid-credential':
+        case 'user-not-found':
+        case 'wrong-password':
+          message = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+          break;
+        case 'email-already-in-use':
+          message = 'البريد الإلكتروني مستخدم بالفعل';
+          break;
+        case 'weak-password':
+          message = 'كلمة المرور ضعيفة جداً';
+          break;
+        case 'too-many-requests':
+          message = 'تم تجاوز عدد المحاولات المسموح بها. يرجى المحاولة لاحقاً';
+          break;
+        case 'network-request-failed':
+          message = 'لا يوجد اتصال بالإنترنت';
+          break;
+        case 'user-disabled':
+          message = 'تم تعطيل هذا الحساب. يرجى التواصل مع الدعم';
+          break;
+        default:
+          message = 'حدث خطأ أثناء المصادقة. يرجى المحاولة مرة أخرى';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: AppThemeConstants.error),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى'),
+          backgroundColor: AppThemeConstants.error,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -143,7 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   tooltip: 'رجوع',
                 )
               : null,
-          title: const Text('محفظ - تسجيل الدخول'),
+          title: Text(_isLogin ? 'محفظ - تسجيل الدخول' : 'محفظ - إنشاء حساب'),
         ),
         body: Column(
           children: [
@@ -160,14 +174,14 @@ class _AuthScreenState extends State<AuthScreen> {
                         // Logo
                         Container(
                           padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
+                          decoration: const BoxDecoration(
+                            color: AppThemeConstants.surface,
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
+                                color: AppThemeConstants.shadow,
                                 blurRadius: 20,
-                                offset: const Offset(0, 5),
+                                offset: Offset(0, 5),
                               ),
                             ],
                           ),
@@ -180,7 +194,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 const Icon(
                               Icons.school,
                               size: 100,
-                              color: AppTheme.primaryAmber,
+                              color: AppThemeConstants.primary,
                             ),
                           ),
                         ),
@@ -191,7 +205,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               .textTheme
                               .headlineMedium
                               ?.copyWith(
-                                color: AppTheme.primaryAmber,
+                                color: AppThemeConstants.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
@@ -200,11 +214,15 @@ class _AuthScreenState extends State<AuthScreen> {
                         if (!_isLogin) ...[
                           TextFormField(
                             controller: _nameController,
-                            decoration:
-                                const InputDecoration(labelText: 'الاسم'),
-                            validator: (value) => value == null || value.isEmpty
-                                ? 'الاسم مطلوب'
-                                : null,
+                            decoration: const InputDecoration(labelText: 'الاسم'),
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.name],
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'الاسم مطلوب';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 12),
                         ],
@@ -214,17 +232,33 @@ class _AuthScreenState extends State<AuthScreen> {
                           decoration: const InputDecoration(
                               labelText: 'البريد الإلكتروني'),
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
                           textDirection: TextDirection.ltr,
+                          autofillHints: const [AutofillHints.email],
                           validator: ValidationUtils.email,
                         ),
                         const SizedBox(height: 12),
 
                         TextFormField(
                           controller: _passwordController,
-                          decoration:
-                              const InputDecoration(labelText: 'كلمة المرور'),
-                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'كلمة المرور',
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                              ),
+                              onPressed: () {
+                                setState(() => _obscurePassword = !_obscurePassword);
+                              },
+                            ),
+                          ),
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
                           validator: ValidationUtils.password,
+                          onFieldSubmitted: (_) => _submit(),
                         ),
                         const SizedBox(height: 12),
 
@@ -252,15 +286,60 @@ class _AuthScreenState extends State<AuthScreen> {
                           const SizedBox(height: 16),
                         ],
 
-                        if (_isLoading)
-                          const CircularProgressIndicator()
-                        else
-                          ElevatedButton(
-                            onPressed: _submit,
-                            child:
-                                Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _submit,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'),
                           ),
+                        ),
                         const SizedBox(height: 8),
+
+                        if (_isLogin)
+                          TextButton(
+                            onPressed: () async {
+                              final email = _emailController.text.trim();
+                              if (email.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('أدخل البريد الإلكتروني أولاً'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+                              try {
+                                await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('تم إرسال رابط إعادة تعيين كلمة المرور'),
+                                    backgroundColor: AppThemeConstants.secondary,
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('حدث خطأ أثناء إرسال رابط إعادة التعيين'),
+                                    backgroundColor: AppThemeConstants.error,
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Text('نسيت كلمة المرور؟'),
+                          ),
 
                         TextButton(
                           onPressed: () {

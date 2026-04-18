@@ -50,8 +50,8 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
                 )
               : null,
           title: const Text('تأكيد المدفوعات المباشرة'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
+          backgroundColor: AppThemeConstants.primary,
+          foregroundColor: AppThemeConstants.onPrimary,
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -81,12 +81,12 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
                   const SizedBox(height: 12),
                   Text(
                     'خطأ في التحميل: ${snapshot.error}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red),
+                    style: const TextStyle(color: AppThemeConstants.error),
                   ),
                 ],
               ),
@@ -99,11 +99,11 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.check_circle_outline,
-                      size: 64, color: Colors.green),
+                      size: 64, color: AppThemeConstants.success),
                   SizedBox(height: 16),
                   Text(
                     'لا توجد مدفوعات بانتظار التأكيد',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: TextStyle(fontSize: 16, color: AppThemeConstants.textSecondary),
                   ),
                 ],
               ),
@@ -132,12 +132,12 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
                 const SizedBox(height: 12),
                 Text(
                   'خطأ في التحميل: ${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
+                  style: const TextStyle(color: AppThemeConstants.error),
                 ),
               ],
             ),
@@ -150,11 +150,11 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.check_circle_outline,
-                    size: 64, color: Colors.green),
+                    size: 64, color: AppThemeConstants.success),
                 SizedBox(height: 16),
                 Text(
                   'لا توجد مدفوعات بانتظار التأكيد',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                  style: TextStyle(fontSize: 16, color: AppThemeConstants.textSecondary),
                 ),
               ],
             ),
@@ -230,13 +230,13 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         content: Text(confirmMessage),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => context.pop(false),
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => context.pop(true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppThemeConstants.accentGreen,
+              backgroundColor: AppThemeConstants.secondary,
             ),
             child: const Text('نعم'),
           ),
@@ -273,7 +273,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               'تم شراء الباقة وإرسال طلب الجلسة الأولى بنجاح ✓',
             ),
             duration: Duration(seconds: 4),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
         // Defer navigation to avoid Navigator lock during dialog dismissal
@@ -307,7 +307,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         messenger.showSnackBar(
           const SnackBar(
             content: Text('تم تأكيد هذه الدفعية من قبل'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppThemeConstants.warning,
           ),
         );
         return;
@@ -332,7 +332,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_ERROR: '
           'paymentId=${widget.payment.id}, error=$e');
       messenger.showSnackBar(
-        SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error),
       );
     } catch (e, stack) {
       // FIX: Catches Dart Errors (TypeError, StateError, AssertionError, …)
@@ -383,16 +383,16 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () => context.pop(),
                 child: const Text('إلغاء'),
               ),
               ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                onPressed: () => context.pop(ctrl.text.trim()),
                 style:
-                    ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
                 child: const Text(
                   'رفض',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: AppThemeConstants.onPrimary),
                 ),
               ),
             ],
@@ -461,11 +461,11 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
             Row(children: [
               CircleAvatar(
                 backgroundColor:
-                    AppThemeConstants.accentGreen.withValues(alpha: 0.15),
+                    AppThemeConstants.secondary.withValues(alpha: 0.15),
                 child: Text(
                   p.studentName.isNotEmpty ? p.studentName[0] : '؟',
-                  style: TextStyle(
-                      color: Colors.green.shade800,
+                  style: const TextStyle(
+                      color: AppThemeConstants.success,
                       fontWeight: FontWeight.bold),
                 ),
               ),
@@ -479,7 +479,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     Text('أرسل إشعار الدفع: $dateStr',
                         style: const TextStyle(
-                            color: Colors.grey, fontSize: 12)),
+                            color: AppThemeConstants.textSecondary, fontSize: 12)),
                   ],
                 ),
               ),
@@ -487,13 +487,13 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.accentGreen,
+                  color: AppThemeConstants.secondary,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '${p.amount.toStringAsFixed(0)} ج.م',
                   style: const TextStyle(
-                      color: Colors.white,
+                      color: AppThemeConstants.onPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 16),
                 ),
@@ -509,15 +509,15 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primaryAmber
+                  color: AppThemeConstants.primary
                       .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border:
-                      Border.all(color: AppThemeConstants.primaryAmber),
+                      Border.all(color: AppThemeConstants.primary),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   const Icon(Icons.collections_bookmark_outlined,
-                      size: 14, color: AppThemeConstants.primaryAmber),
+                      size: 14, color: AppThemeConstants.primary),
                   const SizedBox(width: 4),
                   Text(
                     p.planType == 'bundle'
@@ -526,7 +526,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: AppThemeConstants.primaryAmberDark,
+                      color: AppThemeConstants.primaryVariant,
                     ),
                   ),
                 ]),
@@ -548,16 +548,16 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               margin: const EdgeInsets.symmetric(vertical: 10),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppThemeConstants.primaryAmber
+                color: AppThemeConstants.primary
                     .withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: AppThemeConstants.primaryAmber
+                    color: AppThemeConstants.primary
                         .withValues(alpha: 0.3)),
               ),
               child: Row(children: [
                 const Icon(Icons.info_outline,
-                    color: AppThemeConstants.primaryAmber, size: 16),
+                    color: AppThemeConstants.primary, size: 16),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -567,7 +567,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     '${(p.amount - p.commissionAmount).toStringAsFixed(2)} ج.م',
                     style: const TextStyle(
                         fontSize: 12,
-                        color: AppThemeConstants.primaryAmber),
+                        color: AppThemeConstants.primary),
                   ),
                 ),
               ]),
@@ -587,7 +587,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                   child: ElevatedButton.icon(
                     onPressed: _confirm,
                     icon:
-                        const Icon(Icons.check, color: Colors.white),
+                        const Icon(Icons.check, color: AppThemeConstants.onPrimary),
                     label: const Text(
                       'استلمت الدفع',
                       style: TextStyle(
@@ -595,7 +595,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                           fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.accentGreen,
+                      backgroundColor: AppThemeConstants.secondary,
                       padding:
                           const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -606,11 +606,11 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 const SizedBox(width: 10),
                 OutlinedButton.icon(
                   onPressed: _reject,
-                  icon: const Icon(Icons.close, color: Colors.red),
+                  icon: const Icon(Icons.close, color: AppThemeConstants.error),
                   label: const Text('لم أستلم',
-                      style: TextStyle(color: Colors.red)),
+                      style: TextStyle(color: AppThemeConstants.error)),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
+                    side: const BorderSide(color: AppThemeConstants.error),
                     padding: const EdgeInsets.symmetric(
                         vertical: 12, horizontal: 16),
                     shape: RoundedRectangleBorder(
@@ -627,11 +627,11 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
   Widget _row(IconData icon, String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(children: [
-          Icon(icon, size: 16, color: Colors.grey),
+          Icon(icon, size: 16, color: AppThemeConstants.textSecondary),
           const SizedBox(width: 6),
           Text('$label: ',
               style:
-                  const TextStyle(color: Colors.grey, fontSize: 13)),
+                  const TextStyle(color: AppThemeConstants.textSecondary, fontSize: 13)),
           Expanded(
             child: Text(value,
                 style: const TextStyle(

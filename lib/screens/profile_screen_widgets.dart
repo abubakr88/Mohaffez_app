@@ -1,9 +1,10 @@
 // lib/screens/profile_screen_widgets.dart
 import 'package:flutter/material.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/cached_avatar.dart';
 import '../models/user_model.dart';
 import '../services/profile_completion_service.dart';
+import '../utils/specialization_constants.dart';
 
 /// App bar with profile photo and name
 class ProfileAppBar extends StatelessWidget {
@@ -24,7 +25,7 @@ class ProfileAppBar extends StatelessWidget {
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                  colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -50,15 +51,15 @@ class ProfileAppBar extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppThemeConstants.onPrimary,
                     ),
                   ),
                   // Role
                   Text(
                     user.role == 'mohaffez' ? 'محفّظ' : 'طالب',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: Colors.white70,
+                      color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -92,11 +93,11 @@ class ProfileCompletionCard extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppThemeConstants.onPrimary,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: AppThemeConstants.onPrimary.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -110,7 +111,7 @@ class ProfileCompletionCard extends StatelessWidget {
                 children: [
                   Icon(
                     isComplete ? Icons.check_circle : Icons.info_outline,
-                    color: isComplete ? AppTheme.accentGreen : AppTheme.warning,
+                    color: isComplete ? AppThemeConstants.secondary : AppThemeConstants.warning,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -127,7 +128,7 @@ class ProfileCompletionCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isComplete ? AppTheme.accentGreen : AppTheme.primaryAmber,
+                      color: isComplete ? AppThemeConstants.secondary : AppThemeConstants.primary,
                     ),
                   ),
                 ],
@@ -141,19 +142,19 @@ class ProfileCompletionCard extends StatelessWidget {
                   minHeight: 8,
                   backgroundColor: Colors.grey.shade200,
                   valueColor: AlwaysStoppedAnimation(
-                    isComplete ? AppTheme.accentGreen : AppTheme.primaryAmber,
+                    isComplete ? AppThemeConstants.secondary : AppThemeConstants.primary,
                   ),
                 ),
               ),
               // Missing fields
               if (!isComplete && data.missingFields.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'حقول مفقودة:',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade600,
+                    color: AppThemeConstants.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -168,10 +169,10 @@ class ProfileCompletionCard extends StatelessWidget {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTheme.warning.withValues(alpha: 0.1),
+                            color: AppThemeConstants.warning.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: AppTheme.warning.withValues(alpha: 0.3),
+                              color: AppThemeConstants.warning.withValues(alpha: 0.3),
                               width: 2,
                             ),
                           ),
@@ -309,6 +310,7 @@ class BasicInfoSection extends StatelessWidget {
               onEdit: onEditSpecialization,
               onSave: onSaveSpecialization,
               onCancel: onCancelSpecialization,
+              showSpecializationChips: true,
             ),
           ],
           // Location
@@ -358,7 +360,7 @@ class BasicInfoSection extends StatelessWidget {
   }) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppTheme.primaryAmber),
+        Icon(icon, size: 20, color: AppThemeConstants.primary),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -397,6 +399,7 @@ class BasicInfoSection extends StatelessWidget {
     required VoidCallback onSave,
     required VoidCallback onCancel,
     int maxLines = 1,
+    bool showSpecializationChips = false,
   }) {
     if (isEditing) {
       return Column(
@@ -404,7 +407,7 @@ class BasicInfoSection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 20, color: AppTheme.primaryAmber),
+              Icon(icon, size: 20, color: AppThemeConstants.primary),
               const SizedBox(width: 8),
               Text(
                 label,
@@ -425,6 +428,35 @@ class BasicInfoSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          if (showSpecializationChips) ...[
+            const Text(
+              'اختر من التخصصات الشائعة:',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: SpecializationConstants.specializations
+                  .map((spec) => _SpecializationChip(
+                        label: spec,
+                        onTap: () {
+                          final currentText = controller.text.trim();
+                          if (currentText.isEmpty) {
+                            controller.text = spec;
+                          } else if (!currentText.contains(spec)) {
+                            controller.text = '$currentText، $spec';
+                          }
+                        },
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -454,6 +486,28 @@ class BasicInfoSection extends StatelessWidget {
     );
   }
 
+  Widget _SpecializationChip({required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppThemeConstants.primary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatCard({
     required String label,
     required String value,
@@ -462,12 +516,12 @@ class BasicInfoSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.primaryAmber.withValues(alpha: 0.1),
+        color: AppThemeConstants.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppTheme.primaryAmber),
+          Icon(icon, size: 20, color: AppThemeConstants.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -478,7 +532,7 @@ class BasicInfoSection extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryAmber,
+                    color: AppThemeConstants.primary,
                   ),
                 ),
                 Text(
@@ -548,7 +602,7 @@ class MohaffezManagementSection extends StatelessWidget {
             icon: Icons.access_time,
             title: 'الأوقات المتاحة',
             subtitle: 'إدارة جدول الأوقات المتاحة',
-            color: AppTheme.accentGreen,
+            color: AppThemeConstants.secondary,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme_constants.dart';
 
 class SessionCard extends StatelessWidget {
   final String title;
@@ -65,9 +66,9 @@ class SessionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   subtitle!,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: Colors.grey.shade700,
+                    color: AppThemeConstants.textSecondary,
                   ),
                 ),
               ],
@@ -76,14 +77,14 @@ class SessionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const Icon(Icons.location_on, size: 14, color: AppThemeConstants.textMuted),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         location,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade700,
+                          color: AppThemeConstants.textSecondary,
                         ),
                       ),
                     ),
@@ -95,13 +96,13 @@ class SessionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                    const Icon(Icons.access_time, size: 14, color: AppThemeConstants.textMuted),
                     const SizedBox(width: 4),
                     Text(
                       dateStr,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade700,
+                        color: AppThemeConstants.textSecondary,
                       ),
                     ),
                   ],
@@ -121,9 +122,9 @@ class SessionCard extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: AppThemeConstants.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(color: AppThemeConstants.success.withValues(alpha: 0.3)),
                     ),
                     child: Text(hifz, style: const TextStyle(fontSize: 13)),
                   ),
@@ -139,9 +140,9 @@ class SessionCard extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: AppThemeConstants.info.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
+                      border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.3)),
                     ),
                     child: Text(muraja, style: const TextStyle(fontSize: 13)),
                   ),
@@ -163,7 +164,7 @@ class SessionCard extends StatelessWidget {
                       (index) => Icon(
                         index < rating ? Icons.star : Icons.star_border,
                         size: 14,
-                        color: Colors.amber,
+                        color: AppThemeConstants.secondary,
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -188,9 +189,9 @@ class SessionCard extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: AppThemeConstants.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade200),
+                    border: Border.all(color: AppThemeConstants.warning.withValues(alpha: 0.3)),
                   ),
                   child: Text(notes, style: const TextStyle(fontSize: 13)),
                 ),

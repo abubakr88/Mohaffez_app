@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import '../theme/app_theme_constants.dart';
 
 class ShimmerWidgets {
   // Prevent instantiation
@@ -37,7 +38,7 @@ class ShimmerWidgets {
                 width: 50,
                 height: 50,
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: AppThemeConstants.surface,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -52,7 +53,7 @@ class ShimmerWidgets {
                       width: index == 0 ? double.infinity : 150,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppThemeConstants.surface,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -81,7 +82,7 @@ class ShimmerWidgets {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppThemeConstants.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
@@ -94,7 +95,7 @@ class ShimmerWidgets {
                         width: double.infinity,
                         height: 16,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppThemeConstants.surface,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -103,7 +104,7 @@ class ShimmerWidgets {
                         width: 120,
                         height: 12,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppThemeConstants.surface,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -117,7 +118,7 @@ class ShimmerWidgets {
               width: double.infinity,
               height: 12,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppThemeConstants.surface,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -154,7 +155,7 @@ class ShimmerWidgets {
     return Column(
       children: [
         Container(
-          color: Colors.white,
+          color: AppThemeConstants.surface,
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
@@ -162,8 +163,8 @@ class ShimmerWidgets {
               Container(
                 width: 90,
                 height: 90,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                decoration: const BoxDecoration(
+                  color: AppThemeConstants.textMuted,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -173,7 +174,7 @@ class ShimmerWidgets {
                 width: 150,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppThemeConstants.textMuted,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -183,7 +184,7 @@ class ShimmerWidgets {
                 width: 100,
                 height: 14,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: AppThemeConstants.textMuted,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -211,7 +212,7 @@ class ShimmerWidgets {
           width: 40,
           height: 16,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
+            color: AppThemeConstants.textMuted,
             borderRadius: BorderRadius.circular(4),
           ),
         ),
@@ -220,7 +221,7 @@ class ShimmerWidgets {
           width: 60,
           height: 12,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
+            color: AppThemeConstants.textMuted,
             borderRadius: BorderRadius.circular(4),
           ),
         ),
@@ -255,7 +256,7 @@ class ShimmerWidgets {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.surface,
         borderRadius: BorderRadius.circular(4),
       ),
     );

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/pricing_plan_model.dart';
 import '../providers/pricing_provider.dart';
 import '../providers/user_provider.dart';
-import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/add_pricing_plan_sheet.dart';
 import '../shared/widgets/empty_state.dart';
@@ -128,7 +127,7 @@ class MohaffezPricingScreen extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 12, right: 8),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.primaryAmber),
+          Icon(icon, color: AppThemeConstants.primary),
           const SizedBox(width: 8),
           Text(
             title,
@@ -190,9 +189,9 @@ class PricingPlanCard extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         _getPlanDescription(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: AppThemeConstants.textSecondary,
                         ),
                       ),
                     ],
@@ -206,15 +205,15 @@ class PricingPlanCard extends ConsumerWidget {
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.accentGreen,
+                        color: AppThemeConstants.secondary,
                       ),
                     ),
                     if (plan.sessionsCount > 1)
                       Text(
                         '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} ${ArabicLabels.currency}/${ArabicLabels.singleSession}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: AppThemeConstants.textSecondary,
                         ),
                       ),
                   ],
@@ -244,7 +243,7 @@ class PricingPlanCard extends ConsumerWidget {
                   _buildChip(
                     'جلسة تجريبية',
                     Icons.stars,
-                    color: Colors.orange,
+                    color: AppThemeConstants.warning,
                   ),
               ],
             ),
@@ -253,14 +252,14 @@ class PricingPlanCard extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.accentGreen.withValues(alpha: 0.08),
+                  color: AppThemeConstants.secondary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   plan.description!,
                   style: const TextStyle(
                     fontSize: 13,
-                    color: AppThemeConstants.accentGreen,
+                    color: AppThemeConstants.secondary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -272,7 +271,7 @@ class PricingPlanCard extends ConsumerWidget {
                 Switch(
                   value: plan.isActive,
                   onChanged: (val) => _togglePlanStatus(context, ref, val),
-                  activeThumbColor: AppTheme.accentGreen,
+                  activeThumbColor: AppThemeConstants.secondary,
                 ),
                 const Text('مفعل'),
                 const Spacer(),
@@ -296,23 +295,23 @@ class PricingPlanCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: (color ?? AppTheme.primaryAmber).withValues(alpha: 0.1),
+        color: (color ?? AppThemeConstants.primary).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: (color ?? AppTheme.primaryAmber).withValues(alpha: 0.3),
+          color: (color ?? AppThemeConstants.primary).withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color ?? AppTheme.primaryAmber),
+          Icon(icon, size: 14, color: color ?? AppThemeConstants.primary),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: color ?? AppTheme.primaryAmber,
+              color: color ?? AppThemeConstants.primary,
             ),
           ),
         ],
@@ -365,7 +364,7 @@ class PricingPlanCard extends ConsumerWidget {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
               child: const Text('حذف'),
             ),
           ],

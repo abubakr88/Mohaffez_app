@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/booking_provider.dart' show legacyBookingFlowProvider, BookingPaymentMethod;
+import '../../shared/theme/app_theme_constants.dart';
 
 class BookingConfirmationDetails {
   final String mohaffezId;
@@ -97,7 +98,7 @@ class _BookingConfirmationScreenState
         appBar: AppBar(
           leading: context.canPop()
               ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
+                  icon: const Icon(Icons.arrow_back),
                   onPressed: () => context.pop(),
                   tooltip: 'رجوع',
                 )
@@ -108,13 +109,23 @@ class _BookingConfirmationScreenState
           children: [
             Expanded(
               child: ListView(
+                padding: const EdgeInsets.only(bottom: 100),
                 children: [
                   _buildSessionDetailsCard(),
                   _buildCancellationPolicyCard(),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: CheckboxListTile(
-                      title: const Text('أوافق على سياسة الإلغاء وشروط الخدمة'),
+                      title: InkWell(
+                        onTap: _showPolicyDetails,
+                        child: const Text(
+                          'أوافق على سياسة الإلغاء وشروط الخدمة',
+                          style: TextStyle(
+                            color: AppThemeConstants.secondary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
                       value: _agreedToPolicy,
                       onChanged: (val) =>
                           setState(() => _agreedToPolicy = val ?? false),
@@ -144,7 +155,7 @@ class _BookingConfirmationScreenState
                       ? _confirmBooking
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppThemeConstants.secondary,
                     disabledBackgroundColor: Colors.grey.shade300,
                   ),
                   child: _isSubmitting
@@ -198,9 +209,9 @@ class _BookingConfirmationScreenState
               ],
             ),
             const SizedBox(height: 12),
-            _policyItem('-  إلغاء مجاني قبل 24 ساعة من موعد الجلسة'),
-            _policyItem('-  خصم 50% من المبلغ للإلغاء قبل 12 ساعة'),
-            _policyItem('-  خصم 100% (لا يمكن استرداد المبلغ) للإلغاء بعد ذلك'),
+            _policyItem(Icons.check_circle, Colors.green, 'إلغاء مجاني قبل 24 ساعة من موعد الجلسة'),
+            _policyItem(Icons.warning_amber, Colors.orange, 'خصم 50% من المبلغ للإلغاء قبل 12 ساعة'),
+            _policyItem(Icons.cancel, Colors.red, 'خصم 100% (لا يمكن استرداد المبلغ) للإلغاء بعد ذلك'),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
@@ -229,10 +240,19 @@ class _BookingConfirmationScreenState
     );
   }
 
-  Widget _policyItem(String text) {
+  Widget _policyItem(IconData icon, Color iconColor, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Text(text, style: const TextStyle(fontSize: 14, height: 1.5)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: const TextStyle(fontSize: 14, height: 1.5)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -280,7 +300,7 @@ class _BookingConfirmationScreenState
                           const Icon(Icons.star, color: Colors.amber, size: 18),
                           const SizedBox(width: 4),
                           Text(
-                            '${details.rating.toStringAsFixed(1)}/5',
+                            '${details.rating.toStringAsFixed(1)}/10',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(width: 8),
@@ -302,7 +322,7 @@ class _BookingConfirmationScreenState
             _detailRow(
               Icons.timer,
               'المدة',
-              '${details.slotEnd.difference(details.slotStart).inMinutes} دقيقة',
+              _formatDuration(details.slotStart, details.slotEnd),
             ),
             _detailRow(Icons.location_on, 'المكان', details.location),
             _detailRow(
@@ -383,44 +403,25 @@ class _BookingConfirmationScreenState
         return 'جلسة في المسجد';
       case 'online':
         return 'جلسة أونلاين';
+      case 'بيت':
+        return 'جلسة منزلية';
+      case 'مسجد':
+        return 'جلسة في المسجد';
+      case 'أونلاين':
+        return 'جلسة أونلاين';
       default:
         return type;
     }
   }
 
   Future<void> _confirmBooking() async {
-    // ── DEBUG START ──────────────────────────────────────────────
-    debugPrint('🟡 [Booking] _confirmBooking() called');
-    debugPrint('🟡 [Booking] agreedToPolicy=$_agreedToPolicy');
-    debugPrint('🟡 [Booking] isSubmitting=$_isSubmitting');
-    debugPrint('🟡 [Booking] isUsingSubscription=$_isUsingSubscription');
-    debugPrint(
-        '🟡 [Booking] paymentMethod=${widget.bookingDetails.paymentMethod}');
-    debugPrint('🟡 [Booking] mohaffezId=${widget.bookingDetails.mohaffezId}');
-    debugPrint('🟡 [Booking] studentId=${widget.bookingDetails.studentId}');
-    debugPrint('🟡 [Booking] slotLockId=${widget.bookingDetails.slotLockId}');
-    debugPrint(
-        '🟡 [Booking] subscriptionId=${widget.bookingDetails.subscriptionId}');
-    debugPrint(
-        '🟡 [Booking] remainingCredits=${widget.bookingDetails.remainingCredits}');
-    debugPrint('🟡 [Booking] cost=${widget.bookingDetails.cost}');
-    debugPrint('🟡 [Booking] sessionType=${widget.bookingDetails.sessionType}');
-    debugPrint('🟡 [Booking] slotDate=${widget.bookingDetails.slotDate}');
-    debugPrint(
-        '🟡 [Booking] preferredTimeSlot=${widget.bookingDetails.preferredTimeSlot}');
-    // ── DEBUG END ────────────────────────────────────────────────
-
     final d = widget.bookingDetails;
 
     if (_isUsingSubscription &&
         (d.subscriptionId == null || d.remainingCredits <= 0)) {
-      debugPrint('🔴 [Booking] BLOCKED: insufficient subscription credits');
       _showError('لا يوجد رصيد باقة كافٍ لإتمام الحجز');
       return;
     }
-
-    debugPrint(
-        '🟢 [Booking] Subscription check passed — calling createSessionRequest...');
 
     setState(() => _isSubmitting = true);
     try {
@@ -452,26 +453,23 @@ class _BookingConfirmationScreenState
                 planType: d.planType,
               );
 
-      debugPrint(
-          '🟢 [Booking] createSessionRequest returned: isSuccess=${result.isSuccess} error=${result.errorMessage} sessionId=${result.sessionId}');
-
       if (!mounted) return;
       if (result.isSuccess) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إرسال طلب الحجز بنجاح'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        // Navigate to home and show success message
+        context.go('/home');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم إرسال طلب الحجز بنجاح'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        });
       } else {
-        debugPrint('🔴 [Booking] FAILED: ${result.errorMessage}');
         _showError(result.errorMessage ?? 'فشل في إرسال طلب الحجز');
       }
-    } catch (e, stack) {
-      debugPrint('🔴 [Booking] EXCEPTION: $e');
-      debugPrint('🔴 [Booking] STACK: $stack');
-      if (mounted) _showError('فشل في إرسال الطلب: $e');
+    } catch (e) {
+      if (mounted) _showError('تعذر إتمام الحجز، يرجى المحاولة مرة أخرى');
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -487,11 +485,58 @@ class _BookingConfirmationScreenState
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => ctx.pop(),
             child: const Text('حسناً'),
           ),
         ],
       ),
     );
+  }
+
+  void _showPolicyDetails() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('سياسة الإلغاء وشروط الخدمة'),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'سياسة الإلغاء:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('• إلغاء مجاني قبل 24 ساعة من موعد الجلسة'),
+              Text('• خصم 50% من المبلغ للإلغاء قبل 12 ساعة'),
+              Text('• خصم 100% (لا يمكن استرداد المبلغ) للإلغاء بعد ذلك'),
+              SizedBox(height: 16),
+              Text(
+                'شروط الخدمة:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('• يجب على الطالب الالتزام بموعد الجلسة'),
+              Text('• في حالة التأخير أكثر من 15 دقيقة، يعتبر الطالب غائباً'),
+              Text('• يمكن إعادة جدولة الجلسة مرة واحدة فقط'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => ctx.pop(),
+            child: const Text('فهمت'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(DateTime start, DateTime end) {
+    final diff = end.difference(start);
+    final minutes = diff.inMinutes;
+    if (minutes <= 0) return 'غير محدد';
+    return '$minutes دقيقة';
   }
 }

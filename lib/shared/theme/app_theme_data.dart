@@ -60,7 +60,7 @@ class AppThemeData {
         shape: RoundedRectangleBorder(
           borderRadius: AppThemeConstants.borderRadiusLg,
           side: BorderSide(
-            color: AppThemeConstants.secondary.withOpacity(0.3), // Gold border
+            color: AppThemeConstants.secondary.withValues(alpha: 0.3), // Gold border
             width: 1,
           ),
         ),
@@ -115,21 +115,21 @@ class AppThemeData {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppThemeConstants.surface,
-        border: OutlineInputBorder(
+        border: const OutlineInputBorder(
           borderRadius: AppThemeConstants.borderRadiusMd,
-          borderSide: const BorderSide(color: AppThemeConstants.outline),
+          borderSide: BorderSide(color: AppThemeConstants.outline),
         ),
-        enabledBorder: OutlineInputBorder(
+        enabledBorder: const OutlineInputBorder(
           borderRadius: AppThemeConstants.borderRadiusMd,
-          borderSide: const BorderSide(color: AppThemeConstants.outline),
+          borderSide: BorderSide(color: AppThemeConstants.outline),
         ),
-        focusedBorder: OutlineInputBorder(
+        focusedBorder: const OutlineInputBorder(
           borderRadius: AppThemeConstants.borderRadiusMd,
-          borderSide: const BorderSide(color: AppThemeConstants.primary, width: 2),
+          borderSide: BorderSide(color: AppThemeConstants.primary, width: 2),
         ),
-        errorBorder: OutlineInputBorder(
+        errorBorder: const OutlineInputBorder(
           borderRadius: AppThemeConstants.borderRadiusMd,
-          borderSide: const BorderSide(color: AppThemeConstants.error),
+          borderSide: BorderSide(color: AppThemeConstants.error),
         ),
         contentPadding: const EdgeInsets.all(AppThemeConstants.spaceMd),
         labelStyle: AppThemeConstants.bodyMedium,
@@ -143,7 +143,7 @@ class AppThemeData {
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: AppThemeConstants.onPrimary,
-        unselectedLabelColor: AppThemeConstants.onPrimary.withOpacity(0.7),
+        unselectedLabelColor: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
         indicatorColor: AppThemeConstants.onPrimary,
         indicatorSize: TabBarIndicatorSize.tab,
         labelStyle: AppThemeConstants.titleMedium.copyWith(
@@ -192,7 +192,7 @@ class AppThemeData {
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppThemeConstants.primary,           // Deep blue background
         selectedItemColor: AppThemeConstants.secondary,         // Gold selected
-        unselectedItemColor: Colors.white.withOpacity(0.7),     // White unselected
+        unselectedItemColor: Colors.white.withValues(alpha: 0.7),     // White unselected
         selectedLabelStyle: AppThemeConstants.labelSmall.copyWith(
           fontWeight: FontWeight.w600,
         ),
@@ -201,11 +201,11 @@ class AppThemeData {
         elevation: AppThemeConstants.elevationLg,
       ),
       
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppThemeConstants.primary,
         foregroundColor: AppThemeConstants.onPrimary,
         elevation: AppThemeConstants.elevationMd,
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: AppThemeConstants.borderRadiusRound,
         ),
       ),

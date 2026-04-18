@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -22,14 +21,18 @@ class CompletedSessionsScreen extends ConsumerStatefulWidget {
       _CompletedSessionsScreenState();
 }
 
+enum _SortOrder { newestFirst, oldestFirst }
+
 class _CompletedSessionsScreenState
     extends ConsumerState<CompletedSessionsScreen> {
-  final searchController = TextEditingController();
-  String searchQuery = '';
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  _SortOrder _sortOrder = _SortOrder.newestFirst;
+  int _minRating = 0; // 0 = show all
 
   @override
   void dispose() {
-    searchController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -55,13 +58,18 @@ class _CompletedSessionsScreenState
                 expandedHeight: 130,
                 floating: true,
                 pinned: true,
+                title: const Text(ArabicLabels.completedSessions),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          AppThemeConstants.primaryAmber,
-                          AppThemeConstants.primaryAmberLight
+                          AppThemeConstants.primary,
+                          AppThemeConstants.primaryVariant
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -79,62 +87,39 @@ class _CompletedSessionsScreenState
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
+                                    color: AppThemeConstants.surface.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
                                     Icons.done_all,
                                     size: 28,
-                                    color: Colors.white,
+                                    color: AppThemeConstants.onPrimary,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
-                                const Expanded(
+                                Expanded(
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
+                                      const Text(
                                         ArabicLabels.completedSessions,
                                         style: TextStyle(
                                           fontSize: 26,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                                          color: AppThemeConstants.onPrimary,
                                         ),
                                       ),
-                                      SizedBox(height: 4),
+                                      const SizedBox(height: 4),
                                       Text(
                                         ArabicLabels.sessionHistory,
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.white70,
+                                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                // Total Count
-                                sessionsAsync.when(
-                                  data: (sessions) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      sessions.length.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppThemeConstants.primaryAmber,
-                                      ),
-                                    ),
-                                  ),
-                                  loading: () => const SizedBox.shrink(),
-                                  error: (_, __) => const SizedBox.shrink(),
                                 ),
                               ],
                             ),
@@ -146,38 +131,192 @@ class _CompletedSessionsScreenState
                 ),
               ),
 
-              // Search Bar
+              // Search + Sort/Filter Bar
               SliverToBoxAdapter(
-                child: Container(
-                  margin: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        searchQuery = value.toLowerCase().trim();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: ArabicLabels.searchStudents,
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                searchController.clear();
-                                setState(() {
-                                  searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Search field
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.toLowerCase().trim();
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'ابحث باسم الطالب...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                        ),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
                     ),
-                  ),
+
+                    // Sort + Rating filter row
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Row(
+                        children: [
+                          // Sort dropdown
+                          Expanded(
+                            child: DropdownButtonFormField<_SortOrder>(
+                              initialValue: _sortOrder,
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey.shade100,
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: _SortOrder.newestFirst,
+                                  child: Text('الأحدث أولاً',
+                                      style: TextStyle(fontSize: 13)),
+                                ),
+                                DropdownMenuItem(
+                                  value: _SortOrder.oldestFirst,
+                                  child: Text('الأقدم أولاً',
+                                      style: TextStyle(fontSize: 13)),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() => _sortOrder = value);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Min rating filter
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              initialValue: _minRating,
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey.shade100,
+                              ),
+                              items: [
+                                const DropdownMenuItem(
+                                    value: 0,
+                                    child: Text('كل التقييمات',
+                                        style: TextStyle(fontSize: 13))),
+                                ...List.generate(
+                                  10,
+                                  (i) => DropdownMenuItem(
+                                    value: i + 1,
+                                    child: Text('★ ${i + 1}+',
+                                        style: const TextStyle(fontSize: 13)),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() => _minRating = value);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Active filter chips + count badge
+                    sessionsAsync.when(
+                      data: (allSessions) {
+                        // Compute filtered count to show in badge
+                        var filtered = allSessions.where((s) {
+                          if (_searchQuery.isNotEmpty) {
+                            final name = (s['studentName'] as String? ?? '')
+                                .toLowerCase();
+                            if (!name.contains(_searchQuery)) return false;
+                          }
+                          if (_minRating > 0) {
+                            final rating = s['sessionRating'] as int? ?? 0;
+                            if (rating < _minRating) return false;
+                          }
+                          return true;
+                        }).toList();
+
+                        final hasActiveFilters =
+                            _searchQuery.isNotEmpty || _minRating > 0;
+
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppThemeConstants.primary
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: AppThemeConstants.primary
+                                          .withValues(alpha: 0.3)),
+                                ),
+                                child: Text(
+                                  'الجلسات: ${filtered.length}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppThemeConstants.primary,
+                                  ),
+                                ),
+                              ),
+                              if (hasActiveFilters) ...[
+                                const SizedBox(width: 8),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _minRating = 0;
+                                      _sortOrder = _SortOrder.newestFirst;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.filter_alt_off,
+                                      size: 16),
+                                  label: const Text('إزالة الفلاتر',
+                                      style: TextStyle(fontSize: 12)),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    foregroundColor: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
               ),
 
@@ -195,32 +334,54 @@ class _CompletedSessionsScreenState
                     );
                   }
 
-                  // Apply search filter
-                  final filteredSessions = searchQuery.isEmpty
+                  // 1. Search filter
+                  var filteredSessions = _searchQuery.isEmpty
                       ? allSessions
                       : allSessions.where((session) {
                           final studentName =
                               (session['studentName'] as String? ?? '')
                                   .toLowerCase();
-                          return studentName.contains(searchQuery);
+                          return studentName.contains(_searchQuery);
                         }).toList();
+
+                  // 2. Rating filter
+                  if (_minRating > 0) {
+                    filteredSessions = filteredSessions.where((session) {
+                      final rating = session['sessionRating'] as int? ?? 0;
+                      return rating >= _minRating;
+                    }).toList();
+                  }
+
+                  // 3. Sort
+                  filteredSessions = List.of(filteredSessions)
+                    ..sort((a, b) {
+                      final aDate = a['completedAt'] as DateTime?;
+                      final bDate = b['completedAt'] as DateTime?;
+                      if (aDate == null && bDate == null) return 0;
+                      if (aDate == null) return 1;
+                      if (bDate == null) return -1;
+                      return _sortOrder == _SortOrder.newestFirst
+                          ? bDate.compareTo(aDate)
+                          : aDate.compareTo(bDate);
+                    });
 
                   if (filteredSessions.isEmpty) {
                     return SliverFillRemaining(
                       child: EmptyState(
                         icon: Icons.search_off,
                         title: ArabicLabels.noSearchResults,
-                        message: ArabicLabels.noSessionsMessage,
+                        message: 'لم يتم العثور على جلسات تطابق بحثك',
                         animated: true,
                         action: TextButton.icon(
                           onPressed: () {
-                            searchController.clear();
+                            _searchController.clear();
                             setState(() {
-                              searchQuery = '';
+                              _searchQuery = '';
+                              _minRating = 0;
                             });
                           },
                           icon: const Icon(Icons.clear),
-                          label: const Text(ArabicLabels.clearSearch),
+                          label: const Text('مسح الفلاتر'),
                         ),
                       ),
                     );
@@ -296,20 +457,21 @@ class CompletedSessionCard extends StatelessWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.purple.withValues(alpha: 0.3), width: 1),
+        side: BorderSide(color: AppThemeConstants.primary.withValues(alpha: 0.3), width: 1),
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.all(16),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        trailing: const Icon(Icons.expand_more),
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.purple.withValues(alpha: 0.1),
+            color: AppThemeConstants.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(
             Icons.check_circle,
-            color: Colors.purple,
+            color: AppThemeConstants.primary,
             size: 24,
           ),
         ),
@@ -332,7 +494,7 @@ class CompletedSessionCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     completedAt != null
-                        ? '${ArabicLabels.completed} ${DateFormat('dd/MM/yyyy', 'ar').format(completedAt)}'
+                        ? '${ArabicLabels.completed} ${DateFormat('d MMMM y', 'ar').format(completedAt)}'
                         : ArabicLabels.notSpecified,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -345,26 +507,26 @@ class CompletedSessionCard extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 2,
-                      children: List.generate(
-                        10,
-                        (index) => Icon(
-                          index < sessionRating ? Icons.star : Icons.star_border,
-                          size: 14,
-                          color: Colors.amber,
-                        ),
-                      ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$sessionRating/10',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$sessionRating/10',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -443,7 +605,7 @@ class CompletedSessionCard extends StatelessWidget {
             _buildSectionHeader(
               icon: Icons.assignment,
               title: ArabicLabels.nextAssignments,
-              color: AppTheme.primaryAmber,
+              color: AppThemeConstants.primary,
             ),
             const SizedBox(height: 12),
             if (hifzAssignment != null && hifzAssignment.isNotEmpty)
@@ -451,6 +613,7 @@ class CompletedSessionCard extends StatelessWidget {
                 label: ArabicLabels.hifz,
                 content: hifzAssignment,
                 color: Colors.green,
+                isHifz: true,
               ),
             if (murajaAssignment != null && murajaAssignment.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -468,16 +631,16 @@ class CompletedSessionCard extends StatelessWidget {
             _buildSectionHeader(
               icon: Icons.notes,
               title: ArabicLabels.notes,
-              color: Colors.purple,
+              color: AppThemeConstants.primary,
             ),
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.purple.shade50,
+                color: AppThemeConstants.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.purple.shade200),
+                border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.3)),
               ),
               child: Text(
                 sessionNotes,
@@ -499,12 +662,13 @@ class CompletedSessionCard extends StatelessWidget {
             ArabicLabels.type,
             ArabicLabels.getSessionTypeLabel(sessionType),
           ),
-          _buildInfoRow(Icons.location_on, ArabicLabels.location, location),
+          if (location.isNotEmpty)
+            _buildInfoRow(Icons.location_on, ArabicLabels.location, location),
           if (sessionDate != null)
             _buildInfoRow(
               Icons.event,
               ArabicLabels.sessionDate,
-              DateFormat('dd/MM/yyyy', 'ar').format(sessionDate),
+              DateFormat('d MMMM y', 'ar').format(sessionDate),
             ),
         ],
       ),
@@ -563,21 +727,27 @@ class CompletedSessionCard extends StatelessWidget {
             ),
           ),
           if (completed) ...[
-            ...List.generate(
-              10,
-              (index) => Icon(
-                index < rating ? Icons.star : Icons.star_border,
-                size: 14,
-                color: Colors.amber,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
               ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '$rating/10',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: color,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star, size: 14, color: Colors.amber),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$rating/10',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber,
+                    ),
+                  ),
+                ],
               ),
             ),
           ] else
@@ -598,6 +768,7 @@ class CompletedSessionCard extends StatelessWidget {
     required String label,
     required String content,
     required Color color,
+    bool isHifz = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -612,9 +783,7 @@ class CompletedSessionCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                label == ArabicLabels.hifz
-                    ? Icons.menu_book
-                    : Icons.history_edu,
+                isHifz ? Icons.menu_book : Icons.history_edu,
                 size: 16,
                 color: color,
               ),
@@ -646,22 +815,20 @@ class CompletedSessionCard extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: Colors.grey.shade600),
           const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              '$label: ',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w600,
-              ),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
             ),
           ),
           Expanded(
             child: Text(
               value.isNotEmpty ? value : ArabicLabels.notSpecified,
               style: const TextStyle(fontSize: 13),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

@@ -1,20 +1,18 @@
-﻿// lib/screens/student_assignments_screen.dart
+// lib/screens/student_assignments_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import '../shared/constants/app_theme.dart';
+import 'package:go_router/go_router.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
-import '../shared/widgets/interactive_quran_page.dart';
 import '../providers/session_provider_paginated.dart';
 import '../providers/user_provider.dart';
 import '../utils/arabic_labels.dart';
 import '../models/quran_mistake_model.dart';
 import '../utils/quran_mistake_utils.dart';
-import 'rate_session_screen.dart';
 
 class StudentAssignmentsScreen extends ConsumerWidget {
   const StudentAssignmentsScreen({super.key});
@@ -85,7 +83,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.accentGreen, Color(0xFF66BB6A)],
+                        colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -102,13 +100,13 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
+                                    color: AppThemeConstants.onPrimary.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
                                     Icons.assignment,
                                     size: 28,
-                                    color: Colors.white,
+                                    color: AppThemeConstants.onPrimary,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
@@ -118,7 +116,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                                     style: TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: AppThemeConstants.onPrimary,
                                     ),
                                   ),
                                 ),
@@ -132,38 +130,45 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                 ),
               ),
 
-              SliverFillRemaining(
-                child: sessionsAsync.when(
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: sessionsAsync.when(
                   data: (sessions) {
                     final completedSessions = sessions
                         .where((s) => (s['status'] as String?) == 'completed')
                         .toList();
 
                     if (completedSessions.isEmpty) {
-                      return const EmptyState(
-                        icon: Icons.inventory_2_outlined,
-                        title: ArabicLabels.noCompletedAssignments,
-                        message: ArabicLabels.completeAssignmentsToAppear,
-                        animated: true,
+                      return const SliverFillRemaining(
+                        child: EmptyState(
+                          icon: Icons.inventory_2_outlined,
+                          title: ArabicLabels.noCompletedAssignments,
+                          message: ArabicLabels.completeAssignmentsToAppear,
+                          animated: true,
+                        ),
                       );
                     }
 
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: completedSessions.length,
-                      itemBuilder: (context, index) {
-                        return _CompletedAssignmentCard(
-                          session: completedSessions[index],
-                          studentId: widget.studentId,
-                        );
-                      },
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return _CompletedAssignmentCard(
+                            session: completedSessions[index],
+                            studentId: widget.studentId,
+                          );
+                        },
+                        childCount: completedSessions.length,
+                      ),
                     );
                   },
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => ErrorDisplay.dataLoad(
-                    onRetry: () => ref.invalidate(
-                      studentSessionsFirstPageProvider(widget.studentId),
+                  loading: () => const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (e, _) => SliverFillRemaining(
+                    child: ErrorDisplay.dataLoad(
+                      onRetry: () => ref.invalidate(
+                        studentSessionsFirstPageProvider(widget.studentId),
+                      ),
                     ),
                   ),
                 ),
@@ -209,21 +214,16 @@ class _CompletedAssignmentCardState
     if (sessionId == null || sessionId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('تعذّر تحديد الجلسة'),
-          backgroundColor: Colors.red,
+          content: Text('حدث خطأ في تحميل بيانات الجلسة'),
+          backgroundColor: AppThemeConstants.error,
         ),
       );
       return;
     }
 
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RateSessionScreen(
-          sessionId: sessionId,
-          mohaffezName: session['mohaffezName'] as String? ?? ArabicLabels.mohaffez,
-        ),
-      ),
+    final mohaffezName = session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
+    final result = await context.push<bool>(
+      '/rate-session/$sessionId?mohaffezName=${Uri.encodeComponent(mohaffezName)}',
     );
 
     if (result == true && mounted) {
@@ -231,8 +231,8 @@ class _CompletedAssignmentCardState
       ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('شكراً على تقييمك!'),
-          backgroundColor: Colors.green,
+          content: Text('تم التقييم بنجاح!'),
+          backgroundColor: AppThemeConstants.success,
         ),
       );
     }
@@ -256,15 +256,15 @@ class _CompletedAssignmentCardState
     final previousMurajaCompleted = session['previousMurajaCompleted'] as bool?;
     final previousMurajaRating = session['previousMurajaRating'] as int? ?? 0;
     final performanceNotes = session['performanceNotes'] as String?;
-    final sessionRating = session['sessionRating'] as int? ?? 0;
+    final teacherRating = session['teacherRating'] as int? ?? 0;
     final sessionNotes = session['sessionNotes'] as String?;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
+      elevation: AppThemeConstants.elevationSm,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.green.withValues(alpha: 0.3), width: 2),
+        side: BorderSide(color: AppThemeConstants.success.withValues(alpha: 0.3), width: 2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -277,12 +277,12 @@ class _CompletedAssignmentCardState
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
+                    color: AppThemeConstants.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.check_circle,
-                    color: Colors.green,
+                    color: AppThemeConstants.success,
                     size: 24,
                   ),
                 ),
@@ -302,37 +302,37 @@ class _CompletedAssignmentCardState
                         const SizedBox(height: 4),
                         Text(
                           DateFormat('dd MMM yyyy', 'ar').format(sessionDate),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade600,
+                            color: AppThemeConstants.textSecondary,
                           ),
                         ),
                       ],
                     ],
                   ),
                 ),
-                // Session rating
-                if (sessionRating > 0)
+                // Parent's rating of teacher
+                if (teacherRating > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.2),
+                      color: AppThemeConstants.secondary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star, size: 16, color: Colors.amber),
+                        const Icon(Icons.star, size: 16, color: AppThemeConstants.secondary),
                         const SizedBox(width: 4),
                         Text(
-                          '$sessionRating/10',
+                          '$teacherRating/10',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Colors.amber,
+                            color: AppThemeConstants.secondary,
                           ),
                         ),
                       ],
@@ -388,14 +388,14 @@ class _CompletedAssignmentCardState
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                    color: AppThemeConstants.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
+                    border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.note, size: 16, color: Colors.orange),
+                      const Icon(Icons.note, size: 16, color: AppThemeConstants.warning),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -406,7 +406,7 @@ class _CompletedAssignmentCardState
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.orange,
+                                color: AppThemeConstants.warning,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -428,10 +428,10 @@ class _CompletedAssignmentCardState
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 12),
-              Row(
+              const Row(
                 children: [
-                  Icon(Icons.assignment, size: 18, color: Colors.grey.shade700),
-                  const SizedBox(width: 8),
+                  Icon(Icons.assignment, size: 18, color: AppThemeConstants.textSecondary),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       ArabicLabels.newAssignmentForNextSession,
@@ -440,7 +440,7 @@ class _CompletedAssignmentCardState
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade700,
+                        color: AppThemeConstants.textSecondary,
                       ),
                     ),
                   ),
@@ -452,7 +452,7 @@ class _CompletedAssignmentCardState
                   icon: Icons.book,
                   label: ArabicLabels.hifz,
                   content: hifz,
-                  color: Colors.green,
+                  color: AppThemeConstants.success,
                 ),
               if (hifz.isNotEmpty && muraja.isNotEmpty)
                 const SizedBox(height: 12),
@@ -461,7 +461,7 @@ class _CompletedAssignmentCardState
                   icon: Icons.refresh,
                   label: ArabicLabels.muraja,
                   content: muraja,
-                  color: Colors.blue,
+                  color: AppThemeConstants.primaryVariant,
                 ),
             ],
 
@@ -473,14 +473,14 @@ class _CompletedAssignmentCardState
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
+                  color: AppThemeConstants.primary.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.purple.shade200),
+                  border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.message, size: 16, color: Colors.purple),
+                    const Icon(Icons.message, size: 16, color: AppThemeConstants.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -491,7 +491,7 @@ class _CompletedAssignmentCardState
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Colors.purple,
+                              color: AppThemeConstants.primary,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -510,8 +510,8 @@ class _CompletedAssignmentCardState
             // Mistakes review card
             _MistakeReviewCard(session: session),
 
-            // Rate Session Button (if not rated yet)
-            if (sessionRating == 0) ...[
+            // Rate Session Button (if parent hasn't rated teacher yet)
+            if (teacherRating == 0) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 12),
@@ -519,13 +519,13 @@ class _CompletedAssignmentCardState
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _navigateToRating,
-                  icon: const Icon(Icons.star, color: Colors.white),
+                  icon: const Icon(Icons.star, color: AppThemeConstants.onPrimary),
                   label: const Text(
-                    'تقييم الجلسة',
-                    style: TextStyle(fontSize: 16, color: Colors.white),
+                    ArabicLabels.rateSession,
+                    style: TextStyle(fontSize: 16, color: AppThemeConstants.onPrimary),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
+                    backgroundColor: AppThemeConstants.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -559,7 +559,7 @@ class _CompletedAssignmentCardState
           Icon(
             completed ? Icons.check_circle : Icons.cancel,
             size: 20,
-            color: completed ? color : Colors.red,
+            color: completed ? color : AppThemeConstants.error,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -576,9 +576,9 @@ class _CompletedAssignmentCardState
               child: Row(
                 children: [
                   ...List.generate(
-                    rating,
+                    rating > 5 ? 5 : rating,
                     (index) =>
-                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        const Icon(Icons.star, size: 14, color: AppThemeConstants.secondary),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -593,12 +593,12 @@ class _CompletedAssignmentCardState
               ),
             ),
           ] else
-            Expanded(
+            const Expanded(
               child: Text(
               ArabicLabels.assignmentNotCompleted,
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.red.shade700,
+                color: AppThemeConstants.error,
                 fontWeight: FontWeight.w600,
               ),
               maxLines: 1,
@@ -615,7 +615,7 @@ class _CompletedAssignmentCardState
 // ASSIGNMENT ITEM WIDGET (COMPLETED)
 // ============================================================================
 
-class _CompletedAssignmentItem extends StatelessWidget {
+class _CompletedAssignmentItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final String content;
@@ -629,13 +629,20 @@ class _CompletedAssignmentItem extends StatelessWidget {
   });
 
   @override
+  State<_CompletedAssignmentItem> createState() => _CompletedAssignmentItemState();
+}
+
+class _CompletedAssignmentItemState extends State<_CompletedAssignmentItem> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: widget.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: widget.color.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -643,10 +650,10 @@ class _CompletedAssignmentItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
+              color: widget.color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Icon(icon, size: 16, color: color),
+            child: Icon(widget.icon, size: 16, color: widget.color),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -654,25 +661,41 @@ class _CompletedAssignmentItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
+                  widget.label,
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: color,
+                    color: widget.color,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  content,
+                  widget.content,
                   style: const TextStyle(
                     fontSize: 14,
                     height: 1.5,
                   ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: _isExpanded ? null : 3,
+                  overflow: _isExpanded ? null : TextOverflow.ellipsis,
                 ),
+                if (!_isExpanded)
+                  InkWell(
+                    onTap: () => setState(() => _isExpanded = true),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        ArabicLabels.seeMore,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: widget.color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -688,16 +711,18 @@ class _CompletedAssignmentItem extends StatelessWidget {
 
 class _MistakeReviewCard extends StatelessWidget {
   final Map<String, dynamic> session;
+  late final List<QuranMistake> _mistakes;
 
-  const _MistakeReviewCard({required this.session});
-
-  List<QuranMistake> get _mistakes {
+  _MistakeReviewCard({required this.session}) {
     final mistakesData = session['mistakes'] as List<dynamic>?;
-    if (mistakesData == null || mistakesData.isEmpty) return [];
-    return mistakesData
-        .whereType<Map<String, dynamic>>()
-        .map((m) => QuranMistake.fromMap(m))
-        .toList();
+    if (mistakesData == null || mistakesData.isEmpty) {
+      _mistakes = [];
+    } else {
+      _mistakes = mistakesData
+          .whereType<Map<String, dynamic>>()
+          .map((m) => QuranMistake.fromMap(m))
+          .toList();
+    }
   }
 
   void _openMushaf(BuildContext context) {
@@ -705,25 +730,9 @@ class _MistakeReviewCard extends StatelessWidget {
     
     final startPage = _mistakes.first.pageNumber;
     
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Directionality(
-          textDirection: TextDirection.rtl,
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text(ArabicLabels.reviewMistakes),
-              backgroundColor: AppThemeConstants.primaryAmber,
-            ),
-            body: InteractiveQuranPage(
-              pageNumber: startPage,
-              existingMistakes: _mistakes,
-              onMistakeAdded: (_) {}, // read-only no-op
-              isEditable: false,
-            ),
-          ),
-        ),
-      ),
+    context.push(
+      '/mushaf/$startPage',
+      extra: <String, dynamic>{'mistakes': _mistakes},
     );
   }
 
@@ -738,9 +747,9 @@ class _MistakeReviewCard extends StatelessWidget {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+        color: AppThemeConstants.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
+        border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -748,7 +757,7 @@ class _MistakeReviewCard extends StatelessWidget {
           // Header
           Row(
             children: [
-              const Icon(Icons.menu_book, color: AppThemeConstants.primaryAmber),
+              const Icon(Icons.menu_book, color: AppThemeConstants.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -758,7 +767,7 @@ class _MistakeReviewCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: AppThemeConstants.primaryAmber,
+                    color: AppThemeConstants.primary,
                   ),
                 ),
               ),
@@ -797,8 +806,8 @@ class _MistakeReviewCard extends StatelessWidget {
               icon: const Icon(Icons.auto_stories),
               label: const Text(ArabicLabels.reviewMistakesInMushaf),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppThemeConstants.primaryAmber,
-                foregroundColor: Colors.white,
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),

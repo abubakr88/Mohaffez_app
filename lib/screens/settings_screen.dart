@@ -128,7 +128,7 @@ class SettingsScreen extends ConsumerWidget {
         ),
         Container(
           decoration: BoxDecoration(
-            color: AppThemeConstants.surfaceWhite,
+            color: AppThemeConstants.surface,
             borderRadius: AppThemeConstants.borderRadiusMd,
             boxShadow: [
               BoxShadow(
@@ -152,7 +152,7 @@ class SettingsScreen extends ConsumerWidget {
     Color? iconColor,
   }) {
     return ListTile(
-      leading: Icon(icon, color: iconColor ?? AppThemeConstants.primaryAmber),
+      leading: Icon(icon, color: iconColor ?? AppThemeConstants.primary),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -202,7 +202,7 @@ class SettingsScreen extends ConsumerWidget {
               ListTile(
                 title: const Text('العربية'),
                 trailing: const Icon(Icons.check,
-                    color: AppThemeConstants.primaryAmber),
+                    color: AppThemeConstants.primary),
                 onTap: () => Navigator.pop(ctx),
               ),
               ListTile(

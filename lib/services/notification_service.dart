@@ -295,6 +295,43 @@ class NotificationService {
     }
   }
 
+  /// Send Session Completed Notification (Student can now rate)
+  static Future<void> sendSessionCompletedNotification({
+    required String studentId,
+    required String mohaffezName,
+    required String sessionId,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': studentId,
+        'title': 'اكتملت جلستك!',
+        'body': 'اكتملت جلستك مع $mohaffezName — شاركنا رأيك!',
+        'type': 'sessioncompleted',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'data': {
+          'sessionId': sessionId,
+          'mohaffezName': mohaffezName,
+        },
+      });
+
+      await _sendFCMNotification(
+        userId: studentId,
+        title: 'اكتملت جلستك!',
+        body: 'اكتملت جلستك مع $mohaffezName — شاركنا رأيك!',
+        data: {
+          'type': 'sessioncompleted',
+          'sessionId': sessionId,
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      if (kDebugMode) debugPrint('✅ Session completed notification sent');
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ Error sending session completed notification: $e');
+    }
+  }
+
   /// Send Session Accepted Notification
   static Future<void> sendSessionAcceptedNotification({
     required String studentId,

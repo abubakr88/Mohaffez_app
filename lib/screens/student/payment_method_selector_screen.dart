@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/booking_provider.dart';
+import '../../shared/theme/app_theme_constants.dart';
 
 class PaymentMethodSelectorScreen extends StatefulWidget {
   const PaymentMethodSelectorScreen({
@@ -50,28 +51,20 @@ class _PaymentMethodSelectorScreenState
         appBar: AppBar(
           leading: context.canPop()
               ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
+                  icon: const Icon(Icons.arrow_back),
                   onPressed: () => context.pop(),
                   tooltip: 'رجوع',
                 )
               : null,
           title: const Text('اختر طريقة الدفع'),
         ),
-        body: RadioGroup<BookingPaymentMethod>(
-          groupValue: selectedMethod,
-          onChanged: (value) => setState(() => selectedMethod = value),
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text(
-                      'كيف تريد الدفع؟',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
+        body: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const SizedBox(height: 8),
                     if (widget.hasActiveSubscription)
                       _buildPaymentOption(
                         method: BookingPaymentMethod.subscriptionCredit,
@@ -94,7 +87,7 @@ class _PaymentMethodSelectorScreenState
                       title: 'الدفع بعد قبول المحفظ',
                       benefits: [
                         'انتظار قبول المحفظ',
-                        'ثم لديك 10 ساعات للدفع',
+                        'ثم لديك 10 ساعات للدفع (إلا الدفع = إلغاء تلقائي)',
                         'تكلفة: ${widget.singleSessionPrice.toStringAsFixed(0)} جنيه',
                       ],
                       warning: 'قد يرفض المحفظ الطلب',
@@ -109,13 +102,13 @@ class _PaymentMethodSelectorScreenState
                       benefits: [
                         'وفر حتى ${_calculateSavings()}%',
                         'باقة ${widget.packageSessions} جلسات بـ ${widget.packagePrice.toStringAsFixed(0)} جنيه',
-                        'متوسط الجلسة: ${(widget.packagePrice / widget.packageSessions).toStringAsFixed(0)} جنيه',
+                        'متوسط الجلسة: ${_getAverageSessionPrice()} جنيه',
                       ],
                       backgroundColor: Colors.blue.shade50,
                       borderColor: Colors.blue,
                     ),
                     const SizedBox(height: 24),
-                    _buildComparisonTable(),
+                    if (!widget.hasActiveSubscription) _buildComparisonTable(),
                   ],
                 ),
               ),
@@ -137,21 +130,20 @@ class _PaymentMethodSelectorScreenState
                   child: ElevatedButton(
                     onPressed: selectedMethod == null
                         ? null
-                        : () => Navigator.pop(context, selectedMethod),
+                        : () => context.pop(selectedMethod),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppThemeConstants.secondary,
                       disabledBackgroundColor: Colors.grey.shade300,
                     ),
-                    child: const Text(
-                      'متابعة',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    child: Text(
+                      _getButtonLabel(),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
               ),
             ],
-          ),
         ),
       ),
     );
@@ -168,8 +160,9 @@ class _PaymentMethodSelectorScreenState
     bool recommended = false,
   }) {
     final isSelected = selectedMethod == method;
-    return GestureDetector(
+    return InkWell(
       onTap: () => setState(() => selectedMethod = method),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -191,10 +184,10 @@ class _PaymentMethodSelectorScreenState
                 Expanded(
                   child: Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: borderColor.withValues(alpha: 0.9),
+                      color: AppThemeConstants.textPrimary,
                     ),
                   ),
                 ),
@@ -217,6 +210,8 @@ class _PaymentMethodSelectorScreenState
                   ),
                 Radio<BookingPaymentMethod>(
                   value: method,
+                  groupValue: selectedMethod,
+                  onChanged: (value) => setState(() => selectedMethod = value),
                   activeColor: borderColor,
                 ),
               ],
@@ -225,7 +220,18 @@ class _PaymentMethodSelectorScreenState
             ...benefits.map(
               (benefit) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(benefit, style: const TextStyle(fontSize: 14)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.check_circle,
+                        size: 16, color: borderColor.withAlpha(179)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(benefit,
+                          style: const TextStyle(fontSize: 14)),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (warning != null) ...[
@@ -291,7 +297,7 @@ class _PaymentMethodSelectorScreenState
                 children: [
                   _tableCell('السعر/جلسة'),
                   _tableCell(
-                    '${(widget.packagePrice / widget.packageSessions).toStringAsFixed(0)} ج',
+                    '${_getAverageSessionPrice()} ج',
                   ),
                   _tableCell(
                       '${widget.singleSessionPrice.toStringAsFixed(0)} ج'),
@@ -326,10 +332,33 @@ class _PaymentMethodSelectorScreenState
   }
 
   int _calculateSavings() {
+    // Guard against division by zero
+    if (widget.packageSessions <= 0 || widget.singleSessionPrice <= 0) {
+      return 0;
+    }
     final packagePerSession = widget.packagePrice / widget.packageSessions;
     final savings = ((widget.singleSessionPrice - packagePerSession) /
             widget.singleSessionPrice) *
         100;
-    return savings.round();
+    // Guard against negative savings (bad data)
+    return savings.round().clamp(0, 99);
+  }
+
+  String _getButtonLabel() {
+    switch (selectedMethod) {
+      case BookingPaymentMethod.buyNewPackage:
+        return 'شراء الباقة والحجز';
+      case BookingPaymentMethod.payAfterAcceptance:
+        return 'إرسال الطلب';
+      case BookingPaymentMethod.subscriptionCredit:
+        return 'تأكيد الحجز';
+      default:
+        return 'متابعة';
+    }
+  }
+
+  String _getAverageSessionPrice() {
+    if (widget.packageSessions <= 0) return 'غير محدد';
+    return (widget.packagePrice / widget.packageSessions).toStringAsFixed(0);
   }
 }

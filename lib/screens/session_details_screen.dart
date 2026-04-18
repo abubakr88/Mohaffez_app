@@ -7,7 +7,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../models/session_model.dart';
 import '../models/quran_mistake_model.dart';
 import '../utils/quran_mistake_utils.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../shared/widgets/interactive_quran_page.dart';
@@ -391,7 +391,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+                        colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -537,7 +537,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                       _SectionCard(
                         title: 'الواجبات',
                         icon: Icons.assignment,
-                        color: AppTheme.accentGreen,
+                        color: AppThemeConstants.secondary,
                         child: Column(
                           children: [
                             if (session.hifzAssignment?.isNotEmpty ??
@@ -911,8 +911,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
             label: const Text('إتمام الجلسة'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              side: const BorderSide(color: AppTheme.accentGreen, width: 2),
-              foregroundColor: AppTheme.accentGreen,
+              side: const BorderSide(color: AppThemeConstants.secondary, width: 2),
+              foregroundColor: AppThemeConstants.secondary,
             ),
           ),
         ),
@@ -984,7 +984,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
     if (isStudent &&
         session.status == 'completed' &&
-        session.sessionRating == 0) {
+        session.teacherRating == 0) {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),

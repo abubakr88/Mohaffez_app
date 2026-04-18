@@ -75,7 +75,7 @@ class _AdminWalletSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم حفظ الأرقام بنجاح'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
       }
@@ -84,7 +84,7 @@ class _AdminWalletSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطأ في الحفظ: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -110,21 +110,21 @@ class _AdminWalletSettingsScreenState
             Container(
               padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
               decoration: BoxDecoration(
-                color: Colors.amber.shade100,
+                color: AppThemeConstants.warning.withValues(alpha: 0.1),
                 borderRadius: AppThemeConstants.borderRadiusMd,
               ),
-              child: Row(
+              child: const Row(
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: Colors.amber.shade800,
+                    color: AppThemeConstants.warning,
                   ),
-                  const SizedBox(width: AppThemeConstants.spaceSm),
+                  SizedBox(width: AppThemeConstants.spaceSm),
                   Expanded(
                     child: Text(
                       'هذه الأرقام ستظهر للمحافظين عند دفع مستحقات المنصة',
                       style: TextStyle(
-                        color: Colors.amber.shade900,
+                        color: AppThemeConstants.warning,
                         fontSize: 14,
                       ),
                     ),
@@ -211,7 +211,7 @@ class _AdminWalletSettingsScreenState
                         }
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppThemeConstants.primaryAmber,
+                  backgroundColor: AppThemeConstants.primary,
                   foregroundColor: Colors.white,
                 ),
                 child: _isLoading

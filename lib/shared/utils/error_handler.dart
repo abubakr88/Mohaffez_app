@@ -38,7 +38,7 @@ class ErrorHandler {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: AppThemeConstants.accentGreen, // WHY: Align utility snackbar colors with app theme constants.
+        backgroundColor: AppThemeConstants.secondary, // WHY: Align utility snackbar colors with app theme constants.
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
       ),

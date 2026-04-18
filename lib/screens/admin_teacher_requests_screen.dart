@@ -7,6 +7,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../services/notification_service.dart';
@@ -228,7 +229,7 @@ class _RequestCardState extends State<_RequestCard> {
                   // Avatar
                   Container(
                     width: 48, height: 48,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppThemeConstants.accentBackground,
                       shape: BoxShape.circle,
                     ),
@@ -585,7 +586,7 @@ class _CertificatesList extends StatelessWidget {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => context.pop(),
               child: const Text('إغلاق'),
             ),
           ],

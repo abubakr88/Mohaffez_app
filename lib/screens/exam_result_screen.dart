@@ -8,6 +8,7 @@ import '../models/system_config_model.dart';
 import '../models/user_model.dart';
 import '../providers/system_config_provider.dart';
 import '../providers/user_provider.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../services/cache_service.dart';
 
 class ExamResultScreen extends ConsumerWidget {
@@ -62,8 +63,8 @@ class ExamResultScreen extends ConsumerWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: passed
-              ? [Colors.green.shade50, Colors.white]
-              : [Colors.orange.shade50, Colors.white],
+              ? [AppThemeConstants.success.withValues(alpha: 0.1), AppThemeConstants.onPrimary]
+              : [AppThemeConstants.warning.withValues(alpha: 0.1), AppThemeConstants.onPrimary],
         ),
       ),
       child: SafeArea(
@@ -78,13 +79,13 @@ class ExamResultScreen extends ConsumerWidget {
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: passed ? Colors.green.shade100 : Colors.orange.shade100,
+                  color: passed ? AppThemeConstants.success.withValues(alpha: 0.2) : AppThemeConstants.warning.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   passed ? Icons.check_circle : Icons.warning_rounded,
                   size: 64,
-                  color: passed ? Colors.green : Colors.orange,
+                  color: passed ? AppThemeConstants.success : AppThemeConstants.warning,
                 ),
               ),
               const SizedBox(height: 24),
@@ -94,7 +95,7 @@ class ExamResultScreen extends ConsumerWidget {
                 passed ? 'تهانينا!' : 'لم تنجح في الاختبار',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: passed ? Colors.green : Colors.orange.shade800,
+                      color: passed ? AppThemeConstants.success : AppThemeConstants.warning,
                     ),
               ),
               const SizedBox(height: 16),
@@ -103,11 +104,11 @@ class ExamResultScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppThemeConstants.onPrimary,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: AppThemeConstants.onPrimary.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -151,7 +152,7 @@ class ExamResultScreen extends ConsumerWidget {
                   'الخطوة التالية: أضف شهاداتك ونبذتك المهنية لإرسال طلب الانضمام.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
+                        color: AppThemeConstants.textSecondary,
                       ),
                 ),
                 const SizedBox(height: 32),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../repositories/session_repository.dart';
+import '../services/notification_service.dart';
 import '../models/request_status.dart';
 import '../models/quran_mistake_model.dart';
 import '../models/mohaffez_student_summary.dart';
@@ -1201,71 +1202,13 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     final updates = <String, dynamic>{};
     if (hifz != null) updates['hifzAssignment'] = hifz;
     if (muraja != null) updates['murajaAssignment'] = muraja;
-    if (notes != null) updates['sessionNotes'] = notes;
-    if (rating != null) updates['sessionRating'] = rating;
+    if (notes != null) updates['reviewNotes'] = notes;
+    if (rating != null) updates['teacherRating'] = rating;
     if (updates.isNotEmpty) {
       await updateSession(sessionId, updates);
       
-      // Update teacher's overall rating when student rates session
-      if (rating != null) {
-        await _updateTeacherRating(sessionId);
-      }
-    }
-  }
-
-  /// Updates teacher's overall rating based on average of all session ratings
-  Future<void> _updateTeacherRating(String sessionId) async {
-    try {
-      // Get session to find teacher ID
-      final sessionDoc = await _firestore
-          .collection('hafizSessions')
-          .doc(sessionId)
-          .get();
-      
-      if (!sessionDoc.exists) return;
-      
-      final sessionData = sessionDoc.data()!;
-      final mohaffezId = sessionData['mohaffezId'] as String?;
-      if (mohaffezId == null) return;
-
-      // Get all completed sessions for this teacher with ratings
-      final sessionsQuery = await _firestore
-          .collection('hafizSessions')
-          .where('mohaffezId', isEqualTo: mohaffezId)
-          .where('status', isEqualTo: 'completed')
-          .where('sessionRating', isGreaterThan: 0)
-          .get();
-
-      if (sessionsQuery.docs.isEmpty) return;
-
-      // Calculate average rating
-      var totalRating = 0;
-      var ratingCount = 0;
-      
-      for (final doc in sessionsQuery.docs) {
-        final data = doc.data();
-        final sessionRating = data['sessionRating'] as int? ?? 0;
-        if (sessionRating > 0) {
-          totalRating += sessionRating;
-          ratingCount++;
-        }
-      }
-
-      if (ratingCount == 0) return;
-
-      final averageRating = totalRating / ratingCount;
-
-      // Update teacher's rating and review count
-      await _firestore.collection('users').doc(mohaffezId).update({
-        'rating': averageRating,
-        'reviewCount': ratingCount,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      
-      debugPrint('Updated teacher $mohaffezId rating: $averageRating ($ratingCount reviews)');
-    } catch (e) {
-      // Non-fatal: don't block the rating if teacher update fails
-      debugPrint('Failed to update teacher rating (non-fatal): $e');
+      // Note: Teacher rating update is now handled by Cloud Function
+      // Client-side query not allowed due to Firestore security rules
     }
   }
 
@@ -1347,6 +1290,40 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
           .collection('hafizSessions')
           .doc(sessionId)
           .update(updates);
+
+      // Send notification to student that session is completed and ready for rating
+      try {
+        final sessionDoc = await _firestore
+            .collection('hafizSessions')
+            .doc(sessionId)
+            .get();
+        if (sessionDoc.exists) {
+          final data = sessionDoc.data()!;
+          final studentId = data['studentId'] as String?;
+          final mohaffezId = data['mohaffezId'] as String?;
+
+          if (studentId != null && mohaffezId != null) {
+            // Get teacher name
+            final mohaffezDoc = await _firestore
+                .collection('users')
+                .doc(mohaffezId)
+                .get();
+            final mohaffezName = mohaffezDoc.exists
+                ? (mohaffezDoc.data()?['name'] as String? ?? 'المحفظ')
+                : 'المحفظ';
+
+            await NotificationService.sendSessionCompletedNotification(
+              studentId: studentId,
+              mohaffezName: mohaffezName,
+              sessionId: sessionId,
+            );
+          }
+        }
+      } catch (e) {
+        // Non-fatal: don't block session completion if notification fails
+        debugPrint('Failed to send session completion notification: $e');
+      }
+
       state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);

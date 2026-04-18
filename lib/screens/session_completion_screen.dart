@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../providers/session_provider_paginated.dart';
 import '../shared/utils/error_handler.dart';
@@ -112,7 +111,7 @@ class _SessionCompletionScreenState
       if (!mounted) return;
 
       // Return with success message
-      Navigator.pop(context, true);
+      context.pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -121,7 +120,7 @@ class _SessionCompletionScreenState
                 : 'تم إكمال الجلسة بنجاح ✓',
           ),
           backgroundColor:
-              widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
+              widget.isLateCompletion ? Colors.orange : AppThemeConstants.secondary,
         ),
       );
     } catch (e) {
@@ -149,7 +148,7 @@ class _SessionCompletionScreenState
                   )
                 : null,
             title: const Text('تحديد الأخطاء على المصحف'),
-            backgroundColor: AppTheme.accentGreen,
+            backgroundColor: AppThemeConstants.secondary,
           ),
           body: InteractiveQuranPage(
             pageNumber: currentQuranPage,
@@ -195,7 +194,7 @@ class _SessionCompletionScreenState
             widget.isLateCompletion ? 'إكمال جلسة متأخرة' : 'إكمال الجلسة',
           ),
           backgroundColor:
-              widget.isLateCompletion ? Colors.orange : AppTheme.accentGreen,
+              widget.isLateCompletion ? Colors.orange : AppThemeConstants.secondary,
         ),
         body: Form(
           key: _formKey,
@@ -208,21 +207,21 @@ class _SessionCompletionScreenState
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                    color: AppThemeConstants.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.4)),
+                    border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.4)),
                   ),
                   child: const Row(
                     children: [
                       Icon(Icons.warning_amber_rounded,
-                          color: AppThemeConstants.primaryAmber, size: 28),
+                          color: AppThemeConstants.primary, size: 28),
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'هذه جلسة متأخرة - يُفضل إكمال الجلسات في موعدها',
                           style: TextStyle(
                             fontSize: 14,
-                            color: AppThemeConstants.primaryAmber,
+                            color: AppThemeConstants.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -240,12 +239,12 @@ class _SessionCompletionScreenState
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppTheme.accentGreen.withValues(alpha: 0.1),
+                          color: AppThemeConstants.secondary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.person,
-                          color: AppTheme.accentGreen,
+                          color: AppThemeConstants.secondary,
                           size: 32,
                         ),
                       ),
@@ -337,7 +336,7 @@ class _SessionCompletionScreenState
                             onChanged: (val) =>
                                 setState(() => previousHifzCompleted = val!),
                             title: const Text('أتم الحفظ المطلوب'),
-                            activeColor: AppTheme.accentGreen,
+                            activeColor: AppThemeConstants.secondary,
                           ),
                           const SizedBox(height: 8),
                           const Text(
@@ -362,9 +361,9 @@ class _SessionCompletionScreenState
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppThemeConstants.surfaceWhite,
+                              color: AppThemeConstants.surface,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppThemeConstants.primaryAmber.withValues(alpha: 0.3)),
+                              border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.3)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -401,7 +400,7 @@ class _SessionCompletionScreenState
                             onChanged: (val) =>
                                 setState(() => previousMurajaCompleted = val!),
                             title: const Text('أتم المراجعة المطلوبة'),
-                            activeColor: AppTheme.accentGreen,
+                            activeColor: AppThemeConstants.secondary,
                           ),
                           const SizedBox(height: 8),
                           const Text(
@@ -446,7 +445,7 @@ class _SessionCompletionScreenState
               _buildSectionHeader(
                 icon: Icons.menu_book,
                 title: 'تسجيل الأخطاء على المصحف',
-                color: AppTheme.accentGreen,
+                color: AppThemeConstants.secondary,
               ),
               const SizedBox(height: 12),
               Card(
@@ -463,7 +462,7 @@ class _SessionCompletionScreenState
                             icon: const Icon(Icons.book),
                             label: const Text('فتح المصحف'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryAmber,
+                              backgroundColor: AppThemeConstants.primary,
                             ),
                           ),
                           Text(
@@ -480,12 +479,12 @@ class _SessionCompletionScreenState
                         decoration: BoxDecoration(
                           color: sessionMistakes.isEmpty
                               ? Colors.green.shade50
-                              : AppThemeConstants.primaryAmber.withValues(alpha: 0.08),
+                              : AppThemeConstants.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: sessionMistakes.isEmpty
                                 ? Colors.green.shade200
-                                : AppThemeConstants.primaryAmber.withValues(alpha: 0.4),
+                                : AppThemeConstants.primary.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Row(
@@ -550,7 +549,7 @@ class _SessionCompletionScreenState
               _buildSectionHeader(
                 icon: Icons.assignment,
                 title: 'التكليف الجديد للجلسة القادمة',
-                color: AppTheme.primaryAmber,
+                color: AppThemeConstants.primary,
               ),
               const SizedBox(height: 12),
               Card(
@@ -675,7 +674,7 @@ class _SessionCompletionScreenState
                   style: ElevatedButton.styleFrom(
                     backgroundColor: widget.isLateCompletion
                         ? Colors.orange
-                        : AppTheme.accentGreen,
+                        : AppThemeConstants.secondary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -829,5 +828,6 @@ class _SessionCompletionScreenState
     }
   }
 }
+
 
 

@@ -24,6 +24,7 @@ import '../models/slot_context.dart';
 import '../models/session_request_model.dart';
 import '../models/subscription_model.dart';
 import '../shared/theme/app_theme_constants.dart';
+import '../utils/arabic_labels.dart';
 
 class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {
   final String? requestId;
@@ -114,9 +115,8 @@ class _ConfirmBundleSessionScreenState
       // 7. Inject into provider so the rest of the screen works
       //    without any further changes
       ref.read(bookingFlowProvider.notifier).setSlotContext(rebuilt);
-    } catch (e, stack) {
-      debugPrint('❌ _hydrateContext failed: $e');
-      debugPrintStack(stackTrace: stack);
+    } catch (e) {
+      // Error silently handled - slotContext will remain null
     } finally {
       if (mounted) setState(() => _hydrating = false);
     }
@@ -197,7 +197,7 @@ class _ConfirmBundleSessionScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('لا توجد جلسات متبقية. يرجى تجديد الباقة.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -209,7 +209,7 @@ class _ConfirmBundleSessionScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('حدث خطأ. يرجى المحاولة مرة أخرى.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -247,8 +247,6 @@ class _ConfirmBundleSessionScreenState
         'released': false,
         'sessionRequestId': null, // Will be updated by createSessionRequest CF
       });
-      
-      debugPrint('🔒 Slot lock created: $slotLockId for bundle session');
 
       final result = await bookingService.createSessionRequest(
         mohaffezId: slotContext.mohaffezId,
@@ -291,7 +289,7 @@ class _ConfirmBundleSessionScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: result.isDuplicate ? Colors.orange : Colors.green,
+            backgroundColor: result.isDuplicate ? AppThemeConstants.warning : AppThemeConstants.success,
             duration: Duration(seconds: result.isDuplicate ? 4 : 3),
           ),
         );
@@ -301,27 +299,25 @@ class _ConfirmBundleSessionScreenState
           SnackBar(
             content: Text(
                 result.errorMessage ?? 'فشل إرسال الطلب، حاول مرة أخرى'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
-    } on Exception catch (e) {
+    } on Exception {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ: $e'),
-          backgroundColor: Colors.red,
+        const SnackBar(
+          content: Text('حدث خطأ. يرجى المحاولة مرة أخرى.'),
+          backgroundColor: AppThemeConstants.error,
         ),
       );
-    } catch (e, stack) {
+    } catch (e) {
       // Safety net: catches Dart Errors (TypeError, etc.) that are not Exceptions.
-      debugPrint('❌ _confirmSession unhandled error: $e');
-      debugPrintStack(stackTrace: stack);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطأ غير متوقع — يرجى المحاولة مجدداً: $e'),
-          backgroundColor: Colors.red,
+        const SnackBar(
+          content: Text('خطأ غير متوقع — يرجى المحاولة مجدداً'),
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } finally {
@@ -333,7 +329,16 @@ class _ConfirmBundleSessionScreenState
   Widget build(BuildContext context) {
     if (_hydrating) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('جاري تحميل البيانات...'),
+            ],
+          ),
+        ),
       );
     }
 
@@ -343,11 +348,11 @@ class _ConfirmBundleSessionScreenState
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: AppThemeConstants.backgroundLight,
+        backgroundColor: AppThemeConstants.background,
         appBar: AppBar(
           title: const Text('تأكيد الحجز'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
+          backgroundColor: AppThemeConstants.primary,
+          foregroundColor: AppThemeConstants.onPrimary,
           leading: context.canPop()
               ? IconButton(
                   icon: const Icon(Icons.arrow_back_ios),
@@ -373,7 +378,7 @@ class _ConfirmBundleSessionScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const Icon(Icons.error_outline, size: 64, color: AppThemeConstants.error),
             const SizedBox(height: 16),
             Text(
               _subscriptionError!,
@@ -384,10 +389,11 @@ class _ConfirmBundleSessionScreenState
             ElevatedButton(
               onPressed: () {
                 setState(() {
+                  _hydrating = true;
                   _loadingSubscription = true;
                   _subscriptionError = null;
                 });
-                _loadSubscription();
+                _hydrateContext();
               },
               child: const Text('إعادة المحاولة'),
             ),
@@ -399,18 +405,32 @@ class _ConfirmBundleSessionScreenState
 
   Widget _buildNoContextState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.warning_amber, size: 64, color: Colors.orange),
-          const SizedBox(height: 16),
-          const Text('لم يتم تحديد موعد الجلسة'),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => context.go('/home'),
-            child: const Text('العودة للرئيسية'),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.warning_amber, size: 64, color: AppThemeConstants.warning),
+            const SizedBox(height: 16),
+            const Text('لم يتم تحديد موعد الجلسة'),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (context.canPop())
+                  OutlinedButton(
+                    onPressed: context.pop,
+                    child: const Text('رجوع'),
+                  ),
+                if (context.canPop()) const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: () => context.go('/home'),
+                  child: const Text('العودة للرئيسية'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -421,7 +441,10 @@ class _ConfirmBundleSessionScreenState
     DateTime? displayDate;
     try {
       displayDate = DateTime.parse(slotContext.slotDate);
-    } catch (_) {}
+    } catch (e) {
+      // Date parsing failed - displayDate will remain null and date row will be hidden
+      // Consider logging this error for debugging in development
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -433,9 +456,9 @@ class _ConfirmBundleSessionScreenState
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppThemeConstants.primaryAmber.withValues(alpha: 0.1),
+              color: AppThemeConstants.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppThemeConstants.primaryAmber),
+              border: Border.all(color: AppThemeConstants.primary),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,14 +466,14 @@ class _ConfirmBundleSessionScreenState
                 const Row(
                   children: [
                     Icon(Icons.collections_bookmark_outlined,
-                        color: AppThemeConstants.primaryAmber),
+                        color: AppThemeConstants.primary),
                     SizedBox(width: 8),
                     Text(
                       'استخدام باقة حالية',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: AppThemeConstants.primaryAmber,
+                        color: AppThemeConstants.primary,
                       ),
                     ),
                   ],
@@ -461,41 +484,16 @@ class _ConfirmBundleSessionScreenState
                 _infoRow(
                   Icons.confirmation_number_outlined,
                   'الجلسات المتبقية',
-                  // FIX Bug 2: safe because _loadSubscription now blocks
-                  // entry when remainingSessions <= 0.
-                  '${sub.remainingSessions - 1} من ${sub.totalSessions} (بعد هذه الجلسة)',
+                  '${sub.remainingSessions} من ${sub.totalSessions}',
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'ستُخصم جلسة واحدة عند التأكيد',
+                  style: TextStyle(fontSize: 12, color: AppThemeConstants.textSecondary),
                 ),
               ],
             ),
           ),
-
-          if (_activeSubscription != null && _activeSubscription!.remainingSessions == 1)
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.shade300),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded,
-                      color: Colors.orange.shade700, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'هذه آخر جلسة في باقتك الحالية.',
-                      style: TextStyle(
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
           const SizedBox(height: 16),
 
@@ -504,12 +502,12 @@ class _ConfirmBundleSessionScreenState
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppThemeConstants.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: AppThemeConstants.divider),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: AppThemeConstants.onPrimary.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -530,7 +528,7 @@ class _ConfirmBundleSessionScreenState
                 _infoRow(
                   Icons.category_outlined,
                   'نوع الجلسة',
-                  _translateSessionType(slotContext.sessionType),
+                  ArabicLabels.getSessionTypeLabel(slotContext.sessionType),
                 ),
                 const SizedBox(height: 8),
                 _infoRow(Icons.access_time, 'الوقت',
@@ -556,29 +554,30 @@ class _ConfirmBundleSessionScreenState
           const SizedBox(height: 24),
 
           // FIX Bug 2: warning shown when this IS the last session
-          if (sub.remainingSessions <= 1)
+          if (sub.remainingSessions <= 1) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppThemeConstants.warningBackground,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade300),
+                border: Border.all(color: AppThemeConstants.warning),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.warning_amber, color: Colors.orange, size: 18),
+                  Icon(Icons.warning_amber, color: AppThemeConstants.warning, size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'هذه آخر جلسة في باقتك الحالية',
                       style: TextStyle(
-                          color: Colors.orange, fontWeight: FontWeight.bold),
+                          color: AppThemeConstants.warning, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
             ),
+          ],
 
           const SizedBox(height: 24),
 
@@ -588,8 +587,8 @@ class _ConfirmBundleSessionScreenState
             child: ElevatedButton.icon(
               onPressed: _isLoading ? null : _confirmSession,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppThemeConstants.accentGreen,
-                foregroundColor: Colors.white,
+                backgroundColor: AppThemeConstants.secondary,
+                foregroundColor: AppThemeConstants.surface,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -599,7 +598,7 @@ class _ConfirmBundleSessionScreenState
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
+                          color: AppThemeConstants.onPrimary, strokeWidth: 2),
                     )
                   : const Icon(Icons.check_circle_outline),
               label: Text(
@@ -610,7 +609,7 @@ class _ConfirmBundleSessionScreenState
             ),
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
 
           // ── Cancel button ─────────────────────────────────────────────
           SizedBox(
@@ -634,13 +633,13 @@ class _ConfirmBundleSessionScreenState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
+        Icon(icon, size: 16, color: AppThemeConstants.textSecondary),
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: TextStyle(
+          style: const TextStyle(
               fontSize: 13,
-              color: Colors.grey.shade700,
+              color: AppThemeConstants.textPrimary,
               fontWeight: FontWeight.w600),
         ),
         Expanded(
@@ -648,18 +647,5 @@ class _ConfirmBundleSessionScreenState
         ),
       ],
     );
-  }
-
-  String _translateSessionType(String type) {
-    switch (type) {
-      case 'home':
-        return 'في المنزل';
-      case 'mosque':
-        return 'في المسجد';
-      case 'online':
-        return 'أونلاين';
-      default:
-        return type;
-    }
   }
 }

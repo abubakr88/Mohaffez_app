@@ -36,6 +36,7 @@ class SessionModel with _$SessionModel {
 
     String? performanceNotes,
     @Default(10) int sessionRating,
+    @Default(0) int teacherRating,
     String? sessionNotes,
 
     @TimestampConverter() DateTime? sessionDate,

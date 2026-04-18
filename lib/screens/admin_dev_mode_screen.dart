@@ -178,14 +178,14 @@ class _AdminDevModeScreenState extends ConsumerState<AdminDevModeScreen> {
                     }
                   : null,
               icon: const Icon(Icons.add_circle,
-                  color: AppThemeConstants.primaryAmber),
+                  color: AppThemeConstants.primary),
             ),
           ],
         ),
         const SizedBox(height: AppThemeConstants.spaceMd),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-              backgroundColor: AppThemeConstants.primaryAmber),
+              backgroundColor: AppThemeConstants.primary),
           onPressed: _save,
           child: const Text(ArabicLabels.saveSettings),
         ),

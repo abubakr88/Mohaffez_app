@@ -26,7 +26,7 @@ class MaintenanceScreen extends ConsumerWidget {
                 children: [
                   const Icon(Icons.handyman,
                       size: AppThemeConstants.icon2xl,
-                      color: AppThemeConstants.primaryAmber),
+                      color: AppThemeConstants.primary),
                   const SizedBox(height: AppThemeConstants.spaceLg),
                   const Text(ArabicLabels.maintenanceTitle,
                       style:

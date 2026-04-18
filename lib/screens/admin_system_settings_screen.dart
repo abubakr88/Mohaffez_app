@@ -309,7 +309,7 @@ class _AdminSystemSettingsScreenState
   Widget _saveButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-          backgroundColor: AppThemeConstants.primaryAmber),
+          backgroundColor: AppThemeConstants.primary),
       onPressed: _isLoadingSave ? null : _save,
       child: _isLoadingSave
           ? const SizedBox(

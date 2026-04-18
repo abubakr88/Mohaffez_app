@@ -75,7 +75,7 @@ class _DevModeOverlayState extends ConsumerState<DevModeOverlay> {
 
   Widget _fab(BuildContext context) {
     return FloatingActionButton(
-      backgroundColor: AppThemeConstants.primaryAmber,
+      backgroundColor: AppThemeConstants.primary,
       onPressed: () => _openDevSheet(context),
       child: const Icon(Icons.bug_report),
     );
@@ -165,7 +165,7 @@ class _DevModeOverlayState extends ConsumerState<DevModeOverlay> {
                         batch.delete(d.reference);
                       }
                       await batch.commit();
-                      if (!mounted) return;
+                      if (!ctx.mounted) return;
                       Navigator.of(ctx).pop();
                     } catch (e) {
                       debugPrint('⚠️ Failed to clear dev logs: $e');

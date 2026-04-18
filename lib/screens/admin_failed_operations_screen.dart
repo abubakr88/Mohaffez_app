@@ -42,7 +42,7 @@ class _AdminFailedOperationsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             // WHY: Keep success color sourced from app theme constants.
-            backgroundColor: AppThemeConstants.accentGreen,
+            backgroundColor: AppThemeConstants.secondary,
             content: Text(ArabicLabels.operationSuccess),
           ),
         );
@@ -86,11 +86,11 @@ class _AdminFailedOperationsScreenState
       case 'pending-retry':
       case 'pending_retry':
       case 'pending':
-        return AppThemeConstants.primaryAmber;
+        return AppThemeConstants.primary;
       case 'failed':
         return AppThemeConstants.error;
       case 'dismissed':
-        return AppThemeConstants.accentGreen;
+        return AppThemeConstants.secondary;
       default:
         return AppThemeConstants.textSecondary;
     }
@@ -106,7 +106,7 @@ class _AdminFailedOperationsScreenState
       child: Scaffold(
         appBar: const AdminAppBar(title: ArabicLabels.failedOperations),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppThemeConstants.primaryAmber,
+          backgroundColor: AppThemeConstants.primary,
           onPressed: () => _run(actions.triggerCleanupJob),
           label: const Text(ArabicLabels.runCleanupJob),
           icon: const Icon(Icons.cleaning_services),
@@ -150,7 +150,7 @@ class _AdminFailedOperationsScreenState
                           children: [
                             Icon(
                               _iconForOperationType(operationType),
-                              color: AppThemeConstants.primaryAmber,
+                              color: AppThemeConstants.primary,
                             ),
                             const SizedBox(width: AppThemeConstants.spaceSm),
                             Expanded(
@@ -161,7 +161,7 @@ class _AdminFailedOperationsScreenState
                                     operationType,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: AppThemeConstants.primaryAmber,
+                                      color: AppThemeConstants.primary,
                                     ),
                                   ),
                                   Text(
@@ -198,7 +198,7 @@ class _AdminFailedOperationsScreenState
                             IconButton(
                               icon: const Icon(
                                 Icons.replay,
-                                color: AppThemeConstants.primaryAmber,
+                                color: AppThemeConstants.primary,
                                 size: 20,
                               ),
                               tooltip: ArabicLabels.retryOperation,
@@ -213,7 +213,7 @@ class _AdminFailedOperationsScreenState
                                 : IconButton(
                                     icon: const Icon(
                                       Icons.check_circle_outline,
-                                      color: AppThemeConstants.accentGreen,
+                                      color: AppThemeConstants.secondary,
                                       size: 20,
                                     ),
                                     tooltip: ArabicLabels.dismissOperation,

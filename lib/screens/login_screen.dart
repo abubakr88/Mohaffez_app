@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/offline_banner.dart';
 
 // ============================================================
@@ -152,16 +153,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: AppThemeConstants.onPrimary,
                               fontFamily: 'Cairo',
                             ),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
+                          Text(
                             'مرحباً بعودتك 👋',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.white70,
+                              color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -189,16 +190,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         width: 120,
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppThemeConstants.surface,
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+            const BoxShadow(
+              color: AppThemeConstants.shadow,
               blurRadius: 30,
-              offset: const Offset(0, 10),
+              offset: Offset(0, 10),
             ),
             BoxShadow(
-              color: _LoginTheme.softGold.withOpacity(0.3),
+              color: _LoginTheme.softGold.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
@@ -213,15 +214,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
                     colors: [_LoginTheme.primaryTeal, _LoginTheme.lightTeal],
                   ),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.menu_book_rounded,
-                  color: Colors.white,
+                  color: AppThemeConstants.onPrimary,
                   size: 48,
                 ),
               ),
@@ -236,18 +237,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.surface,
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: AppThemeConstants.shadow,
             blurRadius: 40,
-            offset: const Offset(0, 10),
+            offset: Offset(0, 10),
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: AppThemeConstants.shadow,
             blurRadius: 60,
-            offset: const Offset(0, 20),
+            offset: Offset(0, 20),
           ),
         ],
       ),
@@ -354,7 +355,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: _LoginTheme.primaryTeal.withOpacity(0.4),
+                        color: _LoginTheme.primaryTeal.withValues(alpha: 0.4),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -369,7 +370,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
+                                AppThemeConstants.onPrimary,
                               ),
                             ),
                           )
@@ -378,7 +379,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: AppThemeConstants.onPrimary,
                               fontFamily: 'Cairo',
                             ),
                           ),
@@ -399,14 +400,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       gradient: LinearGradient(
                         colors: [
                           Colors.transparent,
-                          _LoginTheme.textMuted.withOpacity(0.3),
+                          _LoginTheme.textMuted.withValues(alpha: 0.3),
                         ],
                       ),
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'أو',
                     style: TextStyle(
@@ -422,7 +423,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          _LoginTheme.textMuted.withOpacity(0.3),
+                          _LoginTheme.textMuted.withValues(alpha: 0.3),
                           Colors.transparent,
                         ],
                       ),
@@ -442,7 +443,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _LoginTheme.primaryTeal,
                   side: BorderSide(
-                    color: _LoginTheme.primaryTeal.withOpacity(0.5),
+                    color: _LoginTheme.primaryTeal.withValues(alpha: 0.5),
                     width: 1.5,
                   ),
                   shape: RoundedRectangleBorder(
@@ -487,7 +488,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(
+        labelStyle: const TextStyle(
           color: _LoginTheme.textMuted,
           fontSize: 14,
         ),
@@ -545,7 +546,7 @@ class _IslamicPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.03)
+      ..color = AppThemeConstants.surface.withValues(alpha: 0.03)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 

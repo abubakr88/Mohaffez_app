@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../providers/session_provider_paginated.dart';
 
 class RateSessionScreen extends ConsumerStatefulWidget {
@@ -19,8 +19,9 @@ class RateSessionScreen extends ConsumerStatefulWidget {
 }
 
 class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
-  int rating = 10; // Default to 10 (best rating)
+  int rating = 0; // Default to 0 to require explicit user selection
   final notesController = TextEditingController();
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -29,6 +30,18 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
   }
 
   Future<void> _submitRating() async {
+    if (_isSubmitting) return;
+    if (rating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى اختيار تقييم من 1 إلى 10'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+      return;
+    }
+    setState(() => _isSubmitting = true);
+
     try {
       await ref.read(sessionActionsProvider.notifier).updateAssignment(
             sessionId: widget.sessionId,
@@ -37,23 +50,19 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
           );
 
       if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إرسال التقييم بنجاح'),
-            backgroundColor: AppTheme.accentGreen,
-          ),
-        );
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
-            backgroundColor: Colors.red,
+          const SnackBar(
+            content: Text('تعذّر إرسال التقييم، يرجى المحاولة مرة أخرى'),
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -65,7 +74,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
         appBar: AppBar(
           leading: context.canPop()
               ? IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
+                  icon: const Icon(Icons.arrow_back),
                   onPressed: () => context.pop(),
                   tooltip: 'رجوع',
                 )
@@ -81,13 +90,13 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentGreen.withValues(alpha: 0.1),
+                  color: AppThemeConstants.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
                     const Icon(Icons.school,
-                        color: AppTheme.accentGreen, size: 32),
+                        color: AppThemeConstants.success, size: 32),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -95,7 +104,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                         children: [
                           const Text(
                             'المحفظ',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            style: TextStyle(fontSize: 12, color: AppThemeConstants.textSecondary),
                           ),
                           Text(
                             widget.mohaffezName,
@@ -124,7 +133,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
               const SizedBox(height: 8),
               const Text(
                 'اختر تقييمك من 1 إلى 10',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: TextStyle(fontSize: 14, color: AppThemeConstants.textSecondary),
               ),
               const SizedBox(height: 24),
 
@@ -136,17 +145,20 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                   alignment: WrapAlignment.center,
                   children: List.generate(10, (index) {
                     final starRating = index + 1;
-                    return GestureDetector(
+                    return InkWell(
                       onTap: () {
                         setState(() {
                           rating = starRating;
                         });
                       },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
+                      borderRadius: BorderRadius.circular(20),
+                      child: AnimatedScale(
+                        scale: index < rating ? 1.2 : 1.0,
+                        duration: const Duration(milliseconds: 150),
+                        curve: Curves.elasticOut,
                         child: Icon(
                           index < rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
+                          color: AppThemeConstants.secondary,
                           size: 40,
                         ),
                       ),
@@ -163,7 +175,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withValues(alpha: 0.1),
+                    color: AppThemeConstants.secondary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -171,7 +183,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.amber,
+                      color: AppThemeConstants.secondary,
                     ),
                   ),
                 ),
@@ -192,6 +204,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                 controller: notesController,
                 maxLines: 5,
                 maxLength: 500,
+                textInputAction: TextInputAction.done,
                 buildCounter: (context,
                     {required currentLength,
                     required isFocused,
@@ -201,8 +214,8 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         color: currentLength > (maxLength ?? 500) * 0.9
-                            ? Colors.orange
-                            : Colors.grey.shade500,
+                            ? AppThemeConstants.warning
+                            : AppThemeConstants.textSecondary,
                       ),
                     ),
                 decoration: InputDecoration(
@@ -211,7 +224,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: Colors.grey.shade50,
+                  fillColor: AppThemeConstants.surface,
                 ),
               ),
 
@@ -220,16 +233,28 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
               // Submit Button
               SizedBox(
                 width: double.infinity,
-                height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _submitRating,
-                  icon: const Icon(Icons.send),
-                  label: const Text(
-                    'إرسال التقييم',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  onPressed: _isSubmitting ? null : _submitRating,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppThemeConstants.onPrimary,
+                          ),
+                        )
+                      : const Icon(Icons.send),
+                  label: Text(
+                    _isSubmitting ? 'جاري الإرسال...' : 'إرسال التقييم',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryAmber,
+                    backgroundColor: AppThemeConstants.primary,
+                    disabledBackgroundColor: AppThemeConstants.primary.withValues(alpha: 0.6),
+                    foregroundColor: AppThemeConstants.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
               ),

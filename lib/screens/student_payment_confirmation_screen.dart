@@ -14,7 +14,6 @@ import '../providers/user_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../utils/arabic_labels.dart';
-import 'payment_webview_screen.dart';
 
 class StudentPaymentConfirmationScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -87,7 +86,7 @@ class _StudentPaymentConfirmationScreenState
                 )
               : null,
           title: const Text('تأكيد الحجز بالدفع'),
-          backgroundColor: AppThemeConstants.accentGreen,
+          backgroundColor: AppThemeConstants.secondary,
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -142,7 +141,7 @@ class _StudentPaymentConfirmationScreenState
                   child: ElevatedButton(
                     onPressed: () => _proceedToPayment(context, ref),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.accentGreen,
+                      backgroundColor: AppThemeConstants.secondary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: Text(
@@ -198,8 +197,9 @@ class _StudentPaymentConfirmationScreenState
 
   Widget _planCard(PricingPlanModel plan) {
     final selected = selectedPlan?.id == plan.id;
-    return GestureDetector(
+    return InkWell(
       onTap: () => setState(() => selectedPlan = plan),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
@@ -207,14 +207,14 @@ class _StudentPaymentConfirmationScreenState
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color:
-                selected ? AppThemeConstants.accentGreen : Colors.grey.shade300,
+                selected ? AppThemeConstants.secondary : Colors.grey.shade300,
             width: selected ? 2 : 1,
           ),
         ),
         child: Row(
           children: [
             Icon(selected ? Icons.check_circle : Icons.circle_outlined,
-                color: AppThemeConstants.accentGreen),
+                color: AppThemeConstants.secondary),
             const SizedBox(width: 10),
             Expanded(
                 child: Text(plan.title,
@@ -299,15 +299,13 @@ class _StudentPaymentConfirmationScreenState
         return;
       }
 
-      final success = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PaymentWebViewScreen(
-            paymentUrl: result.paymentUrl,
-            paymentId: result.paymentId,
-            plan: selectedPlan!,
-          ),
-        ),
+      final success = await context.push<bool>(
+        '/payment-webview',
+        extra: {
+          'paymentUrl': result.paymentUrl,
+          'paymentId': result.paymentId,
+          'plan': selectedPlan!,
+        },
       );
 
       if (success == true && context.mounted) {

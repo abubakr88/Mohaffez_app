@@ -7,6 +7,53 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
 const notificationHelpers_1 = require("../utils/notificationHelpers");
+function deriveWeeklySummaryId(data) {
+    const year = typeof data.year === 'number'
+        ? data.year
+        : data.weekStart instanceof admin.firestore.Timestamp
+            ? data.weekStart.toDate().getFullYear()
+            : new Date().getFullYear();
+    return `${data.mohaffezId}_${year}_w${data.weekNumber}`;
+}
+async function resolveWeeklySummaryRef(inputId) {
+    const summaryRef = admin_1.db.collection('weeklyCommissionSummaries').doc(inputId);
+    const summarySnap = await summaryRef.get();
+    if (summarySnap.exists)
+        return summaryRef;
+    const legacyRef = admin_1.db.collection('weeklyCommissions').doc(inputId);
+    const legacySnap = await legacyRef.get();
+    if (!legacySnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'لم يتم العثور على الملخص');
+    }
+    const legacy = legacySnap.data();
+    const migratedSummaryRef = admin_1.db
+        .collection('weeklyCommissionSummaries')
+        .doc(deriveWeeklySummaryId(legacy));
+    await admin_1.db.runTransaction(async (tx) => {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+        const migratedSnap = await tx.get(migratedSummaryRef);
+        if (!migratedSnap.exists) {
+            tx.set(migratedSummaryRef, {
+                mohaffezId: legacy.mohaffezId,
+                mohaffezName: (_a = legacy.mohaffezName) !== null && _a !== void 0 ? _a : '',
+                weekNumber: (_b = legacy.weekNumber) !== null && _b !== void 0 ? _b : 0,
+                year: (_c = legacy.year) !== null && _c !== void 0 ? _c : new Date().getFullYear(),
+                totalSessions: (_d = legacy.totalSessions) !== null && _d !== void 0 ? _d : 0,
+                totalRevenue: (_e = legacy.totalRevenue) !== null && _e !== void 0 ? _e : 0,
+                commissionAmount: (_f = legacy.commissionAmount) !== null && _f !== void 0 ? _f : 0,
+                commissionRate: (_g = legacy.commissionRate) !== null && _g !== void 0 ? _g : 0.05,
+                status: (_h = legacy.status) !== null && _h !== void 0 ? _h : 'pending',
+                weekStart: (_j = legacy.weekStart) !== null && _j !== void 0 ? _j : null,
+                weekEnd: (_k = legacy.weekEnd) !== null && _k !== void 0 ? _k : null,
+                dueDate: (_l = legacy.dueDate) !== null && _l !== void 0 ? _l : null,
+                createdAt: (_m = legacy.createdAt) !== null && _m !== void 0 ? _m : admin_1.FieldValue.serverTimestamp(),
+                updatedAt: admin_1.FieldValue.serverTimestamp(),
+                migratedFromLegacyId: legacySnap.id,
+            }, { merge: true });
+        }
+    });
+    return migratedSummaryRef;
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL HELPER — also imported by adminActions.ts
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,9 +150,8 @@ exports.markCommissionPaid = functions.https.onCall(async (data, context) => {
     if (!weeklyCommissionSummaryId) {
         throw new functions.https.HttpsError('invalid-argument', 'معرّف الملخص مطلوب');
     }
-    const summaryRef = admin_1.db
-        .collection('weeklyCommissionSummaries')
-        .doc(weeklyCommissionSummaryId);
+    const summaryRef = await resolveWeeklySummaryRef(weeklyCommissionSummaryId);
+    const resolvedSummaryId = summaryRef.id;
     // FIX: Use transaction with idempotency guard to prevent double-pay
     let summaryData;
     const committed = await admin_1.db.runTransaction(async (tx) => {
@@ -154,7 +200,7 @@ exports.markCommissionPaid = functions.https.onCall(async (data, context) => {
         body: `تم تحويل عمولة الأسبوع ${s.weekNumber}: ${s.commissionAmount.toFixed(2)} ج.م`,
         type: 'commission_paid',
         isRead: false,
-        data: { weeklyCommissionSummaryId },
+        data: { weeklyCommissionSummaryId: resolvedSummaryId },
     });
     return { success: true };
 });
@@ -177,9 +223,8 @@ exports.mohaffezReportCommissionPayment = functions.https.onCall(async (data, co
     if (!weeklyCommissionSummaryId) {
         throw new functions.https.HttpsError('invalid-argument', 'معرّف الملخص مطلوب');
     }
-    const summaryRef = admin_1.db
-        .collection('weeklyCommissionSummaries')
-        .doc(weeklyCommissionSummaryId);
+    const summaryRef = await resolveWeeklySummaryRef(weeklyCommissionSummaryId);
+    const resolvedSummaryId = summaryRef.id;
     // BUG-FIX-C: wrap status check + update atomically to prevent TOCTOU double-notify
     let summaryForNotification;
     const committed = await admin_1.db.runTransaction(async (tx) => {
@@ -229,7 +274,7 @@ exports.mohaffezReportCommissionPayment = functions.https.onCall(async (data, co
             isRead: false,
             highPriority: true,
             data: {
-                weeklyCommissionSummaryId,
+                weeklyCommissionSummaryId: resolvedSummaryId,
                 mohaffezId,
                 commissionAmount: (_b = summaryForNotification.commissionAmount) === null || _b === void 0 ? void 0 : _b.toString(),
             },
@@ -238,7 +283,7 @@ exports.mohaffezReportCommissionPayment = functions.https.onCall(async (data, co
         functions.logger.warn('Failed to notify admin', { adminId: adminDoc.id, err }));
     }));
     functions.logger.info('Commission payment reported by mohaffez', {
-        weeklyCommissionSummaryId,
+        weeklyCommissionSummaryId: resolvedSummaryId,
         mohaffezId,
         weekNumber: summaryForNotification.weekNumber,
         amount: summaryForNotification.commissionAmount,

@@ -1,9 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
-import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/skeleton_card.dart';
 import '../shared/widgets/cached_avatar.dart';
@@ -12,6 +13,7 @@ import '../shared/widgets/error_widgets.dart';
 import '../providers/mohaffez_provider.dart';
 import '../models/mohaffez_model.dart';
 import '../utils/arabic_labels.dart';
+import '../utils/specialization_constants.dart';
 
 class NearbyMohaffezScreen extends ConsumerStatefulWidget {
   const NearbyMohaffezScreen({super.key});
@@ -28,24 +30,18 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
   bool isLoadingLocation = true;
   String? locationError;
   double radiusKm = 50.0;
+  double _displayRadius = 50.0;
   String searchQuery = '';
   String? selectedSpecialization;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-
-  final List<String> specializations = [
-    'حفظ القرآن',
-    'تجويد',
-    'قراءات',
-    'تفسير',
-    'تعليم الأطفال',
-    'اللغة العربية',
-  ];
+  Timer? _searchDebounce;
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -187,7 +183,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                           final distance =
                               mohaffez.getDistanceFrom(userLat, userLng);
 
-                          return MohaffezCard(
+                          return _MohaffezCard(
                             mohaffez: mohaffez,
                             distance: distance,
                             onTap: () =>
@@ -202,17 +198,17 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                     ),
                   );
                 },
-                loading: () => SliverToBoxAdapter(
+                loading: () => const SliverToBoxAdapter(
                   child: Column(
                     children: [
-                      const SkeletonList(itemCount: 6, itemHeight: 90),
+                      SkeletonList(itemCount: 6, itemHeight: 90),
                       Padding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 16),
+                        padding: EdgeInsets.only(top: 8, bottom: 16),
                         child: Text(
                           'جاري البحث عن محفظين بالقرب منك...',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade500,
+                            color: AppThemeConstants.textMuted,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -222,7 +218,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                 ),
                 error: (error, stack) => SliverFillRemaining(
                   child: ErrorDisplay.dataLoad(
-                    onRetry: () => ref.invalidate(nearbyMohaffezProvider),
+                    onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
                   ),
                 ),
               ),
@@ -246,7 +242,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppTheme.primaryAmber, AppTheme.lightAmber],
+              colors: [Color.fromARGB(255, 91, 233, 202), Color.fromARGB(192, 13, 224, 196)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -259,42 +255,42 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: AppThemeConstants.surface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.location_searching,
                       size: 24,
-                      color: Colors.white,
+                      color: AppThemeConstants.surface,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           'ابحث عن محفظ',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppThemeConstants.surface,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           'محفظون معتمدون بالقرب منك',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.white70,
+                            color: AppThemeConstants.surface.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.my_location, color: Colors.white),
+                    icon: const Icon(Icons.my_location, color: AppThemeConstants.surface),
                     onPressed: _getCurrentLocation,
                     tooltip: 'تحديث الموقع',
                   ),
@@ -318,31 +314,36 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
           hintText: 'ابحث باسم المحفظ...',
           hintTextDirection: TextDirection.rtl,
           prefixIcon: const Icon(Icons.search, color: AppThemeConstants.textSecondary),
-          suffixIcon: searchQuery.isNotEmpty
+          suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, color: AppThemeConstants.textSecondary),
                   onPressed: _clearSearch,
                 )
               : null,
           filled: true,
-          fillColor: Colors.grey.shade50,
+          fillColor: AppThemeConstants.background,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: const BorderSide(color: AppThemeConstants.outline),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: const BorderSide(color: AppThemeConstants.outline),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppTheme.primaryAmber, width: 2),
+            borderSide: const BorderSide(color: AppThemeConstants.secondary, width: 2),
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         onChanged: (value) {
-          setState(() {
-            searchQuery = value.trim();
+          _searchDebounce?.cancel();
+          _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+            if (mounted) {
+              setState(() {
+                searchQuery = value.trim();
+              });
+            }
           });
         },
       ),
@@ -355,12 +356,12 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'التخصص',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: AppThemeConstants.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -377,7 +378,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                     });
                   },
                 ),
-                ...specializations.map((spec) => Padding(
+                ...SpecializationConstants.specializations.map((spec) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: _SpecializationChip(
                     label: spec,
@@ -403,9 +404,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
+          color: AppThemeConstants.info.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue.shade200),
+          border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.3)),
         ),
         child: const Row(
           children: [
@@ -417,7 +418,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
             SizedBox(width: 12),
             Text(
               '${ArabicLabels.loading} ${ArabicLabels.location}...',
-              style: TextStyle(fontSize: 14, color: Colors.blue),
+              style: TextStyle(fontSize: 14, color: AppThemeConstants.info),
             ),
           ],
         ),
@@ -429,18 +430,18 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.orange.shade50,
+          color: AppThemeConstants.warningBackground,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.orange.shade200),
+          border: Border.all(color: AppThemeConstants.warning.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.warning_amber, color: Colors.orange),
+            const Icon(Icons.warning_amber, color: AppThemeConstants.warning),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
                 'تعذر تحديد موقعك. يرجى التحقق من إعدادات الموقع.',
-                style: TextStyle(fontSize: 13, color: Colors.orange),
+                style: TextStyle(fontSize: 13, color: AppThemeConstants.warning),
               ),
             ),
             TextButton(
@@ -451,7 +452,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         ),
       );
     }
-
     return const SizedBox.shrink();
   }
 
@@ -472,15 +472,15 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryAmber.withValues(alpha: 0.1),
+                  color: AppThemeConstants.secondary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${radiusKm.round()} كم',
+                  '${_displayRadius.round()} كم',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryAmber,
+                    color: AppThemeConstants.secondary,
                   ),
                 ),
               ),
@@ -488,19 +488,25 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
           ),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              activeTrackColor: AppTheme.primaryAmber,
-              inactiveTrackColor: Colors.grey.shade300,
-              thumbColor: AppTheme.primaryAmber,
-              overlayColor: AppTheme.primaryAmber.withValues(alpha: 0.2),
+              activeTrackColor: AppThemeConstants.secondary,
+              inactiveTrackColor: AppThemeConstants.divider,
+              thumbColor: AppThemeConstants.secondary,
+              overlayColor: AppThemeConstants.secondary.withValues(alpha: 0.2),
             ),
             child: Slider(
-              value: radiusKm,
+              value: _displayRadius,
               min: 5,
               max: 100,
               divisions: 19,
-              label: '${radiusKm.round()} كم',
+              label: '${_displayRadius.round()} كم',
               onChanged: (value) {
                 setState(() {
+                  _displayRadius = value;
+                });
+              },
+              onChangeEnd: (value) {
+                setState(() {
+                  _displayRadius = value;
                   radiusKm = value;
                 });
               },
@@ -518,21 +524,21 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _FilterChip(
+            _SortChip(
               label: 'الأقرب',
               icon: Icons.location_on,
               isSelected: selectedFilter == SortType.distance,
               onTap: () => _updateFilter(SortType.distance),
             ),
             const SizedBox(width: 8),
-            _FilterChip(
+            _SortChip(
               label: 'الأعلى تقييماً',
               icon: Icons.star,
               isSelected: selectedFilter == SortType.rating,
               onTap: () => _updateFilter(SortType.rating),
             ),
             const SizedBox(width: 8),
-            _FilterChip(
+            _SortChip(
               label: 'الأكثر متابعة',
               icon: Icons.people,
               isSelected: selectedFilter == SortType.followers,
@@ -545,13 +551,13 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
   }
 }
 
-class _FilterChip extends StatelessWidget {
+class _SortChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _FilterChip({
+  const _SortChip({
     required this.label,
     required this.icon,
     required this.isSelected,
@@ -566,16 +572,16 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryAmber : Colors.white,
+          color: isSelected ? AppThemeConstants.secondary : AppThemeConstants.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryAmber : Colors.grey.shade300,
+            color: isSelected ? AppThemeConstants.secondary : AppThemeConstants.outline,
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.primaryAmber.withValues(alpha: 0.3),
+                    color: AppThemeConstants.secondary.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -588,7 +594,7 @@ class _FilterChip extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: isSelected ? Colors.white : Colors.grey.shade700,
+              color: isSelected ? AppThemeConstants.surface : AppThemeConstants.textPrimary,
             ),
             const SizedBox(width: 8),
             Text(
@@ -596,7 +602,7 @@ class _FilterChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                color: isSelected ? AppThemeConstants.surface : AppThemeConstants.textPrimary,
               ),
             ),
           ],
@@ -620,16 +626,15 @@ class _SpecializationChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: isSelected ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        margin: const EdgeInsets.only(left: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppThemeConstants.primary.withValues(alpha: 0.15) : Colors.white,
+          color: isSelected ? AppThemeConstants.primary.withValues(alpha: 0.15) : AppThemeConstants.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
+            color: isSelected ? AppThemeConstants.primary : AppThemeConstants.outline,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -638,7 +643,7 @@ class _SpecializationChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade700,
+            color: isSelected ? AppThemeConstants.primary : AppThemeConstants.textPrimary,
           ),
         ),
       ),
@@ -646,13 +651,12 @@ class _SpecializationChip extends StatelessWidget {
   }
 }
 
-class MohaffezCard extends ConsumerWidget {
+class _MohaffezCard extends ConsumerWidget {
   final MohaffezModel mohaffez;
   final double? distance;
   final VoidCallback onTap;
 
-  const MohaffezCard({
-    super.key,
+  const _MohaffezCard({
     required this.mohaffez,
     this.distance,
     required this.onTap,
@@ -664,7 +668,7 @@ class MohaffezCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 3,
+      elevation: AppThemeConstants.elevationSm,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap,
@@ -697,9 +701,9 @@ class MohaffezCard extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         mohaffez.specialization!,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
+                          color: AppThemeConstants.textSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -716,18 +720,18 @@ class MohaffezCard extends ConsumerWidget {
                             label: distance! < 1
                                 ? '${(distance! * 1000).round()} م'
                                 : '${distance!.toStringAsFixed(1)} كم',
-                            color: Colors.blue,
+                            color: AppThemeConstants.info,
                           ),
                         ],
                         _InfoBadge(
                           icon: Icons.star,
                           label: mohaffez.rating.toStringAsFixed(1),
-                          color: Colors.amber,
+                          color: AppThemeConstants.secondary,
                         ),
                         _InfoBadge(
                           icon: Icons.people,
                           label: '${mohaffez.followerCount}',
-                          color: Colors.green,
+                          color: AppThemeConstants.success,
                         ),
                         sessionCountAsync.when(
                           data: (count) => _InfoBadge(
@@ -743,10 +747,10 @@ class MohaffezCard extends ConsumerWidget {
                   ],
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey.shade400,
+                color: AppThemeConstants.textMuted,
               ),
             ],
           ),

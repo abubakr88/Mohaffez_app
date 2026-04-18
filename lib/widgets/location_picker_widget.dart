@@ -4,6 +4,7 @@ import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:google_places_flutter/model/prediction.dart';
 
 import '../config/env_config.dart';
+import '../shared/theme/app_theme_constants.dart';
 
 class LocationPickerWidget extends StatefulWidget {
   const LocationPickerWidget({
@@ -51,13 +52,13 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
+              color: AppThemeConstants.errorBackground,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.shade200),
+              border: Border.all(color: AppThemeConstants.error.withValues(alpha: 0.3)),
             ),
             child: const Text(
               'Google Maps API key غير متوفر في ملف .env',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: AppThemeConstants.error),
             ),
           )
         else
@@ -96,7 +97,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
                 padding: const EdgeInsets.all(12),
                 child: Row(
                   children: [
-                    const Icon(Icons.location_on, color: Colors.red),
+                    const Icon(Icons.location_on, color: AppThemeConstants.primary),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(prediction.description ?? '',
@@ -132,23 +133,23 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: AppThemeConstants.successBackground,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green),
+              border: Border.all(color: AppThemeConstants.success),
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.green),
+                const Icon(Icons.check_circle, color: AppThemeConstants.success),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'العنوان المحدد:',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.green.shade700,
+                          color: AppThemeConstants.success,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -202,7 +203,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('فشل تحديد الموقع: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     }

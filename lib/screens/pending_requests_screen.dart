@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
-import '../shared/constants/app_theme.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../shared/widgets/error_widgets.dart';
@@ -16,7 +15,6 @@ import '../providers/user_provider.dart';
 import '../providers/session_provider_paginated.dart';
 import '../models/request_status.dart';
 import '../utils/arabic_labels.dart';
-import 'direct_payment_confirmations_screen.dart';
 
 // FIX Bug 1: import BookingPaymentMethod so we can reference
 // BookingPaymentMethod.subscriptionCredit.value ('subscription_credit')
@@ -36,7 +34,7 @@ class _PendingRequestsScreenState
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'all';
-  bool _isLoadingAccept = false;
+  final Map<String, bool> _isLoadingAccept = {};
 
   @override
   void dispose() {
@@ -86,7 +84,7 @@ class _PendingRequestsScreenState
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey.shade100,
+                    fillColor: AppThemeConstants.background,
                   ),
                 ),
               ),
@@ -106,13 +104,14 @@ class _PendingRequestsScreenState
       expandedHeight: 120,
       floating: true,
       pinned: true,
+      title: const Text('الطلبات المعلقة'),
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppThemeConstants.primaryAmber,
-                AppThemeConstants.primaryAmberLight,
+                AppThemeConstants.primary,
+                AppThemeConstants.primaryVariant,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -130,34 +129,34 @@ class _PendingRequestsScreenState
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppThemeConstants.surface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.pending_actions,
                           size: 28,
-                          color: Colors.white,
+                          color: AppThemeConstants.onPrimary,
                         ),
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'الطلبات المعلقة',
                               style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppThemeConstants.onPrimary,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               'طلبات تحتاج موافقتك',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.white70,
+                                color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -171,7 +170,7 @@ class _PendingRequestsScreenState
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppThemeConstants.surface,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -179,7 +178,7 @@ class _PendingRequestsScreenState
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.orange,
+                                color: AppThemeConstants.warning,
                               ),
                             ),
                           );
@@ -261,11 +260,6 @@ class _PendingRequestsScreenState
           filtered = filtered.where((r) {
             final status =
                 (r['status'] as String? ?? '').toLowerCase();
-            if (_selectedFilter == RequestStatus.awaitingPayment) {
-              // "في انتظار الدفع" chip shows both payment-waiting states
-              return status == RequestStatus.awaitingPayment ||
-                  status == RequestStatus.awaitingDirectPayment;
-            }
             return status == _selectedFilter;
           }).toList();
         }
@@ -296,7 +290,7 @@ class _PendingRequestsScreenState
               (context, index) {
                 final data = filtered[index];
                 final requestId = data['id'] as String;
-                return PendingRequestCard(
+                return _PendingRequestCard(
                   request: data,
                   requestId: requestId,
                   onAccept: () => _handleAccept(requestId, data),
@@ -315,9 +309,9 @@ class _PendingRequestsScreenState
 
   Future<void> _handleAccept(
       String requestId, Map<String, dynamic> data) async {
-    // Loading guard - prevents double-tap
-    if (_isLoadingAccept) return;
-    setState(() => _isLoadingAccept = true);
+    // Loading guard - prevents double-tap per request
+    if (_isLoadingAccept[requestId] == true) return;
+    setState(() => _isLoadingAccept[requestId] = true);
 
     final status = (data['status'] as String? ?? '').toLowerCase();
 
@@ -340,14 +334,17 @@ class _PendingRequestsScreenState
     if (isSubscriptionCredit) {
       // FIX: removed subscriptionId parameter — CF reads it from Firestore.
       await _confirmSubscriptionSession(data);
-      if (mounted) setState(() => _isLoadingAccept = false);
+      if (mounted) setState(() => _isLoadingAccept[requestId] = false);
       return;
     }
 
     // awaitingDirectPayment: navigate to the confirmations screen.
     if (status == RequestStatus.awaitingDirectPayment) {
       final directPaymentRequestId = data['directPaymentRequestId'] as String?;
-      if (!mounted) return;
+      if (!mounted) {
+        setState(() => _isLoadingAccept[requestId] = false);
+        return;
+      }
       if (directPaymentRequestId != null && directPaymentRequestId.isNotEmpty) {
         context.push(
           '/mohaffez/requests/confirm?directPaymentRequestId=$directPaymentRequestId',
@@ -356,10 +353,11 @@ class _PendingRequestsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('لم يتم العثور على معرف طلب الدفع'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
+      setState(() => _isLoadingAccept[requestId] = false);
       return;
     }
 
@@ -380,6 +378,7 @@ class _PendingRequestsScreenState
           ],
         ),
       );
+      setState(() => _isLoadingAccept[requestId] = false);
       return;
     }
 
@@ -399,7 +398,7 @@ class _PendingRequestsScreenState
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentGreen,
+              backgroundColor: AppThemeConstants.secondary,
             ),
             child: const Text(ArabicLabels.accept),
           ),
@@ -407,7 +406,10 @@ class _PendingRequestsScreenState
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      setState(() => _isLoadingAccept[requestId] = false);
+      return;
+    }
 
     try {
       await ref
@@ -421,7 +423,7 @@ class _PendingRequestsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم قبول الطلب بنجاح ✓'),
-          backgroundColor: AppTheme.accentGreen,
+          backgroundColor: AppThemeConstants.secondary,
         ),
       );
     } catch (e) {
@@ -429,11 +431,11 @@ class _PendingRequestsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoadingAccept = false);
+      if (mounted) setState(() => _isLoadingAccept[requestId] = false);
     }
   }
 
@@ -442,44 +444,44 @@ class _PendingRequestsScreenState
   Future<void> _handleReject(String requestId) async {
     final reasonController = TextEditingController();
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('رفض الطلب'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('يرجى توضيح سبب الرفض:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'مثال: الموعد غير متاح، الجدول ممتلئ...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('رفض الطلب'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('يرجى توضيح سبب الرفض:'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'مثال: الموعد غير متاح، الجدول ممتلئ...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text(ArabicLabels.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
+              child: const Text(ArabicLabels.reject),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(ArabicLabels.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text(ArabicLabels.reject),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (confirmed != true) return;
+      if (confirmed != true) return;
 
-    try {
       final reason = reasonController.text.trim().isEmpty
           ? 'لم يذكر سبب'
           : reasonController.text.trim();
@@ -493,7 +495,7 @@ class _PendingRequestsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم رفض الطلب'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } catch (e) {
@@ -501,9 +503,11 @@ class _PendingRequestsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
+    } finally {
+      reasonController.dispose();
     }
   }
 
@@ -530,7 +534,7 @@ class _PendingRequestsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('خطأ: المستخدم غير مصادق عليه'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -564,7 +568,7 @@ class _PendingRequestsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('خطأ: استجابة فارغة من الخادم'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
         return;
@@ -585,7 +589,7 @@ class _PendingRequestsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم قبول الجلسة بنجاح'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
             duration: Duration(seconds: 3),
           ),
         );
@@ -596,8 +600,7 @@ class _PendingRequestsScreenState
           
           // Invalidate provider after frame to avoid disposal issues
           ref.invalidate(
-            pendingRequestsFirstPageProvider(
-                request['mohaffezId'] as String),
+            pendingRequestsFirstPageProvider(currentUser.uid),
           );
           
           // Navigate safely
@@ -610,7 +613,7 @@ class _PendingRequestsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(data['message'] ?? 'فشل تأكيد الجلسة'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -626,7 +629,7 @@ class _PendingRequestsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.message ?? 'خطأ في تأكيد الجلسة'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } catch (e) {
@@ -641,7 +644,7 @@ class _PendingRequestsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     }
@@ -667,26 +670,27 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
+    return InkWell(
+      onTap: isSelected ? null : onTap,
+      borderRadius: BorderRadius.circular(20),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppThemeConstants.primaryAmber : Colors.white,
+          color: isSelected ? AppThemeConstants.primary : AppThemeConstants.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? AppThemeConstants.primaryAmber
-                : Colors.grey.shade300,
+                ? AppThemeConstants.primary
+                : AppThemeConstants.outline,
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppThemeConstants.primaryAmber
-                        .withValues(alpha: 0.3),
+                    color: AppThemeConstants.primary
+                        .withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -699,7 +703,7 @@ class _FilterChip extends StatelessWidget {
             Icon(icon,
                 size: 18,
                 color:
-                    isSelected ? Colors.white : Colors.grey.shade700),
+                    isSelected ? AppThemeConstants.onPrimary : AppThemeConstants.textSecondary),
             const SizedBox(width: 8),
             Text(
               label,
@@ -708,7 +712,7 @@ class _FilterChip extends StatelessWidget {
                 fontWeight:
                     isSelected ? FontWeight.bold : FontWeight.normal,
                 color:
-                    isSelected ? Colors.white : Colors.grey.shade700,
+                    isSelected ? AppThemeConstants.onPrimary : AppThemeConstants.textSecondary,
               ),
             ),
           ],
@@ -719,17 +723,71 @@ class _FilterChip extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Status Info Helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StatusInfo {
+  final Color color;
+  final Color backgroundColor;
+  final IconData icon;
+  final String label;
+
+  const _StatusInfo({
+    required this.color,
+    required this.backgroundColor,
+    required this.icon,
+    required this.label,
+  });
+
+  static _StatusInfo fromStatus(String status) {
+    final isConfirmed = status == RequestStatus.confirmed;
+    final isAwaitingDirectConfirm =
+        status == RequestStatus.awaitingDirectPayment;
+    final isAwaitingPayment = status == RequestStatus.awaitingPayment;
+
+    if (isConfirmed) {
+      return const _StatusInfo(
+        color: AppThemeConstants.success,
+        backgroundColor: AppThemeConstants.successBackground,
+        icon: Icons.check_circle,
+        label: 'تم القبول',
+      );
+    } else if (isAwaitingDirectConfirm) {
+      return _StatusInfo(
+        color: AppThemeConstants.info,
+        backgroundColor: AppThemeConstants.info.withValues(alpha: 0.1),
+        icon: Icons.payments_outlined,
+        label: 'في انتظار تأكيد الدفع المباشر',
+      );
+    } else if (isAwaitingPayment) {
+      return const _StatusInfo(
+        color: AppThemeConstants.warning,
+        backgroundColor: AppThemeConstants.warningBackground,
+        icon: Icons.payment,
+        label: 'في انتظار الدفع',
+      );
+    } else {
+      return _StatusInfo(
+        color: AppThemeConstants.textSecondary,
+        backgroundColor: AppThemeConstants.textSecondary.withValues(alpha: 0.1),
+        icon: Icons.pending,
+        label: 'قيد المراجعة',
+      );
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Pending Request Card
 // ─────────────────────────────────────────────────────────────────────────────
 
-class PendingRequestCard extends ConsumerWidget {
+class _PendingRequestCard extends ConsumerWidget {
   final Map<String, dynamic> request;
   final String requestId;
   final VoidCallback onAccept;
   final VoidCallback onReject;
 
-  const PendingRequestCard({
-    super.key,
+  const _PendingRequestCard({
     required this.request,
     required this.requestId,
     required this.onAccept,
@@ -739,6 +797,7 @@ class PendingRequestCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = (request['status'] as String? ?? '').toLowerCase();
+    final statusInfo = _StatusInfo.fromStatus(status);
     final studentName = request['studentName'] as String? ?? 'غير معروف';
     final studentAge = (request['studentAge'] as num?)?.toInt();
     final sessionType = request['sessionType'] as String? ?? '';
@@ -767,17 +826,11 @@ class PendingRequestCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
+      elevation: AppThemeConstants.elevationSm,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isConfirmed
-              ? Colors.green.shade200
-              : isAwaitingDirectConfirm
-                  ? Colors.blue.shade200
-                  : isAwaitingPayment
-                      ? Colors.orange.shade200
-                      : Colors.grey.shade200,
+          color: statusInfo.color.withValues(alpha: 0.2),
           width: isConfirmed || isAnyPaymentState ? 2 : 1,
         ),
       ),
@@ -801,65 +854,29 @@ class PendingRequestCard extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isConfirmed
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : isAwaitingDirectConfirm
-                            ? Colors.blue.withValues(alpha: 0.1)
-                            : isAwaitingPayment
-                                ? Colors.orange.withValues(alpha: 0.1)
-                                : Colors.grey.withValues(alpha: 0.1),
+                    color: statusInfo.backgroundColor,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isConfirmed
-                          ? Colors.green
-                          : isAwaitingDirectConfirm
-                              ? Colors.blue
-                              : isAwaitingPayment
-                                  ? Colors.orange
-                                  : Colors.grey,
+                      color: statusInfo.color,
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isConfirmed
-                            ? Icons.check_circle
-                            : isAwaitingDirectConfirm
-                                ? Icons.payments_outlined
-                                : isAwaitingPayment
-                                    ? Icons.payment
-                                    : Icons.pending,
+                        statusInfo.icon,
                         size: 16,
-                        color: isConfirmed
-                            ? Colors.green
-                            : isAwaitingDirectConfirm
-                                ? Colors.blue
-                                : isAwaitingPayment
-                                    ? Colors.orange
-                                    : Colors.grey,
+                        color: statusInfo.color,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isConfirmed
-                            ? 'تم القبول'
-                            : isAwaitingDirectConfirm
-                                ? 'في انتظار تأكيد الدفع المباشر'
-                                : isAwaitingPayment
-                                    ? 'في انتظار الدفع'
-                                    : 'قيد المراجعة',
+                        statusInfo.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: isConfirmed
-                              ? Colors.green
-                              : isAwaitingDirectConfirm
-                                  ? Colors.blue
-                                  : isAwaitingPayment
-                                      ? Colors.orange
-                                      : Colors.grey,
+                          color: statusInfo.color,
                         ),
                       ),
                     ],
@@ -878,13 +895,13 @@ class PendingRequestCard extends ConsumerWidget {
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: planType == 'subscription'
-                          ? Colors.purple.shade50
-                          : Colors.amber.shade50,
+                          ? AppThemeConstants.info.withValues(alpha: 0.1)
+                          : AppThemeConstants.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: planType == 'subscription'
-                            ? Colors.purple.shade300
-                            : Colors.amber.shade400,
+                            ? AppThemeConstants.info
+                            : AppThemeConstants.warning,
                       ),
                     ),
                     child: Row(
@@ -894,8 +911,8 @@ class PendingRequestCard extends ConsumerWidget {
                           Icons.card_membership,
                           size: 13,
                           color: planType == 'subscription'
-                              ? Colors.purple.shade700
-                              : Colors.amber.shade800,
+                              ? AppThemeConstants.info
+                              : AppThemeConstants.warning,
                         ),
                         const SizedBox(width: 5),
                         Text(
@@ -904,8 +921,8 @@ class PendingRequestCard extends ConsumerWidget {
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: planType == 'subscription'
-                                ? Colors.purple.shade700
-                                : Colors.amber.shade800,
+                                ? AppThemeConstants.info
+                                : AppThemeConstants.warning,
                           ),
                         ),
                         if (planTitle != null && planTitle.isNotEmpty) ...[
@@ -915,17 +932,17 @@ class PendingRequestCard extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 11,
                               color: planType == 'subscription'
-                                  ? Colors.purple.shade600
-                                  : Colors.amber.shade700,
+                                  ? AppThemeConstants.info.withValues(alpha: 0.7)
+                                  : AppThemeConstants.warning.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
                         const SizedBox(width: 5),
                         Text(
                           '${sessionsCount ?? 0} جلسة',
-                          style: TextStyle(
+                          style: const TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade700),
+                              color: AppThemeConstants.textSecondary),
                         ),
                       ],
                     ),
@@ -943,19 +960,19 @@ class PendingRequestCard extends ConsumerWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.info.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.blue.shade300),
+                  border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.3)),
                 ),
                 child: const Row(children: [
                   Icon(Icons.payments_outlined,
-                      color: Colors.blue, size: 18),
+                      color: AppThemeConstants.info, size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'الطالب أرسل إشعار دفع مباشر — اذهب لـ "تأكيد المدفوعات" لقبوله أو رفضه',
                       style:
-                          TextStyle(fontSize: 13, color: Colors.blue),
+                          TextStyle(fontSize: 13, color: AppThemeConstants.info),
                     ),
                   ),
                 ]),
@@ -967,24 +984,20 @@ class PendingRequestCard extends ConsumerWidget {
                   onPressed: () {
                     final dpId =
                         request['directPaymentRequestId'] as String?;
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            DirectPaymentConfirmationsScreen(
-                          directPaymentRequestId: dpId,
-                        ),
-                      ),
-                    );
+                    if (dpId != null && dpId.isNotEmpty) {
+                      context.push(
+                        '/mohaffez/requests/confirm?directPaymentRequestId=$dpId',
+                      );
+                    }
                   },
                   icon: const Icon(Icons.check_circle_outline,
-                      color: Colors.white),
+                      color: AppThemeConstants.onPrimary),
                   label: const Text('تأكيد الدفع المباشر',
                       style: TextStyle(
-                          color: Colors.white,
+                          color: AppThemeConstants.onPrimary,
                           fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade600,
+                    backgroundColor: AppThemeConstants.info,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
@@ -1022,7 +1035,7 @@ class PendingRequestCard extends ConsumerWidget {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.payment, size: 16, color: Colors.green),
+                  const Icon(Icons.payment, size: 16, color: AppThemeConstants.success),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -1032,7 +1045,7 @@ class PendingRequestCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.green,
+                          color: AppThemeConstants.success,
                           fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1058,8 +1071,8 @@ class PendingRequestCard extends ConsumerWidget {
                     icon: const Icon(Icons.close, size: 18),
                     label: const Text(ArabicLabels.reject),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
+                      foregroundColor: AppThemeConstants.error,
+                      side: const BorderSide(color: AppThemeConstants.error),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
@@ -1080,11 +1093,11 @@ class PendingRequestCard extends ConsumerWidget {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isAwaitingDirectConfirm
-                          ? Colors.blue
+                          ? AppThemeConstants.info
                           : isAwaitingPayment
-                              ? Colors.orange
-                              : AppTheme.accentGreen,
-                      foregroundColor: Colors.white,
+                              ? AppThemeConstants.warning
+                              : AppThemeConstants.secondary,
+                      foregroundColor: AppThemeConstants.onPrimary,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
@@ -1102,12 +1115,6 @@ class PendingRequestCard extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Text(value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 14)),
-        ),
-        const SizedBox(width: 8),
         Text(
           '$label:',
           maxLines: 1,
@@ -1115,7 +1122,13 @@ class PendingRequestCard extends ConsumerWidget {
           style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.grey),
+              color: AppThemeConstants.textSecondary),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 14)),
         ),
       ],
     );
@@ -1153,9 +1166,9 @@ class PendingRequestCard extends ConsumerWidget {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: AppThemeConstants.successBackground,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                border: Border.all(color: AppThemeConstants.success.withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1163,12 +1176,12 @@ class PendingRequestCard extends ConsumerWidget {
                   const Row(
                     children: [
                       Icon(Icons.collections_bookmark_outlined,
-                          size: 18, color: Colors.green),
+                          size: 18, color: AppThemeConstants.success),
                       SizedBox(width: 8),
                       Text('نوع الحجز: باقة',
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.green)),
+                              color: AppThemeConstants.success)),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1185,20 +1198,20 @@ class PendingRequestCard extends ConsumerWidget {
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.amber.shade50,
+            color: AppThemeConstants.warningBackground,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.amber.shade300),
+            border: Border.all(color: AppThemeConstants.warning.withValues(alpha: 0.3)),
           ),
-          child: Row(
+          child: const Row(
             children: [
               Icon(Icons.card_membership,
-                  size: 18, color: Colors.amber.shade800),
-              const SizedBox(width: 8),
+                  size: 18, color: AppThemeConstants.warning),
+              SizedBox(width: 8),
               Text(
                 'نوع الحجز: باقة — في انتظار تأكيد الدفع المباشر',
                 style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: Colors.amber.shade800),
+                    color: AppThemeConstants.warning),
               ),
             ],
           ),
@@ -1211,18 +1224,18 @@ class PendingRequestCard extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppThemeConstants.info.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.3)),
       ),
       child: const Row(
         children: [
-          Icon(Icons.payment, size: 18, color: Colors.blue),
+          Icon(Icons.payment, size: 18, color: AppThemeConstants.info),
           SizedBox(width: 8),
           Text(
             'نوع الحجز: دفع مباشر',
             style: TextStyle(
-                fontWeight: FontWeight.w600, color: Colors.blue),
+                fontWeight: FontWeight.w600, color: AppThemeConstants.info),
           ),
         ],
       ),

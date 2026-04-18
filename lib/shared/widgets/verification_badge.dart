@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme_constants.dart';
 
 class VerificationBadge extends StatelessWidget {
   final String type; // 'certified', 'experienced', 'phoneVerified', 'topRated'
@@ -30,15 +31,15 @@ class VerificationBadge extends StatelessWidget {
   Color _getColor() {
     switch (type) {
       case 'certified':
-        return Colors.blue;
+        return AppThemeConstants.info;
       case 'experienced':
-        return Colors.amber;
+        return AppThemeConstants.secondary;
       case 'phoneVerified':
-        return Colors.green;
+        return AppThemeConstants.success;
       case 'topRated':
-        return const Color(0xFFFFD700); // Gold
+        return AppThemeConstants.secondary;
       default:
-        return Colors.grey;
+        return AppThemeConstants.textMuted;
     }
   }
 

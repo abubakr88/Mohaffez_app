@@ -22,6 +22,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../models/pricing_plan_model.dart';
@@ -33,16 +34,16 @@ import '../shared/widgets/admin_app_bar.dart';
 // ── Plan badge colours ──────────────────────────────────────────────────────
 
 Color _badgeBg(String planType) => planType == 'subscription'
-    ? Colors.purple.shade50
-    : Colors.amber.shade50;
+    ? AppThemeConstants.primary.withValues(alpha: 0.1)
+    : AppThemeConstants.secondary.withValues(alpha: 0.1);
 
 Color _badgeBorder(String planType) => planType == 'subscription'
-    ? Colors.purple.shade300
-    : Colors.amber.shade400;
+    ? AppThemeConstants.primary
+    : AppThemeConstants.secondary;
 
 Color _badgeFg(String planType) => planType == 'subscription'
-    ? Colors.purple.shade700
-    : Colors.amber.shade800;
+    ? AppThemeConstants.primary
+    : AppThemeConstants.secondary;
 
 // ── Screen ──────────────────────────────────────────────────────────────────
 
@@ -274,7 +275,7 @@ class _SelectBundlePlanScreenState
           padding: EdgeInsets.all(24),
           child: Text(
             'لا توجد باقات متاحة لهذا المحفظ حالياً',
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: AppThemeConstants.textSecondary),
             textAlign: TextAlign.center,
           ),
         ),
@@ -293,8 +294,13 @@ class _SelectBundlePlanScreenState
     final color = _badgeFg(plan.type.name);
     final priceStr = NumberFormat('#,##0', 'ar').format(plan.priceEGP);
     final hasValidity = plan.validityDays != null && plan.validityDays! > 0;
+    final isSubscription = plan.type.name == 'subscription';
+    final pricePerSession = plan.sessionsCount > 0
+        ? plan.priceEGP / plan.sessionsCount
+        : 0.0;
+    final pricePerSessionStr = NumberFormat('#,##0', 'ar').format(pricePerSession);
 
-    return GestureDetector(
+    return InkWell(
       onTap: () {
         debugPrint('🔵 [BUNDLE_FLOW] Step2_PlanSelected: '
             'planId=${plan.id}, '
@@ -305,14 +311,15 @@ class _SelectBundlePlanScreenState
             'validityDays=${plan.validityDays}');
         setState(() => _selectedPlan = plan);
       },
+      borderRadius: AppThemeConstants.borderRadiusLg,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.06) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          color: isSelected ? color.withValues(alpha: 0.06) : AppThemeConstants.surface,
+          borderRadius: AppThemeConstants.borderRadiusLg,
           border: Border.all(
-            color: isSelected ? color : Colors.grey.shade200,
+            color: isSelected ? color : AppThemeConstants.outline,
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
@@ -324,10 +331,10 @@ class _SelectBundlePlanScreenState
                   )
                 ]
               : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
+                  const BoxShadow(
+                    color: AppThemeConstants.shadow,
                     blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    offset: Offset(0, 2),
                   )
                 ],
         ),
@@ -344,13 +351,13 @@ class _SelectBundlePlanScreenState
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected ? color : Colors.grey.shade400,
+                    color: isSelected ? color : AppThemeConstants.textDisabled,
                     width: 2,
                   ),
                   color: isSelected ? color : Colors.transparent,
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check, size: 13, color: Colors.white)
+                    ? const Icon(Icons.check, size: 13, color: AppThemeConstants.onPrimary)
                     : null,
               ),
 
@@ -369,13 +376,28 @@ class _SelectBundlePlanScreenState
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: isSelected ? color : Colors.black87,
+                              color: isSelected ? color : AppThemeConstants.textPrimary,
                             ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
+
+                    // Plan description
+                    if (plan.description != null && plan.description!.isNotEmpty) ...[
+                      Text(
+                        plan.description!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textSecondary,
+                          height: 1.4,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
 
                     Row(
                       children: [
@@ -389,20 +411,42 @@ class _SelectBundlePlanScreenState
                           _InfoChip(
                             icon: Icons.calendar_today_outlined,
                             label: '${plan.validityDays} يوم',
-                            color: Colors.grey.shade600,
+                            color: AppThemeConstants.textSecondary,
+                          ),
+                        ],
+                        if (isSubscription && plan.sessionsPerWeek != null) ...[
+                          const SizedBox(width: 8),
+                          _InfoChip(
+                            icon: Icons.calendar_view_week_outlined,
+                            label: '${plan.sessionsPerWeek}/أسبوع',
+                            color: AppThemeConstants.textSecondary,
                           ),
                         ],
                       ],
                     ),
                     const SizedBox(height: 8),
 
-                    Text(
-                      '$priceStr ج.م',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          '$priceStr ج.م',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (plan.sessionsCount > 0) ...[
+                          Text(
+                            '($pricePerSessionStr ج.م/جلسة)',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppThemeConstants.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -428,7 +472,7 @@ class _SelectBundlePlanScreenState
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   _error!,
-                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                  style: const TextStyle(color: AppThemeConstants.error, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -445,23 +489,23 @@ class _SelectBundlePlanScreenState
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppThemeConstants.onPrimary,
                         ),
                       )
-                    : const Icon(Icons.send_rounded, color: Colors.white),
+                    : const Icon(Icons.send_rounded, color: AppThemeConstants.onPrimary),
                 label: Text(
                   _submitting ? 'جارٍ الإرسال...' : 'إرسال الطلب للمعلم',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppThemeConstants.onPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppThemeConstants.primaryAmber,
-                  disabledBackgroundColor: Colors.grey.shade300,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  backgroundColor: AppThemeConstants.primary,
+                  disabledBackgroundColor: AppThemeConstants.divider,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: AppThemeConstants.borderRadiusMd,
                   ),
                 ),
               ),
@@ -489,15 +533,15 @@ class _SelectBundlePlanScreenState
                   width: 90,
                   height: 90,
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: AppThemeConstants.secondary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                     border:
-                        Border.all(color: Colors.amber.shade300, width: 2),
+                        Border.all(color: AppThemeConstants.secondary, width: 2),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.hourglass_top_rounded,
                     size: 44,
-                    color: Colors.amber.shade700,
+                    color: AppThemeConstants.secondary,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -507,12 +551,12 @@ class _SelectBundlePlanScreenState
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'في انتظار موافقة المعلم على الباقة.\n'
                   'ستتلقى إشعاراً فور الموافقة ويمكنك إتمام الدفع.',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey.shade600,
+                    color: AppThemeConstants.textSecondary,
                     height: 1.6,
                   ),
                   textAlign: TextAlign.center,
@@ -524,7 +568,7 @@ class _SelectBundlePlanScreenState
                         horizontal: 20, vertical: 14),
                     decoration: BoxDecoration(
                       color: _badgeBg(_selectedPlan!.type.name),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppThemeConstants.borderRadiusMd,
                       border: Border.all(
                           color: _badgeBorder(_selectedPlan!.type.name)),
                     ),
@@ -551,15 +595,14 @@ class _SelectBundlePlanScreenState
                 ],
                 const SizedBox(height: 32),
                 OutlinedButton.icon(
-                  onPressed: () =>
-                      Navigator.of(context).popUntil((route) => route.isFirst),
+                  onPressed: () => context.go('/'),
                   icon: const Icon(Icons.home_outlined),
                   label: const Text('العودة إلى الرئيسية'),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppThemeConstants.borderRadiusMd,
                     ),
                   ),
                 ),
@@ -580,12 +623,12 @@ class _SelectBundlePlanScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 56, color: Colors.red),
+            const Icon(Icons.error_outline, size: 56, color: AppThemeConstants.error),
             const SizedBox(height: 16),
             Text(
               _error ?? 'خطأ غير معروف',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
+              style: const TextStyle(color: AppThemeConstants.error),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -617,7 +660,7 @@ class _PlanTypeBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: _badgeBg(planType),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppThemeConstants.borderRadiusRound,
         border: Border.all(color: _badgeBorder(planType)),
       ),
       child: Row(
@@ -652,7 +695,7 @@ class _InfoChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppThemeConstants.borderRadiusSm,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

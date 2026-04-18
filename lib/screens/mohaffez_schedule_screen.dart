@@ -106,16 +106,16 @@ class _MohaffezScheduleScreenState
                             isTodayHighlighted: true,
                             todayDecoration: BoxDecoration(
                               // ── FIX 3: withOpacity → withValues ─────────
-                              color: AppThemeConstants.primaryAmber
+                              color: AppThemeConstants.primary
                                   .withValues(alpha: 0.5),
                               shape: BoxShape.circle,
                             ),
                             selectedDecoration: const BoxDecoration(
-                              color: AppThemeConstants.accentGreen,
+                              color: AppThemeConstants.secondary,
                               shape: BoxShape.circle,
                             ),
                             markerDecoration: const BoxDecoration(
-                              color: AppThemeConstants.accentGreen,
+                              color: AppThemeConstants.secondary,
                               shape: BoxShape.circle,
                             ),
                             markersAlignment: Alignment.bottomCenter,
@@ -159,14 +159,14 @@ class _MohaffezScheduleScreenState
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppThemeConstants.accentGreen, Color(0xFF66BB6A)],
+              colors: [AppThemeConstants.secondary, Color(0xFF66BB6A)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 16, 14),
+              padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -177,7 +177,7 @@ class _MohaffezScheduleScreenState
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           // ── FIX 3: withOpacity → withValues ─────────────
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppThemeConstants.surface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -187,24 +187,24 @@ class _MohaffezScheduleScreenState
                         ),
                       ),
                       const SizedBox(width: 16),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'جدول مواعيد الطلاب',
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppThemeConstants.onPrimary,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               'استعرض كل الجلسات حسب اليوم',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.white70,
+                                color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -310,12 +310,12 @@ class _SessionCard extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             // ── FIX 3: withOpacity → withValues ───────────────────────────
-            color: AppThemeConstants.accentGreen.withValues(alpha: 0.1),
+            color: AppThemeConstants.secondary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Icon(
             Icons.person,
-            color: AppThemeConstants.accentGreen,
+            color: AppThemeConstants.secondary,
           ),
         ),
         title: Text(

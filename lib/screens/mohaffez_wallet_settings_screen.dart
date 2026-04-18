@@ -65,12 +65,12 @@ class _MohaffezWalletSettingsScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم حفظ أرقام المحافظ بنجاح'),
-          backgroundColor: AppThemeConstants.accentGreen,
+          backgroundColor: AppThemeConstants.secondary,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -94,8 +94,8 @@ class _MohaffezWalletSettingsScreenState
       child: Scaffold(
         appBar: AppBar(
           title: const Text('أرقام محافظ الدفع المباشر'),
-          backgroundColor: AppThemeConstants.accentGreen,
-          foregroundColor: Colors.white,
+          backgroundColor: AppThemeConstants.secondary,
+          foregroundColor: AppThemeConstants.onPrimary,
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -107,13 +107,13 @@ class _MohaffezWalletSettingsScreenState
                     padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.only(bottom: 20),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
+                      color: AppThemeConstants.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.amber.shade300),
+                      border: Border.all(color: AppThemeConstants.warning),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.orange),
+                        Icon(Icons.info_outline, color: AppThemeConstants.warning),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -182,7 +182,7 @@ class _MohaffezWalletSettingsScreenState
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppThemeConstants.accentGreen,
+                        backgroundColor: AppThemeConstants.secondary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

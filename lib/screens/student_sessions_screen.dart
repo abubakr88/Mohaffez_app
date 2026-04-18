@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:go_router/go_router.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/widgets/empty_state.dart';
 import '../providers/user_provider.dart';
@@ -41,6 +42,17 @@ class _StudentSessionsScreenState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final user = ref.read(currentUserProvider).value;
+    if (user != null && _studentId != user.uid) {
+      setState(() {
+        _studentId = user.uid;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _animController?.dispose();
     super.dispose();
@@ -50,9 +62,18 @@ class _StudentSessionsScreenState
     final studentId = _studentId;
     if (studentId == null) return;
     ref.invalidate(studentSessionsFirstPageProvider(studentId));
-    await ref
-        .read(studentSessionsFirstPageProvider(studentId).future)
-        .catchError((_) => <Map<String, dynamic>>[]);
+    try {
+      await ref.read(studentSessionsFirstPageProvider(studentId).future);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذّر تحديث الجلسات، يرجى المحاولة مرة أخرى'),
+            backgroundColor: AppThemeConstants.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -62,34 +83,48 @@ class _StudentSessionsScreenState
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    _studentId = user.uid;
+    final studentId = user.uid;
     final sessionsAsync =
-        ref.watch(studentSessionsFirstPageProvider(user.uid));
+        ref.watch(studentSessionsFirstPageProvider(studentId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: AppThemeConstants.backgroundLight,
+        backgroundColor: AppThemeConstants.background,
         body: RefreshIndicator(
           onRefresh: _refreshSessions,
-          color: AppThemeConstants.accentGreen,
+          color: AppThemeConstants.secondary,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               _buildAppBar(sessionsAsync),
               SliverToBoxAdapter(
                 child: sessionsAsync.maybeWhen(
-                  data: (s) => _buildStatsStrip(s),
+                  data: (s) {
+                    final filteredData = _computeFilteredData(s);
+                    return _buildStatsStrip(filteredData);
+                  },
                   orElse: () => const SizedBox.shrink(),
                 ),
               ),
-              SliverToBoxAdapter(child: _buildFilterChips(sessionsAsync)),
+              SliverToBoxAdapter(
+                child: sessionsAsync.maybeWhen(
+                  data: (s) {
+                    final filteredData = _computeFilteredData(s);
+                    return _buildFilterChips(filteredData);
+                  },
+                  orElse: () => const SizedBox.shrink(),
+                ),
+              ),
               sessionsAsync.when(
-                data: (s) => _buildSessionList(s),
+                data: (s) {
+                  final filteredData = _computeFilteredData(s);
+                  return _buildSessionList(filteredData);
+                },
                 loading: () => const SliverFillRemaining(
                   child: Center(
                     child: CircularProgressIndicator(
-                        color: AppThemeConstants.accentGreen),
+                        color: AppThemeConstants.secondary),
                   ),
                 ),
                 error: (_, __) =>
@@ -100,6 +135,40 @@ class _StudentSessionsScreenState
         ),
       ),
     );
+  }
+
+  // ─────────────────────────────────────────────────
+  // FILTER DATA HELPER
+  // ─────────────────────────────────────────────────
+
+  Map<String, dynamic> _computeFilteredData(List<Map<String, dynamic>> sessions) {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final all = sessions.where((s) {
+      final st = (s['status'] as String?)?.toLowerCase();
+      return st == 'accepted' || st == 'completed';
+    }).toList();
+
+    final upcoming = all.where((s) {
+      final d = _toDateTime(s['sessionDate']);
+      return d != null && !d.isBefore(todayStart);
+    }).toList();
+
+    final completed = all.where((s) {
+      final d = _toDateTime(s['sessionDate']);
+      return d != null && d.isBefore(todayStart);
+    }).toList();
+
+    final withAssignments = all.where((s) =>
+        ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
+        ((s['murajaAssignment'] as String?) ?? '').isNotEmpty).toList();
+
+    return {
+      'all': all,
+      'upcoming': upcoming,
+      'completed': completed,
+      'withAssignments': withAssignments,
+    };
   }
 
   // ─────────────────────────────────────────────────
@@ -120,15 +189,15 @@ class _StudentSessionsScreenState
       floating: false,
       pinned: true,
       elevation: 0,
-      backgroundColor: AppThemeConstants.accentGreenDark,
+      backgroundColor: AppThemeConstants.secondary,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppThemeConstants.accentGreenDark,
-                AppThemeConstants.accentGreen,
-                AppThemeConstants.accentGreenLight,
+                AppThemeConstants.secondary.withValues(alpha: 0.9),
+                AppThemeConstants.secondary,
+                AppThemeConstants.secondary.withValues(alpha: 0.7),
               ],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
@@ -146,23 +215,23 @@ class _StudentSessionsScreenState
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.2),
                           borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
                         child: const Icon(Icons.event_available_rounded,
-                            size: 26, color: Colors.white),
+                            size: 26, color: AppThemeConstants.onPrimary),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'جلساتي',
                               style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppThemeConstants.onPrimary,
                                 height: 1.1,
                               ),
                             ),
@@ -170,7 +239,7 @@ class _StudentSessionsScreenState
                               'إدارة جلساتك المؤكدة',
                               style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.white70),
+                                  color: AppThemeConstants.onPrimary.withValues(alpha: 0.7)),
                             ),
                           ],
                         ),
@@ -180,17 +249,17 @@ class _StudentSessionsScreenState
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: AppThemeConstants.onPrimary.withValues(alpha: 0.2),
                             borderRadius: AppThemeConstants.borderRadiusXl,
                             border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.4)),
+                                color: AppThemeConstants.onPrimary.withValues(alpha: 0.4)),
                           ),
                           child: Text(
                             '$totalCount جلسة',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppThemeConstants.onPrimary,
                             ),
                           ),
                         ),
@@ -209,58 +278,42 @@ class _StudentSessionsScreenState
   // STATS STRIP
   // ─────────────────────────────────────────────────
 
-  Widget _buildStatsStrip(List<Map<String, dynamic>> sessions) {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final all = sessions.where((s) {
-      final st = (s['status'] as String?)?.toLowerCase();
-      return st == 'accepted' || st == 'completed';
-    }).toList();
-
-    final upcoming = all.where((s) {
-      final d = _toDateTime(s['sessionDate']);
-      return d != null && !d.isBefore(todayStart);
-    }).length;
-
-    final completed = all.where((s) {
-      final d = _toDateTime(s['sessionDate']);
-      return d != null && d.isBefore(todayStart);
-    }).length;
-
-    final withAssignments = all.where((s) =>
-        ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
-        ((s['murajaAssignment'] as String?) ?? '').isNotEmpty).length;
+  Widget _buildStatsStrip(Map<String, dynamic> filteredData) {
+    final all = filteredData['all'] as List<Map<String, dynamic>>;
+    final upcoming = filteredData['upcoming'] as List<Map<String, dynamic>>;
+    final completed = filteredData['completed'] as List<Map<String, dynamic>>;
+    final withAssignments = filteredData['withAssignments'] as List<Map<String, dynamic>>;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: AppThemeConstants.surfaceWhite,
+      decoration: const BoxDecoration(
+        color: AppThemeConstants.surface,
         borderRadius: AppThemeConstants.borderRadiusLg,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: AppThemeConstants.shadow,
             blurRadius: 12,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           _StatItem(count: all.length, label: 'المجموع',
-              color: AppThemeConstants.accentGreen,
+              color: AppThemeConstants.secondary,
               icon: Icons.grid_view_rounded),
           _StatDivider(),
-          _StatItem(count: upcoming, label: 'القادمة',
+          _StatItem(count: upcoming.length, label: 'القادمة',
               color: AppThemeConstants.info,
               icon: Icons.upcoming_rounded),
           _StatDivider(),
-          _StatItem(count: completed, label: 'المنتهية',
+          _StatItem(count: completed.length, label: 'المنتهية',
               color: AppThemeConstants.textSecondary,
               icon: Icons.history_rounded),
           _StatDivider(),
-          _StatItem(count: withAssignments, label: 'بواجبات',
-              color: AppThemeConstants.primaryAmber,
+          _StatItem(count: withAssignments.length, label: 'بواجبات',
+              color: AppThemeConstants.primary,
               icon: Icons.assignment_rounded),
         ],
       ),
@@ -271,41 +324,22 @@ class _StudentSessionsScreenState
   // FILTER CHIPS
   // ─────────────────────────────────────────────────
 
-  Widget _buildFilterChips(
-      AsyncValue<List<Map<String, dynamic>>> sessionsAsync) {
-    final sessions = sessionsAsync.valueOrNull ?? [];
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final all = sessions.where((s) {
-      final st = (s['status'] as String?)?.toLowerCase();
-      return st == 'accepted' || st == 'completed';
-    }).toList();
-
-    int countFor(String f) {
-      if (f == 'all') return all.length;
-      if (f == 'upcoming') {
-        return all.where((s) {
-          final d = _toDateTime(s['sessionDate']);
-          return d != null && !d.isBefore(todayStart);
-        }).length;
-      }
-      return all.where((s) {
-        final d = _toDateTime(s['sessionDate']);
-        return d != null && d.isBefore(todayStart);
-      }).length;
-    }
+  Widget _buildFilterChips(Map<String, dynamic> filteredData) {
+    final all = filteredData['all'] as List<Map<String, dynamic>>;
+    final upcoming = filteredData['upcoming'] as List<Map<String, dynamic>>;
+    final completed = filteredData['completed'] as List<Map<String, dynamic>>;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
         children: [
-          _buildChip('all', 'الكل', Icons.grid_view_rounded, countFor('all')),
+          _buildChip('all', 'الكل', Icons.grid_view_rounded, all.length),
           const SizedBox(width: 8),
           _buildChip('upcoming', 'القادمة', Icons.upcoming_rounded,
-              countFor('upcoming')),
+              upcoming.length),
           const SizedBox(width: 8),
           _buildChip('completed', 'المنتهية', Icons.history_rounded,
-              countFor('completed')),
+              completed.length),
         ],
       ),
     );
@@ -314,25 +348,32 @@ class _StudentSessionsScreenState
   Widget _buildChip(String value, String label, IconData icon, int count) {
     final isSelected = _selectedFilter == value;
     return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedFilter = value),
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedFilter = value;
+            _animController?.reset();
+            _animController?.forward();
+          });
+        },
+        borderRadius: AppThemeConstants.borderRadiusMd,
         child: AnimatedContainer(
           duration: AppThemeConstants.durationFast,
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppThemeConstants.accentGreen
-                : AppThemeConstants.surfaceWhite,
+                ? AppThemeConstants.secondary
+                : AppThemeConstants.surface,
             borderRadius: AppThemeConstants.borderRadiusMd,
             border: Border.all(
               color: isSelected
-                  ? AppThemeConstants.accentGreen
+                  ? AppThemeConstants.secondary
                   : AppThemeConstants.divider,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppThemeConstants.accentGreen
+                      color: AppThemeConstants.secondary
                           .withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
@@ -346,7 +387,7 @@ class _StudentSessionsScreenState
               Icon(icon,
                   size: 18,
                   color: isSelected
-                      ? Colors.white
+                      ? AppThemeConstants.onPrimary
                       : AppThemeConstants.textSecondary),
               const SizedBox(height: 4),
               Text(
@@ -356,7 +397,7 @@ class _StudentSessionsScreenState
                   fontWeight:
                       isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
-                      ? Colors.white
+                      ? AppThemeConstants.onPrimary
                       : AppThemeConstants.textSecondary,
                 ),
               ),
@@ -367,8 +408,8 @@ class _StudentSessionsScreenState
                       horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? Colors.white.withValues(alpha: 0.3)
-                        : AppThemeConstants.accentGreen
+                        ? AppThemeConstants.onPrimary.withValues(alpha: 0.3)
+                        : AppThemeConstants.secondary
                             .withValues(alpha: 0.15),
                     borderRadius: AppThemeConstants.borderRadiusRound,
                   ),
@@ -378,8 +419,8 @@ class _StudentSessionsScreenState
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       color: isSelected
-                          ? Colors.white
-                          : AppThemeConstants.accentGreen,
+                          ? AppThemeConstants.onPrimary
+                          : AppThemeConstants.secondary,
                     ),
                   ),
                 ),
@@ -395,22 +436,11 @@ class _StudentSessionsScreenState
   // SESSION LIST
   // ─────────────────────────────────────────────────
 
-  Widget _buildSessionList(List<Map<String, dynamic>> sessions) {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-
-    var filtered = sessions.where((s) {
-      final st = (s['status'] as String?)?.toLowerCase();
-      return st == 'accepted' || st == 'completed';
-    }).toList();
+  Widget _buildSessionList(Map<String, dynamic> filteredData) {
+    var filtered = filteredData['all'] as List<Map<String, dynamic>>;
 
     if (_selectedFilter == 'upcoming') {
-      filtered = filtered
-          .where((s) {
-            final d = _toDateTime(s['sessionDate']);
-            return d != null && !d.isBefore(todayStart);
-          })
-          .toList()
+      filtered = filteredData['upcoming'] as List<Map<String, dynamic>>
         ..sort((a, b) {
           final da = _toDateTime(a['sessionDate']);
           final db = _toDateTime(b['sessionDate']);
@@ -418,12 +448,7 @@ class _StudentSessionsScreenState
           return da.compareTo(db);
         });
     } else if (_selectedFilter == 'completed') {
-      filtered = filtered
-          .where((s) {
-            final d = _toDateTime(s['sessionDate']);
-            return d != null && d.isBefore(todayStart);
-          })
-          .toList()
+      filtered = filteredData['completed'] as List<Map<String, dynamic>>
         ..sort((a, b) {
           final da = _toDateTime(a['sessionDate']);
           final db = _toDateTime(b['sessionDate']);
@@ -513,7 +538,7 @@ class _StudentSessionsScreenState
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('إعادة المحاولة'),
             style: TextButton.styleFrom(
-                foregroundColor: AppThemeConstants.accentGreen),
+                foregroundColor: AppThemeConstants.secondary),
           ),
         ],
       ),
@@ -609,34 +634,42 @@ class _SessionCard extends StatelessWidget {
     final accentColor = isToday
         ? AppThemeConstants.warning
         : isUpcoming
-            ? AppThemeConstants.accentGreen
+            ? AppThemeConstants.secondary
             : AppThemeConstants.textSecondary;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppThemeConstants.surfaceWhite,
-        borderRadius: AppThemeConstants.borderRadiusLg,
-        border: Border.all(
-          color: accentColor.withValues(alpha: isUpcoming ? 0.5 : 0.2),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+    return InkWell(
+      onTap: () {
+        final sessionId = session['sessionId'] as String?;
+        if (sessionId != null && sessionId.isNotEmpty) {
+          context.go('/session/$sessionId');
+        }
+      },
+      borderRadius: AppThemeConstants.borderRadiusLg,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.surface,
+          borderRadius: AppThemeConstants.borderRadiusLg,
+          border: Border.all(
+            color: accentColor.withValues(alpha: isUpcoming ? 0.5 : 0.2),
+            width: 1.5,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: AppThemeConstants.borderRadiusLg,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Left accent bar
-              Container(width: 5, color: accentColor),
+          boxShadow: const [
+            BoxShadow(
+              color: AppThemeConstants.shadow,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: AppThemeConstants.borderRadiusLg,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left accent bar
+                Container(width: 5, color: accentColor),
 
               // Content
               Expanded(
@@ -692,7 +725,7 @@ class _SessionCard extends StatelessWidget {
                               icon: Icons.calendar_today_rounded,
                               text: _smartDate(sessionDate, todayStart),
                               color: isUpcoming
-                                  ? AppThemeConstants.accentGreen
+                                  ? AppThemeConstants.secondary
                                   : AppThemeConstants.textSecondary,
                             ),
                           if (timeSlot.isNotEmpty)
@@ -705,7 +738,7 @@ class _SessionCard extends StatelessWidget {
                             _InfoChip(
                               icon: Icons.location_on_rounded,
                               text: location,
-                              color: AppThemeConstants.primaryAmber,
+                              color: AppThemeConstants.primary,
                               maxWidth: 150,
                             ),
                         ],
@@ -721,13 +754,13 @@ class _SessionCard extends StatelessWidget {
                           children: [
                             Icon(Icons.assignment_rounded,
                                 size: 13,
-                                color: AppThemeConstants.primaryAmber),
+                                color: AppThemeConstants.primary),
                             SizedBox(width: 5),
                             Text('الواجبات',
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: AppThemeConstants.primaryAmber)),
+                                    color: AppThemeConstants.primary)),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -735,7 +768,7 @@ class _SessionCard extends StatelessWidget {
                           _AssignmentRow(
                               label: 'حفظ',
                               text: hifz,
-                              color: AppThemeConstants.accentGreen),
+                              color: AppThemeConstants.secondary),
                         if (muraja.isNotEmpty)
                           _AssignmentRow(
                               label: 'مراجعة',
@@ -749,6 +782,7 @@ class _SessionCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -793,7 +827,7 @@ class _SessionTypeAvatar extends StatelessWidget {
     switch (sessionType) {
       case 'mosque':
         icon = Icons.mosque_rounded;
-        color = AppThemeConstants.primaryAmber;
+        color = AppThemeConstants.primary;
         break;
       case 'online':
         icon = Icons.videocam_rounded;
@@ -801,7 +835,7 @@ class _SessionTypeAvatar extends StatelessWidget {
         break;
       default:
         icon = Icons.home_rounded;
-        color = AppThemeConstants.accentGreen;
+        color = AppThemeConstants.secondary;
     }
     if (isCompleted) color = AppThemeConstants.textSecondary;
 
@@ -837,9 +871,9 @@ class _StatusBadge extends StatelessWidget {
       label = 'اليوم';
     } else if (daysUntil != null && daysUntil! <= 3) {
       color = AppThemeConstants.info;
-      label = 'بعد $daysUntil أيام';
+      label = daysUntil == 1 ? 'بعد يوم' : 'بعد $daysUntil أيام';
     } else if (isUpcoming) {
-      color = AppThemeConstants.accentGreen;
+      color = AppThemeConstants.secondary;
       label = 'قادمة';
     } else {
       color = AppThemeConstants.textSecondary;

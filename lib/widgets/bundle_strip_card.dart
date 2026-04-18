@@ -22,31 +22,32 @@ class BundleStripCard extends StatelessWidget {
   }
 
   Color get _progressColor {
-    if (sub.progressPercentage >= 0.5) return AppThemeConstants.accentGreen;
+    if (sub.progressPercentage >= 0.5) return AppThemeConstants.secondary;
     if (sub.progressPercentage >= 0.2) return AppThemeConstants.warning;
     return AppThemeConstants.error;
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: () => context.push('/active-subscriptions'),
+      borderRadius: AppThemeConstants.borderRadiusLg,
       child: Container(
         width: 200,
         margin: const EdgeInsets.only(left: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppThemeConstants.surfaceWhite,
+          color: AppThemeConstants.surface,
           borderRadius: AppThemeConstants.borderRadiusLg,
           border: Border.all(
             color: _progressColor.withValues(alpha: 0.3),
             width: 1.5,
           ),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: AppThemeConstants.shadow,
               blurRadius: 8,
-              offset: const Offset(0, 2),
+              offset: Offset(0, 2),
             ),
           ],
         ),
@@ -68,7 +69,7 @@ class BundleStripCard extends StatelessWidget {
             // Session type
             Text(
               _planTypeLabel(sub.planType),
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              style: const TextStyle(fontSize: 11, color: AppThemeConstants.textSecondary),
             ),
             const SizedBox(height: 10),
             // Progress bar
@@ -76,7 +77,7 @@ class BundleStripCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: sub.progressPercentage,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: AppThemeConstants.divider,
                 valueColor: AlwaysStoppedAnimation<Color>(_progressColor),
                 minHeight: 6,
               ),

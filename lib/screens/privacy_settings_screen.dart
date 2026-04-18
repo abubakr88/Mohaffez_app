@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../shared/constants/app_theme.dart';
+import '../shared/theme/app_theme_constants.dart';
 import '../shared/utils/error_handler.dart';
 
 class PrivacySettingsScreen extends ConsumerStatefulWidget {
@@ -127,7 +127,7 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
       onChanged: onChanged,
       title: Row(
         children: [
-          Icon(icon, color: AppTheme.primaryAmber, size: 20),
+          Icon(icon, color: AppThemeConstants.primary, size: 20),
           const SizedBox(width: 12),
           Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
@@ -135,9 +135,9 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
       subtitle: Padding(
         padding: const EdgeInsets.only(right: 32.0, top: 4),
         child: Text(subtitle,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            style: const TextStyle(fontSize: 12, color: AppThemeConstants.textSecondary)),
       ),
-      activeThumbColor: AppTheme.accentGreen,
+      activeThumbColor: AppThemeConstants.secondary,
     );
   }
 }

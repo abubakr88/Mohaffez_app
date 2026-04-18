@@ -117,7 +117,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: AppThemeConstants.onPrimary,
                                   ),
                                 ),
                               ),
@@ -126,15 +126,15 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'مرحباً،',
                                       style: TextStyle(
-                                          color: Colors.white60, fontSize: 12),
+                                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.6), fontSize: 12),
                                     ),
                                     Text(
                                       adminName,
                                       style: const TextStyle(
-                                        color: Colors.white,
+                                        color: AppThemeConstants.onPrimary,
                                         fontSize: 17,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -168,10 +168,10 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          const Text(
+                          Text(
                             'لوحة تحكم المشرف',
                             style: TextStyle(
-                                color: Colors.white38,
+                                color: AppThemeConstants.onPrimary.withValues(alpha: 0.38),
                                 fontSize: 11,
                                 letterSpacing: 0.3),
                           ),

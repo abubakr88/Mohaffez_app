@@ -5,7 +5,7 @@
 export { sendNotification } from './notifications/sendNotification';
 export { onSessionRequestAccepted } from './notifications/triggers';
 export { onSessionRequestStatusChanged } from './notifications/triggers';
-export { onSessionCreated, onSessionCompleted } from './notifications/triggers';
+export { onSessionCreated, onSessionCompleted, onTeacherRated } from './notifications/triggers';
 export { sendPaymentDeadlineReminders } from './notifications/paymentDeadlineReminders';
 export { sendSessionReminders } from './notifications/sessionReminders';
 

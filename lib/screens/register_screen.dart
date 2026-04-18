@@ -59,7 +59,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم إنشاء الحساب بنجاح'),
-          backgroundColor: AppThemeConstants.accentGreen,
+          backgroundColor: AppThemeConstants.secondary,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -77,8 +77,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('إنشاء حساب جديد'),
-          backgroundColor: AppThemeConstants.primaryAmber,
-          foregroundColor: Colors.white,
+          backgroundColor: AppThemeConstants.primary,
+          foregroundColor: AppThemeConstants.onPrimary,
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -92,14 +92,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
-                    decoration: BoxDecoration(
-                      color: AppThemeConstants.surfaceWhite,
+                    decoration: const BoxDecoration(
+                      color: AppThemeConstants.surface,
                       borderRadius: AppThemeConstants.borderRadiusXl,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
+                          color: AppThemeConstants.shadow,
                           blurRadius: 20,
-                          offset: const Offset(0, 4),
+                          offset: Offset(0, 4),
                         ),
                       ],
                     ),
@@ -114,7 +114,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               borderRadius: AppThemeConstants.borderRadiusMd,
                             ),
                             filled: true,
-                            fillColor: AppThemeConstants.backgroundLight,
+                            fillColor: AppThemeConstants.background,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -138,7 +138,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               borderRadius: AppThemeConstants.borderRadiusMd,
                             ),
                             filled: true,
-                            fillColor: AppThemeConstants.backgroundLight,
+                            fillColor: AppThemeConstants.background,
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -176,7 +176,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               borderRadius: AppThemeConstants.borderRadiusMd,
                             ),
                             filled: true,
-                            fillColor: AppThemeConstants.backgroundLight,
+                            fillColor: AppThemeConstants.background,
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -207,7 +207,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 icon: Icons.school,
                                 title: 'محفّظ',
                                 subtitle: 'معلم القرآن',
-                                color: AppThemeConstants.primaryAmber,
+                                color: AppThemeConstants.primary,
                                 isSelected: _selectedRole == 'mohaffez',
                                 onTap: () {
                                   setState(() {
@@ -225,7 +225,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 icon: Icons.person,
                                 title: 'طالب',
                                 subtitle: 'دارس القرآن',
-                                color: AppThemeConstants.accentGreen,
+                                color: AppThemeConstants.secondary,
                                 isSelected: _selectedRole == 'student',
                                 onTap: () {
                                   setState(() {
@@ -243,7 +243,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           child: ElevatedButton(
                             onPressed: isLoading ? null : _submit,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppThemeConstants.primaryAmber,
+                              backgroundColor: AppThemeConstants.primary,
                               shape: const RoundedRectangleBorder(
                                 borderRadius: AppThemeConstants.borderRadiusMd,
                               ),
@@ -254,7 +254,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     height: 24,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.white,
+                                      color: AppThemeConstants.onPrimary,
                                     ),
                                   )
                                 : const Text(
@@ -310,7 +310,7 @@ class _RoleCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
         decoration: BoxDecoration(
           color:
-              isSelected ? color.withValues(alpha: 0.1) : AppThemeConstants.backgroundLight,
+              isSelected ? color.withValues(alpha: 0.1) : AppThemeConstants.background,
           borderRadius: AppThemeConstants.borderRadiusMd,
           border: Border.all(
             color: isSelected ? color : AppThemeConstants.divider,

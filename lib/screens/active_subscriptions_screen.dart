@@ -7,6 +7,7 @@ import '../models/pricing_plan_model.dart';
 import '../providers/subscription_provider.dart';
 import '../providers/user_provider.dart';
 import '../shared/theme/app_theme_constants.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 // Tab config
 const _kTabs = [
@@ -46,24 +47,31 @@ class _ActiveSubscriptionsScreenState
     return userAsync.when(
       loading: () => const Scaffold(
           body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
+      error: (e, _) => const Scaffold(
+          body: Center(
+              child: Text('حدث خطأ في تحميل البيانات. يرجى المحاولة مرة أخرى.'))),
       data: (user) {
-        if (user == null) return const SizedBox.shrink();
+        if (user == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/login'));
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
-            backgroundColor: AppThemeConstants.backgroundLight,
+            backgroundColor: AppThemeConstants.background,
             appBar: AppBar(
               title: const Text('باقاتي'),
-              backgroundColor: AppThemeConstants.primaryAmber,
-              foregroundColor: AppThemeConstants.surfaceWhite,
+              backgroundColor: AppThemeConstants.primary,
+              foregroundColor: AppThemeConstants.surface,
               elevation: 0,
               bottom: TabBar(
                 controller: _tabController,
-                indicatorColor: AppThemeConstants.surfaceWhite,
-                labelColor: AppThemeConstants.surfaceWhite,
+                indicatorColor: AppThemeConstants.surface,
+                labelColor: AppThemeConstants.surface,
                 unselectedLabelColor:
-                    AppThemeConstants.surfaceWhite.withValues(alpha: 0.6),
+                    AppThemeConstants.surface.withValues(alpha: 0.6),
                 tabs: _kTabs
                     .map((t) => Tab(text: t.label))
                     .toList(),
@@ -98,18 +106,33 @@ class _SubscriptionTabView extends ConsumerWidget {
           (studentId: studentId, status: status)),
     );
 
+    Future<void> onRefresh() async {
+      ref.invalidate(filteredSubscriptionsProvider(
+          (studentId: studentId, status: status)));
+      await ref.read(filteredSubscriptionsProvider(
+              (studentId: studentId, status: status)).future);
+    }
+
     return subsAsync.when(
       loading: () =>
           const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('$e')),
+      error: (e, _) => const Center(
+          child: Text('حدث خطأ في تحميل الاشتراكات. يرجى المحاولة مرة أخرى.')),
       data: (subs) {
-        if (subs.isEmpty) return _EmptyState(status: status);
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: subs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (_, i) =>
-              _SubscriptionCard(sub: subs[i]),
+        return RefreshIndicator(
+          onRefresh: onRefresh,
+          child: subs.isEmpty
+              ? SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: _EmptyState(status: status),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: subs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) =>
+                      _SubscriptionCard(sub: subs[i]),
+                ),
         );
       },
     );
@@ -122,12 +145,11 @@ class _SubscriptionCard extends StatelessWidget {
 
   Color get _progressColor {
     final p = sub.progressPercentage;
-    if (p >= 0.5) return AppThemeConstants.accentGreen;
+    if (p >= 0.5) return AppThemeConstants.secondary;
     if (p >= 0.2) return AppThemeConstants.warning;
     return AppThemeConstants.error;
   }
 
-  // FIX: Helper method to get plan type label
   String _planTypeLabel(PlanType type) {
     switch (type) {
       case PlanType.bundle:
@@ -139,21 +161,30 @@ class _SubscriptionCard extends StatelessWidget {
     }
   }
 
+  int? get _expiryDays {
+    if (sub.expiryDate == null) return null;
+    return sub.expiryDate!.difference(DateTime.now()).inDays;
+  }
+
+  bool get _isExpiringSoon {
+    final days = _expiryDays;
+    return days != null && days >= 0 && days <= 14;
+  }
+
   String _expiryLabel() {
     if (sub.expiryDate == null) return 'بدون تاريخ انتهاء';
-    final days = sub.expiryDate!.difference(DateTime.now()).inDays;
+    final days = _expiryDays!;
     if (days < 0) return 'منتهية الصلاحية';
     if (days == 0) return '⚠️ تنتهي اليوم!';
     if (days <= 14) return '⚠️ تنتهي خلال $days يوماً';
-    final d = sub.expiryDate!;
-    return '${d.day}/${d.month}/${d.year}';
+    return DateFormat('d MMMM y', 'ar').format(sub.expiryDate!);
   }
 
   @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      color: AppThemeConstants.surfaceWhite,
+      color: AppThemeConstants.surface,
       shape: RoundedRectangleBorder(
         borderRadius: AppThemeConstants.borderRadiusLg,
         side: BorderSide(
@@ -171,13 +202,11 @@ class _SubscriptionCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   backgroundColor:
-                      AppThemeConstants.primaryAmber.withValues(alpha: 0.15),
+                      AppThemeConstants.primary.withValues(alpha: 0.15),
                   child: Text(
-                    sub.mohaffezName.isNotEmpty
-                        ? sub.mohaffezName[0]
-                        : '؟',
+                    _getAvatarInitial(sub.mohaffezName),
                     style: const TextStyle(
-                      color: AppThemeConstants.primaryAmber,
+                      color: AppThemeConstants.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -197,9 +226,9 @@ class _SubscriptionCard extends StatelessWidget {
                       ),
                       Text(
                         '${sub.planTitle} · ${_planTypeLabel(sub.planType)}',
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade500),
+                            color: AppThemeConstants.textSecondary),
                       ),
                     ],
                   ),
@@ -212,7 +241,7 @@ class _SubscriptionCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                 value: sub.progressPercentage,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: AppThemeConstants.divider,
                 valueColor:
                     AlwaysStoppedAnimation<Color>(_progressColor),
                 minHeight: 8,
@@ -234,13 +263,9 @@ class _SubscriptionCard extends StatelessWidget {
                   '📅 ${_expiryLabel()}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: sub.expiryDate != null &&
-                            sub.expiryDate!
-                                    .difference(DateTime.now())
-                                    .inDays <=
-                                14
+                    color: _isExpiringSoon
                         ? AppThemeConstants.error
-                        : Colors.grey.shade500,
+                        : AppThemeConstants.textSecondary,
                   ),
                 ),
               ],
@@ -257,8 +282,8 @@ class _SubscriptionCard extends StatelessWidget {
                   icon: const Icon(Icons.book_online_outlined, size: 18),
                   label: const Text('احجز جلسة'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppThemeConstants.primaryAmber,
-                    foregroundColor: AppThemeConstants.surfaceWhite,
+                    backgroundColor: AppThemeConstants.primary,
+                    foregroundColor: AppThemeConstants.surface,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: const RoundedRectangleBorder(
                       borderRadius: AppThemeConstants.borderRadiusMd,
@@ -274,6 +299,16 @@ class _SubscriptionCard extends StatelessWidget {
   }
 }
 
+String _getAvatarInitial(String name) {
+  if (name.isEmpty) return '؟';
+  final trimmed = name.trim();
+  if (trimmed.startsWith('ال')) {
+    if (trimmed.length > 2) return trimmed[2];
+    return trimmed[0];
+  }
+  return trimmed[0];
+}
+
 class _EmptyState extends StatelessWidget {
   final String status;
   const _EmptyState({required this.status});
@@ -281,6 +316,34 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = status == 'active';
+    final isDepleted = status == 'depleted';
+    final isExpired = status == 'expired';
+
+    String getTitle() {
+      if (isActive) return 'لا توجد باقات نشطة';
+      if (isDepleted) return 'لا توجد باقات مستنفدة';
+      if (isExpired) return 'لا توجد باقات منتهية';
+      return 'لا يوجد سجل';
+    }
+
+    String getSubtitle() {
+      if (isActive) return 'ابحث عن محفظ واحجز باقتك الأولى';
+      if (isDepleted) return 'يمكنك تجديد باقتك أو حجز باقة جديدة';
+      if (isExpired) return 'تم انتهاء صلاحية جميع باقاتك السابقة';
+      return '';
+    }
+
+    IconData getIcon() {
+      if (isActive) return Icons.card_membership_outlined;
+      if (isDepleted) return Icons.hourglass_empty;
+      if (isExpired) return Icons.event_busy;
+      return Icons.history;
+    }
+
+    String getButtonLabel() {
+      return 'ابحث عن محفظ';
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -288,38 +351,36 @@ class _EmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              isActive ? Icons.card_membership_outlined : Icons.history,
+              getIcon(),
               size: 64,
               color: Colors.grey.shade400,
             ),
             const SizedBox(height: 16),
             Text(
-              isActive ? 'لا توجد باقات نشطة' : 'لا يوجد سجل',
+              getTitle(),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey.shade600,
               ),
             ),
-            if (isActive) ...[
-              const SizedBox(height: 8),
-              Text(
-                'ابحث عن محفظ واحجز باقتك الأولى',
-                style: TextStyle(
-                    fontSize: 14, color: Colors.grey.shade400),
-                textAlign: TextAlign.center,
+            const SizedBox(height: 8),
+            Text(
+              getSubtitle(),
+              style: TextStyle(
+                  fontSize: 14, color: Colors.grey.shade400),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => context.go('/nearby'),
+              icon: Icon(isActive ? Icons.search : Icons.refresh),
+              label: Text(getButtonLabel()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.surface,
               ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () => context.go('/nearby'),
-                icon: const Icon(Icons.search),
-                label: const Text('ابحث عن محفظ'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppThemeConstants.primaryAmber,
-                  foregroundColor: AppThemeConstants.surfaceWhite,
-                ),
-              ),
-            ],
+            ),
           ],
         ),
       ),
