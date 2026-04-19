@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/quran_mistake_model.dart';
-import '../../../utils/quran_mistake_utils.dart';
+import '../../utils/quran_mistake_utils.dart';
 
 class MistakeTypeSelector extends StatelessWidget {
   final MistakeType selectedType;

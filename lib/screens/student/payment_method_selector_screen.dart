@@ -3,8 +3,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../providers/booking_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import '../../../providers/booking_provider.dart';
+import '../../../shared/theme/app_theme_constants.dart';
 
 class PaymentMethodSelectorScreen extends StatefulWidget {
   const PaymentMethodSelectorScreen({

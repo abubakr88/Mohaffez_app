@@ -12,74 +12,78 @@ import '../models/pricing_plan_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/suspension_provider.dart';
 import '../providers/user_provider.dart';
-import '../screens/availability_management_screen.dart';
-import '../screens/completed_sessions_screen.dart';
-import '../screens/commission_dashboard_screen.dart';
-import '../screens/home_shell.dart';
-import '../screens/login_screen.dart';
-import '../screens/register_screen.dart';
-import '../screens/mohaffez_commission_screen.dart';
-import '../screens/mohaffez_credentials_screen.dart';
-import '../screens/mohaffez_home.dart';
-import '../screens/mohaffez_profile_screen.dart';
-import '../screens/mohaffez_students_screen.dart';
-import '../screens/mohaffez_student_detail_screen.dart';
-import '../screens/mohaffez_wallet_settings_screen.dart';
-import '../screens/nearby_mohaffez_screen.dart';
-import '../screens/notifications_screen.dart';
-import '../screens/payment_webview_screen.dart';
-import '../screens/pick_location_screen.dart';
-import '../screens/pending_requests_screen.dart';
-import '../screens/privacy_settings_screen.dart';
-import '../screens/location_settings_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/rate_session_screen.dart';
-import '../screens/session_completion_screen.dart';
-import '../screens/session_details_screen.dart';
-import '../screens/settings_screen.dart';
-import '../screens/student_assignments_screen.dart';
-import '../screens/student_home.dart';
+// Shared screens
+import '../screens/shared/home_shell.dart';
+import '../screens/shared/login_screen.dart';
+import '../screens/shared/register_screen.dart';
+import '../screens/shared/splash_screen.dart';
+import '../screens/shared/maintenance_screen.dart';
+import '../screens/shared/suspended_screen.dart';
+import '../screens/shared/setup_account_screen.dart';
+import '../screens/shared/exam_result_screen.dart';
+import '../screens/shared/notifications_screen.dart';
+import '../screens/shared/profile_screen.dart';
+import '../screens/shared/settings_screen.dart';
+import '../screens/shared/location_settings_screen.dart';
+import '../screens/shared/privacy_settings_screen.dart';
+import '../screens/shared/payment_webview_screen.dart';
+import '../screens/shared/pick_location_screen.dart';
+import '../screens/shared/session_details_screen.dart';
+// Student screens
+import '../screens/student/student_home.dart';
+import '../screens/student/student_assignments_screen.dart';
+import '../screens/student/student_requests_screen.dart';
+import '../screens/student/student_sessions_screen.dart';
+import '../screens/student/student_schedule_screen.dart';
+import '../screens/student/student_payment_screen.dart';
+import '../screens/student/nearby_mohaffez_screen.dart';
+import '../screens/student/mohaffez_profile_screen.dart';
+import '../screens/student/rate_session_screen.dart';
+import '../screens/student/booking_method_screen.dart';
+import '../screens/student/select_bundle_plan_screen.dart';
+import '../screens/student/confirm_bundle_session_screen.dart';
+import '../screens/student/direct_booking_request_screen.dart';
+import '../screens/student/direct_payment_screen.dart';
+import '../screens/student/active_subscriptions_screen.dart';
+// Teacher screens
+import '../screens/teacher/mohaffez_home.dart';
+import '../screens/teacher/mohaffez_credentials_screen.dart';
+import '../screens/teacher/mohaffez_pricing_screen.dart';
+import '../screens/teacher/mohaffez_schedule_screen.dart';
+import '../screens/teacher/mohaffez_students_screen.dart';
+import '../screens/teacher/mohaffez_student_detail_screen.dart';
+import '../screens/teacher/mohaffez_wallet_settings_screen.dart';
+import '../screens/teacher/mohaffez_commission_screen.dart';
+import '../screens/teacher/availability_management_screen.dart';
+import '../screens/teacher/pending_requests_screen.dart';
+import '../screens/teacher/direct_payment_confirmations_screen.dart';
+import '../screens/teacher/completed_sessions_screen.dart';
+import '../screens/teacher/upcoming_sessions_screen.dart';
+import '../screens/teacher/session_completion_screen.dart';
+import '../screens/teacher/teacher_certificates_screen.dart';
+import '../screens/teacher/teacher_pending_screen.dart';
+import '../screens/teacher/teacher_rejected_screen.dart';
+// Admin screens
+import '../screens/admin/admin_home_screen.dart';
+import '../screens/admin/admin_users_screen.dart';
+import '../screens/admin/admin_user_detail_screen.dart';
+import '../screens/admin/admin_credentials_screen.dart';
+import '../screens/admin/admin_failed_operations_screen.dart';
+import '../screens/admin/admin_promo_codes_screen.dart';
+import '../screens/admin/admin_system_settings_screen.dart';
+import '../screens/admin/admin_dev_mode_screen.dart';
+import '../screens/admin/admin_broadcast_screen.dart';
+import '../screens/admin/admin_slot_locks_screen.dart';
+import '../screens/admin/admin_payment_events_screen.dart';
+import '../screens/admin/admin_audit_log_screen.dart';
+import '../screens/admin/admin_wallet_settings_screen.dart';
+import '../screens/admin/admin_teacher_commissions_screen.dart';
+import '../screens/admin/admin_teacher_requests_screen.dart';
+import '../screens/admin/commission_dashboard_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
-import '../screens/student_requests_screen.dart';
-import '../screens/upcoming_sessions_screen.dart';
-import '../screens/splash_screen.dart';
 import '../shared/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
-import '../screens/student_payment_screen.dart';
-import '../screens/mohaffez_pricing_screen.dart';
-import '../screens/select_bundle_plan_screen.dart';
-import '../screens/student_sessions_screen.dart';
-import '../screens/student_schedule_screen.dart';
-import '../screens/admin_home_screen.dart';
-import '../screens/admin_users_screen.dart';
-import '../screens/admin_user_detail_screen.dart';
-import '../screens/admin_credentials_screen.dart';
-import '../screens/admin_failed_operations_screen.dart';
-import '../screens/admin_promo_codes_screen.dart';
-import '../screens/admin_system_settings_screen.dart';
-import '../screens/admin_dev_mode_screen.dart';
-import '../screens/admin_broadcast_screen.dart';
-import '../screens/admin_slot_locks_screen.dart';
-import '../screens/admin_payment_events_screen.dart';
-import '../screens/maintenance_screen.dart';
-import '../screens/admin_audit_log_screen.dart';
-import '../screens/admin_wallet_settings_screen.dart';
-import '../screens/admin_teacher_commissions_screen.dart';
-import '../screens/mohaffez_schedule_screen.dart'; // ← teacher calendar
-import '../screens/suspended_screen.dart';
-import '../screens/setup_account_screen.dart';
-import '../screens/exam_result_screen.dart';
-import '../screens/active_subscriptions_screen.dart'; // BUG-8: Active subscriptions screen
-import '../screens/direct_payment_screen.dart'; // Path C: Direct payment route
-import '../screens/booking_method_screen.dart'; // Booking method screen
-import '../screens/confirm_bundle_session_screen.dart'; // Path A: Confirm bundle session
-import '../screens/direct_booking_request_screen.dart'; // Path C — Request First
-import '../screens/direct_payment_confirmations_screen.dart'; // Direct payment confirmations
-import '../screens/teacher_certificates_screen.dart';
-import '../screens/teacher_pending_screen.dart';
-import '../screens/teacher_rejected_screen.dart';
-import '../screens/admin_teacher_requests_screen.dart';
 
 // GoRouter Notifier for auth state changes
 class GoRouterNotifier extends ChangeNotifier {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/quran_mistake_model.dart';
-import '../../../utils/quran_mistake_utils.dart';
+import '../../utils/quran_mistake_utils.dart';
 
 class QuranMistakePainter extends CustomPainter {
   final List<QuranMistake> mistakes;
