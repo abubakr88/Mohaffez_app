@@ -50,7 +50,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
           );
 
       if (mounted) {
-        context.pop(true);
+        context.pop(rating);
       }
     } catch (e) {
       if (mounted) {
@@ -64,6 +64,15 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  String _ratingLabel(int r) {
+    if (r <= 2) return 'ضعيف جداً';
+    if (r <= 4) return 'ضعيف';
+    if (r <= 6) return 'مقبول';
+    if (r <= 8) return 'جيد';
+    if (r == 9) return 'جيد جداً';
+    return 'ممتاز';
   }
 
   @override
@@ -131,59 +140,79 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'اختر تقييمك من 1 إلى 10',
-                style: TextStyle(fontSize: 14, color: AppThemeConstants.textSecondary),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('ضعيف', style: TextStyle(fontSize: 12, color: AppThemeConstants.error)),
+                  Text('ممتاز', style: TextStyle(fontSize: 12, color: AppThemeConstants.success)),
+                ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-              // Star Rating (10 stars)
-              Center(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: List.generate(10, (index) {
-                    final starRating = index + 1;
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          rating = starRating;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(20),
+              // Star Rating (10 stars) — size 28 + spacing 4 = ~320px fits in one row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(10, (index) {
+                  final starRating = index + 1;
+                  return GestureDetector(
+                    onTap: () => setState(() => rating = starRating),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: AnimatedScale(
-                        scale: index < rating ? 1.2 : 1.0,
+                        scale: index < rating ? 1.25 : 1.0,
                         duration: const Duration(milliseconds: 150),
                         curve: Curves.elasticOut,
                         child: Icon(
-                          index < rating ? Icons.star : Icons.star_border,
-                          color: AppThemeConstants.secondary,
-                          size: 40,
+                          index < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: index < rating
+                              ? AppThemeConstants.secondary
+                              : AppThemeConstants.textSecondary.withValues(alpha: 0.4),
+                          size: 30,
                         ),
                       ),
-                    );
-                  }),
-                ),
+                    ),
+                  );
+                }),
               ),
 
               const SizedBox(height: 16),
 
-              // Rating display
+              // Rating display with label
               Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppThemeConstants.secondary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$rating / 10',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppThemeConstants.secondary,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Container(
+                    key: ValueKey(rating),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.secondary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppThemeConstants.secondary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$rating / 10',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppThemeConstants.secondary,
+                          ),
+                        ),
+                        if (rating > 0) ...[
+                          const SizedBox(width: 10),
+                          Text(
+                            _ratingLabel(rating),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppThemeConstants.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),

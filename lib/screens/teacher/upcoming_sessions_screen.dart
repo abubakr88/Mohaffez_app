@@ -13,16 +13,36 @@ import '../../shared/utils/arabic_labels.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class UpcomingSessionsScreen extends ConsumerWidget {
+class UpcomingSessionsScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
+  final UpcomingFilter initialFilter;
 
   const UpcomingSessionsScreen({
     super.key,
     required this.mohaffezId,
+    this.initialFilter = UpcomingFilter.all,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UpcomingSessionsScreen> createState() =>
+      _UpcomingSessionsScreenState();
+}
+
+class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialFilter != UpcomingFilter.all) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(upcomingSessionsFilterProvider.notifier).state =
+            widget.initialFilter;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mohaffezId = widget.mohaffezId;
     final sessionsAsync = ref.watch(upcomingSessionsProvider(mohaffezId));
     final filter = ref.watch(upcomingSessionsFilterProvider);
     final filteredSessions =

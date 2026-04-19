@@ -222,16 +222,17 @@ class _CompletedAssignmentCardState
     }
 
     final mohaffezName = session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
-    final result = await context.push<bool>(
+    final result = await context.push<int>(
       '/rate-session/$sessionId?mohaffezName=${Uri.encodeComponent(mohaffezName)}',
     );
 
-    if (result == true && mounted) {
-      // Refresh the parent list
+    if (result != null && result > 0 && mounted) {
+      // Immediately show the real rating without waiting for the provider re-fetch
+      setState(() => session = {...session, 'teacherRating': result});
       ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('تم التقييم بنجاح!'),
+          content: Text('تم التقييم بنجاح! شكراً لك'),
           backgroundColor: AppThemeConstants.success,
         ),
       );
@@ -311,28 +312,24 @@ class _CompletedAssignmentCardState
                     ],
                   ),
                 ),
-                // Parent's rating of teacher
-                if (teacherRating > 0)
+                if (teacherRating == 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: AppThemeConstants.secondary.withValues(alpha: 0.15),
+                      color: AppThemeConstants.warning.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star, size: 16, color: AppThemeConstants.secondary),
-                        const SizedBox(width: 4),
+                        Icon(Icons.star_outline, size: 15, color: AppThemeConstants.warning),
+                        SizedBox(width: 4),
                         Text(
-                          '$teacherRating/10',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppThemeConstants.secondary,
+                          'بانتظار تقييمك',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppThemeConstants.warning,
                           ),
                         ),
                       ],
@@ -510,16 +507,16 @@ class _CompletedAssignmentCardState
             // Mistakes review card
             _MistakeReviewCard(session: session),
 
-            // Rate Session Button (if parent hasn't rated teacher yet)
-            if (teacherRating == 0) ...[
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
+            // Rating section
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            if (teacherRating == 0)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _navigateToRating,
-                  icon: const Icon(Icons.star, color: AppThemeConstants.onPrimary),
+                  icon: const Icon(Icons.star_outline, color: AppThemeConstants.onPrimary),
                   label: const Text(
                     ArabicLabels.rateSession,
                     style: TextStyle(fontSize: 16, color: AppThemeConstants.onPrimary),
@@ -532,8 +529,47 @@ class _CompletedAssignmentCardState
                     ),
                   ),
                 ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppThemeConstants.success.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.verified, color: AppThemeConstants.success, size: 22),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'تم تقييم هذه الجلسة',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppThemeConstants.success,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, size: 16, color: AppThemeConstants.secondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$teacherRating/10',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppThemeConstants.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ],
           ],
         ),
       ),

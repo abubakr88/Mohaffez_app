@@ -355,8 +355,39 @@ exports.onSessionCompleted = functions.firestore
             });
         }
         catch (counterError) {
-            // Non-blocking: log but never fail the trigger
             functions.logger.error('Failed to increment student session counter', { sessionId, studentId, error: counterError });
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────
+    // ── Increment teacher completed-session and students-served counters ──
+    if (mohaffezId) {
+        try {
+            // Check if this student has had any prior completed session with this teacher.
+            // limit(2): one would be the session just completed, two means a repeat student.
+            const priorSnap = await admin_1.db
+                .collection('hafizSessions')
+                .where('mohaffezId', '==', mohaffezId)
+                .where('studentId', '==', studentId)
+                .where('status', '==', 'completed')
+                .limit(2)
+                .get();
+            const isNewStudent = priorSnap.size <= 1;
+            const teacherUpdate = {
+                completedSessionsCount: admin_1.FieldValue.increment(1),
+                updatedAt: admin_1.FieldValue.serverTimestamp(),
+            };
+            if (isNewStudent) {
+                teacherUpdate.studentsServedCount = admin_1.FieldValue.increment(1);
+            }
+            await admin_1.db.collection('users').doc(mohaffezId).update(teacherUpdate);
+            functions.logger.info('Teacher counters incremented', {
+                sessionId,
+                mohaffezId,
+                isNewStudent,
+            });
+        }
+        catch (counterError) {
+            functions.logger.error('Failed to increment teacher counters', { sessionId, mohaffezId, error: counterError });
         }
     }
     // ─────────────────────────────────────────────────────────────────

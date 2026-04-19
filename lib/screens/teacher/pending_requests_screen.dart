@@ -541,18 +541,27 @@ class _PendingRequestsScreenState
       return;
     }
 
+    // Capture the root navigator BEFORE any async gap.
+    // showDialog() uses the root navigator (useRootNavigator: true by default).
+    // Navigator.of(context) after an await targets the nearest navigator (the
+    // GoRouter shell), which is a different object — so pop() was a no-op and
+    // the dialog stayed on screen forever.
+    final rootNav = Navigator.of(context, rootNavigator: true);
+
+    void dismissDialog() {
+      if (rootNav.canPop()) rootNav.pop();
+    }
+
     try {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) =>
-            const Center(child: CircularProgressIndicator()),
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
       );
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'confirmSubscriptionSession',
-        options:
-            HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
       );
 
       final result = await callable.call({
@@ -561,71 +570,35 @@ class _PendingRequestsScreenState
         'mohaffezName': request['mohaffezName'] as String? ?? '',
       });
 
-      // SAFETY: Handle null or non-Map response data gracefully
-      if (result.data == null) {
-        if (!mounted) return;
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('خطأ: استجابة فارغة من الخادم'),
-            backgroundColor: AppThemeConstants.error,
-          ),
-        );
-        return;
-      }
-      
-      final data = result.data is Map 
+      dismissDialog();
+
+      final data = result.data is Map
           ? Map<String, dynamic>.from(result.data as Map)
           : <String, dynamic>{};
-      
-      // IMPORTANT: Check mounted BEFORE any navigation
+
       if (!mounted) return;
-      
-      // Pop the loading dialog first
-      Navigator.of(context).pop();
 
       if (data['success'] == true) {
-        // Show success message first
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تم قبول الجلسة بنجاح'),
+            content: Text('تم قبول الجلسة بنجاح ✓'),
             backgroundColor: AppThemeConstants.success,
             duration: Duration(seconds: 3),
           ),
         );
-        
-        // Use post-frame to avoid navigation during disposal
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          
-          // Invalidate provider after frame to avoid disposal issues
-          ref.invalidate(
-            pendingRequestsFirstPageProvider(currentUser.uid),
-          );
-          
-          // Navigate safely
-          if (mounted) {
-            context.go('/pending-requests');
-          }
-        });
+        ref.invalidate(pendingRequestsFirstPageProvider(currentUser.uid));
+        context.go('/pending-requests');
       } else {
-        // Error from CF - show error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['message'] ?? 'فشل تأكيد الجلسة'),
+            content: Text(data['message'] as String? ?? 'فشل تأكيد الجلسة'),
             backgroundColor: AppThemeConstants.error,
           ),
         );
       }
     } on FirebaseFunctionsException catch (e) {
-      // Check mounted at the start of error handling
+      dismissDialog();
       if (!mounted) return;
-      
-      // Safe pop - check if we can pop first
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.message ?? 'خطأ في تأكيد الجلسة'),
@@ -633,14 +606,8 @@ class _PendingRequestsScreenState
         ),
       );
     } catch (e) {
-      // Check mounted at the start of error handling
+      dismissDialog();
       if (!mounted) return;
-      
-      // Safe pop - check if we can pop first
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ: ${e.toString()}'),

@@ -549,7 +549,7 @@ class _StatsRow extends StatelessWidget {
         value: '$todayCount',
         color: _DS.teal500,
         bg: _DS.teal50,
-        onTap: () => context.go('/teacher-schedule'),
+        onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId&filter=today'),
       ),
       _StatData(
         icon: Icons.event_available_rounded,

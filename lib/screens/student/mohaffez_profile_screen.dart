@@ -982,7 +982,6 @@ class _MohaffezProfileScreenState
         ?.trim();
     final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
     final reviewCount = profile['reviewCount'] as int? ?? 0;
-    final followers = profile['followerCount'] as int? ?? 0;
 
     return SliverAppBar(
       expandedHeight: 248,
@@ -1116,8 +1115,8 @@ class _MohaffezProfileScreenState
                                     : 'جديد',
                               ),
                               _buildHeroBadge(
-                                Icons.people_alt_rounded,
-                                '$followers متابع',
+                                Icons.rate_review_rounded,
+                                reviewCount > 0 ? '$reviewCount تقييم' : 'جديد',
                               ),
                             ],
                           ),
@@ -1204,9 +1203,9 @@ class _MohaffezProfileScreenState
                 color: AppThemeConstants.success,
               ),
               _buildStatItem(
-                icon: Icons.people_rounded,
-                value: '${profile['followerCount'] ?? 0}',
-                label: 'المتابعون',
+                icon: Icons.rate_review_rounded,
+                value: '$reviewCount',
+                label: 'تقييم',
                 color: AppThemeConstants.primary,
               ),
               _buildStatItem(
@@ -1226,17 +1225,16 @@ class _MohaffezProfileScreenState
               label: 'التقييم',
               color: Colors.amber,
             ),
-            const Center(
-              child: SizedBox(
-                width: 26,
-                height: 26,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
-              ),
+            _buildStatItem(
+              icon: Icons.check_circle_rounded,
+              value: '...',
+              label: 'جلسة منجزة',
+              color: AppThemeConstants.success,
             ),
             _buildStatItem(
-              icon: Icons.people_rounded,
-              value: '${profile['followerCount'] ?? 0}',
-              label: 'المتابعون',
+              icon: Icons.rate_review_rounded,
+              value: '$reviewCount',
+              label: 'تقييم',
               color: AppThemeConstants.primary,
             ),
             _buildStatItem(
@@ -1247,25 +1245,34 @@ class _MohaffezProfileScreenState
             ),
           ],
         ),
-        error: (_, __) {
-          final followerCount = profile['followerCount'] ?? 0;
-          return _buildStatsCard(
-            stats: [
-              _buildStatItem(
-                icon: Icons.star_rounded,
-                value: ratingText,
-                label: 'التقييم',
-                color: Colors.amber,
-              ),
-              _buildStatItem(
-                icon: Icons.people_rounded,
-                value: '$followerCount',
-                label: 'المتابعون',
-                color: AppThemeConstants.primary,
-              ),
-            ],
-          );
-        },
+        error: (_, __) => _buildStatsCard(
+          stats: [
+            _buildStatItem(
+              icon: Icons.star_rounded,
+              value: ratingText,
+              label: 'التقييم',
+              color: Colors.amber,
+            ),
+            _buildStatItem(
+              icon: Icons.check_circle_rounded,
+              value: '-',
+              label: 'جلسة منجزة',
+              color: AppThemeConstants.success,
+            ),
+            _buildStatItem(
+              icon: Icons.rate_review_rounded,
+              value: '$reviewCount',
+              label: 'تقييم',
+              color: AppThemeConstants.primary,
+            ),
+            _buildStatItem(
+              icon: Icons.school_rounded,
+              value: '-',
+              label: 'طالب',
+              color: AppThemeConstants.secondary,
+            ),
+          ],
+        ),
       ),
     );
   }

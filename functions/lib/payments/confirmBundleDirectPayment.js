@@ -24,6 +24,7 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const admin_1 = require("../utils/admin");
 const notificationHelpers_1 = require("../utils/notificationHelpers");
+const dateHelpers_1 = require("../utils/dateHelpers");
 class AlreadyConfirmedError extends Error {
     constructor(existingSubscriptionId) {
         super('AlreadyConfirmed');
@@ -157,7 +158,7 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
         // claimResult === 'claimed' → fall through to main transaction (Step 9)
         // 9. Main transaction
         const result = await admin_1.db.runTransaction(async (transaction) => {
-            var _a, _b, _c;
+            var _a, _b, _c, _d, _e;
             // Re-read dpRef inside transaction for consistency
             const dpSnapTx = await transaction.get(dpRef);
             if (!dpSnapTx.exists) {
@@ -174,9 +175,8 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
             }
             // 9a. Read system config for maxActiveSubscriptions + commissionRate
             const PER_SESSION_TYPE_LIMIT = 1; // one active bundle per studentId+mohaffezId+sessionType
-            // commissionRate retained for future per-bundle commission tracking parity
-            // const commissionRate: number =
-            //   (configSnap.data()?.commissionRate as number) ?? 0.05;
+            const configSnap = await transaction.get(admin_1.db.collection('systemConfig').doc('global'));
+            const commissionRate = (_b = (_a = configSnap.data()) === null || _a === void 0 ? void 0 : _a.commissionRate) !== null && _b !== void 0 ? _b : 0.05;
             // 9b. FIX-3: Resolve sessionType with explicit priority order
             const resolvedSessionType = (() => {
                 if (isSlotCoupled &&
@@ -257,7 +257,7 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                 status: initialStatus,
                 directPaymentRequestId: paymentId,
                 // WHY: preserves link back to the original bundle booking request
-                sessionRequestId: (_a = dp.sessionRequestId) !== null && _a !== void 0 ? _a : null,
+                sessionRequestId: (_c = dp.sessionRequestId) !== null && _c !== void 0 ? _c : null,
                 createdAt: admin_1.FieldValue.serverTimestamp(),
                 updatedAt: admin_1.FieldValue.serverTimestamp(),
             });
@@ -286,7 +286,7 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                     paymentType: 'bundle',
                     subscriptionId: subscriptionRef.id,
                     paymentTransactionId: transactionTag,
-                    requestId: (_c = (_b = dpTx.sessionRequestId) !== null && _b !== void 0 ? _b : newRequestRef === null || newRequestRef === void 0 ? void 0 : newRequestRef.id) !== null && _c !== void 0 ? _c : null,
+                    requestId: (_e = (_d = dpTx.sessionRequestId) !== null && _d !== void 0 ? _d : newRequestRef === null || newRequestRef === void 0 ? void 0 : newRequestRef.id) !== null && _e !== void 0 ? _e : null,
                     mohaffezPhone: mohaffezPhone !== null && mohaffezPhone !== void 0 ? mohaffezPhone : null,
                     imamAddressText: imamAddressText !== null && imamAddressText !== void 0 ? imamAddressText : null,
                     imamAddressLat: imamAddressLat !== null && imamAddressLat !== void 0 ? imamAddressLat : null,
@@ -347,6 +347,41 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                 mohaffezConfirmedAt: admin_1.FieldValue.serverTimestamp(),
                 updatedAt: admin_1.FieldValue.serverTimestamp(),
             });
+            // 9i-commission. Write bundle commission to weeklyCommissionSummaries.
+            // Use the first session date if slot-coupled, otherwise today's date.
+            const commissionDateObj = slotDateTs ? slotDateTs.toDate() : now;
+            const weekNum = (0, dateHelpers_1.getWeekNumber)(commissionDateObj);
+            const commissionYear = commissionDateObj.getFullYear();
+            const commissionAmount = dp.amount * commissionRate;
+            const summaryId = `${mohaffezId}_${commissionYear}_w${weekNum}`;
+            const summaryRef = admin_1.db.collection('weeklyCommissionSummaries').doc(summaryId);
+            const summarySnap = await transaction.get(summaryRef);
+            if (summarySnap.exists) {
+                transaction.update(summaryRef, {
+                    totalSessions: admin_1.FieldValue.increment(1),
+                    totalRevenue: admin_1.FieldValue.increment(dp.amount),
+                    commissionAmount: admin_1.FieldValue.increment(commissionAmount),
+                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+                });
+            }
+            else {
+                transaction.set(summaryRef, {
+                    mohaffezId,
+                    mohaffezName: dp.mohaffezName,
+                    weekNumber: weekNum,
+                    year: commissionYear,
+                    totalSessions: 1,
+                    totalRevenue: dp.amount,
+                    commissionAmount,
+                    commissionRate,
+                    status: 'pending',
+                    weekStart: admin.firestore.Timestamp.fromDate((0, dateHelpers_1.getWeekStart)(commissionDateObj)),
+                    weekEnd: admin.firestore.Timestamp.fromDate((0, dateHelpers_1.getWeekEnd)(commissionDateObj)),
+                    dueDate: admin.firestore.Timestamp.fromDate((0, dateHelpers_1.getNextMonday)(commissionDateObj)),
+                    createdAt: admin_1.FieldValue.serverTimestamp(),
+                    updatedAt: admin_1.FieldValue.serverTimestamp(),
+                });
+            }
             // FIX double-write-2: DELETED step 9j - it was updating the same
             // sessionRequests/{sessionRequestId} document that step 9h already updated.
             // This caused "Transaction: modified document more than once" error.

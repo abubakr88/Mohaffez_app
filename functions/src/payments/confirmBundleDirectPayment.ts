@@ -23,6 +23,12 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
+import {
+  getWeekNumber,
+  getWeekStart,
+  getWeekEnd,
+  getNextMonday,
+} from '../utils/dateHelpers';
 
 class AlreadyConfirmedError extends Error {
   constructor(public readonly existingSubscriptionId: string) {
@@ -221,9 +227,8 @@ export const confirmBundleDirectPayment = functions.https.onCall(
 
         // 9a. Read system config for maxActiveSubscriptions + commissionRate
         const PER_SESSION_TYPE_LIMIT = 1; // one active bundle per studentId+mohaffezId+sessionType
-        // commissionRate retained for future per-bundle commission tracking parity
-        // const commissionRate: number =
-        //   (configSnap.data()?.commissionRate as number) ?? 0.05;
+        const configSnap = await transaction.get(db.collection('systemConfig').doc('global'));
+        const commissionRate: number = (configSnap.data()?.commissionRate as number) ?? 0.05;
 
         // 9b. FIX-3: Resolve sessionType with explicit priority order
         const resolvedSessionType: string = (() => {
@@ -431,6 +436,42 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           mohaffezConfirmedAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
+
+        // 9i-commission. Write bundle commission to weeklyCommissionSummaries.
+        // Use the first session date if slot-coupled, otherwise today's date.
+        const commissionDateObj = slotDateTs ? slotDateTs.toDate() : now;
+        const weekNum = getWeekNumber(commissionDateObj);
+        const commissionYear = commissionDateObj.getFullYear();
+        const commissionAmount = (dp.amount as number) * commissionRate;
+        const summaryId = `${mohaffezId}_${commissionYear}_w${weekNum}`;
+        const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
+        const summarySnap = await transaction.get(summaryRef);
+
+        if (summarySnap.exists) {
+          transaction.update(summaryRef, {
+            totalSessions:    FieldValue.increment(1),
+            totalRevenue:     FieldValue.increment(dp.amount as number),
+            commissionAmount: FieldValue.increment(commissionAmount),
+            updatedAt:        FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(summaryRef, {
+            mohaffezId,
+            mohaffezName:    dp.mohaffezName,
+            weekNumber:      weekNum,
+            year:            commissionYear,
+            totalSessions:   1,
+            totalRevenue:    dp.amount,
+            commissionAmount,
+            commissionRate,
+            status:          'pending',
+            weekStart:       admin.firestore.Timestamp.fromDate(getWeekStart(commissionDateObj)),
+            weekEnd:         admin.firestore.Timestamp.fromDate(getWeekEnd(commissionDateObj)),
+            dueDate:         admin.firestore.Timestamp.fromDate(getNextMonday(commissionDateObj)),
+            createdAt:       FieldValue.serverTimestamp(),
+            updatedAt:       FieldValue.serverTimestamp(),
+          });
+        }
 
         // FIX double-write-2: DELETED step 9j - it was updating the same
         // sessionRequests/{sessionRequestId} document that step 9h already updated.

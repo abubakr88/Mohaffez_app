@@ -59,6 +59,7 @@ import '../screens/teacher/pending_requests_screen.dart';
 import '../screens/teacher/direct_payment_confirmations_screen.dart';
 import '../screens/teacher/completed_sessions_screen.dart';
 import '../screens/teacher/upcoming_sessions_screen.dart';
+import '../providers/session_provider_paginated.dart' show UpcomingFilter;
 import '../screens/teacher/session_completion_screen.dart';
 import '../screens/teacher/teacher_certificates_screen.dart';
 import '../screens/teacher/teacher_pending_screen.dart';
@@ -561,7 +562,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                   onRetry: () => context.go('/mohaffez-home'),
                 );
               }
-              return UpcomingSessionsScreen(mohaffezId: mohaffezId);
+              final filterParam = state.uri.queryParameters['filter'];
+              final initialFilter = filterParam == 'today'
+                  ? UpcomingFilter.today
+                  : filterParam == 'thisWeek'
+                      ? UpcomingFilter.thisWeek
+                      : filterParam == 'thisMonth'
+                          ? UpcomingFilter.thisMonth
+                          : UpcomingFilter.all;
+              return UpcomingSessionsScreen(
+                mohaffezId: mohaffezId,
+                initialFilter: initialFilter,
+              );
             },
           ),
           GoRoute(
