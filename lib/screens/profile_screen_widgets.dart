@@ -442,7 +442,7 @@ class BasicInfoSection extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: SpecializationConstants.specializations
-                  .map((spec) => _SpecializationChip(
+                  .map((spec) => _specializationChip(
                         label: spec,
                         onTap: () {
                           final currentText = controller.text.trim();
@@ -486,7 +486,7 @@ class BasicInfoSection extends StatelessWidget {
     );
   }
 
-  Widget _SpecializationChip({required String label, required VoidCallback onTap}) {
+  Widget _specializationChip({required String label, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(

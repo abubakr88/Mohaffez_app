@@ -35,6 +35,7 @@ class RoleGuard implements RouteGuard {
     '/teacher-pending',
     '/teacher-rejected',
     '/teacher-certificates',
+    '/mohaffez/requests',
   ];
 
   // Mohaffez-only routes.

@@ -54,7 +54,7 @@ class _TeacherCertificatesScreenState
   final List<_CertEntry> _certificates = [];
   bool _submitting = false;
 
-  Widget _SpecializationChip({required String label, required VoidCallback onTap}) {
+  Widget _specializationChip({required String label, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -465,7 +465,7 @@ class _TeacherCertificatesScreenState
                               spacing: 8,
                               runSpacing: 8,
                               children: SpecializationConstants.specializations
-                                  .map((spec) => _SpecializationChip(
+                                  .map((spec) => _specializationChip(
                                         label: spec,
                                         onTap: () {
                                           final currentText =

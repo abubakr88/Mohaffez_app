@@ -109,41 +109,41 @@ class _PaymentMethodSelectorScreenState
                     ),
                     const SizedBox(height: 24),
                     if (!widget.hasActiveSubscription) _buildComparisonTable(),
-                  ],
-                ),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: selectedMethod == null
-                        ? null
-                        : () => context.pop(selectedMethod),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.secondary,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                    ),
-                    child: Text(
-                      _getButtonLabel(),
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: selectedMethod == null
+                      ? null
+                      : () => context.pop(selectedMethod),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppThemeConstants.secondary,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                  ),
+                  child: Text(
+                    _getButtonLabel(),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-            ],
+            ),
+          ],
         ),
       ),
     );
@@ -208,9 +208,12 @@ class _PaymentMethodSelectorScreenState
                       ),
                     ),
                   ),
+                // ignore: deprecated_member_use
                 Radio<BookingPaymentMethod>(
                   value: method,
+                  // ignore: deprecated_member_use
                   groupValue: selectedMethod,
+                  // ignore: deprecated_member_use
                   onChanged: (value) => setState(() => selectedMethod = value),
                   activeColor: borderColor,
                 ),

@@ -136,9 +136,22 @@ class MohaffezHomeContent extends ConsumerWidget {
         final future = sessions.where((s) {
           final d = s['sessionDate'] as DateTime?;
           return d != null && d.isAfter(now);
-        });
+        }).toList();
         debugPrint('⏰ Future sessions count: ${future.length}');
-        return future.isEmpty ? null : future.first['sessionDate'] as DateTime?;
+        if (future.isEmpty) return null;
+        // Sort by actual datetime (sessionDate + slotStart) to get the earliest session
+        future.sort((a, b) {
+          final da = a['sessionDate'] as DateTime?;
+          final db = b['sessionDate'] as DateTime?;
+          if (da == null || db == null) return 0;
+          final slotStartA = a['slotStart'] as DateTime?;
+          final slotStartB = b['slotStart'] as DateTime?;
+          if (slotStartA != null && slotStartB != null) {
+            return slotStartA.compareTo(slotStartB);
+          }
+          return da.compareTo(db);
+        });
+        return future.first['sessionDate'] as DateTime?;
       },
       loading: () => null,
       error: (_, __) => null,

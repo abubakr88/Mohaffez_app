@@ -282,18 +282,6 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           }
         }
 
-        // Step 9h-b pre-read: must happen before any writes (Firestore transaction rule)
-        const originalSessionRequestId = dpTx.originalSessionRequestId as string | undefined;
-        let originalReqSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-        if (
-          originalSessionRequestId &&
-          originalSessionRequestId !== (dpTx.sessionRequestId as string | undefined)
-        ) {
-          originalReqSnap = await transaction.get(
-            db.collection('sessionRequests').doc(originalSessionRequestId)
-          );
-        }
-
         // 9d. Compute expiry
         const now = new Date();
         const expiryDate =
@@ -436,32 +424,6 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           }
         }
 
-        // Step 9h-b: resolve original sessionRequest (pre-read above, just write here)
-        if (originalReqSnap && originalReqSnap.exists) {
-          const originalReqData = originalReqSnap.data();
-          const previousStatus = originalReqData?.status as string | undefined;
-          const resolvableStatuses = [
-            'awaitingdirectpaymentconfirmation',
-            'awaitingPayment',
-            'pending',
-          ];
-          if (previousStatus && resolvableStatuses.includes(previousStatus)) {
-            transaction.update(originalReqSnap.ref, {
-              status: 'accepted',
-              isPaid: true,
-              paidAt: FieldValue.serverTimestamp(),
-              subscriptionId: subscriptionRef.id,
-              paymentId,
-              directPaymentConfirmedAt: FieldValue.serverTimestamp(),
-              updatedAt: FieldValue.serverTimestamp(),
-            });
-            functions.logger.info('confirmBundleDirectPayment original request resolved', {
-              originalSessionRequestId,
-              previousStatus,
-            });
-          }
-        }
-
         // 9i. Confirm the directPaymentRequest
         transaction.update(dpRef, {
           status: 'confirmed',
@@ -497,7 +459,11 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         };
       });
 
-      // 10. Post-transaction notifications (non-blocking for atomicity)
+      // 10. Post-transaction notifications — fire-and-forget.
+      // WHY: the Firestore transaction already committed; a slow or failing FCM
+      // call must never block this response. Awaiting it caused the teacher's
+      // screen to stay in a loading state for the full 30-second client timeout
+      // even though the subscription was already confirmed.
       let notificationBody =
         planType === 'bundle'
           ? `تم تفعيل حزمة "${planTitle}" · ${sessionsCount} جلسة`
@@ -506,7 +472,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         notificationBody += '\nتم حجز أول جلسة بنجاح ✅';
       }
 
-      await createAndSendNotification({
+      createAndSendNotification({
         userId: studentId,
         senderId: mohaffezId,
         title: planType === 'bundle' ? 'تم تأكيد الحزمة! ✅' : 'تم تأكيد الاشتراك! ✅',
@@ -519,6 +485,11 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           planType,
           sessionsCount: String(sessionsCount),
         },
+      }).catch((err: unknown) => {
+        functions.logger.error('confirmBundleDirectPayment: notification failed (non-blocking)', {
+          paymentId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
 
       functions.logger.info('confirmBundleDirectPayment Completed successfully', {

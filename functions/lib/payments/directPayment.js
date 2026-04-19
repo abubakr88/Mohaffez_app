@@ -160,11 +160,19 @@ exports.studentMarkedDirectPayment = functions.https.onCall(async (data, context
             validityDays: finalValidityDays,
         });
         // WRITE D: update existing sessionRequest
+        // FIX: For bundle/subscription with slot fields, set original request to 'accepted'
+        // to prevent duplicate requests from appearing in teacher's pending list.
+        // Only the NEW slot-coupled request should remain in 'awaitingdirectpaymentconfirmation'.
+        // For all other cases (normal single sessions, bundles without slot fields), keep the original behavior.
+        const isBundleWithSlot = isBundleOrSubscription && hasSlotFields;
+        const shouldHideOriginalRequest = isBundleWithSlot;
         tx.update(reqRef, {
-            status: STATUS.AWAITING_DIRECT,
-            directPaymentRequestId: dpRef.id,
-            slotLockId: (_d = newLockRef === null || newLockRef === void 0 ? void 0 : newLockRef.id) !== null && _d !== void 0 ? _d : null,
+            status: shouldHideOriginalRequest ? STATUS.ACCEPTED : STATUS.AWAITING_DIRECT,
+            directPaymentRequestId: shouldHideOriginalRequest ? null : dpRef.id,
+            slotLockId: shouldHideOriginalRequest ? null : (_d = newLockRef === null || newLockRef === void 0 ? void 0 : newLockRef.id) !== null && _d !== void 0 ? _d : null,
             directPaymentMethod: paymentMethod,
+            isPaid: shouldHideOriginalRequest ? true : false,
+            paidAt: shouldHideOriginalRequest ? admin_1.FieldValue.serverTimestamp() : null,
             updatedAt: admin_1.FieldValue.serverTimestamp(),
         });
         // WRITE E: link bundle sessionRequest back to dpRef (slot-coupled only)

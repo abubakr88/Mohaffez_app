@@ -160,6 +160,27 @@ class _MohaffezProfileScreenState
     final plansAsync =
         ref.watch(activePricingPlansProvider(widget.mohaffezId));
 
+    // Auto-switch to the first session type that has a plan
+    ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
+      next.whenData((plans) {
+        if (!_hasPlanForType(plans, selectedSessionType)) {
+          const order = ['home', 'mosque', 'online'];
+          final first = order.firstWhere(
+            (t) => _hasPlanForType(plans, t),
+            orElse: () => selectedSessionType,
+          );
+          if (first != selectedSessionType && mounted) {
+            setState(() {
+              selectedSessionType = first;
+              selectedTimeSlot = null;
+              selectedDate = null;
+              selectedDayOfWeek = null;
+            });
+          }
+        }
+      });
+    });
+
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
@@ -200,11 +221,11 @@ class _MohaffezProfileScreenState
                       const SizedBox(height: 16),
                       _buildTrustBadgesSection(),
                       const SizedBox(height: 16),
-                      _buildSessionTypeSelector(),
+                      _buildSessionTypeSelector(plansAsync),
                       const SizedBox(height: 16),
                       _buildPricingSection(plansAsync),
                       const SizedBox(height: 16),
-                      _buildAvailabilitySection(ref, profile),
+                      _buildAvailabilitySection(ref, profile, plansAsync),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -1696,7 +1717,124 @@ class _MohaffezProfileScreenState
 
   // ─── Session type selector ────────────────────────────────────────────────
 
-  Widget _buildSessionTypeSelector() {
+  bool _hasPlanForType(List<PricingPlanModel> plans, String type) {
+    return plans.any((p) {
+      if (type == 'home') return p.mode == SessionMode.home;
+      if (type == 'mosque') return p.mode == SessionMode.mosque;
+      if (type == 'online') return p.mode == SessionMode.online;
+      return false;
+    });
+  }
+
+  Widget _buildSessionTypeSelector(
+      AsyncValue<List<PricingPlanModel>> plansAsync) {
+    final plans = plansAsync.valueOrNull ?? [];
+
+    final homeHasPlan = _hasPlanForType(plans, 'home');
+    final mosqueHasPlan = _hasPlanForType(plans, 'mosque');
+    final onlineHasPlan = _hasPlanForType(plans, 'online');
+    final anyMissing = !homeHasPlan || !mosqueHasPlan || !onlineHasPlan;
+
+    Widget chip({
+      required String type,
+      required String label,
+      required IconData icon,
+      required Color activeColor,
+      required bool hasPlan,
+    }) {
+      final isSelected = selectedSessionType == type && hasPlan;
+      return GestureDetector(
+        onTap: hasPlan
+            ? null
+            : () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('لم يحدد المحفظ خطة سعر لهذا النوع من الجلسات'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: hasPlan
+                ? (isSelected ? activeColor : Colors.white)
+                : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: hasPlan
+                  ? (isSelected
+                      ? activeColor
+                      : AppThemeConstants.outline)
+                  : Colors.grey.shade300,
+              width: isSelected ? 2 : 1.5,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: activeColor.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : [],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: hasPlan
+                ? () {
+                    final hadSelectedSlot = selectedTimeSlot != null;
+                    setState(() {
+                      selectedSessionType = type;
+                      selectedTimeSlot = null;
+                      selectedDate = null;
+                      selectedDayOfWeek = null;
+                    });
+                    if (hadSelectedSlot && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم مسح الموعد المختار'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }
+                : null,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  hasPlan ? icon : Icons.lock_outline_rounded,
+                  size: 18,
+                  color: hasPlan
+                      ? (isSelected
+                          ? AppThemeConstants.textPrimary
+                          : AppThemeConstants.textSecondary)
+                      : Colors.grey.shade400,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: hasPlan
+                        ? (isSelected
+                            ? AppThemeConstants.textPrimary
+                            : AppThemeConstants.textSecondary)
+                        : Colors.grey.shade400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -1711,118 +1849,48 @@ class _MohaffezProfileScreenState
             spacing: 8,
             runSpacing: 8,
             children: [
-              ChoiceChip(
-                label: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.home, size: 18),
-                    SizedBox(width: 6),
-                    Text('بيت الطالب'),
-                  ],
-                ),
-                selected: selectedSessionType == 'home',
-                onSelected: (selected) {
-                  if (selected) {
-                    final hadSelectedSlot = selectedTimeSlot != null;
-                    setState(() {
-                      selectedSessionType = 'home';
-                      selectedTimeSlot = null;
-                      selectedDate = null;
-                      selectedDayOfWeek = null;
-                    });
-                    if (hadSelectedSlot && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تم مسح الموعد المختار'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  }
-                },
-                selectedColor:
-                    AppThemeConstants.primary.withValues(alpha: 0.3),
-                labelStyle: TextStyle(
-                  fontWeight: selectedSessionType == 'home'
-                      ? FontWeight.bold
-                      : FontWeight.normal,
-                ),
+              chip(
+                type: 'home',
+                label: 'بيت الطالب',
+                icon: Icons.home_rounded,
+                activeColor:
+                    AppThemeConstants.primary.withValues(alpha: 0.18),
+                hasPlan: homeHasPlan,
               ),
-              ChoiceChip(
-                label: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.mosque, size: 18),
-                    SizedBox(width: 6),
-                    Text('المسجد'),
-                  ],
-                ),
-                selected: selectedSessionType == 'mosque',
-                onSelected: (selected) {
-                  if (selected) {
-                    final hadSelectedSlot = selectedTimeSlot != null;
-                    setState(() {
-                      selectedSessionType = 'mosque';
-                      selectedTimeSlot = null;
-                      selectedDate = null;
-                      selectedDayOfWeek = null;
-                    });
-                    if (hadSelectedSlot && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تم مسح الموعد المختار'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  }
-                },
-                selectedColor:
-                    AppThemeConstants.secondary.withValues(alpha: 0.3),
-                labelStyle: TextStyle(
-                  fontWeight: selectedSessionType == 'mosque'
-                      ? FontWeight.bold
-                      : FontWeight.normal,
-                ),
+              chip(
+                type: 'mosque',
+                label: 'المسجد',
+                icon: Icons.mosque_rounded,
+                activeColor:
+                    AppThemeConstants.secondary.withValues(alpha: 0.18),
+                hasPlan: mosqueHasPlan,
               ),
-              ChoiceChip(
-                label: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.videocam, size: 18),
-                    SizedBox(width: 6),
-                    Text('أونلاين'),
-                  ],
-                ),
-                selected: selectedSessionType == 'online',
-                onSelected: (selected) {
-                  if (selected) {
-                    final hadSelectedSlot = selectedTimeSlot != null;
-                    setState(() {
-                      selectedSessionType = 'online';
-                      selectedTimeSlot = null;
-                      selectedDate = null;
-                      selectedDayOfWeek = null;
-                    });
-                    if (hadSelectedSlot && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('تم مسح الموعد المختار'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  }
-                },
-                selectedColor: Colors.blue.withValues(alpha: 0.3),
-                labelStyle: TextStyle(
-                  fontWeight: selectedSessionType == 'online'
-                      ? FontWeight.bold
-                      : FontWeight.normal,
-                ),
+              chip(
+                type: 'online',
+                label: 'أونلاين',
+                icon: Icons.videocam_rounded,
+                activeColor: Colors.blue.withValues(alpha: 0.18),
+                hasPlan: onlineHasPlan,
               ),
             ],
           ),
+          if (anyMissing && plansAsync.hasValue) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.lock_outline_rounded,
+                    size: 13, color: Colors.grey.shade500),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'الأنواع المقفلة: لم يحدد المحفظ خطة سعر لها بعد',
+                    style: TextStyle(
+                        fontSize: 11, color: Colors.grey.shade500),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1830,8 +1898,41 @@ class _MohaffezProfileScreenState
 
   // ─── Availability section ─────────────────────────────────────────────────
 
-  Widget _buildAvailabilitySection(
-      WidgetRef ref, Map<String, dynamic> profile) {
+  Widget _buildAvailabilitySection(WidgetRef ref,
+      Map<String, dynamic> profile,
+      AsyncValue<List<PricingPlanModel>> plansAsync) {
+    final plans = plansAsync.valueOrNull ?? [];
+    final currentTypeHasPlan = plansAsync.hasValue
+        ? _hasPlanForType(plans, selectedSessionType)
+        : true;
+
+    if (!currentTypeHasPlan) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: AppThemeConstants.borderRadiusMd,
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline_rounded,
+                  color: Colors.grey.shade400, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'اختر نوع جلسة متاح أولاً لعرض المواعيد',
+                  style: TextStyle(fontSize: 14, color: AppThemeConstants.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final availability = ref.watch(availabilityProvider(widget.mohaffezId));
     return availability.when(
       data: (slots) {
