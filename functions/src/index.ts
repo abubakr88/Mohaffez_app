@@ -55,3 +55,6 @@ export {
 // Suspension triggers
 export { onUserSuspended } from './onUserSuspended';
 export { onUserUnsuspended } from './onUserUnsuspended';
+
+// Student count function
+export { getMohaffezStudentCount } from './getMohaffezStudentCount';
