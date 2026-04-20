@@ -1203,12 +1203,6 @@ class _MohaffezProfileScreenState
                 color: AppThemeConstants.success,
               ),
               _buildStatItem(
-                icon: Icons.rate_review_rounded,
-                value: '$reviewCount',
-                label: 'تقييم',
-                color: AppThemeConstants.primary,
-              ),
-              _buildStatItem(
                 icon: Icons.school_rounded,
                 value: '$uniqueStudents',
                 label: 'طالب',
@@ -1232,12 +1226,6 @@ class _MohaffezProfileScreenState
               color: AppThemeConstants.success,
             ),
             _buildStatItem(
-              icon: Icons.rate_review_rounded,
-              value: '$reviewCount',
-              label: 'تقييم',
-              color: AppThemeConstants.primary,
-            ),
-            _buildStatItem(
               icon: Icons.school_rounded,
               value: '...',
               label: 'طالب',
@@ -1258,12 +1246,6 @@ class _MohaffezProfileScreenState
               value: '-',
               label: 'جلسة منجزة',
               color: AppThemeConstants.success,
-            ),
-            _buildStatItem(
-              icon: Icons.rate_review_rounded,
-              value: '$reviewCount',
-              label: 'تقييم',
-              color: AppThemeConstants.primary,
             ),
             _buildStatItem(
               icon: Icons.school_rounded,
@@ -1312,17 +1294,13 @@ class _MohaffezProfileScreenState
             ),
           ),
           const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.22,
-            ),
-            itemCount: stats.length,
-            itemBuilder: (context, index) => stats[index],
+          Row(
+            children: List.generate(stats.length, (i) => Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(left: i < stats.length - 1 ? 8 : 0),
+                child: stats[i],
+              ),
+            )),
           ),
         ],
       ),

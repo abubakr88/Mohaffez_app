@@ -217,6 +217,14 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
             }
             // 9d. Compute expiry
             const now = new Date();
+            // Pre-read commission summary BEFORE any writes (Firestore transaction rule)
+            const commissionDateObj = slotDateTs ? slotDateTs.toDate() : now;
+            const weekNum = (0, dateHelpers_1.getWeekNumber)(commissionDateObj);
+            const commissionYear = commissionDateObj.getFullYear();
+            const commissionAmount = dp.amount * commissionRate;
+            const summaryId = `${mohaffezId}_${commissionYear}_w${weekNum}`;
+            const summaryRef = admin_1.db.collection('weeklyCommissionSummaries').doc(summaryId);
+            const summarySnap = await transaction.get(summaryRef);
             const expiryDate = validityDays !== null
                 ? admin.firestore.Timestamp.fromDate(new Date(now.getTime() + validityDays * 86400000))
                 : null;
@@ -348,14 +356,7 @@ exports.confirmBundleDirectPayment = functions.https.onCall(async (data, context
                 updatedAt: admin_1.FieldValue.serverTimestamp(),
             });
             // 9i-commission. Write bundle commission to weeklyCommissionSummaries.
-            // Use the first session date if slot-coupled, otherwise today's date.
-            const commissionDateObj = slotDateTs ? slotDateTs.toDate() : now;
-            const weekNum = (0, dateHelpers_1.getWeekNumber)(commissionDateObj);
-            const commissionYear = commissionDateObj.getFullYear();
-            const commissionAmount = dp.amount * commissionRate;
-            const summaryId = `${mohaffezId}_${commissionYear}_w${weekNum}`;
-            const summaryRef = admin_1.db.collection('weeklyCommissionSummaries').doc(summaryId);
-            const summarySnap = await transaction.get(summaryRef);
+            // summarySnap was pre-read above (before writes) to satisfy Firestore transaction ordering.
             if (summarySnap.exists) {
                 transaction.update(summaryRef, {
                     totalSessions: admin_1.FieldValue.increment(1),

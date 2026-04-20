@@ -79,22 +79,24 @@ final availabilityProvider = StreamProvider.family<List<Map<String, dynamic>>, S
   },
 );
 
-/// Provider for mohaffez statistics — reads denormalized counters from the
-/// teacher's user document (maintained by Cloud Functions) so any authenticated
-/// user can access them without needing to query hafizSessions directly.
-final mohaffezStatsProvider = FutureProvider.family<Map<String, dynamic>, String>(
-  (ref, mohaffezId) async {
-    final doc = await FirebaseFirestore.instance
+/// Provider for mohaffez statistics — streams denormalized counters from the
+/// teacher's user document so the profile updates in real-time when Cloud
+/// Functions increment completedSessionsCount / studentsServedCount.
+final mohaffezStatsProvider = StreamProvider.family<Map<String, dynamic>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
         .collection('users')
         .doc(mohaffezId)
-        .get();
-    if (!doc.exists) {
-      return {'completedSessions': 0, 'uniqueStudents': 0};
-    }
-    final data = doc.data()!;
-    return {
-      'completedSessions': (data['completedSessionsCount'] as num?)?.toInt() ?? 0,
-      'uniqueStudents': (data['studentsServedCount'] as num?)?.toInt() ?? 0,
-    };
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) {
+            return {'completedSessions': 0, 'uniqueStudents': 0};
+          }
+          final data = doc.data()!;
+          return {
+            'completedSessions': (data['completedSessionsCount'] as num?)?.toInt() ?? 0,
+            'uniqueStudents': (data['studentsServedCount'] as num?)?.toInt() ?? 0,
+          };
+        });
   },
 );
