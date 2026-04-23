@@ -64,6 +64,7 @@ final activeSubscriptionsProvider = StreamProvider.autoDispose
       .where('studentId', isEqualTo: studentId)
       .where('status', isEqualTo: 'active')
       .orderBy('createdAt', descending: true)
+      .limit(20)
       .snapshots()
       .map((snap) => snap.docs
           .map((d) => SubscriptionModel.fromFirestore(d))

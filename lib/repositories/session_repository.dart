@@ -26,6 +26,8 @@ class SessionRepository {
       debugPrint(
           'SessionRepository: Fetching students for mohaffez $mohaffezId');
 
+      // High limit intentional: query deduplicates by studentId client-side,
+      // so we need enough sessions to surface all unique students.
       final snapshot = await _firestore
           .collection('hafizSessions')
           .where('mohaffezId', isEqualTo: mohaffezId)
@@ -34,6 +36,7 @@ class SessionRepository {
             'completed',
           ])
           .orderBy('sessionDate', descending: true)
+          .limit(500)
           .get();
 
       debugPrint(
@@ -125,6 +128,7 @@ class SessionRepository {
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', whereNotIn: RequestStatus.teacherInboxExcluded)
         .orderBy('slotDate', descending: false) // nearest first
+        .limit(100)
         .snapshots()
         .asyncMap((snap) async {
           final docs = snap.docs;
@@ -166,13 +170,14 @@ class SessionRepository {
 
   /// Non-paginated one-shot fetch of all pending requests (for export/admin).
   Future<List<SessionRequestModel>> getPendingRequests(
-      String mohaffezId) async {
-    final snapshot = await _firestore
+      String mohaffezId, {int? limit}) async {
+    var query = _firestore
         .collection('sessionRequests')
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', whereNotIn: RequestStatus.teacherInboxExcluded)
-        .orderBy('slotDate', descending: false)
-        .get();
+        .orderBy('slotDate', descending: false);
+    if (limit != null) query = query.limit(limit);
+    final snapshot = await query.get();
 
     final studentIds = snapshot.docs
         .map((doc) => doc.data()['studentId'] as String?)
@@ -466,12 +471,13 @@ class SessionRepository {
 
   /// All sessions for a mohaffez (one-shot, for export/admin use).
   Future<List<SessionModel>> getMohaffezSessions(
-      String mohaffezId) async {
-    final snapshot = await _firestore
+      String mohaffezId, {int? limit}) async {
+    var query = _firestore
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
-        .orderBy('sessionDate', descending: true)
-        .get();
+        .orderBy('sessionDate', descending: true);
+    if (limit != null) query = query.limit(limit);
+    final snapshot = await query.get();
     return snapshot.docs
         .map((doc) =>
             SessionModel.fromJson({...doc.data(), 'id': doc.id}))
@@ -480,12 +486,13 @@ class SessionRepository {
 
   /// All sessions for a student (one-shot).
   Future<List<SessionModel>> getStudentSessions(
-      String studentId) async {
-    final snapshot = await _firestore
+      String studentId, {int? limit}) async {
+    var query = _firestore
         .collection('hafizSessions')
         .where('studentId', isEqualTo: studentId)
-        .orderBy('sessionDate', descending: true)
-        .get();
+        .orderBy('sessionDate', descending: true);
+    if (limit != null) query = query.limit(limit);
+    final snapshot = await query.get();
     return snapshot.docs
         .map((doc) =>
             SessionModel.fromJson({...doc.data(), 'id': doc.id}))

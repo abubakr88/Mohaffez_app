@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:io';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -314,6 +315,7 @@ class UserRepository {
       final snapshot = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'mohaffez')
+          .where('status', isEqualTo: 'active')
           .where('addressLat', isNotEqualTo: null)
           .get()
           .timeout(const Duration(seconds: 15));
@@ -395,7 +397,17 @@ class UserRepository {
           .child('profile_photos')
           .child('$userId.jpg');
 
-      await storageRef.putFile(imageFile);
+      final compressed = await FlutterImageCompress.compressWithFile(
+        imageFile.absolute.path,
+        minWidth: 400,
+        minHeight: 400,
+        quality: 85,
+      );
+      if (compressed != null) {
+        await storageRef.putData(compressed);
+      } else {
+        await storageRef.putFile(imageFile);
+      }
       final downloadUrl = await storageRef.getDownloadURL();
 
       // Update user document

@@ -27,6 +27,7 @@ class NotificationService {
   
   static int _tokenRetryCount = 0;
   static const int _maxTokenRetries = 3;
+  static DateTime? _lastTokenSaveTime;
 
   /// Initialize notifications with better error handling
   static Future<void> initialize() async {
@@ -122,11 +123,19 @@ class NotificationService {
         return;
       }
 
-      await _firestore.collection('users').doc(user.uid).set({
+      final now = DateTime.now();
+      if (_lastTokenSaveTime != null &&
+          now.difference(_lastTokenSaveTime!) < const Duration(hours: 1)) {
+        if (kDebugMode) debugPrint('NotificationService: Token save skipped (debounced)');
+        return;
+      }
+
+      await _firestore.collection('users').doc(user.uid).update({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      });
 
+      _lastTokenSaveTime = now;
       if (kDebugMode) debugPrint('NotificationService: FCM token saved: $token');
       _tokenRetryCount = 0;
     } catch (e) {
@@ -144,10 +153,11 @@ class NotificationService {
     if (user == null) return;
 
     try {
-      await _firestore.collection('users').doc(user.uid).set({
+      await _firestore.collection('users').doc(user.uid).update({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      });
+      _lastTokenSaveTime = DateTime.now();
       if (kDebugMode) debugPrint('NotificationService: Token updated: $token');
     } catch (e) {
       if (kDebugMode) debugPrint('NotificationService: Error updating token: $e');
@@ -163,10 +173,18 @@ class NotificationService {
       final token = await messaging.getToken();
       if (token == null || token.isEmpty) return;
 
-      await _firestore.collection('users').doc(user.uid).set({
+      final now = DateTime.now();
+      if (_lastTokenSaveTime != null &&
+          now.difference(_lastTokenSaveTime!) < const Duration(hours: 1)) {
+        if (kDebugMode) debugPrint('NotificationService: Token refresh skipped (debounced)');
+        return;
+      }
+
+      await _firestore.collection('users').doc(user.uid).update({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      });
+      _lastTokenSaveTime = now;
 
       if (kDebugMode) debugPrint('NotificationService: FCM token refreshed on resume');
     } catch (e) {
@@ -581,12 +599,13 @@ class NotificationService {
   /// Get unread notification count
   static Future<int> getUnreadCount(String userId) async {
     try {
-      final snapshot = await _firestore
+      final result = await _firestore
           .collection('notifications')
           .where('userId', isEqualTo: userId)
           .where('isRead', isEqualTo: false)
+          .count()
           .get();
-      return snapshot.docs.length;
+      return result.count ?? 0;
     } catch (e) {
       if (kDebugMode) debugPrint('Error getting unread count: $e');
       return 0;

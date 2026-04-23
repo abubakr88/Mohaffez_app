@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -152,7 +153,10 @@ class _AdminCredentialsScreenState
                                     context: context,
                                     builder: (_) => Dialog(
                                       child: InteractiveViewer(
-                                        child: Image.network(urls.first.toString()),
+                                        child: CachedNetworkImage(
+                                          imageUrl: urls.first.toString(),
+                                          errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported),
+                                        ),
                                       ),
                                     ),
                                   );
@@ -163,12 +167,12 @@ class _AdminCredentialsScreenState
                                   ? ClipRRect(
                                       borderRadius:
                                           AppThemeConstants.borderRadiusSm,
-                                      child: Image.network(
-                                        (c['imageUrls'] as List).first.toString(),
+                                      child: CachedNetworkImage(
+                                        imageUrl: (c['imageUrls'] as List).first.toString(),
                                         width: 48,
                                         height: 48,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
+                                        errorWidget: (_, __, ___) =>
                                             const Icon(Icons.image_not_supported),
                                       ),
                                     )

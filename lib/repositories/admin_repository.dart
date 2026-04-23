@@ -11,7 +11,7 @@ class AdminRepository {
       query = query.where('role', isEqualTo: roleFilter);
     }
 
-    final snap = await query.get();
+    final snap = await query.limit(500).get();
     return snap.docs
         .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
         .toList();
