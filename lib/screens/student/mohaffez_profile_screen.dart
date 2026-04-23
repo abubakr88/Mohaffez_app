@@ -11,6 +11,7 @@ import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../providers/mohaffez_profile_providers.dart';
 import '../../providers/pricing_provider.dart';
+import '../../providers/student_count_provider.dart';
 import '../../models/pricing_plan_model.dart';
 import '../../models/slot_context.dart';
 import '../../providers/booking_flow_provider.dart';
@@ -1180,13 +1181,20 @@ class _MohaffezProfileScreenState
     final reviewCount = profile['reviewCount'] as int? ?? 0;
     final ratingText = reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد';
     final statsAsync = ref.watch(mohaffezStatsProvider(widget.mohaffezId));
+    final studentCountAsync = ref.watch(mohaffezStudentCountProvider(widget.mohaffezId));
 
     return Padding(
       padding: const EdgeInsets.all(16),
       child: statsAsync.when(
         data: (stats) {
           final completedSessions = stats['completedSessions'] as int? ?? 0;
-          final uniqueStudents = stats['uniqueStudents'] as int? ?? 0;
+          final studentCount = studentCountAsync.when(
+            data: (count) => count,
+            loading: () => 0,
+            error: (_, __) => 0,
+          );
+
+          debugPrint('👨‍🏫 Student count from Cloud Function: $studentCount');
 
           return _buildStatsCard(
             stats: [
@@ -1204,7 +1212,7 @@ class _MohaffezProfileScreenState
               ),
               _buildStatItem(
                 icon: Icons.school_rounded,
-                value: '$uniqueStudents',
+                value: '$studentCount',
                 label: 'طالب',
                 color: AppThemeConstants.secondary,
               ),

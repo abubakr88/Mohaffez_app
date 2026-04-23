@@ -1394,6 +1394,18 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
       .toList();
 });
 
+// Provider for total student count (for teacher home screen - teachers have permission to query sessions)
+final mohaffezStudentsCountProvider = Provider.autoDispose.family<int, String>(
+  (ref, mohaffezId) {
+    final studentsAsync = ref.watch(mohaffezStudentsProvider(mohaffezId));
+    return studentsAsync.when(
+      data: (students) => students.length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+  },
+);
+
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
   return SessionRepository(FirebaseFirestore.instance);
 });

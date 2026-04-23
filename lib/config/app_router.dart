@@ -59,6 +59,7 @@ import '../screens/teacher/pending_requests_screen.dart';
 import '../screens/teacher/direct_payment_confirmations_screen.dart';
 import '../screens/teacher/completed_sessions_screen.dart';
 import '../screens/teacher/upcoming_sessions_screen.dart';
+import '../screens/teacher/session_quiz_screen.dart';
 import '../providers/session_provider_paginated.dart' show UpcomingFilter;
 import '../screens/teacher/session_completion_screen.dart';
 import '../screens/teacher/teacher_certificates_screen.dart';
@@ -641,6 +642,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/teacher-schedule',
             name: 'teacher-schedule',
             builder: (context, state) => const MohaffezScheduleScreen(),
+          ),
+          GoRoute(
+            path: '/session-quiz',
+            name: 'session-quiz',
+            builder: (context, state) {
+              final studentName = state.uri.queryParameters['studentName'];
+              return SessionQuizScreen(studentName: studentName);
+            },
           ),
           // ──────────────────────────────────────────────────────────────
 
