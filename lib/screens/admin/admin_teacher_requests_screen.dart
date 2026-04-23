@@ -4,6 +4,7 @@
 // Admin can expand each card to review profile data + certificates,
 // then approve (→ status: 'active') or reject (→ status: 'rejected' + note).
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -576,9 +577,10 @@ class _CertificatesList extends StatelessWidget {
               itemBuilder: (_, i) => ClipRRect(
                 borderRadius:
                     const BorderRadius.all(Radius.circular(8)),
-                child: Image.network(urls[i],
+                child: CachedNetworkImage(
+                    imageUrl: urls[i],
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorWidget: (_, __, ___) =>
                         const Icon(Icons.broken_image_rounded,
                             size: 40, color: Colors.grey)),
               ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1418,7 +1419,7 @@ class _Avatar extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(size / 2),
         child: photoUrl != null && photoUrl!.isNotEmpty
-            ? Image.network(photoUrl!, fit: BoxFit.cover)
+            ? CachedNetworkImage(imageUrl: photoUrl!, fit: BoxFit.cover)
             : Center(
                 child: Text(
                   initials,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -523,7 +524,6 @@ class _StatsRow extends StatelessWidget {
   final int todayCount;
   final AsyncValue<List<Map<String, dynamic>>> upcomingSessions;
   final int pendingCount;
-
   const _StatsRow({
     required this.mohaffezId,
     required this.todayCount,
@@ -724,6 +724,9 @@ class _ActionsSection extends StatelessWidget {
       _ActionData(icon: Icons.workspace_premium_rounded, label: 'الشهادات',
           color: _DS.blue, bg: _DS.blueBg,
           onTap: () => context.push('/credentials')),
+      _ActionData(icon: Icons.quiz_rounded, label: 'التحديات',
+          color: _DS.amber, bg: _DS.amberBg,
+          onTap: () => context.push('/session-quiz')),
     ];
 
     return Column(
@@ -1409,7 +1412,7 @@ class _Avatar extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(size / 2),
         child: photoUrl != null && photoUrl!.isNotEmpty
-            ? Image.network(photoUrl!, fit: BoxFit.cover)
+            ? CachedNetworkImage(imageUrl: photoUrl!, fit: BoxFit.cover)
             : Center(
                 child: Text(
                   initials,
