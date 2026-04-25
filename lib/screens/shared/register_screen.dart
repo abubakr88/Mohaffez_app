@@ -22,6 +22,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
   bool _autoValidate = false;
   String _selectedRole = 'student';
+  String _selectedGender = 'male';
 
   @override
   void dispose() {
@@ -43,6 +44,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       password: _passwordController.text.trim(),
       name: _nameController.text.trim(),
       role: _selectedRole,
+      gender: _selectedGender,
     );
 
     if (!mounted) return;
@@ -190,6 +192,52 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ),
                         const SizedBox(height: AppThemeConstants.spaceLg),
                         const Text(
+                          'اختر الجنس',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(
+                          height: AppThemeConstants.spaceMd -
+                              AppThemeConstants.spaceXs,
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _GenderCard(
+                                icon: Icons.male,
+                                title: 'ذكر',
+                                color: AppThemeConstants.primary,
+                                isSelected: _selectedGender == 'male',
+                                onTap: () {
+                                  setState(() {
+                                    _selectedGender = 'male';
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(
+                              width: AppThemeConstants.spaceMd -
+                                  AppThemeConstants.spaceXs,
+                            ),
+                            Expanded(
+                              child: _GenderCard(
+                                icon: Icons.female,
+                                title: 'أنثى',
+                                color: AppThemeConstants.secondary,
+                                isSelected: _selectedGender == 'female',
+                                onTap: () {
+                                  setState(() {
+                                    _selectedGender = 'female';
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceLg),
+                        const Text(
                           'اختر نوع الحساب',
                           style: TextStyle(
                             fontSize: 16,
@@ -278,6 +326,60 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GenderCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _GenderCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+        decoration: BoxDecoration(
+          color:
+              isSelected ? color.withValues(alpha: 0.1) : AppThemeConstants.background,
+          borderRadius: AppThemeConstants.borderRadiusMd,
+          border: Border.all(
+            color: isSelected ? color : AppThemeConstants.divider,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 48,
+              color: isSelected ? color : AppThemeConstants.textDisabled,
+            ),
+            Spacing.vSm,
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? color : AppThemeConstants.textSecondary,
+              ),
+            ),
+          ],
         ),
       ),
     );

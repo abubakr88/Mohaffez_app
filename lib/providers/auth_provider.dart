@@ -107,6 +107,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     required String password,
     required String name,
     required String role,
+    String? gender,
   }) async {
     state = const AsyncValue.loading();
 
@@ -150,6 +151,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'examRetryCount': 0,
           'examPassed': false,
           'examNextRetryAt': null,
+          'gender': gender,
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (e) {

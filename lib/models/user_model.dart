@@ -34,6 +34,7 @@ class UserModel with _$UserModel {
     @Default(0) int examRetryCount,
     @Default(false) bool examPassed,
     @TimestampConverter() DateTime? examNextRetryAt,
+    String? gender,
     // ─────────────────────────────────────────────────────────
   }) = _UserModel;
 
