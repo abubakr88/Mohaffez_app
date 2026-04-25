@@ -191,23 +191,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           },
                         ),
                         const SizedBox(height: AppThemeConstants.spaceLg),
-                        const Text(
-                          'اختر الجنس',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(
-                          height: AppThemeConstants.spaceMd -
-                              AppThemeConstants.spaceXs,
-                        ),
                         Row(
                           children: [
                             Expanded(
                               child: _GenderCard(
-                                icon: Icons.male,
-                                title: 'ذكر',
+                                title: _selectedRole == 'student' ? 'طالب' : 'معلم',
                                 color: AppThemeConstants.primary,
                                 isSelected: _selectedGender == 'male',
                                 onTap: () {
@@ -223,8 +211,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             Expanded(
                               child: _GenderCard(
-                                icon: Icons.female,
-                                title: 'أنثى',
+                                title: _selectedRole == 'student' ? 'طالبة' : 'معلمة',
                                 color: AppThemeConstants.secondary,
                                 isSelected: _selectedGender == 'female',
                                 onTap: () {
@@ -333,14 +320,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 }
 
 class _GenderCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final Color color;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _GenderCard({
-    required this.icon,
+    this.icon,
     required this.title,
     required this.color,
     required this.isSelected,
@@ -365,12 +352,14 @@ class _GenderCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 48,
-              color: isSelected ? color : AppThemeConstants.textDisabled,
-            ),
-            Spacing.vSm,
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 48,
+                color: isSelected ? color : AppThemeConstants.textDisabled,
+              ),
+              Spacing.vSm,
+            ],
             Text(
               title,
               style: TextStyle(
