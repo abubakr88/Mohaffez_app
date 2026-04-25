@@ -22,39 +22,29 @@ class ScheduleConstants {
     String startTime = defaultStartTime,
     String endTime = defaultEndTime,
     int durationMinutes = defaultSessionDurationMinutes,
+    int breakMinutes = 0,
   }) {
     final slots = <Map<String, String>>[];
-    
-    // Parse start time
+
     final startParts = startTime.split(':');
-    int currentHour = int.parse(startParts[0]);
-    int currentMinute = int.parse(startParts[1]);
-    
-    // Parse end time
     final endParts = endTime.split(':');
-    final endHour = int.parse(endParts[0]);
-    final endMinute = int.parse(endParts[1]);
-    
-    // Convert to total minutes for easier comparison
-    int currentTotalMinutes = currentHour * 60 + currentMinute;
-    final endTotalMinutes = endHour * 60 + endMinute;
-    
+
+    int currentTotalMinutes =
+        int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+    final endTotalMinutes =
+        int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+
     while (currentTotalMinutes + durationMinutes <= endTotalMinutes) {
-      final startHour = currentTotalMinutes ~/ 60;
-      final startMin = currentTotalMinutes % 60;
-      
-      final endSlotMinutes = currentTotalMinutes + durationMinutes;
-      final endSlotHour = endSlotMinutes ~/ 60;
-      final endSlotMin = endSlotMinutes % 60;
-      
+      final slotEnd = currentTotalMinutes + durationMinutes;
       slots.add({
-        'start': '${startHour.toString().padLeft(2, '0')}:${startMin.toString().padLeft(2, '0')}',
-        'end': '${endSlotHour.toString().padLeft(2, '0')}:${endSlotMin.toString().padLeft(2, '0')}',
+        'start':
+            '${(currentTotalMinutes ~/ 60).toString().padLeft(2, '0')}:${(currentTotalMinutes % 60).toString().padLeft(2, '0')}',
+        'end':
+            '${(slotEnd ~/ 60).toString().padLeft(2, '0')}:${(slotEnd % 60).toString().padLeft(2, '0')}',
       });
-      
-      currentTotalMinutes += durationMinutes;
+      currentTotalMinutes += durationMinutes + breakMinutes;
     }
-    
+
     return slots;
   }
 

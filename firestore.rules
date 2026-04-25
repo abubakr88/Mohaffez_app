@@ -445,7 +445,25 @@ service cloud.firestore {
 
     match /slotLocks/{lockId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+
+      allow create: if isAuthenticated() &&
+                    !isSuspended() &&
+                    request.resource.data.lockedBy == request.auth.uid &&
+                    request.resource.data.mohaffezId is string &&
+                    request.resource.data.expiresAt is timestamp;
+
+      // Only the locker, the mohaffez holding the slot, or admin can
+      // update/release a lock. Prevents other authenticated users from
+      // overwriting or deleting foreign locks.
+      allow update: if isAdmin() ||
+                    (isAuthenticated() &&
+                     (resource.data.lockedBy == request.auth.uid ||
+                      resource.data.mohaffezId == request.auth.uid));
+
+      allow delete: if isAdmin() ||
+                    (isAuthenticated() &&
+                     (resource.data.lockedBy == request.auth.uid ||
+                      resource.data.mohaffezId == request.auth.uid));
     }
 
     // ============================================
@@ -510,7 +528,20 @@ service cloud.firestore {
                   (resource == null ||
                    request.auth.uid == resource.data.userId ||
                    request.auth.uid == resource.data.recipientId);
-      allow create: if isAuthenticated();
+
+      // Clients may create notifications targeting another user (e.g. student
+      // notifying mohaffez on booking). Tighten initial state to block garbage
+      // writes and prevent pre-read spam: must target a valid user, must start
+      // unread, and must use server time.
+      allow create: if isAuthenticated() &&
+                    !isSuspended() &&
+                    request.resource.data.userId is string &&
+                    request.resource.data.userId.size() > 0 &&
+                    request.resource.data.isRead == false &&
+                    request.resource.data.createdAt == request.time &&
+                    request.resource.data.title is string &&
+                    request.resource.data.body is string;
+
       allow update: if isAuthenticated() &&
                     (request.auth.uid == resource.data.userId ||
                      request.auth.uid == resource.data.recipientId) &&
@@ -563,7 +594,18 @@ service cloud.firestore {
 
     match /failedOperations/{operationId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated();
+
+      // Clients enqueue retry records when a best-effort side-effect (e.g. a
+      // post-booking notification) fails. Constrain initial state so the queue
+      // can't be poisoned: must start as pending-retry at retryCount 0, with
+      // server time and a non-empty operationType. Admin-only thereafter.
+      allow create: if isAuthenticated() &&
+                    request.resource.data.operationType is string &&
+                    request.resource.data.operationType.size() > 0 &&
+                    request.resource.data.status == 'pending-retry' &&
+                    request.resource.data.retryCount == 0 &&
+                    request.resource.data.timestamp == request.time;
+
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -587,7 +629,7 @@ service cloud.firestore {
 
     match /devLogs/{logId} {
       allow read: if isAdmin();
-      allow write: if isAdmin() || isAuthenticated();
+      allow write: if isAdmin();
     }
 
     match /adminAuditLog/{logId} {
