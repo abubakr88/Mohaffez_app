@@ -73,6 +73,18 @@ class RoleGuard implements RouteGuard {
     // Only process if authenticated (AuthGuard handles unauth).
     if (authState.value == null) return null;
 
+    // WHY: teacher-pending must be checked before sharedRoutePrefixes so that
+    // status changes (pending_approval → active/rejected) trigger a redirect
+    // without racing against an imperative context.go() in the screen.
+    if (currentPath == '/teacher-pending') {
+      if (userState.isLoading) return null;
+      final user = userState.value;
+      if (user == null) return null;
+      if (user.status == 'active') return mohaffezHomePath;
+      if (user.status == 'rejected') return '/teacher-rejected';
+      return null;
+    }
+
     // Shared routes are always allowed for authenticated users.
     if (_startsWithAny(currentPath, sharedRoutePrefixes)) return null;
 

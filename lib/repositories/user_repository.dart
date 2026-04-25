@@ -89,6 +89,7 @@ class UserRepository {
           return prev.uid == next.uid &&
               prev.name == next.name &&
               prev.role == next.role &&
+              prev.status == next.status &&
               prev.photoUrl == next.photoUrl;
         });
   }

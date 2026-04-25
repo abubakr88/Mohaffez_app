@@ -9,7 +9,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
@@ -21,17 +20,9 @@ class TeacherPendingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
-
-    // React to status changes in real-time
-    ref.listen(currentUserProvider, (_, next) {
-      final user = next.valueOrNull;
-      if (user == null) return;
-      if (user.status == 'active' && context.mounted) {
-        context.go('/mohaffez-home');
-      } else if (user.status == 'rejected' && context.mounted) {
-        context.go('/teacher-rejected');
-      }
-    });
+    // WHY: Navigation on status change is handled exclusively by RoleGuard
+    // (triggered by GoRouterNotifier). An imperative context.go() here would
+    // race with GoRouter's own redirect and cause a duplicate page-key crash.
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
+import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -139,7 +141,16 @@ void main() async {
     debugPrint('✅ System UI configured');
 
     // ============================================
-    // 9. Launch App
+    // 9. Google Maps — switch to AndroidViewSurface to prevent
+    //    SurfaceProducer NPE crash when a map view is disposed during resize.
+    // ============================================
+    final mapsImpl = GoogleMapsFlutterPlatform.instance;
+    if (mapsImpl is GoogleMapsFlutterAndroid) {
+      mapsImpl.useAndroidViewSurface = true;
+    }
+
+    // ============================================
+    // 10. Launch App
     // ============================================
     debugPrint('🚀 Launching Al-Mohaffez app...');
     runApp(const ProviderScope(child: DevModeOverlay(child: MyApp())));

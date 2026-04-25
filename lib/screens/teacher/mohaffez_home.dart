@@ -9,6 +9,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../models/request_status.dart';
 import '../../providers/session_provider_paginated.dart';
+import '../../providers/teacher_setup_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/app_version_service.dart';
 import '../../shared/theme/app_theme_constants.dart';
@@ -88,8 +89,19 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) AppVersionService.checkOnStartup(context);
+      if (!mounted) return;
+      AppVersionService.checkOnStartup(context);
+      _maybeShowWizard();
     });
+  }
+
+  Future<void> _maybeShowWizard() async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null || user.role != 'mohaffez') return;
+    final shouldShow = await shouldAutoShowSetupWizard(user.uid);
+    if (!mounted || !shouldShow) return;
+    ref.read(wizardModeProvider.notifier).state = true;
+    context.push('/profile');
   }
 
   @override

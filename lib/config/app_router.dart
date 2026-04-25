@@ -65,6 +65,7 @@ import '../screens/teacher/session_completion_screen.dart';
 import '../screens/teacher/teacher_certificates_screen.dart';
 import '../screens/teacher/teacher_pending_screen.dart';
 import '../screens/teacher/teacher_rejected_screen.dart';
+import '../screens/teacher/teacher_setup_wizard_screen.dart';
 // Admin screens
 import '../screens/admin/admin_home_screen.dart';
 import '../screens/admin/admin_users_screen.dart';
@@ -218,6 +219,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (context, state, child) => HomeShell(child: child),
         routes: [
+          // WHY: Wizard is inside ShellRoute so context.push() to step screens
+          // stays within the same navigator, avoiding duplicate page-key crashes.
+          // HomeShell hides its chrome (appBar/drawer/bottomNav) on this route.
+          GoRoute(
+            path: '/teacher-setup-wizard',
+            name: 'teacher-setup-wizard',
+            builder: (context, state) => const TeacherSetupWizardScreen(),
+          ),
           // ============================================
           // STUDENT ROUTES
           // ============================================
