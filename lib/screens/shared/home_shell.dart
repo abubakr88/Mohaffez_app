@@ -8,6 +8,7 @@ import '../../providers/navigation_provider.dart';
 import '../../providers/notification_provider_paginated.dart';
 import '../../providers/system_config_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/teacher_setup_provider.dart';
 import '../../models/user_model.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/offline_banner.dart';
@@ -93,11 +94,32 @@ class HomeShell extends ConsumerWidget {
             .watch(unreadNotificationsCountProvider(user.uid))
             .value ?? 0;
 
+        // WHY: wizard is inside the ShellRoute to avoid cross-navigator push
+        // crashes, but it must appear full-screen (no chrome).
+        final currentPath = GoRouterState.of(context).uri.path;
+        final isWizard = currentPath == '/teacher-setup-wizard';
+
+        // Sequential setup wizard flow: teacher tapped "دليل الإعداد السريع"
+        // from the drawer and is walking through the 5 setup screens in order.
+        const wizardStepRoutes = [
+          '/profile',
+          '/credentials',
+          '/availability',
+          '/wallet-settings',
+          '/pricing-management',
+        ];
+        final wizardMode = ref.watch(wizardModeProvider);
+        final isInWizardFlow = isMohaffez &&
+            wizardMode &&
+            wizardStepRoutes.contains(currentPath);
+        final wizardStepIdx =
+            isInWizardFlow ? wizardStepRoutes.indexOf(currentPath) : -1;
+
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
             backgroundColor: const Color(0xFFF4F7F6),
-            appBar: _buildAppBar(
+            appBar: isWizard ? null : _buildAppBar(
               context, ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
@@ -105,7 +127,7 @@ class HomeShell extends ConsumerWidget {
               userId: user.uid,
               unreadCount: unreadCount,
             ),
-            drawer: _buildDrawer(
+            drawer: (isWizard || isInWizardFlow) ? null : _buildDrawer(
               context, ref,
               isMohaffez: isMohaffez,
               isAdmin: isAdmin,
@@ -118,13 +140,21 @@ class HomeShell extends ConsumerWidget {
                 Expanded(child: child),
               ],
             ),
-            bottomNavigationBar: _buildBottomNavBar(
-              context, ref,
-              isMohaffez: isMohaffez,
-              isAdmin: isAdmin,
-              currentIndex: currentIndex,
-              unreadCount: unreadCount,
-            ),
+            bottomNavigationBar: isWizard
+                ? null
+                : isInWizardFlow
+                    ? _buildWizardNavBar(
+                        context, ref,
+                        stepIdx: wizardStepIdx,
+                        stepRoutes: wizardStepRoutes,
+                      )
+                    : _buildBottomNavBar(
+                        context, ref,
+                        isMohaffez: isMohaffez,
+                        isAdmin: isAdmin,
+                        currentIndex: currentIndex,
+                        unreadCount: unreadCount,
+                      ),
           ),
         );
       },
@@ -256,6 +286,146 @@ String _screenTitle(bool isMohaffez, bool isAdmin, int currentIndex) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATION BELL
 // ═══════════════════════════════════════════════════════════════════════════════
+// WIZARD NAVIGATION BAR — sequential Next / Finish bar shown during wizard flow
+// ═══════════════════════════════════════════════════════════════════════════════
+const _wizardStepLabels = [
+  'الملف الشخصي',
+  'الشهادات',
+  'أوقات الفراغ',
+  'المحفظة',
+  'الأسعار والباقات',
+];
+
+Widget _buildWizardNavBar(
+  BuildContext context,
+  WidgetRef ref, {
+  required int stepIdx,
+  required List<String> stepRoutes,
+}) {
+  final isLast = stepIdx == stepRoutes.length - 1;
+  final stepLabel = stepIdx >= 0 && stepIdx < _wizardStepLabels.length
+      ? _wizardStepLabels[stepIdx]
+      : '';
+
+  void exitWizard() {
+    ref.read(wizardModeProvider.notifier).state = false;
+    context.go('/mohaffez-home');
+  }
+
+  void goNext() {
+    if (isLast) {
+      exitWizard();
+    } else {
+      context.push(stepRoutes[stepIdx + 1]);
+    }
+  }
+
+  return Container(
+    decoration: const BoxDecoration(
+      color: Color(0xFF095752),
+      boxShadow: [
+        BoxShadow(color: Color(0x33000000), blurRadius: 8, offset: Offset(0, -2)),
+      ],
+    ),
+    child: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            // Close button
+            IconButton(
+              onPressed: exitWizard,
+              icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              tooltip: 'إغلاق',
+            ),
+            const SizedBox(width: 8),
+            // Step label + counter
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stepLabel,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'الخطوة ${stepIdx + 1} من ${stepRoutes.length}',
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Progress dots
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(stepRoutes.length, (i) {
+                final isActive = i == stepIdx;
+                final isDone = i < stepIdx;
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: isActive ? 20 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isDone
+                        ? const Color(0xFF4CAF82)
+                        : isActive
+                            ? const Color(0xFFD4A44A)
+                            : Colors.white24,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(width: 12),
+            // Next / Finish button
+            ElevatedButton(
+              onPressed: goNext,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isLast
+                    ? const Color(0xFF2E8B57)
+                    : const Color(0xFFD4A44A),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(isLast ? 'إنهاء' : 'التالي'),
+                  const SizedBox(width: 4),
+                  Icon(
+                    isLast ? Icons.check_rounded : Icons.arrow_back_rounded,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // BOTTOM NAVIGATION — custom design with active pill, clear icons, readable badge
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -554,6 +724,8 @@ Widget _buildDrawer(
 
               // ── Mohaffez ─────────────────────────────────────────────────
               if (isMohaffez) ...[
+                _drawerSection('دليل الإعداد'),
+                _SetupGuideDrawerTile(uid: user.uid),
                 _drawerSection('أدوات المحفظ'),
                 _drawerTile(context, title: 'بيانات الاعتماد',
                     icon: Icons.verified_user_rounded, route: 'credentials',
@@ -800,4 +972,72 @@ Widget _drawerSection(String label) {
       ),
     ),
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETUP GUIDE DRAWER TILE — shows live "X/5" progress badge
+// ═══════════════════════════════════════════════════════════════════════════════
+class _SetupGuideDrawerTile extends ConsumerWidget {
+  final String uid;
+  const _SetupGuideDrawerTile({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progressAsync = ref.watch(teacherSetupProvider);
+    final completed = progressAsync.value?.completedCount ?? 0;
+    final allDone = progressAsync.value?.allDone ?? false;
+    final color = allDone ? const Color(0xFF2E8B57) : _ShellDS.teal500;
+    final bgColor = allDone
+        ? const Color(0xFFE8F5E9)
+        : const Color(0xFFEAF6F3);
+
+    return ListTile(
+      dense: true,
+      leading: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(Icons.rocket_launch_rounded, size: 20, color: color),
+      ),
+      title: const Text(
+        'دليل الإعداد السريع',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppThemeConstants.textPrimary,
+        ),
+      ),
+      trailing: progressAsync.isLoading
+          ? const SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: allDone ? const Color(0xFF2E8B57) : _ShellDS.teal500,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                allDone ? 'مكتمل ✓' : '$completed/5',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+      onTap: () {
+        ref.read(wizardModeProvider.notifier).state = true;
+        context.pop();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (context.mounted) {
+            context.push('/profile');
+          }
+        });
+      },
+    );
+  }
 }
