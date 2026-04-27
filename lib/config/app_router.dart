@@ -60,6 +60,7 @@ import '../screens/teacher/direct_payment_confirmations_screen.dart';
 import '../screens/teacher/completed_sessions_screen.dart';
 import '../screens/teacher/upcoming_sessions_screen.dart';
 import '../screens/teacher/session_quiz_screen.dart';
+import '../screens/teacher/student_challenges_screen.dart';
 import '../providers/session_provider_paginated.dart' show UpcomingFilter;
 import '../screens/teacher/session_completion_screen.dart';
 import '../screens/teacher/teacher_certificates_screen.dart';
@@ -656,8 +657,24 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/session-quiz',
             name: 'session-quiz',
             builder: (context, state) {
-              final studentName = state.uri.queryParameters['studentName'];
-              return SessionQuizScreen(studentName: studentName);
+              final p = state.uri.queryParameters;
+              return SessionQuizScreen(
+                studentName: p['studentName'],
+                mohaffezId: p['mohaffezId'],
+                studentId: p['studentId'],
+              );
+            },
+          ),
+          GoRoute(
+            path: '/student-challenges',
+            name: 'student-challenges',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>;
+              return StudentChallengesScreen(
+                mohaffezId: extra['mohaffezId'] as String,
+                studentId: extra['studentId'] as String,
+                studentName: extra['studentName'] as String,
+              );
             },
           ),
           // ──────────────────────────────────────────────────────────────

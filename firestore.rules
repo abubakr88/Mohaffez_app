@@ -83,11 +83,10 @@ service cloud.firestore {
 
       // ── Credentials subcollection ──
       match /credentials/{credentialId} {
-        allow read: if isAdmin() || (isAuthenticated() && (
-          resource == null ||
-          resource.data.status == 'approved' ||
-          request.auth.uid == userId
-        ));
+        // get: allow owner to read their own (even non-existent docs), or approved docs for anyone
+        allow get: if isAdmin() || isOwner(userId) || (isAuthenticated() && resource.data.status == 'approved');
+        // list: query validation requires no resource==null branch — only data-based conditions
+        allow list: if isAdmin() || isOwner(userId) || (isAuthenticated() && resource.data.status == 'approved');
 
         allow create: if isOwner(userId) &&
                       request.resource.data.userId == userId &&
@@ -150,6 +149,17 @@ service cloud.firestore {
         allow update: if false;
         allow delete: if false;
       }
+
+      // ── Student challenge questions (teacher-managed per-student question bank) ──
+      // Path: users/{mohaffezId}/studentChallenges/{studentId}/questions/{questionId}
+      // Teacher (userId == mohaffezId) has full write access.
+      // Student can read their own questions when a session is active.
+      match /studentChallenges/{studentId}/questions/{questionId} {
+        allow read: if isOwner(userId) || request.auth.uid == studentId;
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
     }
 
     // ============================================
@@ -157,11 +167,8 @@ service cloud.firestore {
     // ============================================
 
     match /{path=**}/credentials/{credentialId} {
-      allow read: if isAdmin() || (isAuthenticated() && (
-        resource == null ||
-        resource.data.status == 'approved' ||
-        request.auth.uid == resource.data.userId
-      ));
+      allow get: if isAdmin() || (isAuthenticated() && (resource.data.status == 'approved' || request.auth.uid == resource.data.userId));
+      allow list: if isAdmin() || (isAuthenticated() && (resource.data.status == 'approved' || request.auth.uid == resource.data.userId));
     }
 
     // ============================================
@@ -321,24 +328,19 @@ service cloud.firestore {
                     request.resource.data.mohaffezId is string;
 
       allow update: if isAuthenticated() && (
+        // Student attaches gateway order ID before redirecting to payment page.
         (request.auth.uid == resource.data.studentId &&
          resource.data.status in ['pending', 'processing'] &&
          onlyUpdating(['updatedAt', 'gatewayOrderId']))
         ||
+        // Teacher confirms a cash payment they received in person.
         (request.auth.uid == resource.data.mohaffezId &&
          resource.data.method == 'cash' &&
          resource.data.status == 'pending' &&
          request.resource.data.status == 'completed' &&
          onlyUpdating(['status', 'completedAt', 'paidAt', 'updatedAt']))
-        ||
-        (onlyUpdating([
-          'status', 'completedAt', 'updatedAt', 'paidAt',
-          'gatewayTransactionId', 'transactionReference',
-          'gatewayResponse', 'failureReason',
-          'processingStartedAt', 'processedAt',
-          'idempotencyKey', 'subscriptionId',
-          'method', 'gateway', 'notes', 'sessionId'
-        ]))
+        // All other status/gateway field transitions (status, gatewayTransactionId,
+        // gatewayResponse, failureReason, etc.) are server-only via Cloud Functions / Admin SDK.
       );
 
       allow delete: if false;
@@ -351,29 +353,16 @@ service cloud.firestore {
         request.auth.uid == resource.data.mohaffezId
       );
 
-      allow create: if isAuthenticated() &&
-                    !isSuspended() &&
-                    request.auth.uid == request.resource.data.studentId &&
-                    request.resource.data.status == 'active' &&
-                    request.resource.data.remainingSessions > 0 &&
-                    request.resource.data.totalSessions > 0 &&
-                    request.resource.data.studentId is string &&
-                    request.resource.data.mohaffezId is string;
+      allow create: if false; // Server-only via Cloud Functions after verified payment.
 
       allow update: if isAuthenticated() && (
-        (request.resource.data.remainingSessions == resource.data.remainingSessions - 1 &&
-         resource.data.remainingSessions > 0 &&
-         request.resource.data.status in ['active', 'expired', 'depleted'] &&
-         onlyUpdating(['remainingSessions', 'lastUsedAt', 'status', 'updatedAt']))
-        ||
+        // Student explicitly cancels their own active subscription.
         (request.auth.uid == resource.data.studentId &&
          resource.data.status == 'active' &&
          request.resource.data.status == 'cancelled' &&
          onlyUpdating(['status', 'cancelledAt', 'updatedAt']))
-        ||
-        (resource.data.status == 'active' &&
-         request.resource.data.status == 'expired' &&
-         onlyUpdating(['status', 'expiredAt', 'updatedAt']))
+        // remainingSessions decrement and status→expired/depleted transitions are
+        // server-only via Cloud Functions / Admin SDK to enforce session-consumption proof.
       );
 
       allow delete: if false;

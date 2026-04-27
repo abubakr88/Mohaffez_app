@@ -88,17 +88,8 @@ void main() async {
     // 5. Setup Firebase Cloud Messaging
     // ============================================
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-    // Request notification permissions (iOS)
-    final messaging = FirebaseMessaging.instance;
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-    debugPrint(
-        '✅ Notification permission status: ${settings.authorizationStatus}');
+    await NotificationService.initialize();
+    debugPrint('✅ NotificationService initialized');
 
     // ============================================
     // 6. Initialize Arabic Date Formatting

@@ -43,37 +43,6 @@ class PaymentRepository {
     });
   }
 
-  Future<void> updatePaymentStatus(
-    String paymentId,
-    PaymentStatus status, {
-    String? transactionReference,
-    String? gatewayTransactionId,
-    String? failureReason,
-  }) async {
-    final updateData = <String, dynamic>{
-      'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    if (status == PaymentStatus.completed) {
-      updateData['paidAt'] = FieldValue.serverTimestamp();
-    }
-    if (transactionReference != null) {
-      updateData['transactionReference'] = transactionReference;
-    }
-    if (gatewayTransactionId != null) {
-      updateData['gatewayTransactionId'] = gatewayTransactionId;
-    }
-    if (failureReason != null) {
-      updateData['failureReason'] = failureReason;
-    }
-
-    await _firestore
-        .collection('payments')
-        .doc(paymentId)
-        .update(updateData);
-  }
-
   Future<void> updatePaymentGatewayInfo(
     String paymentId, {
     String? orderId,
@@ -117,14 +86,6 @@ class PaymentRepository {
 
   // ── Subscription management ─────────────────────────────────────────────────
 
-  Future<String> createSubscription(SubscriptionModel subscription) async {
-    final docRef = await _firestore.collection('subscriptions').add({
-      ...subscription.toJson(),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    return docRef.id;
-  }
-
   Stream<List<SubscriptionModel>> watchStudentSubscriptions(
       String studentId) {
     return _firestore
@@ -146,47 +107,6 @@ class PaymentRepository {
         .get();
     if (!doc.exists) return null;
     return SubscriptionModel.fromFirestore(doc);
-  }
-
-  /// Consume one session from a subscription (transactional).
-  /// Uses FirebaseException so the transaction retry logic handles it correctly.
-  Future<void> consumeSession(String subscriptionId) async {
-    await _firestore.runTransaction((transaction) async {
-      final subRef =
-          _firestore.collection('subscriptions').doc(subscriptionId);
-      final subDoc = await transaction.get(subRef);
-
-      if (!subDoc.exists) {
-        throw FirebaseException(
-          plugin: 'cloud_firestore',
-          code: 'not-found',
-          message: 'Subscription not found: $subscriptionId',
-        );
-      }
-
-      final subscription = SubscriptionModel.fromFirestore(subDoc);
-
-      if (subscription.remainingSessions <= 0) {
-        throw FirebaseException(
-          plugin: 'cloud_firestore',
-          code: 'failed-precondition',
-          message:
-              'No sessions remaining for subscription: $subscriptionId',
-        );
-      }
-
-      final newRemaining = subscription.remainingSessions - 1;
-      final newStatus = newRemaining == 0
-          ? SubscriptionStatus.depleted
-          : subscription.status;
-
-      transaction.update(subRef, {
-        'remainingSessions': newRemaining,
-        'status': newStatus.name,
-        'lastUsedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    });
   }
 
   /// Check if a student has an active subscription with a mohaffez.
@@ -230,14 +150,10 @@ class PaymentRepository {
       final subscription =
           SubscriptionModel.fromFirestore(snapshot.docs.first);
 
-      // Check expiry client-side (Cloud Function also checks, but guard here
-      // to avoid showing expired bundles in the UI)
+      // Guard against showing an expired subscription in the UI.
+      // Do NOT write status here — expiry transitions are Cloud Function–only.
       if (subscription.expiryDate != null &&
           subscription.expiryDate!.isBefore(DateTime.now())) {
-        await _firestore
-            .collection('subscriptions')
-            .doc(subscription.id)
-            .update({'status': SubscriptionStatus.expired.name});
         return null;
       }
 
@@ -249,16 +165,4 @@ class PaymentRepository {
     }
   }
 
-  Future<void> updateSubscriptionStatus(
-    String subscriptionId,
-    SubscriptionStatus status,
-  ) async {
-    await _firestore
-        .collection('subscriptions')
-        .doc(subscriptionId)
-        .update({
-      'status': status.name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
 }

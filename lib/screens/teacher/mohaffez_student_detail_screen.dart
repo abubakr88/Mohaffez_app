@@ -97,6 +97,34 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                 child: _StudentSummaryCard(student: student),
               ),
 
+              // ── Manage challenges button ───────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push(
+                      '/student-challenges',
+                      extra: {
+                        'mohaffezId': mohaffezId,
+                        'studentId': student.studentId,
+                        'studentName': student.studentName,
+                      },
+                    ),
+                    icon: const Icon(Icons.extension_rounded, size: 18),
+                    label: const Text('إدارة تحديات الجلسة'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppThemeConstants.primary,
+                      side: const BorderSide(color: AppThemeConstants.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      textStyle: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+
               // ── Session list ───────────────────────────────────────────
               sessionsAsync.when(
                 data: (sessions) {

@@ -199,17 +199,4 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<bool> useSubscriptionSession({
-    required String subscriptionId,
-    required String sessionId,
-  }) async {
-    try {
-      await _repository.consumeSession(subscriptionId);
-      return true;
-    } catch (e, stack) {
-      debugPrint('useSubscriptionSession failed: $e');
-      state = AsyncValue.error(e, stack);
-      return false;
-    }
-  }
 }

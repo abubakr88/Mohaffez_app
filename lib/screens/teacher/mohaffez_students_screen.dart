@@ -1,4 +1,4 @@
-// lib/screens/mohaffez_students_screen.dart
+// lib/screens/teacher/mohaffez_students_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,9 +14,27 @@ import '../../shared/widgets/error_widgets.dart';
 import '../../shared/utils/arabic_labels.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Root widget: only resolves the authenticated user.
-// The inner _StudentsBody widget owns the students provider watch so that
-// ref.watch(mohaffezStudentsProvider) is NEVER called conditionally.
+// Sort options
+// ─────────────────────────────────────────────────────────────────────────────
+enum _SortBy { lastSession, sessionCount, rating, name }
+
+extension _SortByX on _SortBy {
+  String get label => switch (this) {
+        _SortBy.lastSession => 'آخر جلسة',
+        _SortBy.sessionCount => 'عدد الجلسات',
+        _SortBy.rating => 'التقييم',
+        _SortBy.name => 'الاسم',
+      };
+  IconData get icon => switch (this) {
+        _SortBy.lastSession => Icons.calendar_today,
+        _SortBy.sessionCount => Icons.school,
+        _SortBy.rating => Icons.star,
+        _SortBy.name => Icons.sort_by_alpha,
+      };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Root widget — resolves authenticated user only
 // ─────────────────────────────────────────────────────────────────────────────
 class MohaffezStudentsScreen extends ConsumerWidget {
   const MohaffezStudentsScreen({super.key});
@@ -32,7 +50,6 @@ class MohaffezStudentsScreen extends ConsumerWidget {
             body: Center(child: Text(ArabicLabels.userNotFound)),
           );
         }
-        // FIX: separate widget ensures watch is always at top-level build
         return _StudentsBody(mohaffezId: user.uid);
       },
       loading: () => const Scaffold(
@@ -48,34 +65,307 @@ class MohaffezStudentsScreen extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Inner body: watches mohaffezStudentsProvider unconditionally.
+// Inner body — owns all filter/sort/search state
 // ─────────────────────────────────────────────────────────────────────────────
-class _StudentsBody extends ConsumerWidget {
+class _StudentsBody extends ConsumerStatefulWidget {
   final String mohaffezId;
 
   const _StudentsBody({required this.mohaffezId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // FIX: FutureProvider — either resolves to data or transitions to error.
-    // Will never stay in AsyncLoading indefinitely.
-    final studentsAsync = ref.watch(mohaffezStudentsProvider(mohaffezId));
+  ConsumerState<_StudentsBody> createState() => _StudentsBodyState();
+}
+
+class _StudentsBodyState extends ConsumerState<_StudentsBody> {
+  final _searchCtrl = TextEditingController();
+  _SortBy _sortBy = _SortBy.lastSession;
+  bool _sortAsc = false;
+  bool _filterHifz = false;
+  bool _filterMuraja = false;
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  int get _activeFilterCount =>
+      (_filterHifz ? 1 : 0) + (_filterMuraja ? 1 : 0);
+
+  List<MohaffezStudentSummary> _applyFilters(
+      List<MohaffezStudentSummary> all) {
+    var list = all.where((s) {
+      if (_searchQuery.isNotEmpty &&
+          !s.studentName.contains(_searchQuery)) {
+        return false;
+      }
+      if (_filterHifz && s.hifzAssignment.isEmpty) return false;
+      if (_filterMuraja && s.murajaAssignment.isEmpty) return false;
+      return true;
+    }).toList();
+
+    list.sort((a, b) {
+      final int cmp;
+      switch (_sortBy) {
+        case _SortBy.lastSession:
+          cmp = (b.lastSessionDate ?? DateTime(0))
+              .compareTo(a.lastSessionDate ?? DateTime(0));
+        case _SortBy.sessionCount:
+          cmp = b.sessionCount.compareTo(a.sessionCount);
+        case _SortBy.rating:
+          cmp = b.sessionRating.compareTo(a.sessionRating);
+        case _SortBy.name:
+          cmp = a.studentName.compareTo(b.studentName);
+      }
+      return _sortAsc ? -cmp : cmp;
+    });
+
+    return list;
+  }
+
+  void _showSortSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'ترتيب حسب',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                RadioGroup<_SortBy>(
+                  groupValue: _sortBy,
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setSheet(() {});
+                    setState(() => _sortBy = val);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _SortBy.values
+                        .map((opt) => RadioListTile<_SortBy>(
+                              value: opt,
+                              title: Row(
+                                children: [
+                                  Icon(opt.icon,
+                                      size: 16,
+                                      color: _sortBy == opt
+                                          ? AppThemeConstants.primary
+                                          : Colors.grey),
+                                  const SizedBox(width: 8),
+                                  Text(opt.label),
+                                ],
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              dense: true,
+                            ))
+                        .toList(),
+                  ),
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: Icon(
+                    _sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
+                    color: AppThemeConstants.primary,
+                    size: 20,
+                  ),
+                  title: Text(_sortAsc ? 'تصاعدي' : 'تنازلي'),
+                  trailing: Switch.adaptive(
+                    value: _sortAsc,
+                    activeThumbColor: AppThemeConstants.primary,
+                    onChanged: (val) {
+                      setSheet(() {});
+                      setState(() => _sortAsc = val);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final studentsAsync =
+        ref.watch(mohaffezStudentsProvider(widget.mohaffezId));
+    final totalCount = studentsAsync.valueOrNull?.length;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         body: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(mohaffezStudentsProvider(mohaffezId));
+            ref.invalidate(mohaffezStudentsProvider(widget.mohaffezId));
             await ref
-                .read(mohaffezStudentsProvider(mohaffezId).future)
+                .read(mohaffezStudentsProvider(widget.mohaffezId).future)
                 .catchError((_) => <MohaffezStudentSummary>[]);
           },
           child: CustomScrollView(
             slivers: [
-              _AppBarSliver(mohaffezId: mohaffezId),
+              // ── AppBar with embedded search ──────────────────────────────
+              SliverAppBar(
+                expandedHeight: 100,
+                floating: true,
+                pinned: true,
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(52),
+                  child: Container(
+                    color: AppThemeConstants.primary,
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _searchCtrl,
+                        onChanged: (v) =>
+                            setState(() => _searchQuery = v),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 14),
+                        cursorColor: Colors.white,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          hintText: 'ابحث باسم الطالب...',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 14,
+                          ),
+                          prefixIcon: const Icon(Icons.search,
+                              color: Colors.white70, size: 18),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(Icons.clear,
+                                      color: Colors.white70, size: 18),
+                                  onPressed: () {
+                                    _searchCtrl.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeConstants.primary,
+                          AppThemeConstants.primaryVariant,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 58),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.groups,
+                                  size: 24,
+                                  color: AppThemeConstants.onPrimary),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  'طلابي',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppThemeConstants.onPrimary,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                if (totalCount != null)
+                                  Text(
+                                    '$totalCount طالب',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white
+                                          .withValues(alpha: 0.75),
+                                      height: 1.2,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Filter / Sort bar (pinned, scrolls with header) ──────────
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _FilterBarDelegate(
+                  sortBy: _sortBy,
+                  sortAsc: _sortAsc,
+                  filterHifz: _filterHifz,
+                  filterMuraja: _filterMuraja,
+                  activeFilterCount: _activeFilterCount,
+                  onSortTap: _showSortSheet,
+                  onHifzToggle: (v) => setState(() => _filterHifz = v),
+                  onMurajaToggle: (v) =>
+                      setState(() => _filterMuraja = v),
+                  onClearAll: () => setState(() {
+                    _filterHifz = false;
+                    _filterMuraja = false;
+                  }),
+                ),
+              ),
+
+              // ── Student list ─────────────────────────────────────────────
               studentsAsync.when(
-                // Show stale data while refreshing instead of re-showing skeleton
                 skipLoadingOnRefresh: true,
                 data: (students) {
                   if (students.isEmpty) {
@@ -83,40 +373,72 @@ class _StudentsBody extends ConsumerWidget {
                       child: EmptyState(
                         icon: Icons.people_outline,
                         title: 'لا يوجد طلاب بعد',
-                        message: 'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
+                        message:
+                            'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
                         animated: true,
                       ),
                     );
                   }
+
+                  final filtered = _applyFilters(students);
+
+                  if (filtered.isEmpty) {
+                    return SliverFillRemaining(
+                      child: EmptyState(
+                        icon: Icons.search_off,
+                        title: 'لا توجد نتائج',
+                        message: _searchQuery.isNotEmpty
+                            ? 'لا يوجد طالب باسم "$_searchQuery"'
+                            : 'جرّب تغيير معايير الفلتر',
+                      ),
+                    );
+                  }
+
                   return SliverPadding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (ctx, index) {
-                          final student = students[index];
+                          if (index == 0) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _ResultsHeader(
+                                  total: students.length,
+                                  filtered: filtered.length,
+                                ),
+                                const SizedBox(height: 8),
+                                StudentCard(
+                                  student: filtered[0],
+                                  onTap: () => context.push(
+                                    '/student/${filtered[0].studentId}',
+                                    extra: filtered[0],
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                          final student = filtered[index];
                           return StudentCard(
                             student: student,
-                            onTap: () {
-                              context.push(
-                                '/student/${student.studentId}',
-                                extra: student,
-                              );
-                            },
+                            onTap: () => context.push(
+                              '/student/${student.studentId}',
+                              extra: student,
+                            ),
                           );
                         },
-                        childCount: students.length,
+                        childCount: filtered.length,
                       ),
                     ),
                   );
                 },
-                // FIX: skeleton cards instead of single full-screen spinner
                 loading: () => const SliverFillRemaining(
                   child: _SkeletonList(),
                 ),
                 error: (e, _) => SliverFillRemaining(
                   child: ErrorDisplay.dataLoad(
-                    onRetry: () =>
-                        ref.invalidate(mohaffezStudentsProvider(mohaffezId)),
+                    onRetry: () => ref.invalidate(
+                        mohaffezStudentsProvider(widget.mohaffezId)),
                   ),
                 ),
               ),
@@ -129,74 +451,179 @@ class _StudentsBody extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SliverAppBar extracted to its own widget
+// Pinned filter + sort bar
 // ─────────────────────────────────────────────────────────────────────────────
-class _AppBarSliver extends ConsumerWidget {
-  final String mohaffezId;
+class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
+  final _SortBy sortBy;
+  final bool sortAsc;
+  final bool filterHifz;
+  final bool filterMuraja;
+  final int activeFilterCount;
+  final VoidCallback onSortTap;
+  final ValueChanged<bool> onHifzToggle;
+  final ValueChanged<bool> onMurajaToggle;
+  final VoidCallback onClearAll;
 
-  const _AppBarSliver({required this.mohaffezId});
+  _FilterBarDelegate({
+    required this.sortBy,
+    required this.sortAsc,
+    required this.filterHifz,
+    required this.filterMuraja,
+    required this.activeFilterCount,
+    required this.onSortTap,
+    required this.onHifzToggle,
+    required this.onMurajaToggle,
+    required this.onClearAll,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return SliverAppBar(
-      expandedHeight: 120,
-      floating: true,
-      pinned: true,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  double get minExtent => 52;
+  @override
+  double get maxExtent => 52;
+
+  @override
+  bool shouldRebuild(_FilterBarDelegate old) =>
+      sortBy != old.sortBy ||
+      sortAsc != old.sortAsc ||
+      filterHifz != old.filterHifz ||
+      filterMuraja != old.filterMuraja ||
+      activeFilterCount != old.activeFilterCount;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade200),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            // Sort button
+            _SortButton(
+              label: sortBy.label,
+              ascending: sortAsc,
+              onTap: onSortTap,
             ),
+            const SizedBox(width: 8),
+            // Hifz filter chip
+            FilterChip(
+              label: const Text('لديهم حفظ'),
+              selected: filterHifz,
+              onSelected: onHifzToggle,
+              avatar: Icon(Icons.menu_book,
+                  size: 14,
+                  color: filterHifz ? Colors.green : Colors.grey),
+              selectedColor: Colors.green.withValues(alpha: 0.12),
+              checkmarkColor: Colors.green,
+              showCheckmark: false,
+              labelStyle: TextStyle(
+                fontSize: 12,
+                fontWeight: filterHifz ? FontWeight.w700 : FontWeight.normal,
+                color: filterHifz ? Colors.green.shade700 : null,
+              ),
+              side: filterHifz
+                  ? BorderSide(color: Colors.green.shade300)
+                  : null,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+            ),
+            const SizedBox(width: 8),
+            // Muraja filter chip
+            FilterChip(
+              label: const Text('لديهم مراجعة'),
+              selected: filterMuraja,
+              onSelected: onMurajaToggle,
+              avatar: Icon(Icons.refresh,
+                  size: 14,
+                  color: filterMuraja ? Colors.blue : Colors.grey),
+              selectedColor: Colors.blue.withValues(alpha: 0.12),
+              checkmarkColor: Colors.blue,
+              showCheckmark: false,
+              labelStyle: TextStyle(
+                fontSize: 12,
+                fontWeight:
+                    filterMuraja ? FontWeight.w700 : FontWeight.normal,
+                color: filterMuraja ? Colors.blue.shade700 : null,
+              ),
+              side: filterMuraja
+                  ? BorderSide(color: Colors.blue.shade300)
+                  : null,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+            ),
+            // Clear all — only when filters active
+            if (activeFilterCount > 0) ...[
+              const SizedBox(width: 8),
+              ActionChip(
+                label: Text('مسح ($activeFilterCount)'),
+                onPressed: onClearAll,
+                avatar: const Icon(Icons.close, size: 14, color: Colors.red),
+                backgroundColor: Colors.red.withValues(alpha: 0.08),
+                side: BorderSide(color: Colors.red.shade200),
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SortButton extends StatelessWidget {
+  final String label;
+  final bool ascending;
+  final VoidCallback onTap;
+
+  const _SortButton({
+    required this.label,
+    required this.ascending,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppThemeConstants.primary.withValues(alpha: 0.35),
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppThemeConstants.surface.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.groups,
-                            size: 28, color: AppThemeConstants.onPrimary),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'طلابي',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppThemeConstants.onPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'قائمة الطلاب',
-                              style: TextStyle(
-                                  fontSize: 12, color: AppThemeConstants.onPrimary.withValues(alpha: 0.7)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              ascending ? Icons.arrow_upward : Icons.arrow_downward,
+              size: 13,
+              color: AppThemeConstants.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppThemeConstants.primary,
               ),
             ),
-          ),
+            const SizedBox(width: 4),
+            const Icon(Icons.expand_more,
+                size: 14, color: AppThemeConstants.primary),
+          ],
         ),
       ),
     );
@@ -204,8 +631,55 @@ class _AppBarSliver extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StudentCard — pure StatelessWidget; session count comes from the model.
-// No ConsumerWidget needed — eliminates N+1 provider calls entirely.
+// Results header — shows count / filtered count
+// ─────────────────────────────────────────────────────────────────────────────
+class _ResultsHeader extends StatelessWidget {
+  final int total;
+  final int filtered;
+
+  const _ResultsHeader({required this.total, required this.filtered});
+
+  @override
+  Widget build(BuildContext context) {
+    final isFiltered = filtered != total;
+    return Row(
+      children: [
+        Text(
+          isFiltered ? '$filtered من $total طالب' : '$total طالب',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isFiltered
+                ? AppThemeConstants.primary
+                : AppThemeConstants.textSecondary,
+          ),
+        ),
+        if (isFiltered) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppThemeConstants.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'مفلتر',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppThemeConstants.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StudentCard — pure StatelessWidget; no N+1 queries
 // ─────────────────────────────────────────────────────────────────────────────
 class StudentCard extends StatelessWidget {
   final MohaffezStudentSummary student;
@@ -271,7 +745,6 @@ class StudentCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Session count chip — pre-aggregated, zero extra queries
                   _StatChip(
                     icon: Icons.school,
                     label: '${student.sessionCount}',
@@ -476,7 +949,7 @@ class _AssignmentRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Skeleton loading — 5 ghost cards instead of a single spinner
+// Skeleton loading — 5 ghost cards while fetching
 // ─────────────────────────────────────────────────────────────────────────────
 class _SkeletonList extends StatelessWidget {
   const _SkeletonList();

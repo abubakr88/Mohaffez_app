@@ -2,8 +2,11 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/quran_quiz_bank.dart';
+import '../../models/challenge_question.dart';
+import '../../providers/challenge_questions_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
@@ -31,18 +34,26 @@ class _DS {
   static const r20 = BorderRadius.all(Radius.circular(20));
 }
 
-enum _GameMode { selector, game1, game2, game3, game4 }
+enum _GameMode { selector, game1, game2, game3, game4, game5 }
 
 // ─── Root screen ─────────────────────────────────────────────────────────────
-class SessionQuizScreen extends StatefulWidget {
+class SessionQuizScreen extends ConsumerStatefulWidget {
   final String? studentName;
-  const SessionQuizScreen({super.key, this.studentName});
+  final String? mohaffezId;
+  final String? studentId;
+
+  const SessionQuizScreen({
+    super.key,
+    this.studentName,
+    this.mohaffezId,
+    this.studentId,
+  });
 
   @override
-  State<SessionQuizScreen> createState() => _SessionQuizScreenState();
+  ConsumerState<SessionQuizScreen> createState() => _SessionQuizScreenState();
 }
 
-class _SessionQuizScreenState extends State<SessionQuizScreen> {
+class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen> {
   _GameMode _mode = _GameMode.selector;
 
   // Global score across all games this session
@@ -70,6 +81,11 @@ class _SessionQuizScreenState extends State<SessionQuizScreen> {
   bool           _g4Submitted   = false;
   bool           _g4Correct     = false;
 
+  // ── Game 5: teacher custom questions ─────────────────────────────────────
+  int   _g5Index         = 0;
+  bool  _g5Revealed      = false;
+  bool? _g5MarkedCorrect;
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   QuizAyah _nextAyah() {
     if (_usedAyahIndices.length >= QuranQuizBank.ayahs.length) _usedAyahIndices.clear();
@@ -89,6 +105,10 @@ class _SessionQuizScreenState extends State<SessionQuizScreen> {
         _loadGame3();
       } else if (mode == _GameMode.game4) {
         _loadGame4();
+      } else if (mode == _GameMode.game5) {
+        _g5Index = 0;
+        _g5Revealed = false;
+        _g5MarkedCorrect = null;
       }
     });
   }
@@ -203,6 +223,7 @@ class _SessionQuizScreenState extends State<SessionQuizScreen> {
       _GameMode.game2:    'تحديد السورة',
       _GameMode.game3:    'أحكام التجويد',
       _GameMode.game4:    'ترتيب الآيات',
+      _GameMode.game5:    'تحديات المحفظ',
     };
     return Container(
       decoration: const BoxDecoration(
@@ -296,6 +317,8 @@ class _SessionQuizScreenState extends State<SessionQuizScreen> {
         return _buildGame3();
       case _GameMode.game4:
         return _buildGame4();
+      case _GameMode.game5:
+        return _buildGame5();
     }
   }
 
@@ -336,6 +359,17 @@ class _SessionQuizScreenState extends State<SessionQuizScreen> {
       ),
     ];
 
+    // Load custom questions count if teacher–student context available
+    int customCount = 0;
+    if (widget.mohaffezId != null && widget.studentId != null) {
+      final params = (
+        mohaffezId: widget.mohaffezId!,
+        studentId: widget.studentId!,
+      );
+      final all = ref.watch(studentChallengesProvider(params)).valueOrNull ?? [];
+      customCount = all.where((q) => q.isActive).length;
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -368,12 +402,83 @@ class _SessionQuizScreenState extends State<SessionQuizScreen> {
             itemCount: modes.length,
             itemBuilder: (_, i) => _buildModeCard(modes[i]),
           ),
+          // Custom questions card — only shown when teacher has set questions
+          if (customCount > 0) ...[
+            const SizedBox(height: 14),
+            _buildCustomQuestionsCard(customCount),
+          ],
           if (_totalAsked > 0) ...[
             const SizedBox(height: 28),
             _buildSessionSummary(),
           ],
           const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomQuestionsCard(int count) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _selectMode(_GameMode.game5);
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0B7A75), Color(0xFF0E8278)],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: _DS.r20,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0B7A75).withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: _DS.r16,
+              ),
+              child: const Icon(Icons.extension_rounded,
+                  color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'تحديات المحفظ',
+                    style: TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '$count سؤال مخصص من محفظك',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_back_ios_new_rounded,
+                color: Colors.white, size: 16),
+          ],
+        ),
       ),
     );
   }
@@ -617,6 +722,406 @@ class _SessionQuizScreenState extends State<SessionQuizScreen> {
       onNext: _nextQuestion,
     );
   }
+
+  // ── Game 5: teacher custom questions ─────────────────────────────────────
+  Widget _buildGame5() {
+    if (widget.mohaffezId == null || widget.studentId == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text('لا توجد بيانات الجلسة',
+              style: TextStyle(color: _DS.text3)),
+        ),
+      );
+    }
+    final params = (
+      mohaffezId: widget.mohaffezId!,
+      studentId: widget.studentId!,
+    );
+    final questionsAsync = ref.watch(studentChallengesProvider(params));
+
+    return questionsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('خطأ: $e')),
+      data: (all) {
+        final active = all.where((q) => q.isActive).toList();
+        if (active.isEmpty) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                const Icon(Icons.extension_off_rounded,
+                    size: 64, color: _DS.text3),
+                const SizedBox(height: 16),
+                const Text('لا توجد أسئلة مفعّلة',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _DS.text1)),
+                const SizedBox(height: 8),
+                const Text('فعّل بعض الأسئلة من شاشة إدارة التحديات',
+                    style: TextStyle(fontSize: 14, color: _DS.text2),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 32),
+                _BackToMenuButton(
+                    onTap: () =>
+                        setState(() => _mode = _GameMode.selector)),
+              ],
+            ),
+          );
+        }
+
+        // All done
+        if (_g5Index >= active.length) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                Container(
+                  width: 80, height: 80,
+                  decoration: const BoxDecoration(
+                    color: _DS.teal50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.emoji_events_rounded,
+                      size: 44, color: _DS.teal500),
+                ),
+                const SizedBox(height: 20),
+                const Text('انتهت جميع الأسئلة!',
+                    style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _DS.text1)),
+                const SizedBox(height: 8),
+                Text(
+                  '$_totalCorrect إجابة صحيحة من ${active.length} سؤال',
+                  style: const TextStyle(fontSize: 15, color: _DS.text2),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: _TealButton(
+                    label: 'إعادة التحديات',
+                    icon: Icons.replay_rounded,
+                    onTap: () => setState(() {
+                      _g5Index = 0;
+                      _g5Revealed = false;
+                      _g5MarkedCorrect = null;
+                    }),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _BackToMenuButton(
+                    onTap: () =>
+                        setState(() => _mode = _GameMode.selector)),
+              ],
+            ),
+          );
+        }
+
+        final q = active[_g5Index];
+        final typeColor = _g5TypeColor(q.type);
+        final typeBg    = _g5TypeBg(q.type);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Progress indicator
+              Row(
+                children: [
+                  Text(
+                    'سؤال ${_g5Index + 1} من ${active.length}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _DS.text3),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: 120,
+                    child: ClipRRect(
+                      borderRadius: _DS.r12,
+                      child: LinearProgressIndicator(
+                        value: (_g5Index + 1) / active.length,
+                        backgroundColor: _DS.border,
+                        color: _DS.teal500,
+                        minHeight: 6,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Question card
+              GestureDetector(
+                onTap: _g5Revealed ? null : () => setState(() => _g5Revealed = true),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: _DS.r20,
+                    border: Border.all(
+                      color: _g5MarkedCorrect == null
+                          ? (_g5Revealed
+                              ? typeColor.withValues(alpha: 0.4)
+                              : _DS.border)
+                          : _g5MarkedCorrect!
+                              ? _DS.green.withValues(alpha: 0.5)
+                              : AppThemeConstants.error.withValues(alpha: 0.5),
+                      width: _g5MarkedCorrect != null ? 2 : 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: typeColor.withValues(alpha: 0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Type + difficulty badges
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: typeBg,
+                              borderRadius: _DS.r12,
+                              border: Border.all(
+                                  color:
+                                      typeColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              q.type.label,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: typeColor),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _g5DiffBg(q.difficulty),
+                              borderRadius: _DS.r12,
+                            ),
+                            child: Text(
+                              _g5DiffLabel(q.difficulty),
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: _g5DiffColor(q.difficulty)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Question text
+                      Text(
+                        q.question,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: _DS.text1,
+                          height: 1.6,
+                        ),
+                      ),
+                      // Revealed: show hint + answer
+                      if (_g5Revealed) ...[
+                        if (q.hint != null && q.hint!.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _DS.amberBg,
+                              borderRadius: _DS.r12,
+                              border: Border.all(
+                                  color: _DS.amber.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                    Icons.lightbulb_outline_rounded,
+                                    size: 16,
+                                    color: _DS.amber),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    q.hint!,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        color: _DS.text1,
+                                        height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (q.answer != null && q.answer!.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _DS.teal50,
+                              borderRadius: _DS.r12,
+                              border:
+                                  Border.all(color: _DS.teal100),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.key_rounded,
+                                    size: 16, color: _DS.teal500),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    q.answer!,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        color: _DS.teal700,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ] else ...[
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.touch_app_rounded,
+                                size: 14,
+                                color: typeColor.withValues(alpha: 0.7)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'اضغط للكشف',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: typeColor.withValues(alpha: 0.7),
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Result + navigation
+              if (_g5MarkedCorrect != null) ...[
+                _ResultBanner(correct: _g5MarkedCorrect!),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: _TealButton(
+                    label: _g5Index + 1 < active.length
+                        ? 'السؤال التالي'
+                        : 'إنهاء التحديات',
+                    icon: _g5Index + 1 < active.length
+                        ? Icons.arrow_back_ios_new_rounded
+                        : Icons.check_circle_outline_rounded,
+                    onTap: () => setState(() {
+                      _g5Index++;
+                      _g5Revealed = false;
+                      _g5MarkedCorrect = null;
+                    }),
+                  ),
+                ),
+              ] else if (_g5Revealed) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _OutlineButton(
+                        label: 'خطأ',
+                        icon: Icons.close_rounded,
+                        color: AppThemeConstants.error,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _g5MarkedCorrect = false;
+                            _totalAsked++;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _OutlineButton(
+                        label: 'صحيح',
+                        icon: Icons.check_rounded,
+                        color: _DS.green,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _g5MarkedCorrect = true;
+                            _totalCorrect++;
+                            _totalAsked++;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+              _BackToMenuButton(
+                  onTap: () => setState(() => _mode = _GameMode.selector)),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Color _g5TypeColor(ChallengeType t) => switch (t) {
+    ChallengeType.completeAyah  => _DS.teal500,
+    ChallengeType.nameSurah     => _DS.amber,
+    ChallengeType.tajweedRule   => _DS.purple,
+    ChallengeType.wordMeaning   => _DS.blue,
+    ChallengeType.openQuestion  => _DS.green,
+  };
+  Color _g5TypeBg(ChallengeType t) => switch (t) {
+    ChallengeType.completeAyah  => _DS.teal50,
+    ChallengeType.nameSurah     => _DS.amberBg,
+    ChallengeType.tajweedRule   => _DS.purpleBg,
+    ChallengeType.wordMeaning   => _DS.blueBg,
+    ChallengeType.openQuestion  => _DS.greenBg,
+  };
+  Color  _g5DiffColor(String d)  => switch (d) {
+    'easy'  => _DS.green,
+    'hard'  => AppThemeConstants.error,
+    _       => _DS.amber,
+  };
+  Color  _g5DiffBg(String d)    => switch (d) {
+    'easy'  => _DS.greenBg,
+    'hard'  => AppThemeConstants.error.withValues(alpha: 0.08),
+    _       => _DS.amberBg,
+  };
+  String _g5DiffLabel(String d)  => switch (d) {
+    'easy'  => 'سهل',
+    'hard'  => 'صعب',
+    _       => 'متوسط',
+  };
 
   // ── Shared reveal-card builder (games 1 & 2) ─────────────────────────────
   Widget _buildRevealGame({

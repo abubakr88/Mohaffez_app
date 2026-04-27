@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../shared/theme/app_theme_constants.dart';
+import '../../providers/quiz_access_provider.dart';
 import '../../providers/session_provider_paginated.dart';
 import '../../shared/utils/error_handler.dart';
 import '../../models/quran_mistake_model.dart';
@@ -545,7 +546,18 @@ class _SessionCompletionScreenState
 
               const SizedBox(height: 24),
 
-              // Section 3: New assignments
+              // Section 3: Quiz unlock toggle
+              _buildSectionHeader(
+                icon: Icons.extension_rounded,
+                title: 'تحديات الجلسة',
+                color: AppThemeConstants.primary,
+              ),
+              const SizedBox(height: 12),
+              _QuizToggleCard(sessionId: widget.sessionId),
+
+              const SizedBox(height: 24),
+
+              // Section 4: New assignments
               _buildSectionHeader(
                 icon: Icons.assignment,
                 title: 'التكليف الجديد للجلسة القادمة',
@@ -826,6 +838,91 @@ class _SessionCompletionScreenState
       case MistakeType.other:
         return Icons.help_outline;
     }
+  }
+}
+
+class _QuizToggleCard extends ConsumerWidget {
+  final String sessionId;
+  const _QuizToggleCard({required this.sessionId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quizAsync = ref.watch(sessionQuizStateProvider(sessionId));
+    final isUnlocked = quizAsync.valueOrNull ?? false;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isUnlocked
+                    ? AppThemeConstants.secondary.withValues(alpha: 0.12)
+                    : AppThemeConstants.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                isUnlocked ? Icons.extension_rounded : Icons.lock_rounded,
+                color: isUnlocked
+                    ? AppThemeConstants.secondary
+                    : AppThemeConstants.primary,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isUnlocked ? 'التحديات مفعّلة للطالب' : 'التحديات مغلقة',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: isUnlocked
+                          ? AppThemeConstants.secondary
+                          : AppThemeConstants.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isUnlocked
+                        ? 'يمكن للطالب الآن فتح تحديات الجلسة'
+                        : 'فعّل الزر ليتمكن الطالب من دخول التحديات',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppThemeConstants.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: isUnlocked,
+              activeThumbColor: AppThemeConstants.secondary,
+              activeTrackColor:
+                  AppThemeConstants.secondary.withValues(alpha: 0.4),
+              onChanged: (val) async {
+                try {
+                  await setQuizUnlocked(sessionId: sessionId, unlocked: val);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('تعذّر تغيير حالة التحديات'),
+                        backgroundColor: AppThemeConstants.error,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../providers/payment_provider.dart';
+import '../../providers/quiz_access_provider.dart';
 import '../../providers/session_provider_paginated.dart';
 import '../../providers/user_provider.dart';
 import '../../services/app_version_service.dart';
@@ -258,6 +259,8 @@ class StudentHomeContent extends ConsumerWidget {
                       _NextSessionCountdown(nextSessionDate: nextSessionDate),
                       if (nextSessionDate != null) const SizedBox(height: 20),
                       _ActionsSection(studentId: studentId),
+                      const SizedBox(height: 20),
+                      _QuizAccessCard(studentId: studentId),
                       const SizedBox(height: 28),
                       _AssignmentsSection(studentId: studentId),
                       const SizedBox(height: 16),
@@ -805,6 +808,144 @@ class _ActionCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QUIZ ACCESS CARD
+// ═══════════════════════════════════════════════════════════════════════════════
+class _QuizAccessCard extends ConsumerWidget {
+  final String studentId;
+  const _QuizAccessCard({required this.studentId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quizAsync = ref.watch(quizUnlockedSessionProvider(studentId));
+
+    final unlockInfo = quizAsync.valueOrNull;
+    final isUnlocked = unlockInfo != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel(
+          title: 'تحديات الجلسة',
+          subtitle: 'يفتحها محفظك أثناء الجلسة',
+        ),
+        const SizedBox(height: 14),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isUnlocked
+                ? () {
+                    HapticFeedback.lightImpact();
+                    context.push(
+                      '/session-quiz'
+                      '?mohaffezId=${unlockInfo.mohaffezId}'
+                      '&studentId=$studentId',
+                    );
+                  }
+                : () {
+                    HapticFeedback.lightImpact();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'يفتح المحفظ التحديات أثناء الجلسة',
+                          textDirection: TextDirection.rtl,
+                        ),
+                        backgroundColor: AppThemeConstants.primary,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+            borderRadius: _DS.r16,
+            child: Ink(
+              decoration: BoxDecoration(
+                color: isUnlocked ? const Color(0xFF0E8278) : Colors.white,
+                borderRadius: _DS.r16,
+                border: Border.all(
+                  color: isUnlocked
+                      ? const Color(0xFF0E8278)
+                      : _DS.border,
+                  width: isUnlocked ? 0 : 1,
+                ),
+                boxShadow: isUnlocked
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF0E8278).withValues(alpha: 0.25),
+                          blurRadius: 14,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
+                    : _DS.subtleShadow,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isUnlocked
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : _DS.teal50,
+                        borderRadius: _DS.r12,
+                      ),
+                      child: Icon(
+                        isUnlocked
+                            ? Icons.extension_rounded
+                            : Icons.lock_rounded,
+                        color: isUnlocked ? Colors.white : _DS.text3,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isUnlocked ? 'تحديات الجلسة — مفعّلة!' : 'تحديات الجلسة',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isUnlocked ? Colors.white : _DS.text1,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            isUnlocked
+                                ? 'اضغط لبدء تحديات الحفظ والتجويد'
+                                : 'في انتظار المحفظ ليفتح التحديات',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isUnlocked
+                                  ? Colors.white.withValues(alpha: 0.8)
+                                  : _DS.text3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      isUnlocked
+                          ? Icons.arrow_back_ios_new_rounded
+                          : Icons.lock_outline_rounded,
+                      size: 16,
+                      color: isUnlocked
+                          ? Colors.white.withValues(alpha: 0.8)
+                          : _DS.text3,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

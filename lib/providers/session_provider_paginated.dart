@@ -1235,6 +1235,7 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'completedAt': FieldValue.serverTimestamp(),
         'sessionRating': sessionRating,
         'isLateCompletion': isLateCompletion,
+        'quizUnlocked': false,
       };
 
       if (previousHifzCompleted != null) {

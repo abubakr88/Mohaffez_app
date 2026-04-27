@@ -44,6 +44,9 @@ class _ConfirmBundleSessionScreenState
   String? _subscriptionError;
   SessionRequestModel? _loadedRequest;
   bool _hydrating = true;
+  // Local cache so bookingFlowProvider.reset() on success doesn't null out
+  // slotContext during the GoRouter transition frame (causing a brief flash).
+  SlotContext? _cachedSlotContext;
 
   @override
   void initState() {
@@ -55,9 +58,9 @@ class _ConfirmBundleSessionScreenState
     // 1. Read current slotContext from provider
     final slotCtx = ref.read(bookingFlowProvider).slotContext;
 
-    // 2. If slotContext is already set, nothing to do
+    // 2. If slotContext is already set, cache it locally and move on.
     if (slotCtx != null) {
-      if (mounted) setState(() => _hydrating = false);
+      if (mounted) setState(() { _cachedSlotContext = slotCtx; _hydrating = false; });
       if (mounted) await _loadSubscription();
       return;
     }
@@ -112,9 +115,9 @@ class _ConfirmBundleSessionScreenState
         slotLockId: r.slotLockId,
       );
 
-      // 7. Inject into provider so the rest of the screen works
-      //    without any further changes
+      // 7. Inject into provider and cache locally.
       ref.read(bookingFlowProvider.notifier).setSlotContext(rebuilt);
+      _cachedSlotContext = rebuilt;
     } catch (e) {
       // Error silently handled - slotContext will remain null
     } finally {
@@ -342,8 +345,9 @@ class _ConfirmBundleSessionScreenState
       );
     }
 
-    final flow = ref.watch(bookingFlowProvider);
-    final slotContext = flow.slotContext;
+    // Use the locally cached slotContext so bookingFlowProvider.reset() on
+    // success doesn't null it out during the GoRouter transition frame.
+    final slotContext = _cachedSlotContext;
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
