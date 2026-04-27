@@ -1,8 +1,9 @@
 // screens/privacy_settings_screen.dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/user_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/utils/error_handler.dart';
 
@@ -52,10 +53,7 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
   }
 
   Future<void> _updateSetting(String key, bool value) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    // تحديث الواجهة فوراً (Optimistic UI)
+    // Optimistic UI update
     setState(() {
       if (key == 'showPhoneNumber') _showPhoneNumber = value;
       if (key == 'allowMessages') _allowMessages = value;
@@ -63,17 +61,13 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
     });
 
     try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'privacySettings': {
-          'showPhoneNumber':
-              key == 'showPhoneNumber' ? value : _showPhoneNumber,
-          'allowMessages': key == 'allowMessages' ? value : _allowMessages,
-          'showLocation': key == 'showLocation' ? value : _showLocation,
-        }
-      }, SetOptions(merge: true));
+      await ref.read(userUpdateNotifierProvider.notifier).updatePrivacySettings({
+        'showPhoneNumber': _showPhoneNumber,
+        'allowMessages': _allowMessages,
+        'showLocation': _showLocation,
+      });
     } catch (e) {
       if (mounted) ErrorHandler.showError(context, "فشل حفظ الإعدادات");
-      // إعادة التعيين في حال الفشل
       _loadSettings();
     }
   }
@@ -135,7 +129,8 @@ class _PrivacySettingsScreenState extends ConsumerState<PrivacySettingsScreen> {
       subtitle: Padding(
         padding: const EdgeInsets.only(right: 32.0, top: 4),
         child: Text(subtitle,
-            style: const TextStyle(fontSize: 12, color: AppThemeConstants.textSecondary)),
+            style: const TextStyle(
+                fontSize: 12, color: AppThemeConstants.textSecondary)),
       ),
       activeThumbColor: AppThemeConstants.secondary,
     );

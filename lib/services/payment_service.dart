@@ -1,7 +1,5 @@
 // lib/services/payment_service.dart
 import 'dart:convert';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crypto/crypto.dart';
@@ -191,39 +189,4 @@ class PaymentService {
     return calculatedHmac == receivedHmac;
   }
 
-  /// Create a payment document without client-side event logging
-  /// Event creation is handled by Cloud Functions Firestore trigger
-  Future<String> createPayment({
-    required String mohaffezId,
-    required String mohaffezName,
-    required String planId,
-    required String planTitle,
-    required double amount,
-    required Map<String, dynamic> metadata,
-  }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User not authenticated');
-
-    // Create payment document WITHOUT event logging
-    final paymentDoc = await FirebaseFirestore.instance
-        .collection('payments')
-        .add({
-      'studentId': user.uid,
-      'studentName': user.displayName ?? '',
-      'studentEmail': user.email ?? '',
-      'studentPhone': user.phoneNumber ?? '',
-      'mohaffezId': mohaffezId,
-      'mohaffezName': mohaffezName,
-      'planId': planId,
-      'planTitle': planTitle,
-      'amount': amount,
-      'currency': 'EGP',
-      'status': 'pending',
-      'metadata': metadata,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // Cloud Functions will create the payment event via trigger
-    return paymentDoc.id;
-  }
 }

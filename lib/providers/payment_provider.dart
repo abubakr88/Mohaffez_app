@@ -6,7 +6,6 @@ import '../models/payment_model.dart';
 import '../models/pricing_plan_model.dart';
 import '../models/subscription_model.dart';
 import '../repositories/payment_repository.dart';
-import '../services/payment_service.dart';
 
 final studentSubscriptionsProvider =
     StreamProvider.family<List<SubscriptionModel>, String>((ref, studentId) {
@@ -48,11 +47,7 @@ class PaymentStartResult {
 
 final paymentActionsProvider =
     StateNotifierProvider<PaymentActionsNotifier, AsyncValue<void>>((ref) {
-  return PaymentActionsNotifier(
-    ref.watch(paymentRepositoryProvider),
-    ref.watch(paymentServiceProvider),
-    FirebaseFirestore.instance,
-  );
+  return PaymentActionsNotifier(ref.watch(paymentRepositoryProvider));
 });
 
 // BUG-8 FIX: Stream active subscriptions for a student to display in ActiveSubscriptionsScreen.
@@ -73,14 +68,8 @@ final activeSubscriptionsProvider = StreamProvider.autoDispose
 
 class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
   final PaymentRepository _repository;
-  // ignore: unused_field
-  final PaymentService _paymentService;
-  // ignore: unused_field
-  final FirebaseFirestore _firestore;
 
-  PaymentActionsNotifier(
-      this._repository, this._paymentService, this._firestore)
-      : super(const AsyncValue.data(null));
+  PaymentActionsNotifier(this._repository) : super(const AsyncValue.data(null));
 
   /// ✅ FIXED: Free session now only creates payment document
   /// Cloud Function handles all session creation logic
@@ -130,53 +119,7 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
           paymentUrl: '', // Empty URL means use Cloud Function
           sessionId: null, // Will be created by Cloud Function
         );
-      }      /* PAYMOB_DISABLED - gateway path disabled, use direct payment flow
-      else {
-        // PAID SESSION FLOW (Gateway payment)
-        if (kDebugMode) debugPrint('💳 PAID SESSION: Creating Paymob payment');
-        
-        final pendingPayment = basePayment.copyWith(
-          status: PaymentStatus.pending,
-          method: PaymentMethod.card,
-          gateway: PaymentGateway.paymob,
-          metadata: mergedMetadata,
-        );
-
-        final paymentId = await _repository.createPayment(pendingPayment);
-
-        final gatewayResult = await _paymentService.initiatePayment(
-          paymentId: paymentId,
-          amount: pendingPayment.amount,
-          studentEmail: pendingPayment.studentEmail,
-          studentPhone: pendingPayment.studentPhone,
-          studentName: pendingPayment.studentName,
-        );
-
-        if (gatewayResult['success'] != true) {
-          await _repository.updatePaymentStatus(
-            paymentId,
-            PaymentStatus.failed,
-            failureReason: gatewayResult['error']?.toString(),
-          );
-          throw Exception(
-              gatewayResult['error'] ?? 'Failed to create payment URL');
-        }
-
-        final paymentUrl = gatewayResult['paymentUrl'] as String;
-        final orderId = gatewayResult['orderId']?.toString();
-        final paymentKey = gatewayResult['paymentKey']?.toString();
-
-        await _repository.updatePaymentGatewayInfo(
-          paymentId,
-          orderId: orderId,
-          paymentKey: paymentKey,
-        );
-
-        state = const AsyncValue.data(null);
-        return PaymentStartResult(paymentId: paymentId, paymentUrl: paymentUrl);
-      }
-      */
-      else {
+      } else {
         // Direct payment flow � no gateway
         final directPayment = basePayment.copyWith(
           status: PaymentStatus.pending,
