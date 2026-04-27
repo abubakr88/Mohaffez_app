@@ -19,75 +19,6 @@ class SessionRepository {
   // MOHAFFEZ STUDENTS
   // ============================================================================
 
-  /// Get all unique students for a specific mohaffez with their last session.
-  Future<List<Map<String, dynamic>>> getMohaffezStudents(
-      String mohaffezId) async {
-    try {
-      debugPrint(
-          'SessionRepository: Fetching students for mohaffez $mohaffezId');
-
-      // High limit intentional: query deduplicates by studentId client-side,
-      // so we need enough sessions to surface all unique students.
-      final snapshot = await _firestore
-          .collection('hafizSessions')
-          .where('mohaffezId', isEqualTo: mohaffezId)
-          .where('status', whereIn: [
-            RequestStatus.accepted,
-            'completed',
-          ])
-          .orderBy('sessionDate', descending: true)
-          .limit(500)
-          .get();
-
-      debugPrint(
-          'SessionRepository: Found ${snapshot.docs.length} sessions');
-
-      final Map<String, Map<String, dynamic>> studentsMap = {};
-
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final studentId = data['studentId'] as String?;
-        if (studentId != null && !studentsMap.containsKey(studentId)) {
-          studentsMap[studentId] = {
-            ...data,
-            'id': doc.id,
-            'studentId': studentId,
-            'studentName': data['studentName'] ?? '',
-            'lastSessionDate':
-                (data['sessionDate'] as Timestamp?)?.toDate(),
-            'hifzAssignment': data['hifzAssignment'],
-            'murajaAssignment': data['murajaAssignment'],
-            'sessionRating': data['sessionRating'] ?? 0,
-            'sessionNotes': data['sessionNotes'],
-            'previousHifzCompleted': data['previousHifzCompleted'],
-            'previousHifzRating': data['previousHifzRating'] ?? 0,
-            'previousMurajaCompleted': data['previousMurajaCompleted'],
-            'previousMurajaRating': data['previousMurajaRating'] ?? 0,
-            'performanceNotes': data['performanceNotes'],
-            'status': data['status'],
-          };
-        }
-      }
-
-      final students = studentsMap.values.toList()
-        ..sort((a, b) {
-          final dateA = a['lastSessionDate'] as DateTime?;
-          final dateB = b['lastSessionDate'] as DateTime?;
-          if (dateA == null) return 1;
-          if (dateB == null) return -1;
-          return dateB.compareTo(dateA);
-        });
-
-      debugPrint(
-          'SessionRepository: Returning ${students.length} unique students');
-      return students;
-    } catch (e) {
-      debugPrint(
-          'SessionRepository: Error getting mohaffez students: $e');
-      rethrow;
-    }
-  }
-
   /// Get total session count for a specific student with a mohaffez.
   Future<int> getStudentSessionCountWithMohaffez(
       String mohaffezId, String studentId) async {
@@ -161,12 +92,6 @@ class SessionRepository {
           }).toList();
         });
   }
-
-  /// Alias kept for backward compatibility with any code still calling
-  /// [watchPendingRequestsFirstPage]. Both delegate to [watchPendingRequests].
-  Stream<List<SessionRequestModel>> watchPendingRequestsFirstPage(
-          String mohaffezId) =>
-      watchPendingRequests(mohaffezId);
 
   /// Non-paginated one-shot fetch of all pending requests (for export/admin).
   Future<List<SessionRequestModel>> getPendingRequests(
