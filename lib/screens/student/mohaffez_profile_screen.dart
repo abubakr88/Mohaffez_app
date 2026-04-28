@@ -255,7 +255,7 @@ class _MohaffezProfileScreenState
                   'يرجى التحقق من الاتصال بالإنترنت والمحاولة مرة أخرى',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey,
+                    color: AppThemeConstants.grey500,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -293,10 +293,10 @@ class _MohaffezProfileScreenState
                   child: Container(
                     padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppThemeConstants.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
+                            color: AppThemeConstants.black.withValues(alpha: 0.1),
                             blurRadius: 10,
                             offset: const Offset(0, -2),
                           ),
@@ -384,7 +384,7 @@ class _MohaffezProfileScreenState
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppThemeConstants.primary,
-                                foregroundColor: Colors.white,
+                                foregroundColor: AppThemeConstants.white,
                                 shape: const RoundedRectangleBorder(
                                   borderRadius: AppThemeConstants.borderRadiusMd,
                                 ),
@@ -461,13 +461,13 @@ class _MohaffezProfileScreenState
                       const Text(
                         'الأسعار تبدأ من',
                         style: TextStyle(
-                            color: Colors.white70, fontSize: 14),
+                            color: AppThemeConstants.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${pricePerSession.toStringAsFixed(0)} ج.م',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
                           height: 1.1,
@@ -476,18 +476,18 @@ class _MohaffezProfileScreenState
                       const Text(
                         'لكل جلسة',
                         style: TextStyle(
-                            color: Colors.white70, fontSize: 14),
+                            color: AppThemeConstants.white70, fontSize: 14),
                       ),
                     ],
                   ),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: AppThemeConstants.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.local_offer,
-                        color: Colors.white, size: 40),
+                        color: AppThemeConstants.white, size: 40),
                   ),
                 ],
               ),
@@ -497,20 +497,20 @@ class _MohaffezProfileScreenState
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: AppThemeConstants.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.savings,
-                          color: Colors.white, size: 18),
+                          color: AppThemeConstants.white, size: 18),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
                           'وفر حتى $savings ج.م مع الباقات',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),
@@ -532,18 +532,18 @@ class _MohaffezProfileScreenState
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: AppThemeConstants.errorLight,
           borderRadius: AppThemeConstants.borderRadiusMd,
-          border: Border.all(color: Colors.red.shade200),
+          border: Border.all(color: AppThemeConstants.accentRed),
         ),
         child: const Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.red, size: 20),
+            Icon(Icons.error_outline, color: AppThemeConstants.error, size: 20),
             SizedBox(width: 12),
             Expanded(
               child: Text(
                 'تعذر تحميل الأسعار',
-                style: TextStyle(fontSize: 14, color: Colors.red),
+                style: TextStyle(fontSize: 14, color: AppThemeConstants.error),
               ),
             ),
           ],
@@ -594,7 +594,7 @@ class _MohaffezProfileScreenState
                   ),
                   child: const Icon(
                     Icons.shield_rounded,
-                    color: Colors.white,
+                    color: AppThemeConstants.white,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -678,7 +678,7 @@ class _MohaffezProfileScreenState
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppThemeConstants.outline),
       ),
@@ -720,7 +720,7 @@ class _MohaffezProfileScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: AppThemeConstants.secondary.withValues(alpha: 0.26),
@@ -758,18 +758,18 @@ class _MohaffezProfileScreenState
     final isBundle =
         plan.type == PlanType.bundle || plan.type == PlanType.subscription;
     final badgeColor =
-        isBundle ? Colors.purple.shade700 : Colors.amber.shade800;
-    final badgeBg = isBundle ? Colors.purple.shade50 : Colors.amber.shade50;
+        isBundle ? AppThemeConstants.accentPurpleDark : AppThemeConstants.accentAmberDark;
+    final badgeBg = isBundle ? AppThemeConstants.accentPurpleLight : AppThemeConstants.accentAmberLight;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppThemeConstants.grey200),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: AppThemeConstants.black.withValues(alpha: 0.04),
               blurRadius: 4,
               offset: const Offset(0, 2))
         ],
@@ -817,7 +817,7 @@ class _MohaffezProfileScreenState
             const SizedBox(height: 8),
             Text(plan.description!,
                 style:
-                    TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    const TextStyle(fontSize: 12, color: AppThemeConstants.grey600)),
           ],
         ],
       ),
@@ -951,18 +951,18 @@ class _MohaffezProfileScreenState
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.red.shade50,
+            color: AppThemeConstants.errorLight,
             borderRadius: AppThemeConstants.borderRadiusMd,
-            border: Border.all(color: Colors.red.shade200),
+            border: Border.all(color: AppThemeConstants.accentRed),
           ),
           child: const Row(
             children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 20),
+              Icon(Icons.error_outline, color: AppThemeConstants.error, size: 20),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'تعذر تحميل خطط التسعير',
-                  style: TextStyle(fontSize: 14, color: Colors.red),
+                  style: TextStyle(fontSize: 14, color: AppThemeConstants.error),
                 ),
               ),
             ],
@@ -1014,7 +1014,7 @@ class _MohaffezProfileScreenState
                 height: 180,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: AppThemeConstants.white.withValues(alpha: 0.06),
                 ),
               ),
             ),
@@ -1043,14 +1043,14 @@ class _MohaffezProfileScreenState
                   borderRadius: BorderRadius.circular(28),
                   gradient: LinearGradient(
                     colors: [
-                      Colors.white.withValues(alpha: 0.16),
-                      Colors.white.withValues(alpha: 0.09),
+                      AppThemeConstants.white.withValues(alpha: 0.16),
+                      AppThemeConstants.white.withValues(alpha: 0.09),
                     ],
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
                   ),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: AppThemeConstants.white.withValues(alpha: 0.18),
                   ),
                 ),
                 child: Row(
@@ -1074,7 +1074,7 @@ class _MohaffezProfileScreenState
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: AppThemeConstants.white,
                               ),
                             ),
                           ),
@@ -1084,7 +1084,7 @@ class _MohaffezProfileScreenState
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: AppThemeConstants.white,
                               height: 1.15,
                             ),
                             maxLines: 2,
@@ -1097,7 +1097,7 @@ class _MohaffezProfileScreenState
                               specialization,
                               style: const TextStyle(
                                 fontSize: 14,
-                                color: Colors.white70,
+                                color: AppThemeConstants.white70,
                                 height: 1.4,
                               ),
                               maxLines: 2,
@@ -1132,19 +1132,19 @@ class _MohaffezProfileScreenState
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.42),
+                          color: AppThemeConstants.white.withValues(alpha: 0.42),
                           width: 2,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.20),
+                            color: AppThemeConstants.black.withValues(alpha: 0.20),
                             blurRadius: 16,
                             offset: const Offset(0, 10),
                           ),
                         ],
                       ),
                       child: CircleAvatar(
-                        backgroundColor: Colors.white,
+                        backgroundColor: AppThemeConstants.white,
                         child: profile['photoUrl'] != null &&
                                 (profile['photoUrl'] as String).isNotEmpty
                             ? ClipOval(
@@ -1202,7 +1202,7 @@ class _MohaffezProfileScreenState
                 icon: Icons.star_rounded,
                 value: ratingText,
                 label: 'التقييم',
-                color: Colors.amber,
+                color: AppThemeConstants.accentAmber,
               ),
               _buildStatItem(
                 icon: Icons.check_circle_rounded,
@@ -1225,7 +1225,7 @@ class _MohaffezProfileScreenState
               icon: Icons.star_rounded,
               value: ratingText,
               label: 'التقييم',
-              color: Colors.amber,
+              color: AppThemeConstants.accentAmber,
             ),
             _buildStatItem(
               icon: Icons.check_circle_rounded,
@@ -1247,7 +1247,7 @@ class _MohaffezProfileScreenState
               icon: Icons.star_rounded,
               value: ratingText,
               label: 'التقييم',
-              color: Colors.amber,
+              color: AppThemeConstants.accentAmber,
             ),
             _buildStatItem(
               icon: Icons.check_circle_rounded,
@@ -1271,9 +1271,9 @@ class _MohaffezProfileScreenState
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white),
+        border: Border.all(color: AppThemeConstants.white),
         boxShadow: [
           BoxShadow(
             color: AppThemeConstants.shadow.withValues(alpha: 0.09),
@@ -1343,7 +1343,7 @@ class _MohaffezProfileScreenState
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
+              color: AppThemeConstants.white.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 18),
@@ -1390,9 +1390,9 @@ class _MohaffezProfileScreenState
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: AppThemeConstants.grey50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(color: AppThemeConstants.grey200),
             ),
             child: Text(
               bio,
@@ -1424,11 +1424,11 @@ class _MohaffezProfileScreenState
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [
-                    const Color(0xFF7F1D1D),
-                    Colors.red.shade700,
-                    const Color(0xFFB91C1C),
+                    Color(0xFF7F1D1D),
+                    AppThemeConstants.error,
+                    Color(0xFFB91C1C),
                   ],
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
@@ -1436,7 +1436,7 @@ class _MohaffezProfileScreenState
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.red.withValues(alpha: 0.3),
+                    color: AppThemeConstants.error.withValues(alpha: 0.3),
                     blurRadius: 16,
                     offset: const Offset(0, 8),
                   ),
@@ -1453,7 +1453,7 @@ class _MohaffezProfileScreenState
                       padding: EdgeInsets.all(12),
                       child: Icon(
                         Icons.play_circle_fill_rounded,
-                        color: Colors.white,
+                        color: AppThemeConstants.white,
                         size: 34,
                       ),
                     ),
@@ -1468,7 +1468,7 @@ class _MohaffezProfileScreenState
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                           ),
                         ),
                         SizedBox(height: 4),
@@ -1476,7 +1476,7 @@ class _MohaffezProfileScreenState
                           'استعراض سريع للصوت وأسلوب التلاوة قبل اتخاذ القرار.',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.white70,
+                            color: AppThemeConstants.white70,
                             height: 1.35,
                           ),
                         ),
@@ -1485,7 +1485,7 @@ class _MohaffezProfileScreenState
                   ),
                   Icon(
                     Icons.open_in_new_rounded,
-                    color: Colors.white70,
+                    color: AppThemeConstants.white70,
                   ),
                 ],
               ),
@@ -1526,21 +1526,21 @@ class _MohaffezProfileScreenState
                     margin: const EdgeInsetsDirectional.only(end: 12),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [
-                          const Color(0xFFFCFBFF),
-                          Colors.purple.shade50,
+                          Color(0xFFFCFBFF),
+                          AppThemeConstants.accentPurpleLight,
                         ],
                         begin: Alignment.topRight,
                         end: Alignment.bottomLeft,
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Colors.purple.withValues(alpha: 0.18),
+                        color: AppThemeConstants.accentPurple.withValues(alpha: 0.18),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.purple.withValues(alpha: 0.08),
+                          color: AppThemeConstants.accentPurple.withValues(alpha: 0.08),
                           blurRadius: 14,
                           offset: const Offset(0, 8),
                         ),
@@ -1555,12 +1555,12 @@ class _MohaffezProfileScreenState
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: Colors.purple.withValues(alpha: 0.12),
+                                color: AppThemeConstants.accentPurple.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: const Icon(
                                 Icons.workspace_premium_rounded,
-                                color: Colors.purple,
+                                color: AppThemeConstants.accentPurple,
                                 size: 24,
                               ),
                             ),
@@ -1586,25 +1586,25 @@ class _MohaffezProfileScreenState
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: AppThemeConstants.white.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.business_rounded,
                                 size: 16,
-                                color: Colors.grey.shade600,
+                                color: AppThemeConstants.grey600,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   cred['organization'] ?? '',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 13,
                                     height: 1.4,
-                                    color: Colors.grey.shade700,
+                                    color: AppThemeConstants.grey700,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -1620,23 +1620,23 @@ class _MohaffezProfileScreenState
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.12),
+                            color: AppThemeConstants.success.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.check_circle_rounded,
                                 size: 14,
-                                color: Colors.green.shade700,
+                                color: AppThemeConstants.success,
                               ),
-                              const SizedBox(width: 5),
+                              SizedBox(width: 5),
                               Text(
                                 'معتمدة',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.green.shade700,
+                                  color: AppThemeConstants.success,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -1661,18 +1661,18 @@ class _MohaffezProfileScreenState
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.red.shade50,
+            color: AppThemeConstants.errorLight,
             borderRadius: AppThemeConstants.borderRadiusMd,
-            border: Border.all(color: Colors.red.shade200),
+            border: Border.all(color: AppThemeConstants.accentRed),
           ),
           child: const Row(
             children: [
-              Icon(Icons.error_outline, color: Colors.red, size: 20),
+              Icon(Icons.error_outline, color: AppThemeConstants.error, size: 20),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'تعذر تحميل الشهادات والمؤهلات',
-                  style: TextStyle(fontSize: 14, color: Colors.red),
+                  style: TextStyle(fontSize: 14, color: AppThemeConstants.error),
                 ),
               ),
             ],
@@ -1686,21 +1686,21 @@ class _MohaffezProfileScreenState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
+        color: AppThemeConstants.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.10)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 14, color: AppThemeConstants.white),
           const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: AppThemeConstants.white,
             ),
           ),
         ],
@@ -1753,15 +1753,15 @@ class _MohaffezProfileScreenState
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: hasPlan
-                ? (isSelected ? activeColor : Colors.white)
-                : Colors.grey.shade100,
+                ? (isSelected ? activeColor : AppThemeConstants.white)
+                : AppThemeConstants.grey100,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: hasPlan
                   ? (isSelected
                       ? activeColor
                       : AppThemeConstants.outline)
-                  : Colors.grey.shade300,
+                  : AppThemeConstants.grey300,
               width: isSelected ? 2 : 1.5,
             ),
             boxShadow: isSelected
@@ -1805,7 +1805,7 @@ class _MohaffezProfileScreenState
                       ? (isSelected
                           ? AppThemeConstants.textPrimary
                           : AppThemeConstants.textSecondary)
-                      : Colors.grey.shade400,
+                      : AppThemeConstants.grey400,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -1818,7 +1818,7 @@ class _MohaffezProfileScreenState
                         ? (isSelected
                             ? AppThemeConstants.textPrimary
                             : AppThemeConstants.textSecondary)
-                        : Colors.grey.shade400,
+                        : AppThemeConstants.grey400,
                   ),
                 ),
               ],
@@ -1862,23 +1862,23 @@ class _MohaffezProfileScreenState
                 type: 'online',
                 label: 'أونلاين',
                 icon: Icons.videocam_rounded,
-                activeColor: Colors.blue.withValues(alpha: 0.18),
+                activeColor: AppThemeConstants.accentBlue.withValues(alpha: 0.18),
                 hasPlan: onlineHasPlan,
               ),
             ],
           ),
           if (anyMissing && plansAsync.hasValue) ...[
             const SizedBox(height: 10),
-            Row(
+            const Row(
               children: [
                 Icon(Icons.lock_outline_rounded,
-                    size: 13, color: Colors.grey.shade500),
-                const SizedBox(width: 5),
+                    size: 13, color: AppThemeConstants.grey500),
+                SizedBox(width: 5),
                 Expanded(
                   child: Text(
                     'الأنواع المقفلة: لم يحدد المحفظ خطة سعر لها بعد',
                     style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500),
+                        fontSize: 11, color: AppThemeConstants.grey500),
                   ),
                 ),
               ],
@@ -1905,16 +1905,16 @@ class _MohaffezProfileScreenState
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: AppThemeConstants.grey50,
             borderRadius: AppThemeConstants.borderRadiusMd,
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: AppThemeConstants.grey300),
           ),
-          child: Row(
+          child: const Row(
             children: [
               Icon(Icons.lock_outline_rounded,
-                  color: Colors.grey.shade400, size: 28),
-              const SizedBox(width: 12),
-              const Expanded(
+                  color: AppThemeConstants.grey400, size: 28),
+              SizedBox(width: 12),
+              Expanded(
                 child: Text(
                   'اختر نوع جلسة متاح أولاً لعرض المواعيد',
                   style: TextStyle(fontSize: 14, color: AppThemeConstants.textSecondary),
@@ -1936,22 +1936,22 @@ class _MohaffezProfileScreenState
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: AppThemeConstants.grey50,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(color: AppThemeConstants.grey200),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(Icons.calendar_today,
-                          color: Colors.grey.shade400, size: 32),
-                      const SizedBox(width: 12),
+                          color: AppThemeConstants.grey400, size: 32),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'لا توجد أوقات متاحة',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 15, color: Colors.grey.shade600),
+                              fontSize: 15, color: AppThemeConstants.grey600),
                         ),
                       ),
                     ],
@@ -1984,22 +1984,22 @@ class _MohaffezProfileScreenState
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: AppThemeConstants.warningLight,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.shade200),
+                    border: Border.all(color: AppThemeConstants.accentOrange),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(Icons.info_outline,
-                          color: Colors.orange.shade400, size: 32),
-                      const SizedBox(width: 12),
+                          color: AppThemeConstants.accentOrange, size: 32),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'لا توجد أوقات متاحة لهذا النوع من الجلسات',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 15, color: Colors.orange.shade700),
+                              fontSize: 15, color: AppThemeConstants.warning),
                         ),
                       ),
                     ],
@@ -2117,7 +2117,7 @@ class _MohaffezProfileScreenState
                                     'اليوم',
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.white,
+                                      color: AppThemeConstants.white,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -2156,12 +2156,12 @@ class _MohaffezProfileScreenState
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? AppThemeConstants.secondary
-                                          : Colors.green.shade50,
+                                          : AppThemeConstants.successLight,
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color: isSelected
                                             ? AppThemeConstants.secondary
-                                            : Colors.green.shade200,
+                                            : AppThemeConstants.accentGreenAlt,
                                         width: 2,
                                       ),
                                     ),
@@ -2172,8 +2172,8 @@ class _MohaffezProfileScreenState
                                           Icons.access_time,
                                           size: 14,
                                           color: isSelected
-                                              ? Colors.white
-                                              : Colors.green.shade700,
+                                              ? AppThemeConstants.white
+                                              : AppThemeConstants.success,
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
@@ -2182,14 +2182,14 @@ class _MohaffezProfileScreenState
                                             fontSize: 13,
                                             fontWeight: FontWeight.w600,
                                             color: isSelected
-                                                ? Colors.white
-                                                : Colors.green.shade700,
+                                                ? AppThemeConstants.white
+                                                : AppThemeConstants.success,
                                           ),
                                         ),
                                         if (isSelected) ...[
                                           const SizedBox(width: 4),
                                           const Icon(Icons.check_circle,
-                                              size: 16, color: Colors.white),
+                                              size: 16, color: AppThemeConstants.white),
                                         ],
                                       ],
                                     ),
@@ -2211,11 +2211,11 @@ class _MohaffezProfileScreenState
             height: 320,
             child: SkeletonList(itemCount: 4, itemHeight: 70),
           ),
-      error: (_, __) => Padding(
-            padding: const EdgeInsets.all(16),
+      error: (_, __) => const Padding(
+            padding: EdgeInsets.all(16),
             child: Text(
               'خطأ في تحميل الأوقات المتاحة',
-              style: TextStyle(color: Colors.red.shade700),
+              style: TextStyle(color: AppThemeConstants.error),
             ),
           ),
         );

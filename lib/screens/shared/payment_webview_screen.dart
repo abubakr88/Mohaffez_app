@@ -256,7 +256,7 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
             WebViewWidget(controller: controller),
             if (loadingProgress < 100)
               Container(
-                color: Colors.white,
+                color: AppThemeConstants.white,
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -267,9 +267,9 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
                         child: CircularProgressIndicator(
                           value: loadingProgress / 100,
                           strokeWidth: 6,
-                          backgroundColor: Colors.grey.shade200,
+                          backgroundColor: AppThemeConstants.grey200,
                           valueColor:
-                              const AlwaysStoppedAnimation<Color>(Colors.green),
+                              const AlwaysStoppedAnimation<Color>(AppThemeConstants.success),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -285,7 +285,7 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
                       Text(
                         '$loadingProgress%',
                         style:
-                            const TextStyle(fontSize: 14, color: Colors.grey),
+                            const TextStyle(fontSize: 14, color: AppThemeConstants.grey500),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -293,19 +293,19 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
                         child: LinearProgressIndicator(
                           value: loadingProgress / 100,
                           minHeight: 8,
-                          backgroundColor: Colors.grey.shade200,
+                          backgroundColor: AppThemeConstants.grey200,
                           valueColor:
-                              const AlwaysStoppedAnimation<Color>(Colors.green),
+                              const AlwaysStoppedAnimation<Color>(AppThemeConstants.success),
                         ),
                       ),
                       const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 40),
                         child: Text(
                           'لا تغلق هذه الصفحة حتى اكتمال العملية',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade600,
+                            color: AppThemeConstants.grey600,
                           ),
                           textAlign: TextAlign.center,
                         ),

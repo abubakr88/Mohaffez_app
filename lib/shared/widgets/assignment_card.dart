@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class AssignmentCard extends StatelessWidget {
   final String mohaffezName;
@@ -59,9 +60,9 @@ class AssignmentCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '$sessionType - $slotLabel',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
-                  color: Colors.grey.shade700,
+                  color: AppThemeConstants.grey700,
                 ),
               ),
             ],
@@ -69,9 +70,9 @@ class AssignmentCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 location,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: AppThemeConstants.grey600,
                 ),
               ),
             ],
@@ -79,9 +80,9 @@ class AssignmentCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 'تاريخ الجلسة: $dateStr',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: AppThemeConstants.grey600,
                 ),
               ),
             ],
@@ -101,9 +102,9 @@ class AssignmentCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppThemeConstants.successLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
+                  border: Border.all(color: AppThemeConstants.accentGreenAlt),
                 ),
                 child: Text(
                   hifz,
@@ -126,9 +127,9 @@ class AssignmentCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.accentBlueLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppThemeConstants.accentBlue),
                 ),
                 child: Text(
                   muraja,
@@ -192,9 +193,9 @@ class AssignmentCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
+                  color: AppThemeConstants.accentAmberLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade200),
+                  border: Border.all(color: AppThemeConstants.accentAmber),
                 ),
                 child: Text(
                   notes,
@@ -209,9 +210,9 @@ class AssignmentCard extends StatelessWidget {
   }
 
   Color _getRatingColor(int rating) {
-    if (rating >= 7) return Colors.green;
-    if (rating >= 5) return Colors.orange;
-    return Colors.red;
+    if (rating >= 7) return AppThemeConstants.success;
+    if (rating >= 5) return AppThemeConstants.warning;
+    return AppThemeConstants.error;
   }
 
   IconData _getRatingIcon(int rating) {

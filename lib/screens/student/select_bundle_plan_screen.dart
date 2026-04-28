@@ -354,7 +354,7 @@ class _SelectBundlePlanScreenState
                     color: isSelected ? color : AppThemeConstants.textDisabled,
                     width: 2,
                   ),
-                  color: isSelected ? color : Colors.transparent,
+                  color: isSelected ? color : AppThemeConstants.transparent,
                 ),
                 child: isSelected
                     ? const Icon(Icons.check, size: 13, color: AppThemeConstants.onPrimary)

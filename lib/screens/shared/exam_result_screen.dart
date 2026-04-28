@@ -120,7 +120,7 @@ class ExamResultScreen extends ConsumerWidget {
                       '${score.toStringAsFixed(1)}%',
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: passed ? Colors.green : Colors.orange,
+                            color: passed ? AppThemeConstants.success : AppThemeConstants.warning,
                           ),
                     ),
                     const SizedBox(height: 8),
@@ -132,7 +132,7 @@ class ExamResultScreen extends ConsumerWidget {
                     Text(
                       'الحد الأدنى للنجاح: ${config.examPassingScore.toStringAsFixed(0)}%',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
+                            color: AppThemeConstants.grey500,
                           ),
                     ),
                   ],
@@ -167,8 +167,8 @@ class ExamResultScreen extends ConsumerWidget {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppThemeConstants.success,
+                      foregroundColor: AppThemeConstants.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -182,25 +182,25 @@ class ExamResultScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
+                    color: AppThemeConstants.warningLight,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.shade300),
+                    border: Border.all(color: AppThemeConstants.accentOrange),
                   ),
                   child: Column(
                     children: [
-                      Row(
+                      const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             Icons.info_outline,
-                            color: Colors.orange.shade800,
+                            color: AppThemeConstants.warningDark,
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Text(
                             'معلومات مهمة',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.orange.shade800,
+                              color: AppThemeConstants.warningDark,
                             ),
                           ),
                         ],
@@ -211,15 +211,15 @@ class ExamResultScreen extends ConsumerWidget {
                             ? 'يمكنك إعادة الاختبار بعد ${config.examRetryCooldownDays} أيام من الآن.'
                             : 'لقد استنفدت جميع محاولات إعادة الاختبار (${config.examMaxRetries} محاولات).',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.orange.shade900),
+                        style: const TextStyle(color: AppThemeConstants.warningDark),
                       ),
                       if (canRetry && retryCount > 0) ...[
                         const SizedBox(height: 8),
                         Text(
                           'محاولاتك السابقة: $retryCount / ${config.examMaxRetries}',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.orange.shade700,
+                          style: const TextStyle(
+                            color: AppThemeConstants.warning,
                             fontSize: 12,
                           ),
                         ),
@@ -242,9 +242,9 @@ class ExamResultScreen extends ConsumerWidget {
                           ? null
                           : () => _retryExam(context, ref),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
+                        backgroundColor: AppThemeConstants.warning,
+                        foregroundColor: AppThemeConstants.white,
+                        disabledBackgroundColor: AppThemeConstants.grey300,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -271,8 +271,8 @@ class ExamResultScreen extends ConsumerWidget {
                     child: ElevatedButton(
                       onPressed: () => _logout(context, ref),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppThemeConstants.grey500,
+                        foregroundColor: AppThemeConstants.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -289,7 +289,7 @@ class ExamResultScreen extends ConsumerWidget {
                     'إذا كنت تعتقد أن هناك خطأ، يرجى التواصل مع الدعم.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey,
+                          color: AppThemeConstants.grey500,
                         ),
                   ),
                 ],
@@ -361,13 +361,13 @@ class _RetryCountdownState extends State<_RetryCountdown> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.timer, size: 18, color: Colors.orange),
+          const Icon(Icons.timer, size: 18, color: AppThemeConstants.warning),
           const SizedBox(width: 8),
           Text(
             days > 0
@@ -376,7 +376,7 @@ class _RetryCountdownState extends State<_RetryCountdown> {
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: Colors.orange,
+              color: AppThemeConstants.warning,
             ),
           ),
         ],

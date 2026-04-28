@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/connectivity_service.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class OfflineBanner extends StatelessWidget {
   const OfflineBanner({super.key});
@@ -16,17 +17,17 @@ class OfflineBanner extends StatelessWidget {
 
         return Container(
           width: double.infinity,
-          color: Colors.red.shade600,
+          color: AppThemeConstants.error,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: const Row(
             children: [
-              Icon(Icons.wifi_off, color: Colors.white, size: 18),
+              Icon(Icons.wifi_off, color: AppThemeConstants.white, size: 18),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'لا يوجد اتصال بالإنترنت، سيتم مزامنة البيانات عند العودة.',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppThemeConstants.white,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),

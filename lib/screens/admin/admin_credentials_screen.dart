@@ -188,8 +188,8 @@ class _AdminCredentialsScreenState
                                   const SizedBox(height: 2),
                                   Text(
                                     '${ArabicLabels.userId}: $userId\n${ArabicLabels.submittedAt}: $ts',
-                                    style: TextStyle(
-                                        fontSize: 12, color: Colors.grey.shade600),
+                                    style: const TextStyle(
+                                        fontSize: 12, color: AppThemeConstants.grey600),
                                   ),
                                 ],
                               ),
@@ -226,7 +226,7 @@ class _AdminCredentialsScreenState
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppThemeConstants.error,
-                                foregroundColor: Colors.white,
+                                foregroundColor: AppThemeConstants.white,
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 visualDensity: VisualDensity.compact,
                               ),
@@ -236,7 +236,7 @@ class _AdminCredentialsScreenState
                                       height: 14,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: AppThemeConstants.white,
                                       ),
                                     )
                                   : const Icon(Icons.cancel, size: 16),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/quran_mistake_model.dart';
 import '../../utils/quran_mistake_utils.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 Future<void> showMistakeDetailDialog(
   BuildContext context,
@@ -15,9 +16,9 @@ Future<void> showMistakeDetailDialog(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Icon(icon, size: 14, color: Colors.grey.shade600),
+          Icon(icon, size: 14, color: AppThemeConstants.grey600),
           const SizedBox(width: 6),
-          Text('$label: ', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          Text('$label: ', style: const TextStyle(fontSize: 13, color: AppThemeConstants.grey600)),
           Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         ],
       ),
@@ -74,9 +75,9 @@ Future<void> showMistakeDetailDialog(
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
+                  color: AppThemeConstants.accentAmberLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade200),
+                  border: Border.all(color: AppThemeConstants.accentAmber),
                 ),
                 child: Text(
                   mistake.wordText!,
@@ -87,16 +88,16 @@ Future<void> showMistakeDetailDialog(
             ],
             if (hasComment) ...[
               const SizedBox(height: 14),
-              Row(
+              const Row(
                 children: [
-                  Icon(Icons.chat_bubble, size: 16, color: Colors.blue.shade700),
-                  const SizedBox(width: 6),
+                  Icon(Icons.chat_bubble, size: 16, color: AppThemeConstants.accentBlueDark),
+                  SizedBox(width: 6),
                   Text(
                     'تعليق المعلم',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: Colors.blue.shade800,
+                      color: AppThemeConstants.accentBlueDark,
                     ),
                   ),
                 ],
@@ -106,25 +107,25 @@ Future<void> showMistakeDetailDialog(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.accentBlueLight,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppThemeConstants.accentBlue),
                 ),
                 child: Text(
                   mistake.correctionNote!,
-                  style: TextStyle(fontSize: 14, color: Colors.blue.shade900, height: 1.6),
+                  style: const TextStyle(fontSize: 14, color: AppThemeConstants.accentBlueDark, height: 1.6),
                 ),
               ),
             ],
             if (!hasComment && isEditable) ...[
               const SizedBox(height: 12),
-              Row(
+              const Row(
                 children: [
-                  Icon(Icons.chat_bubble_outline, size: 14, color: Colors.grey.shade400),
-                  const SizedBox(width: 6),
+                  Icon(Icons.chat_bubble_outline, size: 14, color: AppThemeConstants.grey400),
+                  SizedBox(width: 6),
                   Text(
                     'لا يوجد تعليق لهذا الخطأ',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 12, color: AppThemeConstants.grey500),
                   ),
                 ],
               ),

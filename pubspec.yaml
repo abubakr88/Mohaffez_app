@@ -93,6 +93,9 @@ dependencies:
   
   table_calendar: ^3.0.9
 
+  # Quiz celebrations
+  confetti: ^0.8.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

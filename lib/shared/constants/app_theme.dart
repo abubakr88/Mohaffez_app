@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme_data.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 /// @deprecated Use AppThemeConstants and AppThemeData instead.
 /// Kept for backward compatibility during migration.
@@ -18,7 +19,7 @@ class AppTheme {
 
   /// Notification badge color
   static const Color notificationRed = Color(0xFFDC2626);
-  static const Color surfaceColor = Colors.white;
+  static const Color surfaceColor = AppThemeConstants.white;
 
   /// @deprecated Use direct semantic token from AppThemeConstants
   static const Color complementaryBlue = Color(0xFF0B7A75);

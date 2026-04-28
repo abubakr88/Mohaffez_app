@@ -26,7 +26,7 @@ class EmptyState extends StatelessWidget {
     final Widget iconWidget = Icon(
       icon,
       size: iconSize,
-      color: iconColor ?? Colors.grey.shade300,
+      color: iconColor ?? AppThemeConstants.grey300,
       semanticLabel: title, // Accessibility
     );
 
@@ -77,10 +77,10 @@ class EmptyState extends StatelessWidget {
               },
               child: Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+                  color: AppThemeConstants.grey600,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -104,9 +104,9 @@ class EmptyState extends StatelessWidget {
                 child: Text(
                   message!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
-                    color: Colors.grey.shade500,
+                    color: AppThemeConstants.grey500,
                   ),
                 ),
               ),
@@ -166,15 +166,15 @@ class CompactEmptyState extends StatelessWidget {
           Icon(
             icon,
             size: 48,
-            color: iconColor ?? Colors.grey.shade300,
+            color: iconColor ?? AppThemeConstants.grey300,
           ),
           const SizedBox(height: 12),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
-              color: Colors.grey.shade600,
+              color: AppThemeConstants.grey600,
             ),
           ),
         ],
@@ -228,10 +228,10 @@ class IllustratedEmptyState extends StatelessWidget {
             // Title
             Text(
               title,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade700,
+                color: AppThemeConstants.grey700,
               ),
               textAlign: TextAlign.center,
             ),
@@ -242,9 +242,9 @@ class IllustratedEmptyState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 14,
-                color: Colors.grey.shade600,
+                color: AppThemeConstants.grey600,
               ),
             ),
 

@@ -153,10 +153,10 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
   });
 
   Color get _statusColor => switch (summary.status) {
-        'paid' => Colors.green,
-        'overdue' => Colors.red,
-        'awaiting_confirmation' => Colors.blue,
-        _ => Colors.orange,
+        'paid' => AppThemeConstants.success,
+        'overdue' => AppThemeConstants.error,
+        'awaiting_confirmation' => AppThemeConstants.accentBlue,
+        _ => AppThemeConstants.warning,
       };
 
   String get _statusLabel => switch (summary.status) {
@@ -244,7 +244,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       color:
-                          summary.isOverdue ? Colors.red : Colors.grey,
+                          summary.isOverdue ? AppThemeConstants.error : AppThemeConstants.grey500,
                     ),
                   )
                 else
@@ -270,7 +270,7 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                   label: const Text('ادفع الآن', style: TextStyle(fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppThemeConstants.white,
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -285,21 +285,21 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.accentBlueLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppThemeConstants.accentBlue),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.hourglass_top,
-                        size: 16, color: Colors.blue.shade700),
-                    const SizedBox(width: 6),
+                        size: 16, color: AppThemeConstants.accentBlueDark),
+                    SizedBox(width: 6),
                     Text(
                       'في انتظار تأكيد الأدمن',
                       style: TextStyle(
                           fontSize: 13,
-                          color: Colors.blue.shade700),
+                          color: AppThemeConstants.accentBlueDark),
                     ),
                   ],
                 ),
@@ -327,7 +327,7 @@ class _InfoChip extends StatelessWidget {
       padding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: AppThemeConstants.grey100,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -335,9 +335,9 @@ class _InfoChip extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
-              color: Colors.grey.shade600,
+              color: AppThemeConstants.grey600,
             ),
           ),
           Text(
@@ -413,20 +413,20 @@ class _PayNowSheetState extends State<_PayNowSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
+              const Text(
                 'تسديد مستحقات المنصة',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
+                  color: AppThemeConstants.grey800,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 '$weekLabel — ${widget.summary.commissionAmount.toStringAsFixed(2)} ج.م',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
-                  color: Colors.grey.shade600,
+                  color: AppThemeConstants.grey600,
                 ),
               ),
               const SizedBox(height: 24),
@@ -438,12 +438,12 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                   color: const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
+                child: const Text(
                   'يرجى تحويل المبلغ المستحق إلى حساب المنصة عبر إحدى وسائل الدفع التالية',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.amber.shade800,
+                    color: AppThemeConstants.accentAmberDark,
                   ),
                 ),
               ),
@@ -506,7 +506,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                   onPressed: _isLoading ? null : _submitPayment,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppThemeConstants.white,
                     padding:
                         const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -519,7 +519,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                           ),
                         )
                       : const Text(
@@ -580,7 +580,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
       };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
           content: Text(message),
         ),
       );
@@ -588,7 +588,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
       if (!mounted) return; // FIXED: FIX-1 — mounted guard in catch
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
           content: Text('خطأ: ${e.toString()}'),
         ),
       );

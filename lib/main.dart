@@ -118,7 +118,7 @@ void main() async {
     // 8. Configure System UI
     // ============================================
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
+      statusBarColor: AppThemeConstants.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
       systemNavigationBarColor: AppThemeConstants.surface,
@@ -166,7 +166,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
     home: Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppThemeConstants.white,
         body: SafeArea(
           child: Center(
             child: Padding(
@@ -200,9 +200,9 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: AppThemeConstants.grey100,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: AppThemeConstants.grey300),
                     ),
                     child: Text(
                       error.toString(),
@@ -220,7 +220,7 @@ Widget _buildErrorApp(Object error, StackTrace stackTrace) {
                       onPressed: () => SystemNavigator.pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppThemeConstants.primary,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppThemeConstants.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

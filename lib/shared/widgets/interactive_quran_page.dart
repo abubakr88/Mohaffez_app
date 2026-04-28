@@ -1,4 +1,4 @@
-﻿// lib/shared/widgets/interactive_quran_page.dart
+// lib/shared/widgets/interactive_quran_page.dart
 
 import 'package:flutter/material.dart';
 import '../../models/quran_mistake_model.dart';
@@ -6,6 +6,7 @@ import '../../services/quran_service.dart';
 import 'quran/mistake_detail_dialog.dart';
 import 'quran/mistake_type_selector.dart';
 import 'quran/quran_page_image.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class InteractiveQuranPage extends StatefulWidget {
   final int pageNumber;
@@ -73,7 +74,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppThemeConstants.transparent,
       builder: (_) => _JumpToSheet(
         currentPage: currentPage,
         onPageSelected: (page) {
@@ -249,13 +250,13 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                   TextField(
                     controller: noteController,
                     maxLines: 3,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'تعليق التصحيح',
                       hintText: 'اشرح الخطأ وكيفية التصحيح...',
                       helperText: 'إضافة تعليق ستظهر علامة زرقاء 🔵 على الآية',
-                      helperStyle: TextStyle(color: Colors.blue.shade700),
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.chat_bubble_outline),
+                      helperStyle: TextStyle(color: AppThemeConstants.accentBlueDark),
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.chat_bubble_outline),
                     ),
                   ),
                 ],
@@ -331,22 +332,22 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   Widget _buildCommentLegend() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: Colors.blue.shade50,
+      color: AppThemeConstants.accentBlueLight,
       child: Row(
         children: [
           Container(
             width: 13,
             height: 13,
-            decoration: BoxDecoration(
-              color: Colors.blue.shade700,
+            decoration: const BoxDecoration(
+              color: AppThemeConstants.accentBlueDark,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.chat_bubble, size: 7, color: Colors.white),
+            child: const Icon(Icons.chat_bubble, size: 7, color: AppThemeConstants.white),
           ),
           const SizedBox(width: 8),
-          Text(
+          const Text(
             'العلامة الزرقاء = يوجد تعليق من المعلم — اضغط على العلامة لعرضه',
-            style: TextStyle(fontSize: 11, color: Colors.blue.shade800),
+            style: TextStyle(fontSize: 11, color: AppThemeConstants.accentBlueDark),
           ),
         ],
       ),
@@ -365,10 +366,10 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: AppThemeConstants.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -392,12 +393,12 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: AppThemeConstants.grey50,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: AppThemeConstants.grey300),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: AppThemeConstants.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -410,8 +411,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.menu_book,
-                          size: 14, color: Colors.green.shade700),
+                      const Icon(Icons.menu_book,
+                          size: 14, color: AppThemeConstants.success),
                       const SizedBox(width: 5),
                       Text(
                         'صفحة $currentPage',
@@ -421,8 +422,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                         ),
                       ),
                       const SizedBox(width: 5),
-                      Icon(Icons.keyboard_arrow_up,
-                          size: 18, color: Colors.grey.shade500),
+                      const Icon(Icons.keyboard_arrow_up,
+                          size: 18, color: AppThemeConstants.grey500),
                     ],
                   ),
                   // Juz label
@@ -430,8 +431,8 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                     const SizedBox(height: 2),
                     Text(
                       'الجزء ${pageInfo!['juz']}',
-                      style: TextStyle(
-                          fontSize: 11, color: Colors.grey.shade600),
+                      style: const TextStyle(
+                          fontSize: 11, color: AppThemeConstants.grey600),
                     ),
                   ],
                   // Mistakes badge
@@ -441,16 +442,16 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
+                        color: AppThemeConstants.warningLight,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.orange.shade300),
+                        border: Border.all(color: AppThemeConstants.accentOrange),
                       ),
                       child: Text(
                         '$mistakesOnPage '
                         '${mistakesOnPage == 1 ? 'ملاحظة' : 'ملاحظات'}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
-                          color: Colors.orange.shade800,
+                          color: AppThemeConstants.warningDark,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -491,12 +492,12 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
   Color _getMistakeColor(MistakeType type) {
     switch (type) {
-      case MistakeType.tajweed:       return Colors.orange;
-      case MistakeType.pronunciation: return Colors.red;
-      case MistakeType.reading:       return Colors.purple;
-      case MistakeType.skip:          return Colors.blue;
-      case MistakeType.addition:      return Colors.green;
-      case MistakeType.other:         return Colors.grey;
+      case MistakeType.tajweed:       return AppThemeConstants.warning;
+      case MistakeType.pronunciation: return AppThemeConstants.error;
+      case MistakeType.reading:       return AppThemeConstants.accentPurple;
+      case MistakeType.skip:          return AppThemeConstants.accentBlue;
+      case MistakeType.addition:      return AppThemeConstants.success;
+      case MistakeType.other:         return AppThemeConstants.grey500;
     }
   }
 
@@ -579,7 +580,7 @@ class _JumpToSheetState extends State<_JumpToSheet>
         minChildSize: 0.45,
         builder: (_, scrollCtrl) => Container(
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: AppThemeConstants.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
@@ -591,7 +592,7 @@ class _JumpToSheetState extends State<_JumpToSheet>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: AppThemeConstants.grey300,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -603,8 +604,8 @@ class _JumpToSheetState extends State<_JumpToSheet>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Icon(Icons.menu_book,
-                        color: Colors.green.shade700, size: 22),
+                    const Icon(Icons.menu_book,
+                        color: AppThemeConstants.success, size: 22),
                     const SizedBox(width: 8),
                     const Text(
                       'الانتقال إلى',
@@ -617,15 +618,15 @@ class _JumpToSheetState extends State<_JumpToSheet>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: AppThemeConstants.successLight,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade200),
+                        border: Border.all(color: AppThemeConstants.accentGreenAlt),
                       ),
                       child: Text(
                         'ص ${widget.currentPage}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.green.shade800,
+                          color: AppThemeConstants.successDark,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -659,7 +660,7 @@ class _JumpToSheetState extends State<_JumpToSheet>
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: AppThemeConstants.grey50,
                   ),
                 ),
               ),
@@ -668,9 +669,9 @@ class _JumpToSheetState extends State<_JumpToSheet>
               // ── Tabs ──────────────────────────────────────────────────
               TabBar(
                 controller: _tab,
-                labelColor: Colors.green.shade700,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: Colors.green.shade700,
+                labelColor: AppThemeConstants.success,
+                unselectedLabelColor: AppThemeConstants.grey500,
+                indicatorColor: AppThemeConstants.success,
                 labelStyle: const TextStyle(fontWeight: FontWeight.bold),
                 tabs: const [
                   Tab(
@@ -752,11 +753,11 @@ class _SurahList extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey.shade300),
+            const Icon(Icons.search_off, size: 48, color: AppThemeConstants.grey300),
             const SizedBox(height: 12),
             Text(
               'لا توجد نتائج لـ "$query"',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+              style: const TextStyle(color: AppThemeConstants.grey500, fontSize: 14),
             ),
           ],
         ),
@@ -775,7 +776,7 @@ class _SurahList extends StatelessWidget {
         final isCurrent = surahNum == currentSurah;
 
         return Material(
-          color: isCurrent ? Colors.green.shade50 : Colors.transparent,
+          color: isCurrent ? AppThemeConstants.successLight : AppThemeConstants.transparent,
           child: InkWell(
             onTap: () => onSelected(page),
             child: Padding(
@@ -789,13 +790,13 @@ class _SurahList extends StatelessWidget {
                     height: 38,
                     decoration: BoxDecoration(
                       color: isCurrent
-                          ? Colors.green.shade600
-                          : Colors.green.shade50,
+                          ? AppThemeConstants.success
+                          : AppThemeConstants.successLight,
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isCurrent
-                            ? Colors.green.shade600
-                            : Colors.green.shade200,
+                            ? AppThemeConstants.success
+                            : AppThemeConstants.accentGreenAlt,
                       ),
                     ),
                     alignment: Alignment.center,
@@ -805,8 +806,8 @@ class _SurahList extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                         color: isCurrent
-                            ? Colors.white
-                            : Colors.green.shade700,
+                            ? AppThemeConstants.white
+                            : AppThemeConstants.success,
                       ),
                     ),
                   ),
@@ -822,16 +823,16 @@ class _SurahList extends StatelessWidget {
                             : FontWeight.w500,
                         fontSize: 16,
                         color: isCurrent
-                            ? Colors.green.shade800
-                            : Colors.black87,
+                            ? AppThemeConstants.successDark
+                            : AppThemeConstants.black87,
                       ),
                     ),
                   ),
 
                   // Current indicator
                   if (isCurrent) ...[
-                    Icon(Icons.location_on,
-                        size: 14, color: Colors.green.shade600),
+                    const Icon(Icons.location_on,
+                        size: 14, color: AppThemeConstants.success),
                     const SizedBox(width: 4),
                   ],
 
@@ -841,8 +842,8 @@ class _SurahList extends StatelessWidget {
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: isCurrent
-                          ? Colors.green.shade100
-                          : Colors.grey.shade100,
+                          ? AppThemeConstants.successLight
+                          : AppThemeConstants.grey100,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -850,8 +851,8 @@ class _SurahList extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         color: isCurrent
-                            ? Colors.green.shade800
-                            : Colors.grey.shade600,
+                            ? AppThemeConstants.successDark
+                            : AppThemeConstants.grey600,
                         fontWeight: isCurrent
                             ? FontWeight.bold
                             : FontWeight.normal,
@@ -905,18 +906,18 @@ class _JuzList extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
-              color: isCurrent ? Colors.green.shade600 : Colors.green.shade50,
+              color: isCurrent ? AppThemeConstants.success : AppThemeConstants.successLight,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isCurrent
-                    ? Colors.green.shade700
-                    : Colors.green.shade200,
+                    ? AppThemeConstants.success
+                    : AppThemeConstants.accentGreenAlt,
                 width: isCurrent ? 2 : 1,
               ),
               boxShadow: isCurrent
                   ? [
                       BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.3),
+                        color: AppThemeConstants.success.withValues(alpha: 0.3),
                         blurRadius: 6,
                         offset: const Offset(0, 3),
                       ),
@@ -928,7 +929,7 @@ class _JuzList extends StatelessWidget {
               children: [
                 Icon(
                   isCurrent ? Icons.location_on : Icons.book_outlined,
-                  color: isCurrent ? Colors.white : Colors.green.shade600,
+                  color: isCurrent ? AppThemeConstants.white : AppThemeConstants.success,
                   size: 20,
                 ),
                 const SizedBox(height: 5),
@@ -937,7 +938,7 @@ class _JuzList extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
-                    color: isCurrent ? Colors.white : Colors.green.shade800,
+                    color: isCurrent ? AppThemeConstants.white : AppThemeConstants.successDark,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -946,8 +947,8 @@ class _JuzList extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     color: isCurrent
-                        ? Colors.green.shade100
-                        : Colors.grey.shade600,
+                        ? AppThemeConstants.successLight
+                        : AppThemeConstants.grey600,
                   ),
                 ),
               ],

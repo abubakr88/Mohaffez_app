@@ -469,7 +469,7 @@ class _AvailabilityManagementScreenState
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primary),
                 child: const Text('إضافة',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppThemeConstants.white)),
               ),
             ],
           ),
@@ -565,12 +565,12 @@ class _AvailabilityManagementScreenState
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.save, color: Colors.white),
+                            strokeWidth: 2, color: AppThemeConstants.white))
+                    : const Icon(Icons.save, color: AppThemeConstants.white),
                 label: Text(
                   _saving ? 'جارٍ الحفظ…' : 'حفظ الجدول',
                   style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold),
+                      color: AppThemeConstants.white, fontWeight: FontWeight.bold),
                 ),
               )
             : null,
@@ -605,11 +605,11 @@ class _AvailabilityManagementScreenState
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppThemeConstants.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.calendar_today,
-                            size: 28, color: Colors.white),
+                            size: 28, color: AppThemeConstants.white),
                       ),
                       const SizedBox(width: 16),
                       const Expanded(
@@ -621,13 +621,13 @@ class _AvailabilityManagementScreenState
                               style: TextStyle(
                                   fontSize: 26,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white),
+                                  color: AppThemeConstants.white),
                             ),
                             SizedBox(height: 4),
                             Text(
                               'حدد أيامك وأوقاتك بسهولة',
                               style: TextStyle(
-                                  fontSize: 13, color: Colors.white70),
+                                  fontSize: 13, color: AppThemeConstants.white70),
                             ),
                           ],
                         ),
@@ -635,7 +635,7 @@ class _AvailabilityManagementScreenState
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: IconButton(
-                          icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                          icon: const Icon(Icons.settings_outlined, color: AppThemeConstants.white),
                           tooltip: 'إعدادات الجدول',
                           onPressed: _showScheduleSettings,
                         ),
@@ -656,12 +656,12 @@ class _AvailabilityManagementScreenState
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppThemeConstants.grey200),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: AppThemeConstants.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2)),
         ],
@@ -688,16 +688,16 @@ class _AvailabilityManagementScreenState
               _StatPill(
                 label: 'استراحة',
                 value: '$_breakMinutes د',
-                color: Colors.orange.shade700,
+                color: AppThemeConstants.warning,
                 icon: Icons.free_breakfast_outlined,
               ),
             ],
             if (_excludePrayers) ...[
               const SizedBox(width: 16),
-              _StatPill(
+              const _StatPill(
                 label: 'الصلوات مستثناة',
                 value: '5',
-                color: Colors.green.shade700,
+                color: AppThemeConstants.success,
                 icon: Icons.mosque_outlined,
               ),
             ],
@@ -712,19 +712,19 @@ class _AvailabilityManagementScreenState
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppThemeConstants.accentBlueLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.blue.shade100),
+        border: Border.all(color: AppThemeConstants.accentBlueLight),
       ),
-      child: Row(
+      child: const Row(
         children: [
-          Icon(Icons.info_outline, color: Colors.blue.shade600, size: 18),
-          const SizedBox(width: 10),
+          Icon(Icons.info_outline, color: AppThemeConstants.accentBlueDark, size: 18),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
               'فعّل الأيام التي تعمل فيها، حدد الوقت ونوع الجلسة، ثم اضغط حفظ.',
               style:
-                  TextStyle(fontSize: 12, color: Colors.blue.shade800),
+                  TextStyle(fontSize: 12, color: AppThemeConstants.accentBlueDark),
             ),
           ),
         ],
@@ -806,7 +806,7 @@ class _AvailabilityManagementScreenState
                   Row(
                     children: [
                       const Icon(Icons.mosque_outlined,
-                          color: Colors.green, size: 20),
+                          color: AppThemeConstants.success, size: 20),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text('استثناء أوقات الصلاة',
@@ -818,7 +818,7 @@ class _AvailabilityManagementScreenState
                         value: tempExcludePrayers,
                         onChanged: (v) =>
                             setDS(() => tempExcludePrayers = v),
-                        activeTrackColor: Colors.green,
+                        activeTrackColor: AppThemeConstants.success,
                       ),
                     ],
                   ),
@@ -858,23 +858,23 @@ class _AvailabilityManagementScreenState
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: AppThemeConstants.successLight,
                         borderRadius: BorderRadius.circular(8),
                         border:
-                            Border.all(color: Colors.green.shade200),
+                            Border.all(color: AppThemeConstants.accentGreenAlt),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline,
-                              color: Colors.green.shade700, size: 16),
+                          const Icon(Icons.info_outline,
+                              color: AppThemeConstants.success, size: 16),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _prayerWindowDescription(
                                   tempBefore, tempAfter),
-                              style: TextStyle(
+                              style: const TextStyle(
                                   fontSize: 12,
-                                  color: Colors.green.shade800),
+                                  color: AppThemeConstants.successDark),
                             ),
                           ),
                         ],
@@ -905,7 +905,7 @@ class _AvailabilityManagementScreenState
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primary),
                 child: const Text('حفظ الإعدادات',
-                    style: TextStyle(color: Colors.white)),
+                    style: TextStyle(color: AppThemeConstants.white)),
               ),
             ],
           ),
@@ -964,7 +964,7 @@ class _DayCard extends StatelessWidget {
   static const _typeColors = {
     'home': AppThemeConstants.primary,
     'mosque': AppThemeConstants.secondary,
-    'online': Colors.blue,
+    'online': AppThemeConstants.accentBlue,
   };
 
   @override
@@ -973,12 +973,12 @@ class _DayCard extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: availability.isActive
               ? AppThemeConstants.primary
-              : Colors.grey.shade200,
+              : AppThemeConstants.grey200,
           width: 1.5,
         ),
         boxShadow: availability.isActive
@@ -1020,7 +1020,7 @@ class _DayCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: availability.isActive
                   ? AppThemeConstants.primary.withValues(alpha: 0.1)
-                  : Colors.grey.shade100,
+                  : AppThemeConstants.grey100,
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -1031,7 +1031,7 @@ class _DayCard extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: availability.isActive
                       ? AppThemeConstants.primary
-                      : Colors.grey.shade500,
+                      : AppThemeConstants.grey500,
                 ),
               ),
             ),
@@ -1044,8 +1044,8 @@ class _DayCard extends StatelessWidget {
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: availability.isActive
-                    ? Colors.black87
-                    : Colors.grey.shade400,
+                    ? AppThemeConstants.black87
+                    : AppThemeConstants.grey400,
               ),
             ),
           ),
@@ -1064,15 +1064,15 @@ class _DayCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Icon(Icons.access_time, size: 18, color: Colors.grey.shade500),
+          const Icon(Icons.access_time, size: 18, color: AppThemeConstants.grey500),
           const SizedBox(width: 8),
           const Text('من',
-              style: TextStyle(fontSize: 13, color: Colors.grey)),
+              style: TextStyle(fontSize: 13, color: AppThemeConstants.grey500)),
           const SizedBox(width: 8),
           _TimeButton(time: availability.startTime, onTap: onPickStart),
           const SizedBox(width: 8),
           const Text('إلى',
-              style: TextStyle(fontSize: 13, color: Colors.grey)),
+              style: TextStyle(fontSize: 13, color: AppThemeConstants.grey500)),
           const SizedBox(width: 8),
           _TimeButton(time: availability.endTime, onTap: onPickEnd),
         ],
@@ -1110,11 +1110,11 @@ class _DayCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              Icon(Icons.block, size: 16, color: Colors.red.shade400),
-              const SizedBox(width: 6),
-              const Text(
+              Icon(Icons.block, size: 16, color: AppThemeConstants.accentRed),
+              SizedBox(width: 6),
+              Text(
                 'أوقات مستثناة',
                 style:
                     TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
@@ -1132,28 +1132,28 @@ class _DayCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: AppThemeConstants.errorLight,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade100),
+                    border: Border.all(color: AppThemeConstants.errorLight),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.remove_circle_outline,
-                          size: 16, color: Colors.red.shade400),
+                      const Icon(Icons.remove_circle_outline,
+                          size: 16, color: AppThemeConstants.accentRed),
                       const SizedBox(width: 8),
                       Text(
                         '${excl.start}  –  ${excl.end}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.red.shade700,
+                          color: AppThemeConstants.error,
                         ),
                       ),
                       const Spacer(),
                       GestureDetector(
                         onTap: () => onRemoveExclusion(i),
-                        child: Icon(Icons.close,
-                            size: 18, color: Colors.red.shade400),
+                        child: const Icon(Icons.close,
+                            size: 18, color: AppThemeConstants.accentRed),
                       ),
                     ],
                   ),
@@ -1168,7 +1168,7 @@ class _DayCard extends StatelessWidget {
             label: const Text('إضافة وقت مستثنى',
                 style: TextStyle(fontSize: 12)),
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red.shade600,
+              foregroundColor: AppThemeConstants.error,
               padding: EdgeInsets.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -1267,10 +1267,10 @@ class _TypeChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? color.withValues(alpha: 0.12)
-              : Colors.grey.shade100,
+              : AppThemeConstants.grey100,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? color : Colors.grey.shade300,
+            color: selected ? color : AppThemeConstants.grey300,
             width: 1.5,
           ),
         ),
@@ -1279,7 +1279,7 @@ class _TypeChip extends StatelessWidget {
           children: [
             Icon(icon,
                 size: 18,
-                color: selected ? color : Colors.grey.shade400),
+                color: selected ? color : AppThemeConstants.grey400),
             const SizedBox(height: 4),
             Text(
               label,
@@ -1287,7 +1287,7 @@ class _TypeChip extends StatelessWidget {
                 fontSize: 11,
                 fontWeight:
                     selected ? FontWeight.bold : FontWeight.normal,
-                color: selected ? color : Colors.grey.shade500,
+                color: selected ? color : AppThemeConstants.grey500,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1331,8 +1331,8 @@ class _StatPill extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: color)),
             Text(label,
-                style: TextStyle(
-                    fontSize: 11, color: Colors.grey.shade500)),
+                style: const TextStyle(
+                    fontSize: 11, color: AppThemeConstants.grey500)),
           ],
         ),
       ],
@@ -1372,8 +1372,8 @@ class _OffsetRow extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600)),
               Text(sublabel,
-                  style: TextStyle(
-                      fontSize: 11, color: Colors.grey.shade600)),
+                  style: const TextStyle(
+                      fontSize: 11, color: AppThemeConstants.grey600)),
             ],
           ),
         ),
@@ -1418,19 +1418,19 @@ class _StepButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: enabled
               ? AppThemeConstants.primary.withValues(alpha: 0.1)
-              : Colors.grey.shade100,
+              : AppThemeConstants.grey100,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: enabled
                 ? AppThemeConstants.primary.withValues(alpha: 0.3)
-                : Colors.grey.shade200,
+                : AppThemeConstants.grey200,
           ),
         ),
         child: Icon(icon,
             size: 18,
             color: enabled
                 ? AppThemeConstants.primary
-                : Colors.grey.shade400),
+                : AppThemeConstants.grey400),
       ),
     );
   }

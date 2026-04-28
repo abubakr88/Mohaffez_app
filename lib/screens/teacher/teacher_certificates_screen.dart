@@ -96,7 +96,7 @@ class _TeacherCertificatesScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppThemeConstants.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -226,7 +226,7 @@ class _TeacherCertificatesScreenState
                           const SnackBar(
                               content:
                                   Text('يرجى ملء الحقول المطلوبة (*)'),
-                              backgroundColor: Colors.red),
+                              backgroundColor: AppThemeConstants.error),
                         );
                         return;
                       }
@@ -242,7 +242,7 @@ class _TeacherCertificatesScreenState
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _DS.teal700,
-                      foregroundColor: Colors.white,
+                      foregroundColor: AppThemeConstants.white,
                       shape: const RoundedRectangleBorder(
                           borderRadius: _DS.r12),
                     ),
@@ -326,7 +326,7 @@ class _TeacherCertificatesScreenState
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: AppThemeConstants.transparent,
         statusBarIconBrightness: Brightness.light,
       ),
       child: Directionality(
@@ -343,7 +343,7 @@ class _TeacherCertificatesScreenState
                   pinned: true,
                   automaticallyImplyLeading: false,
                   backgroundColor: _DS.teal700,
-                  surfaceTintColor: Colors.transparent,
+                  surfaceTintColor: AppThemeConstants.transparent,
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
                     background: Container(
@@ -366,13 +366,13 @@ class _TeacherCertificatesScreenState
                                   Container(
                                     width: 44, height: 44,
                                     decoration: BoxDecoration(
-                                      color: Colors.white
+                                      color: AppThemeConstants.white
                                           .withValues(alpha: 0.15),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
                                         Icons.workspace_premium_rounded,
-                                        color: Colors.white, size: 24),
+                                        color: AppThemeConstants.white, size: 24),
                                   ),
                                   const SizedBox(width: 12),
                                   const Expanded(
@@ -384,13 +384,13 @@ class _TeacherCertificatesScreenState
                                             style: TextStyle(
                                                 fontSize: 20,
                                                 fontWeight: FontWeight.w800,
-                                                color: Colors.white)),
+                                                color: AppThemeConstants.white)),
                                         SizedBox(height: 4),
                                         Text(
                                             'أضف نبذتك وشهاداتك ثم أرسل طلب الانضمام',
                                             style: TextStyle(
                                                 fontSize: 13,
-                                                color: Colors.white70)),
+                                                color: AppThemeConstants.white70)),
                                       ],
                                     ),
                                   ),
@@ -574,7 +574,7 @@ class _TeacherCertificatesScreenState
                           onPressed: _submitting ? null : _submit,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _DS.teal700,
-                            foregroundColor: Colors.white,
+                            foregroundColor: AppThemeConstants.white,
                             shape: const RoundedRectangleBorder(
                                 borderRadius: _DS.r16),
                             elevation: 0,
@@ -584,7 +584,7 @@ class _TeacherCertificatesScreenState
                                   width: 24, height: 24,
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2.5,
-                                      color: Colors.white),
+                                      color: AppThemeConstants.white),
                                 )
                               : const Row(
                                   mainAxisAlignment:
@@ -646,8 +646,8 @@ class _StepIndicator extends StatelessWidget {
                   height: 4,
                   decoration: BoxDecoration(
                     color: active
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.3),
+                        ? AppThemeConstants.white
+                        : AppThemeConstants.white.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                   margin: EdgeInsets.only(left: i < 2 ? 6 : 0),
@@ -658,7 +658,7 @@ class _StepIndicator extends StatelessWidget {
                   width: 20, height: 20,
                   margin: const EdgeInsets.only(right: 6),
                   decoration: const BoxDecoration(
-                      color: Colors.white, shape: BoxShape.circle),
+                      color: AppThemeConstants.white, shape: BoxShape.circle),
                   child: Center(
                     child: Text('$currentStep',
                         style: const TextStyle(
@@ -693,12 +693,12 @@ class _SectionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: _DS.r16,
         border: Border.all(color: _DS.border),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: AppThemeConstants.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2)),
         ],
@@ -783,7 +783,7 @@ class _CertTile extends StatelessWidget {
             decoration: const BoxDecoration(
                 color: _DS.teal500, shape: BoxShape.circle),
             child: const Icon(Icons.workspace_premium_rounded,
-                color: Colors.white, size: 20),
+                color: AppThemeConstants.white, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -808,7 +808,7 @@ class _CertTile extends StatelessWidget {
           IconButton(
             onPressed: onRemove,
             icon: const Icon(Icons.close_rounded,
-                color: Colors.red, size: 20),
+                color: AppThemeConstants.error, size: 20),
             tooltip: 'إزالة',
           ),
         ],

@@ -86,13 +86,13 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
+                                    color: AppThemeConstants.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
                                     Icons.event_available,
                                     size: 28,
-                                    color: Colors.white,
+                                    color: AppThemeConstants.white,
                                   ),
                                 ),
                                 const SizedBox(width: 16),
@@ -106,7 +106,7 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                         style: TextStyle(
                                           fontSize: 26,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                                          color: AppThemeConstants.white,
                                         ),
                                       ),
                                       SizedBox(height: 4),
@@ -114,7 +114,7 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                         'جلساتك المجدولة',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.white70,
+                                          color: AppThemeConstants.white70,
                                         ),
                                       ),
                                     ],
@@ -128,7 +128,7 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                       vertical: 8,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: AppThemeConstants.white,
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
@@ -225,9 +225,9 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                       // Filtered Count
                       Text(
                         'عدد الجلسات: ${filteredSessions.length}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade600,
+                          color: AppThemeConstants.grey600,
                         ),
                       ),
                     ],
@@ -427,7 +427,7 @@ class SessionCard extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم تسجيل عدم الحضور'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppThemeConstants.warning,
         ),
       );
 
@@ -453,7 +453,7 @@ class SessionCard extends ConsumerWidget {
         child: AlertDialog(
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              Icon(Icons.warning_amber_rounded, color: AppThemeConstants.warning, size: 28),
               SizedBox(width: 12),
               Text(ArabicLabels.cancelSession),
             ],
@@ -470,18 +470,18 @@ class SessionCard extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.accentBlueLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: AppThemeConstants.accentBlue),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline, size: 20, color: Colors.blue),
+                    Icon(Icons.info_outline, size: 20, color: AppThemeConstants.accentBlue),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'سيتم إعادة الوقت للمحفظ ليتمكن طلاب آخرون من الحجز',
-                        style: TextStyle(fontSize: 13, color: Colors.blue),
+                        style: TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
                       ),
                     ),
                   ],
@@ -497,8 +497,8 @@ class SessionCard extends ConsumerWidget {
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                backgroundColor: AppThemeConstants.error,
+                foregroundColor: AppThemeConstants.white,
               ),
               child: const Text('نعم، إلغاء الجلسة'),
             ),
@@ -538,12 +538,12 @@ class SessionCard extends ConsumerWidget {
         const SnackBar(
           content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
+              Icon(Icons.check_circle, color: AppThemeConstants.white),
               SizedBox(width: 12),
               Text('تم إلغاء الجلسة بنجاح'),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: AppThemeConstants.success,
           duration: Duration(seconds: 3),
         ),
       );
@@ -555,12 +555,12 @@ class SessionCard extends ConsumerWidget {
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.error_outline, color: Colors.white),
+              const Icon(Icons.error_outline, color: AppThemeConstants.white),
               const SizedBox(width: 12),
               Expanded(child: Text('فشل إلغاء الجلسة: ${e.toString()}')),
             ],
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -722,9 +722,9 @@ class SessionCard extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Text(
                           sessionType,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade600,
+                            color: AppThemeConstants.grey600,
                           ),
                         ),
                       ],
@@ -766,17 +766,17 @@ class SessionCard extends ConsumerWidget {
               // Date & Time
               Row(
                 children: [
-                  Icon(Icons.calendar_today,
-                      size: 14, color: Colors.grey.shade600),
+                  const Icon(Icons.calendar_today,
+                      size: 14, color: AppThemeConstants.grey600),
                   const SizedBox(width: 6),
                   Text(
                     sessionDate != null
                         ? DateFormat('EEEE dd MMMM yyyy', 'ar')
                             .format(sessionDate)
                         : 'غير محدد',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color: AppThemeConstants.grey700,
                     ),
                   ),
                 ],
@@ -784,27 +784,27 @@ class SessionCard extends ConsumerWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.access_time,
-                      size: 14, color: Colors.grey.shade600),
+                  const Icon(Icons.access_time,
+                      size: 14, color: AppThemeConstants.grey600),
                   const SizedBox(width: 6),
                   Text(
                     timeSlot,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
-                      color: Colors.grey.shade700,
+                      color: AppThemeConstants.grey700,
                     ),
                   ),
                   if (location.isNotEmpty) ...[
                     const SizedBox(width: 16),
-                    Icon(Icons.location_on,
-                        size: 14, color: Colors.grey.shade600),
+                    const Icon(Icons.location_on,
+                        size: 14, color: AppThemeConstants.grey600),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         location,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.grey.shade700,
+                          color: AppThemeConstants.grey700,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -830,8 +830,8 @@ class SessionCard extends ConsumerWidget {
                                 ? null
                                 : () => _openWhatsApp(context, mohaffezPhone),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.green,
-                          side: const BorderSide(color: Colors.green),
+                          foregroundColor: AppThemeConstants.success,
+                          side: const BorderSide(color: AppThemeConstants.success),
                         ),
                       ),
                     ),
@@ -846,8 +846,8 @@ class SessionCard extends ConsumerWidget {
                                 ? null
                                 : () => _callTeacher(context, mohaffezPhone),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.blue,
-                          side: const BorderSide(color: Colors.blue),
+                          foregroundColor: AppThemeConstants.accentBlue,
+                          side: const BorderSide(color: AppThemeConstants.accentBlue),
                         ),
                       ),
                     ),
@@ -859,8 +859,8 @@ class SessionCard extends ConsumerWidget {
                             style: TextStyle(fontSize: 14)),
                         onPressed: () => _openMaps(context, locationAddress),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
+                          foregroundColor: AppThemeConstants.error,
+                          side: const BorderSide(color: AppThemeConstants.error),
                         ),
                       ),
                     ),
@@ -874,7 +874,7 @@ class SessionCard extends ConsumerWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
-                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                  icon: const Icon(Icons.cancel_outlined, color: AppThemeConstants.error),
                   tooltip: ArabicLabels.cancelSession,
                   onPressed: () => _showCancelSessionDialog(
                     context,
@@ -898,8 +898,8 @@ class SessionCard extends ConsumerWidget {
                           icon: const Icon(Icons.person_off, size: 18),
                           label: const Text('لم يحضر'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.orange,
-                            side: const BorderSide(color: Colors.orange),
+                            foregroundColor: AppThemeConstants.warning,
+                            side: const BorderSide(color: AppThemeConstants.warning),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
@@ -944,8 +944,8 @@ class SessionCard extends ConsumerWidget {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                              isLate ? Colors.orange : AppThemeConstants.secondary,
-                          foregroundColor: Colors.white,
+                              isLate ? AppThemeConstants.warning : AppThemeConstants.secondary,
+                          foregroundColor: AppThemeConstants.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -960,21 +960,21 @@ class SessionCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: AppThemeConstants.accentBlueLight,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
+                    border: Border.all(color: AppThemeConstants.accentBlue),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.schedule,
-                          size: 20, color: Colors.blue.shade700),
+                      const Icon(Icons.schedule,
+                          size: 20, color: AppThemeConstants.accentBlueDark),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'يمكن إكمال الجلسة قبل الموعد بـ $earlyMinutes دقيقة',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.blue.shade900,
+                            color: AppThemeConstants.accentBlueDark,
                           ),
                         ),
                       ),
@@ -1031,7 +1031,7 @@ class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
           ElevatedButton(
             onPressed: () =>
                 Navigator.pop(context, reasonController.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.warning),
             child: const Text('تأكيد'),
           ),
         ],

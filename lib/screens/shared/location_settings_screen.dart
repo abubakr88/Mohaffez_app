@@ -146,17 +146,17 @@ class _LocationSettingsScreenState
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.gps_fixed,
                                       size: 16,
-                                      color: Colors.grey.shade500,
+                                      color: AppThemeConstants.grey500,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'خط العرض: ${user.addressLat!.toStringAsFixed(4)}',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey.shade600,
+                                        color: AppThemeConstants.grey600,
                                       ),
                                     ),
                                   ],
@@ -164,17 +164,17 @@ class _LocationSettingsScreenState
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.gps_fixed,
                                       size: 16,
-                                      color: Colors.grey.shade500,
+                                      color: AppThemeConstants.grey500,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'خط الطول: ${user.addressLng!.toStringAsFixed(4)}',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey.shade600,
+                                        color: AppThemeConstants.grey600,
                                       ),
                                     ),
                                   ],
@@ -223,7 +223,7 @@ class _LocationSettingsScreenState
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: AppThemeConstants.white,
                               ),
                             )
                           : Icon(
@@ -241,7 +241,7 @@ class _LocationSettingsScreenState
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: AppThemeConstants.secondary,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppThemeConstants.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -255,26 +255,26 @@ class _LocationSettingsScreenState
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
+                        color: AppThemeConstants.errorLight,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.red.shade200,
+                          color: AppThemeConstants.accentRed,
                         ),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
                           Icon(
                             Icons.error_outline,
-                            color: Colors.red.shade700,
+                            color: AppThemeConstants.error,
                             size: 20,
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'بدون موقع، لن يتمكن الطلاب من العثور عليك في البحث',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.red.shade900,
+                                color: AppThemeConstants.errorDark,
                                 height: 1.3,
                               ),
                             ),
@@ -324,7 +324,7 @@ class _LocationSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ تم تحديث الموقع بنجاح'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
       }
@@ -333,7 +333,7 @@ class _LocationSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطأ: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }

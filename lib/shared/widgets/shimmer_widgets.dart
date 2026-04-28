@@ -16,8 +16,8 @@ class ShimmerWidgets {
     if (!enabled) return child;
 
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: baseColor ?? AppThemeConstants.grey300,
+      highlightColor: highlightColor ?? AppThemeConstants.grey100,
       child: child,
     );
   }
@@ -129,7 +129,7 @@ class ShimmerWidgets {
                   width: 80,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppThemeConstants.white,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -138,7 +138,7 @@ class ShimmerWidgets {
                   width: 60,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppThemeConstants.white,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),

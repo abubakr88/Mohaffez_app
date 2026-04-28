@@ -27,8 +27,8 @@ class _AdminPaymentEventsScreenState
     'paymentcompleted': {'label': 'مكتمل', 'color': AppThemeConstants.success},
     'paymentfailed': {'label': 'فشل', 'color': AppThemeConstants.error},
     'webhookreceived': {'label': 'Webhook', 'color': AppThemeConstants.info},
-    'bookingconfirmed': {'label': 'حجز', 'color': Colors.teal},
-    'subscriptioncreated': {'label': 'اشتراك', 'color': Colors.purple},
+    'bookingconfirmed': {'label': 'حجز', 'color': AppThemeConstants.primary},
+    'subscriptioncreated': {'label': 'اشتراك', 'color': AppThemeConstants.accentPurple},
     'paymentcreated': {'label': 'جديد', 'color': AppThemeConstants.warning},
   };
 
@@ -216,12 +216,12 @@ class _AdminPaymentEventsScreenState
                   if (snapshot.hasError) {
                     return Center(
                       child: Card(
-                        color: Colors.red.shade50,
+                        color: AppThemeConstants.errorLight,
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Text(
                             'خطأ في تحميل الأحداث: ${snapshot.error}',
-                            style: TextStyle(color: Colors.red.shade700),
+                            style: const TextStyle(color: AppThemeConstants.error),
                           ),
                         ),
                       ),
@@ -254,7 +254,7 @@ class _AdminPaymentEventsScreenState
                       // Get event type config
                       final config = _eventTypeConfig[eventType];
                       final label = config?['label'] as String? ?? eventType;
-                      final color = config?['color'] as Color? ?? Colors.grey;
+                      final color = config?['color'] as Color? ?? AppThemeConstants.grey500;
 
                       return Card(
                         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -284,8 +284,8 @@ class _AdminPaymentEventsScreenState
                                   if (timestamp != null)
                                     Text(
                                       timeFormat.format(timestamp.toDate()),
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
+                                      style: const TextStyle(
+                                        color: AppThemeConstants.grey600,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -305,10 +305,10 @@ class _AdminPaymentEventsScreenState
                               // Bottom: ExpansionTile
                               if (extraData != null && extraData.isNotEmpty)
                                 ExpansionTile(
-                                  title: Text(
+                                  title: const Text(
                                     'بيانات إضافية',
                                     style: TextStyle(
-                                      color: Colors.grey[600],
+                                      color: AppThemeConstants.grey600,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -323,7 +323,7 @@ class _AdminPaymentEventsScreenState
                                                 Text(
                                                   e.key,
                                                   style: const TextStyle(
-                                                    color: Colors.amber,
+                                                    color: AppThemeConstants.accentAmber,
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 12,
                                                   ),
@@ -331,8 +331,8 @@ class _AdminPaymentEventsScreenState
                                                 const Spacer(),
                                                 Text(
                                                   e.value.toString(),
-                                                  style: TextStyle(
-                                                    color: Colors.grey[700],
+                                                  style: const TextStyle(
+                                                    color: AppThemeConstants.grey700,
                                                     fontSize: 12,
                                                   ),
                                                 ),
@@ -367,8 +367,8 @@ class _AdminPaymentEventsScreenState
         children: [
           Text(
             label,
-            style: TextStyle(
-              color: Colors.grey[600],
+            style: const TextStyle(
+              color: AppThemeConstants.grey600,
               fontSize: 12,
             ),
           ),

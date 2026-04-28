@@ -231,19 +231,39 @@ class _ConfirmBundleSessionScreenState
 
       // ── CREATE SLOT LOCK ───────────────────────────────────────────────────
       // Path A (use existing bundle) needs a slot lock to prevent conflicts,
-      // just like Path B (buy new bundle) creates one in directPayment.ts
+      // just like Path B (buy new bundle) creates one in directPayment.ts.
+      //
+      // Must include `availabilityDocId` — without it, the createSessionRequest
+      // CF reads the lock, can't locate the matching availability doc, and
+      // skips disabling the time slot. Result: the slot stays bookable for
+      // other students even though this booking is in flight.
       final firestore = FirebaseFirestore.instance;
+
+      // Look up the availability doc for the slot's weekday so the CF can
+      // disable the time slot atomically when it accepts the request.
+      final availabilitySnap = await firestore
+          .collection('users')
+          .doc(slotContext.mohaffezId)
+          .collection('availability')
+          .where('dayOfWeek', isEqualTo: slotDate.weekday)
+          .limit(1)
+          .get();
+      final availabilityDocId = availabilitySnap.docs.isEmpty
+          ? null
+          : availabilitySnap.docs.first.id;
+
       final lockRef = firestore.collection('slotLocks').doc();
       slotLockId = lockRef.id;
-      
+
       final expiresAt = DateTime.now().add(const Duration(hours: 24));
-      
+
       await lockRef.set({
         'id': slotLockId,
         'mohaffezId': slotContext.mohaffezId,
         'slotDate': Timestamp.fromDate(slotDate),
         'timeSlot': slotContext.preferredTimeSlot,
         'sessionType': slotContext.sessionType,
+        if (availabilityDocId != null) 'availabilityDocId': availabilityDocId,
         'lockedBy': currentUser.uid,
         'lockedAt': FieldValue.serverTimestamp(),
         'expiresAt': Timestamp.fromDate(expiresAt),

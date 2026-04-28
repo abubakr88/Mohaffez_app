@@ -61,7 +61,7 @@ class _DevModeOverlayState extends ConsumerState<DevModeOverlay> {
                   label: Text(
                     'DEV',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppThemeConstants.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

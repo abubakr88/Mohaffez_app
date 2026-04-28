@@ -165,14 +165,14 @@ class _AdminWalletSettingsScreenState
               controller: _vodafoneController,
               keyboardType: TextInputType.phone,
               validator: _validatePhone,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Vodafone Cash',
                 hintText: 'رقم Vodafone Cash',
                 prefixIcon: Icon(
                   Icons.phone_android,
-                  color: Colors.red.shade700,
+                  color: AppThemeConstants.error,
                 ),
-                border: const OutlineInputBorder(
+                border: OutlineInputBorder(
                   borderRadius: AppThemeConstants.borderRadiusMd,
                 ),
               ),
@@ -184,14 +184,14 @@ class _AdminWalletSettingsScreenState
               controller: _orangeController,
               keyboardType: TextInputType.phone,
               validator: _validatePhone,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Orange Money',
                 hintText: 'رقم Orange Money',
                 prefixIcon: Icon(
                   Icons.phone_android,
-                  color: Colors.orange.shade700,
+                  color: AppThemeConstants.warning,
                 ),
-                border: const OutlineInputBorder(
+                border: OutlineInputBorder(
                   borderRadius: AppThemeConstants.borderRadiusMd,
                 ),
               ),
@@ -212,11 +212,11 @@ class _AdminWalletSettingsScreenState
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppThemeConstants.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppThemeConstants.white,
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator(
-                        color: Colors.white,
+                        color: AppThemeConstants.white,
                       )
                     : const Text(
                         'حفظ الأرقام',

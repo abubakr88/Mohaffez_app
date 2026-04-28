@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 // Reads rejection note directly from Firestore (not in UserModel)
 final _rejectionNoteProvider = StreamProvider.autoDispose<String?>((ref) {
@@ -32,7 +33,7 @@ class TeacherRejectedScreen extends ConsumerWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: AppThemeConstants.transparent,
         statusBarIconBrightness: Brightness.dark,
       ),
       child: Directionality(
@@ -52,18 +53,18 @@ class TeacherRejectedScreen extends ConsumerWidget {
                       width: 120,
                       height: 120,
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
+                        color: AppThemeConstants.errorLight,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.red.withValues(alpha: 0.15),
+                            color: AppThemeConstants.error.withValues(alpha: 0.15),
                             blurRadius: 24,
                             offset: const Offset(0, 8),
                           ),
                         ],
                       ),
-                      child: Icon(Icons.cancel_rounded,
-                          size: 60, color: Colors.red.shade400),
+                      child: const Icon(Icons.cancel_rounded,
+                          size: 60, color: AppThemeConstants.accentRed),
                     ),
                     const SizedBox(height: 32),
 
@@ -95,26 +96,26 @@ class TeacherRejectedScreen extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: AppThemeConstants.errorLight,
                           borderRadius:
                               const BorderRadius.all(Radius.circular(12)),
                           border: Border.all(
-                              color: Colors.red.withValues(alpha: 0.3)),
+                              color: AppThemeConstants.error.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
                                 Icon(Icons.info_outline_rounded,
                                     size: 18,
-                                    color: Colors.red.shade600),
-                                const SizedBox(width: 8),
+                                    color: AppThemeConstants.error),
+                                SizedBox(width: 8),
                                 Text(
                                   'سبب الرفض:',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.red.shade700,
+                                    color: AppThemeConstants.error,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -123,9 +124,9 @@ class TeacherRejectedScreen extends ConsumerWidget {
                             const SizedBox(height: 8),
                             Text(
                               rejectionNote,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 14,
-                                color: Colors.red.shade900,
+                                color: AppThemeConstants.errorDark,
                                 height: 1.5,
                               ),
                             ),
@@ -140,14 +141,14 @@ class TeacherRejectedScreen extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppThemeConstants.white,
                         borderRadius:
                             const BorderRadius.all(Radius.circular(16)),
                         border: Border.all(
                             color: const Color(0xFFE5EDE9)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
+                            color: AppThemeConstants.black.withValues(alpha: 0.04),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -199,7 +200,7 @@ class TeacherRejectedScreen extends ConsumerWidget {
                                 fontWeight: FontWeight.w700)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0C6F6A),
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppThemeConstants.white,
                           shape: const RoundedRectangleBorder(
                             borderRadius:
                                 BorderRadius.all(Radius.circular(14)),

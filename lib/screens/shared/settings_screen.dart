@@ -122,7 +122,7 @@ class SettingsScreen extends ConsumerWidget {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: AppThemeConstants.grey500,
             ),
           ),
         ),
@@ -132,7 +132,7 @@ class SettingsScreen extends ConsumerWidget {
             borderRadius: AppThemeConstants.borderRadiusMd,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: AppThemeConstants.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -172,7 +172,7 @@ class SettingsScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('لا يمكن فتح رابط سياسة الخصوصية'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppThemeConstants.error,
             ),
           );
         }
@@ -182,7 +182,7 @@ class SettingsScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطأ: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -298,7 +298,7 @@ class SettingsScreen extends ConsumerWidget {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('تم تغيير كلمة المرور بنجاح'),
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppThemeConstants.success,
                       ),
                     );
                   }
@@ -308,7 +308,7 @@ class SettingsScreen extends ConsumerWidget {
                         ? 'كلمة المرور الحالية غير صحيحة'
                         : 'حدث خطأ: ${e.message}';
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(msg), backgroundColor: Colors.red),
+                      SnackBar(content: Text(msg), backgroundColor: AppThemeConstants.error),
                     );
                   }
                 }
@@ -499,7 +499,7 @@ class _EmailNotificationsScreenState extends State<EmailNotificationsScreen> {
               padding: EdgeInsets.only(bottom: 16),
               child: Text(
                 'اختر الإشعارات التي تريد استلامها عبر البريد الإلكتروني:',
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: AppThemeConstants.grey500),
               ),
             ),
             SwitchListTile(

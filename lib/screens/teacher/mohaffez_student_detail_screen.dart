@@ -262,20 +262,20 @@ class _StudentSummaryCard extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey),
+                    color: AppThemeConstants.grey500),
               ),
               const SizedBox(height: 8),
               if (student.hifzAssignment.isNotEmpty)
                 _InfoRow(
                   icon: Icons.menu_book,
-                  color: Colors.green,
+                  color: AppThemeConstants.success,
                   label: 'حفظ',
                   value: student.hifzAssignment,
                 ),
               if (student.murajaAssignment.isNotEmpty)
                 _InfoRow(
                   icon: Icons.refresh,
-                  color: Colors.blue,
+                  color: AppThemeConstants.accentBlue,
                   label: 'مراجعة',
                   value: student.murajaAssignment,
                 ),
@@ -334,11 +334,11 @@ class _SessionHistoryCard extends StatelessWidget {
 
     final status = session['status'] as String? ?? 'accepted';
     final (statusColor, statusLabel) = switch (status) {
-      'completed' => (Colors.green, 'مكتملة'),
-      'accepted' => (Colors.blue, 'مقبولة'),
-      'pending' => (Colors.orange, 'قيد الانتظار'),
-      'rejected' || 'cancelled' => (Colors.red, 'ملغية'),
-      _ => (Colors.grey, status),
+      'completed' => (AppThemeConstants.success, 'مكتملة'),
+      'accepted' => (AppThemeConstants.accentBlue, 'مقبولة'),
+      'pending' => (AppThemeConstants.warning, 'قيد الانتظار'),
+      'rejected' || 'cancelled' => (AppThemeConstants.error, 'ملغية'),
+      _ => (AppThemeConstants.grey500, status),
     };
 
     final hifz = session['hifzAssignment'] as String? ?? '';
@@ -359,7 +359,7 @@ class _SessionHistoryCard extends StatelessWidget {
             Row(
               children: [
                 const Icon(Icons.calendar_today,
-                    size: 14, color: Colors.grey),
+                    size: 14, color: AppThemeConstants.grey500),
                 const SizedBox(width: 6),
                 Text(
                   formattedDate,
@@ -392,15 +392,15 @@ class _SessionHistoryCard extends StatelessWidget {
               Row(
                 children: [
                   const Icon(Icons.access_time,
-                      size: 14, color: Colors.grey),
+                      size: 14, color: AppThemeConstants.grey500),
                   const SizedBox(width: 6),
                   Text(
                     session['preferredTimeSlot'] as String? ?? '',
                     style: const TextStyle(
-                        fontSize: 13, color: Colors.black87),
+                        fontSize: 13, color: AppThemeConstants.black87),
                   ),
                   const SizedBox(width: 12),
-                  const Icon(Icons.category, size: 14, color: Colors.grey),
+                  const Icon(Icons.category, size: 14, color: AppThemeConstants.grey500),
                   const SizedBox(width: 4),
                   Text(
                     switch (session['sessionType'] as String? ?? '') {
@@ -410,7 +410,7 @@ class _SessionHistoryCard extends StatelessWidget {
                       _ => session['sessionType'] as String? ?? '',
                     },
                     style: const TextStyle(
-                        fontSize: 13, color: Colors.black87),
+                        fontSize: 13, color: AppThemeConstants.black87),
                   ),
                 ],
               ),
@@ -423,7 +423,7 @@ class _SessionHistoryCard extends StatelessWidget {
                 Row(
                   children: [
                     const Icon(Icons.menu_book,
-                        size: 14, color: Colors.green),
+                        size: 14, color: AppThemeConstants.success),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -440,7 +440,7 @@ class _SessionHistoryCard extends StatelessWidget {
                 Row(
                   children: [
                     const Icon(Icons.refresh,
-                        size: 14, color: Colors.blue),
+                        size: 14, color: AppThemeConstants.accentBlue),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -467,14 +467,14 @@ class _SessionHistoryCard extends StatelessWidget {
                     (i) => Icon(
                       i < rating ? Icons.star : Icons.star_border,
                       size: 12,
-                      color: Colors.amber,
+                      color: AppThemeConstants.accentAmber,
                     ),
                   ),
                   const SizedBox(width: 6),
                   Text(
                     '$rating/10',
                     style: const TextStyle(
-                        fontSize: 12, color: Colors.grey),
+                        fontSize: 12, color: AppThemeConstants.grey500),
                   ),
                 ],
               ),
@@ -488,13 +488,13 @@ class _SessionHistoryCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: AppThemeConstants.grey100,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   session['performanceNotes'] as String? ?? '',
                   style: const TextStyle(
-                      fontSize: 12, color: Colors.black87),
+                      fontSize: 12, color: AppThemeConstants.black87),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),

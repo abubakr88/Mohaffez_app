@@ -66,7 +66,7 @@ class _DirectBookingRequestScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('حدث خطأ. أعد المحاولة'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -142,7 +142,7 @@ class _DirectBookingRequestScreenState
         messenger.showSnackBar(
           const SnackBar(
             content: Text('تم إرسال الطلب بالفعل'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppThemeConstants.warning,
           ),
         );
         context.go('/requests');
@@ -151,13 +151,13 @@ class _DirectBookingRequestScreenState
       messenger.showSnackBar(
         SnackBar(
           content: Text(e.message ?? e.code),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } on Exception catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('$e'), backgroundColor: AppThemeConstants.error),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -192,7 +192,7 @@ class _DirectBookingRequestScreenState
         appBar: AppBar(
           title: const Text('إرسال طلب حجز'),
           backgroundColor: AppThemeConstants.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: AppThemeConstants.white,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios),
             tooltip: 'رجوع',
@@ -216,7 +216,7 @@ class _DirectBookingRequestScreenState
               // Payment method note
               const InfoCard(
                 icon: Icons.account_balance_wallet_outlined,
-                color: Colors.teal,
+                color: AppThemeConstants.primary,
                 title: 'طريقة الدفع',
                 body: 'ستدفع بعد قبول المحفظ للطلب. لا يُطلب منك الدفع الآن.',
               ),
@@ -235,12 +235,12 @@ class _DirectBookingRequestScreenState
                 decoration: BoxDecoration(
                   color: _acknowledged
                       ? AppThemeConstants.primary.withValues(alpha: 0.08)
-                      : Colors.grey.shade50,
+                      : AppThemeConstants.grey50,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: _acknowledged
                         ? AppThemeConstants.primary.withValues(alpha: 0.4)
-                        : Colors.grey.shade300,
+                        : AppThemeConstants.grey300,
                   ),
                 ),
                 child: CheckboxListTile(
@@ -268,15 +268,15 @@ class _DirectBookingRequestScreenState
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
+                              color: AppThemeConstants.white, strokeWidth: 2),
                         )
-                      : const Icon(Icons.send_outlined, color: Colors.white),
+                      : const Icon(Icons.send_outlined, color: AppThemeConstants.white),
                   label: Text(
                     _submitting ? 'جاري الإرسال...' : 'إرسال الطلب',
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white),
+                        color: AppThemeConstants.white),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primary,
@@ -296,7 +296,7 @@ class _DirectBookingRequestScreenState
                   onPressed: _submitting ? null : () => context.pop(),
                   child: const Text(
                     'إلغاء',
-                    style: TextStyle(color: Colors.grey, fontSize: 15),
+                    style: TextStyle(color: AppThemeConstants.grey500, fontSize: 15),
                   ),
                 ),
               ),
@@ -369,10 +369,10 @@ class SummaryCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                const Icon(Icons.access_time, size: 16, color: AppThemeConstants.grey500),
                 const SizedBox(width: 8),
                 const Text('الوقت: ',
-                    style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    style: TextStyle(color: AppThemeConstants.grey500, fontSize: 13)),
                 Expanded(
                   child: Directionality(
                     textDirection: ui.TextDirection.ltr,
@@ -399,10 +399,10 @@ class SummaryCard extends StatelessWidget {
 
   Widget _row(IconData icon, String label, String value) =>
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, size: 16, color: Colors.grey),
+        Icon(icon, size: 16, color: AppThemeConstants.grey500),
         const SizedBox(width: 8),
         Text(label,
-            style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            style: const TextStyle(color: AppThemeConstants.grey500, fontSize: 13)),
         Expanded(
             child: Text(value,
                 style: const TextStyle(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/subscription_model.dart';
 import '../../providers/session_provider_paginated.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 /// Shows a payment-type info card on the teacher's session request detail screen.
 /// - Bundle/subscription request → green card with planTitle + remainingSessions/totalSessions
@@ -24,10 +25,10 @@ class RequestPaymentTypeBadge extends ConsumerWidget {
     }
 
     return _shell(
-      bg: Colors.blue.shade50,
-      border: Colors.blue.shade200,
-      child: _row(Icons.payments_outlined, Colors.blue.shade700, 'نوع الحجز',
-          'دفع مباشر', Colors.blue.shade700),
+      bg: AppThemeConstants.accentBlueLight,
+      border: AppThemeConstants.accentBlue,
+      child: _row(Icons.payments_outlined, AppThemeConstants.accentBlueDark, 'نوع الحجز',
+          'دفع مباشر', AppThemeConstants.accentBlueDark),
     );
   }
 }
@@ -50,23 +51,23 @@ class _BundleCard extends ConsumerWidget {
         if (sub == null) return _fallback(requestData);
         final isLast = sub.remainingSessions <= 1;
         return _shell(
-          bg: Colors.green.shade50,
-          border: Colors.green.shade200,
+          bg: AppThemeConstants.successLight,
+          border: AppThemeConstants.accentGreenAlt,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _row(Icons.card_membership, Colors.green.shade700, 'نوع الحجز',
-                  'باقة', Colors.green.shade700),
+              _row(Icons.card_membership, AppThemeConstants.success, 'نوع الحجز',
+                  'باقة', AppThemeConstants.success),
               const SizedBox(height: 6),
-              _row(Icons.label_outline, Colors.black54, 'اسم الباقة',
-                  sub.planTitle, Colors.black87),
+              _row(Icons.label_outline, AppThemeConstants.black54, 'اسم الباقة',
+                  sub.planTitle, AppThemeConstants.black87),
               const SizedBox(height: 6),
               _row(
                 Icons.event_available,
-                isLast ? Colors.orange.shade700 : Colors.black54,
+                isLast ? AppThemeConstants.warning : AppThemeConstants.black54,
                 'الجلسات المتبقية',
                 '${sub.remainingSessions} / ${sub.totalSessions}',
-                isLast ? Colors.orange.shade700 : Colors.black87,
+                isLast ? AppThemeConstants.warning : AppThemeConstants.black87,
               ),
               if (isLast) ...[
                 const SizedBox(height: 8),
@@ -74,20 +75,20 @@ class _BundleCard extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: AppThemeConstants.warningLight,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
+                    border: Border.all(color: AppThemeConstants.accentOrange),
                   ),
-                  child: Row(children: [
+                  child: const Row(children: [
                     Icon(Icons.warning_amber_rounded,
-                        size: 14, color: Colors.orange.shade700),
-                    const SizedBox(width: 6),
+                        size: 14, color: AppThemeConstants.warning),
+                    SizedBox(width: 6),
                     Text(
                       'آخر جلسة في باقة الطالب',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade700),
+                          color: AppThemeConstants.warning),
                     ),
                   ]),
                 ),
@@ -102,16 +103,16 @@ class _BundleCard extends ConsumerWidget {
   Widget _fallback(Map<String, dynamic> req) {
     final title = (req['planTitle'] as String?) ?? 'باقة';
     return _shell(
-      bg: Colors.green.shade50,
-      border: Colors.green.shade200,
+      bg: AppThemeConstants.successLight,
+      border: AppThemeConstants.accentGreenAlt,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _row(Icons.card_membership, Colors.green.shade700, 'نوع الحجز',
-              'باقة', Colors.green.shade700),
+          _row(Icons.card_membership, AppThemeConstants.success, 'نوع الحجز',
+              'باقة', AppThemeConstants.success),
           const SizedBox(height: 6),
-          _row(Icons.label_outline, Colors.black54, 'اسم الباقة', title,
-              Colors.black87),
+          _row(Icons.label_outline, AppThemeConstants.black54, 'اسم الباقة', title,
+              AppThemeConstants.black87),
         ],
       ),
     );

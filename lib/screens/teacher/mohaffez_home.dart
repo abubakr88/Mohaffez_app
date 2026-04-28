@@ -181,7 +181,7 @@ class MohaffezHomeContent extends ConsumerWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: AppThemeConstants.transparent,
         statusBarIconBrightness: Brightness.light,
       ),
       child: Directionality(
@@ -209,7 +209,7 @@ class MohaffezHomeContent extends ConsumerWidget {
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   backgroundColor: _DS.teal700,
-                  surfaceTintColor: Colors.transparent,
+                  surfaceTintColor: AppThemeConstants.transparent,
                   automaticallyImplyLeading: false,
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
@@ -307,7 +307,7 @@ class _HomeHeader extends StatelessWidget {
               width: 220, height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.04),
+                color: AppThemeConstants.white.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -317,7 +317,7 @@ class _HomeHeader extends StatelessWidget {
               width: 130, height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.03),
+                color: AppThemeConstants.white.withValues(alpha: 0.03),
               ),
             ),
           ),
@@ -342,7 +342,7 @@ class _HomeHeader extends StatelessWidget {
                               name,
                               style: const TextStyle(
                                 fontSize: 22, fontWeight: FontWeight.w800,
-                                color: Colors.white, letterSpacing: -0.3,
+                                color: AppThemeConstants.white, letterSpacing: -0.3,
                               ),
                               maxLines: 1, overflow: TextOverflow.ellipsis,
                             ),
@@ -350,16 +350,16 @@ class _HomeHeader extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
+                                color: AppThemeConstants.white.withValues(alpha: 0.15),
                                 borderRadius: _DS.r8,
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                                border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.25)),
                               ),
                               child: const Text(
                                 'معلم',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: AppThemeConstants.white,
                                 ),
                               ),
                             ),
@@ -367,13 +367,13 @@ class _HomeHeader extends StatelessWidget {
                             Row(
                               children: [
                                 Icon(Icons.calendar_today_rounded, size: 12,
-                                    color: Colors.white.withValues(alpha: 0.7)),
+                                    color: AppThemeConstants.white.withValues(alpha: 0.7)),
                                 const SizedBox(width: 5),
                                 Text(
                                   dateText,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.white.withValues(alpha: 0.75),
+                                    color: AppThemeConstants.white.withValues(alpha: 0.75),
                                   ),
                                 ),
                               ],
@@ -389,21 +389,21 @@ class _HomeHeader extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.13),
+                      color: AppThemeConstants.white.withValues(alpha: 0.13),
                       borderRadius: _DS.r12,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                      border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.18)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 12),
+                        const Icon(Icons.auto_awesome_rounded, color: AppThemeConstants.white, size: 12),
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
                             greeting,
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.white.withValues(alpha: 0.95),
+                              color: AppThemeConstants.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w500,
                             ),
                             maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -443,11 +443,11 @@ class _PendingBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.pending_actions_rounded, color: Colors.white, size: 13),
+          const Icon(Icons.pending_actions_rounded, color: AppThemeConstants.white, size: 13),
           const SizedBox(width: 5),
           Text(
             '$count ${count == 1 ? "طلب" : "طلبات"}',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppThemeConstants.white),
           ),
         ],
       ),
@@ -466,7 +466,7 @@ class _PendingAlertBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: AppThemeConstants.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
@@ -633,7 +633,7 @@ class _StatCard extends StatelessWidget {
         boxShadow: _DS.cardShadow,
       ),
       child: Material(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: _DS.r16,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -786,7 +786,7 @@ class _ActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: AppThemeConstants.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
@@ -795,7 +795,7 @@ class _ActionCard extends StatelessWidget {
         borderRadius: _DS.r16,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppThemeConstants.white,
             borderRadius: _DS.r16,
             border: Border.all(color: _DS.border),
             boxShadow: _DS.subtleShadow,
@@ -1175,7 +1175,7 @@ class _SessionCard extends StatelessWidget {
     final relDate = _relativeDate(sessionDate);
 
     return Material(
-      color: Colors.transparent,
+      color: AppThemeConstants.transparent,
       child: InkWell(
         onTap: onTap != null
             ? () {
@@ -1186,7 +1186,7 @@ class _SessionCard extends StatelessWidget {
         borderRadius: _DS.r16,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppThemeConstants.white,
             borderRadius: _DS.r16,
             border: Border.all(color: isToday ? color.withValues(alpha: 0.3) : _DS.border),
             boxShadow: _DS.subtleShadow,
@@ -1385,7 +1385,7 @@ class _EmptyCard extends StatelessWidget {
           Container(
             width: 52, height: 52,
             decoration: BoxDecoration(
-              color: Colors.white, borderRadius: _DS.r16,
+              color: AppThemeConstants.white, borderRadius: _DS.r16,
               border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Icon(icon, color: color, size: 26),
@@ -1417,9 +1417,9 @@ class _Avatar extends StatelessWidget {
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: AppThemeConstants.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(size / 2),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 2),
+        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.45), width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(size / 2),
@@ -1429,7 +1429,7 @@ class _Avatar extends StatelessWidget {
                 child: Text(
                   initials,
                   style: TextStyle(
-                    fontSize: size * 0.38, fontWeight: FontWeight.w800, color: Colors.white,
+                    fontSize: size * 0.38, fontWeight: FontWeight.w800, color: AppThemeConstants.white,
                   ),
                 ),
               ),

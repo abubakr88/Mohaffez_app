@@ -183,7 +183,7 @@ class _MohaffezScheduleScreenState
                         child: const Icon(
                           Icons.event_available,
                           size: 28,
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -338,7 +338,7 @@ class _SessionCard extends StatelessWidget {
             if (date != null)
               Text(
                 DateFormat('EEEE d MMMM yyyy', 'ar').format(date),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                style: const TextStyle(fontSize: 11, color: AppThemeConstants.grey600),
               ),
           ],
         ),

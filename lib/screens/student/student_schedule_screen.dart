@@ -157,7 +157,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.purple,
+                AppThemeConstants.accentPurple,
                 Color(0xFFAB47BC),
               ],
             ),
@@ -174,13 +174,13 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppThemeConstants.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.calendar_today,
                           size: 28,
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -193,7 +193,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                               style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppThemeConstants.white,
                               ),
                             ),
                             SizedBox(height: 4),
@@ -201,7 +201,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                               'عرض الجلسات في التقويم',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.white70,
+                                color: AppThemeConstants.white70,
                               ),
                             ),
                           ],

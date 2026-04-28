@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class AvailabilityCalendarWidget extends StatelessWidget {
   final String mohaffezId;
@@ -93,15 +94,15 @@ class _DayAvailabilityCard extends StatelessWidget {
           width: 100,
           margin: const EdgeInsets.only(left: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppThemeConstants.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isToday ? Colors.blue : Colors.grey.shade300,
+              color: isToday ? AppThemeConstants.accentBlue : AppThemeConstants.grey300,
               width: isToday ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: AppThemeConstants.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -115,15 +116,15 @@ class _DayAvailabilityCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: isToday ? Colors.blue : Colors.grey.shade800,
+                  color: isToday ? AppThemeConstants.accentBlue : AppThemeConstants.grey800,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 DateFormat('dd/MM').format(date),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: AppThemeConstants.grey600,
                 ),
               ),
               const SizedBox(height: 8),
@@ -134,8 +135,8 @@ class _DayAvailabilityCard extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: availableSlots > 0
-                      ? Colors.green.shade50
-                      : Colors.grey.shade100,
+                      ? AppThemeConstants.successLight
+                      : AppThemeConstants.grey100,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -144,7 +145,7 @@ class _DayAvailabilityCard extends StatelessWidget {
                     Icon(
                       availableSlots > 0 ? Icons.check_circle : Icons.cancel,
                       size: 14,
-                      color: availableSlots > 0 ? Colors.green : Colors.grey,
+                      color: availableSlots > 0 ? AppThemeConstants.success : AppThemeConstants.grey500,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -153,8 +154,8 @@ class _DayAvailabilityCard extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: availableSlots > 0
-                            ? Colors.green.shade700
-                            : Colors.grey.shade600,
+                            ? AppThemeConstants.success
+                            : AppThemeConstants.grey600,
                       ),
                     ),
                   ],

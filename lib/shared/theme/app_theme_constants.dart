@@ -44,6 +44,64 @@ class AppThemeConstants {
   static const Color outline = Color(0xFFE5E7EB);
   static const Color shadow = Color(0x1A000000);           // Very subtle shadow
 
+  // ─── Pure neutrals (use these instead of Colors.white/black/transparent) ──
+  // Centralized so a future dark-mode / rebrand only needs to flip these
+  // here, never in screens.
+  static const Color white = Colors.white;
+  static const Color black = Colors.black;
+  static const Color transparent = Colors.transparent;
+
+  // Material's opacity-named neutral aliases (kept as named constants so
+  // screens never reach for `Colors.white70` etc).
+  static const Color white24 = Color(0x3DFFFFFF);
+  static const Color white60 = Color(0x99FFFFFF);
+  static const Color white70 = Color(0xB3FFFFFF);
+  static const Color black54 = Color(0x8A000000);
+  static const Color black87 = Color(0xDD000000);
+
+  // ─── Greys (Material-equivalent neutral scale) ───────────────────────────
+  static const Color grey50  = Color(0xFFFAFAFA);
+  static const Color grey100 = Color(0xFFF5F5F5);
+  static const Color grey200 = Color(0xFFEEEEEE);
+  static const Color grey300 = Color(0xFFE0E0E0);
+  static const Color grey400 = Color(0xFFBDBDBD);
+  static const Color grey500 = Color(0xFF9E9E9E);
+  static const Color grey600 = Color(0xFF757575);
+  static const Color grey700 = Color(0xFF616161);
+  static const Color grey800 = Color(0xFF424242);
+  static const Color grey900 = Color(0xFF212121);
+
+  // ─── Semantic light/dark variants ────────────────────────────────────────
+  // Used for lighter chip backgrounds and stronger headline accents.
+  static const Color successLight = Color(0xFFDCFCE7); // alias of successBackground
+  static const Color successDark  = Color(0xFF15803D);
+  static const Color errorLight   = Color(0xFFFEE2E2); // alias of errorBackground
+  static const Color errorDark    = Color(0xFF991B1B);
+  static const Color warningLight = Color(0xFFFFF3E0); // alias of warningBackground
+  static const Color warningDark  = Color(0xFFC2410C);
+  static const Color infoLight    = Color(0xFFE3F2FD);
+  static const Color infoDark     = Color(0xFF1E40AF);
+
+  // ─── Accent palette (per-domain UI: badges, chips, info cards) ───────────
+  static const Color accentPurple     = Color(0xFF7A5AF8);
+  static const Color accentPurpleLight = Color(0xFFF0EEFF);
+  static const Color accentPurpleDark  = Color(0xFF5B3FB8);
+  static const Color accentBlue        = Color(0xFF2563EB);
+  static const Color accentBlueLight   = Color(0xFFE3F2FD);
+  static const Color accentBlueDark    = Color(0xFF1E40AF);
+  static const Color accentAmber       = Color(0xFFFFB300);
+  static const Color accentAmberLight  = Color(0xFFFFF8E1);
+  static const Color accentAmberDark   = Color(0xFFFF8F00);
+  static const Color accentOrange      = Color(0xFFE67E22);
+  static const Color accentOrangeLight = Color(0xFFFFF3E0);
+  static const Color accentOrangeDark  = Color(0xFFC2410C);
+  static const Color accentRed         = Color(0xFFE53935);
+  static const Color accentRedLight    = Color(0xFFFFEBEE);
+  static const Color accentRedDark     = Color(0xFFB91C1C);
+  static const Color accentGreenAlt    = Color(0xFF2E8B57);
+  static const Color accentGreenAltLight = Color(0xFFE8F5E9);
+  static const Color accentGreenAltDark  = Color(0xFF1B5E20);
+
   // ─── Legacy aliases for backwards compatibility ─────────────────────────
   @Deprecated('Use deepTeal instead')
   static const Color primaryTeal = deepTeal;

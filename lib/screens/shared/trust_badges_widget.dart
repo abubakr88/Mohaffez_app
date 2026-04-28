@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class TrustBadgesWidget extends StatelessWidget {
   final bool showPaymentMethods;
@@ -13,9 +14,9 @@ class TrustBadgesWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: AppThemeConstants.successLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
+        border: Border.all(color: AppThemeConstants.accentGreenAlt),
       ),
       child: Column(
         children: [
@@ -52,7 +53,7 @@ class TrustBadgesWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey,
+                color: AppThemeConstants.grey500,
               ),
             ),
             const SizedBox(height: 12),
@@ -67,12 +68,12 @@ class TrustBadgesWidget extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
+                    color: AppThemeConstants.warningLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.account_balance_wallet,
-                    color: Colors.orange,
+                    color: AppThemeConstants.warning,
                     size: 24,
                   ),
                 ),
@@ -82,7 +83,7 @@ class TrustBadgesWidget extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange,
+                    color: AppThemeConstants.warning,
                   ),
                 ),
               ],
@@ -96,21 +97,21 @@ class TrustBadgesWidget extends StatelessWidget {
   Widget _buildTrustItem(IconData icon, String title, String subtitle) {
     return Column(
       children: [
-        Icon(icon, color: Colors.green.shade700, size: 28),
+        Icon(icon, color: AppThemeConstants.success, size: 28),
         const SizedBox(height: 6),
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.bold,
-            color: Colors.green.shade700,
+            color: AppThemeConstants.success,
           ),
         ),
         Text(
           subtitle,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 10,
-            color: Colors.grey.shade600,
+            color: AppThemeConstants.grey600,
           ),
         ),
       ],
@@ -121,9 +122,9 @@ class TrustBadgesWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: AppThemeConstants.grey300),
       ),
       child: Image.asset(
         assetPath,
@@ -133,7 +134,7 @@ class TrustBadgesWidget extends StatelessWidget {
         errorBuilder: (_, __, ___) => Container(
           width: 40,
           height: 24,
-          color: Colors.grey.shade200,
+          color: AppThemeConstants.grey200,
           child: const Icon(Icons.credit_card, size: 16),
         ),
       ),

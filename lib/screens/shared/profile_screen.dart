@@ -407,7 +407,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
+            statusBarColor: AppThemeConstants.transparent,
             statusBarIconBrightness: Brightness.light,
           ),
           child: Directionality(
@@ -431,7 +431,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       elevation: 0,
                       scrolledUnderElevation: 0,
                       backgroundColor: _DS.teal700,
-                      surfaceTintColor: Colors.transparent,
+                      surfaceTintColor: AppThemeConstants.transparent,
                       automaticallyImplyLeading: false,
                       flexibleSpace: FlexibleSpaceBar(
                         collapseMode: CollapseMode.pin,
@@ -587,7 +587,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                           // Logout
                           Material(
-                            color: Colors.transparent,
+                            color: AppThemeConstants.transparent,
                             child: InkWell(
                               onTap: () {
                                 HapticFeedback.mediumImpact();
@@ -682,7 +682,7 @@ class _ProfileHeader extends StatelessWidget {
               width: 220, height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.04),
+                color: AppThemeConstants.white.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -692,7 +692,7 @@ class _ProfileHeader extends StatelessWidget {
               width: 130, height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.03),
+                color: AppThemeConstants.white.withValues(alpha: 0.03),
               ),
             ),
           ),
@@ -729,16 +729,16 @@ class _ProfileHeader extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: _DS.teal500,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2.5),
+                                border: Border.all(color: AppThemeConstants.white, width: 2.5),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.2),
+                                    color: AppThemeConstants.black.withValues(alpha: 0.2),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-                              child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 16),
+                              child: const Icon(Icons.camera_alt_rounded, color: AppThemeConstants.white, size: 16),
                             ),
                           ),
                         ),
@@ -750,7 +750,7 @@ class _ProfileHeader extends StatelessWidget {
                       name,
                       style: const TextStyle(
                         fontSize: 20, fontWeight: FontWeight.w800,
-                        color: Colors.white, letterSpacing: -0.3,
+                        color: AppThemeConstants.white, letterSpacing: -0.3,
                       ),
                       maxLines: 1, overflow: TextOverflow.ellipsis,
                     ),
@@ -759,15 +759,15 @@ class _ProfileHeader extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
+                        color: AppThemeConstants.white.withValues(alpha: 0.15),
                         borderRadius: _DS.r12,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.2)),
                       ),
                       child: Text(
                         isMohaffez ? 'محفّظ' : 'طالب',
                         style: TextStyle(
                           fontSize: 12, fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.95),
+                          color: AppThemeConstants.white.withValues(alpha: 0.95),
                         ),
                       ),
                     ),
@@ -785,7 +785,7 @@ class _ProfileHeader extends StatelessWidget {
                           Container(
                             width: 1, height: 24,
                             margin: const EdgeInsets.symmetric(horizontal: 20),
-                            color: Colors.white.withValues(alpha: 0.25),
+                            color: AppThemeConstants.white.withValues(alpha: 0.25),
                           ),
                           _HeaderStat(
                             icon: Icons.star_rounded,
@@ -819,7 +819,7 @@ class _HeaderStat extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 16),
+        Icon(icon, color: AppThemeConstants.white.withValues(alpha: 0.7), size: 16),
         const SizedBox(width: 6),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -827,13 +827,13 @@ class _HeaderStat extends StatelessWidget {
             Text(
               value,
               style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white,
+                fontSize: 16, fontWeight: FontWeight.w800, color: AppThemeConstants.white,
               ),
             ),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10, color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 10, color: AppThemeConstants.white.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -863,7 +863,7 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: _DS.r16,
         border: Border.all(color: _DS.border),
         boxShadow: _DS.subtleShadow,
@@ -930,7 +930,7 @@ class _BioDisplay extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Material(
-          color: Colors.transparent,
+          color: AppThemeConstants.transparent,
           child: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -1028,7 +1028,7 @@ class _ContactRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: AppThemeConstants.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
@@ -1098,7 +1098,7 @@ class _ActionTile extends StatelessWidget {
     return Column(
       children: [
         Material(
-          color: Colors.transparent,
+          color: AppThemeConstants.transparent,
           child: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();

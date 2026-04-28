@@ -1,6 +1,7 @@
 // lib/shared/widgets/cached_avatar.dart - OPTIMIZED
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class CachedAvatar extends StatelessWidget {
   final String? imageUrl;
@@ -18,7 +19,7 @@ class CachedAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: radius,
-      backgroundColor: Colors.grey.shade200,
+      backgroundColor: AppThemeConstants.grey200,
       child: imageUrl != null && imageUrl!.isNotEmpty
           ? ClipOval(
               child: CachedNetworkImage(
@@ -42,7 +43,7 @@ class CachedAvatar extends StatelessWidget {
                   return Icon(
                     Icons.person,
                     size: radius,
-                    color: Colors.grey.shade400,
+                    color: AppThemeConstants.grey400,
                   );
                 },
               ),
@@ -50,7 +51,7 @@ class CachedAvatar extends StatelessWidget {
           : Icon(
               Icons.person,
               size: radius,
-              color: Colors.grey.shade400,
+              color: AppThemeConstants.grey400,
             ),
     );
   }

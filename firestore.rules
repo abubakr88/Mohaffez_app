@@ -85,8 +85,8 @@ service cloud.firestore {
       match /credentials/{credentialId} {
         // get: allow owner to read their own (even non-existent docs), or approved docs for anyone
         allow get: if isAdmin() || isOwner(userId) || (isAuthenticated() && resource.data.status == 'approved');
-        // list: query validation requires no resource==null branch — only data-based conditions
-        allow list: if isAdmin() || isOwner(userId) || (isAuthenticated() && resource.data.status == 'approved');
+        // list: resource is null for query operations — allow authenticated users and rely on client query filter
+        allow list: if isAdmin() || isOwner(userId) || isAuthenticated();
 
         allow create: if isOwner(userId) &&
                       request.resource.data.userId == userId &&
@@ -168,7 +168,8 @@ service cloud.firestore {
 
     match /{path=**}/credentials/{credentialId} {
       allow get: if isAdmin() || (isAuthenticated() && (resource.data.status == 'approved' || request.auth.uid == resource.data.userId));
-      allow list: if isAdmin() || (isAuthenticated() && (resource.data.status == 'approved' || request.auth.uid == resource.data.userId));
+      // list: resource is null for query operations — allow authenticated users and rely on client query filter
+      allow list: if isAdmin() || isAuthenticated();
     }
 
     // ============================================

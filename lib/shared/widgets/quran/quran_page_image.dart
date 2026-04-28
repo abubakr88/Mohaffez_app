@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../models/quran_mistake_model.dart';
 import '../../../services/quran_service.dart';
 import 'quran_mistake_painter.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class QuranPageImage extends StatelessWidget {
   final GlobalKey imageKey;
@@ -46,7 +47,7 @@ class QuranPageImage extends StatelessWidget {
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.menu_book, color: Colors.grey, size: 64),
+                      const Icon(Icons.menu_book, color: AppThemeConstants.grey500, size: 64),
                       const SizedBox(height: 16),
                       Text(
                         'صفحة $currentPage',
@@ -58,12 +59,12 @@ class QuranPageImage extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         'الجزء ${pageInfo?['juz'] ?? ''}',
-                        style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                        style: const TextStyle(fontSize: 16, color: AppThemeConstants.grey600),
                       ),
                       const SizedBox(height: 16),
                       const Text(
                         'تأكد من الاتصال بالإنترنت',
-                        style: TextStyle(color: Colors.red),
+                        style: TextStyle(color: AppThemeConstants.error),
                       ),
                     ],
                   );

@@ -237,7 +237,7 @@ class _TypeChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: isOnline ? Colors.blue.shade700 : AppThemeConstants.secondary,
+          color: isOnline ? AppThemeConstants.accentBlueDark : AppThemeConstants.secondary,
         ),
       ),
     );
@@ -263,9 +263,9 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
-                color: Colors.grey.shade700,
+                color: AppThemeConstants.grey700,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

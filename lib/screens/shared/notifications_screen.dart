@@ -437,10 +437,10 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppThemeConstants.primary : Colors.white,
+          color: isSelected ? AppThemeConstants.primary : AppThemeConstants.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
+            color: isSelected ? AppThemeConstants.primary : AppThemeConstants.grey300,
           ),
           boxShadow: isSelected
               ? [
@@ -460,7 +460,7 @@ class _FilterChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700,
               ),
             ),
             if (count != null) ...[
@@ -469,8 +469,8 @@ class _FilterChip extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withValues(alpha: 0.3)
-                      : Colors.grey.shade200,
+                      ? AppThemeConstants.white.withValues(alpha: 0.3)
+                      : AppThemeConstants.grey200,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -478,7 +478,7 @@ class _FilterChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.white : Colors.grey.shade700,
+                    color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700,
                   ),
                 ),
               ),
@@ -513,10 +513,10 @@ class _NotificationCard extends StatelessWidget {
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
         decoration: BoxDecoration(
-          color: Colors.red,
+          color: AppThemeConstants.error,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete, color: Colors.white, size: 28),
+        child: const Icon(Icons.delete, color: AppThemeConstants.white, size: 28),
       ),
       onDismissed: (_) => onDismiss(),
       child: Card(
@@ -532,11 +532,11 @@ class _NotificationCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color:
-                  notification.isRead ? Colors.white : color.withValues(alpha: 0.05),
+                  notification.isRead ? AppThemeConstants.white : color.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: notification.isRead
-                    ? Colors.grey.shade200
+                    ? AppThemeConstants.grey200
                     : color.withValues(alpha: 0.3),
                 width: notification.isRead ? 1 : 2,
               ),
@@ -569,18 +569,18 @@ class _NotificationCard extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         notification.body ?? '',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade700,
+                          color: AppThemeConstants.grey700,
                           height: 1.4,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         _formatTimestamp(notification.createdAt),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: AppThemeConstants.grey500,
                         ),
                       ),
                     ],
@@ -607,20 +607,20 @@ class _NotificationCard extends StatelessWidget {
 Color _getNotificationColor(String? type) {
   switch (type) {
     case 'session_request':
-      return Colors.orange;
+      return AppThemeConstants.warning;
     case 'session_accepted':
-      return Colors.green;
+      return AppThemeConstants.success;
     case 'payment_required':
     case 'paymentrequired':
       return AppThemeConstants.primary;
     case 'session_rejected':
-      return Colors.red;
+      return AppThemeConstants.error;
     case 'assignment_updated':
-      return Colors.blue;
+      return AppThemeConstants.accentBlue;
     case 'follow':
-      return Colors.purple;
+      return AppThemeConstants.accentPurple;
     default:
-      return Colors.grey;
+      return AppThemeConstants.grey500;
   }
 }
 

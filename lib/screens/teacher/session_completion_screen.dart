@@ -121,7 +121,7 @@ class _SessionCompletionScreenState
                 : 'تم إكمال الجلسة بنجاح ✓',
           ),
           backgroundColor:
-              widget.isLateCompletion ? Colors.orange : AppThemeConstants.secondary,
+              widget.isLateCompletion ? AppThemeConstants.warning : AppThemeConstants.secondary,
         ),
       );
     } catch (e) {
@@ -195,7 +195,7 @@ class _SessionCompletionScreenState
             widget.isLateCompletion ? 'إكمال جلسة متأخرة' : 'إكمال الجلسة',
           ),
           backgroundColor:
-              widget.isLateCompletion ? Colors.orange : AppThemeConstants.secondary,
+              widget.isLateCompletion ? AppThemeConstants.warning : AppThemeConstants.secondary,
         ),
         body: Form(
           key: _formKey,
@@ -258,7 +258,7 @@ class _SessionCompletionScreenState
                               'إكمال جلسة',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.grey,
+                                color: AppThemeConstants.grey500,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -284,7 +284,7 @@ class _SessionCompletionScreenState
                 _buildSectionHeader(
                   icon: Icons.assignment_turned_in,
                   title: 'مراجعة التكليف السابق',
-                  color: Colors.blue,
+                  color: AppThemeConstants.accentBlue,
                 ),
                 const SizedBox(height: 12),
                 Card(
@@ -298,9 +298,9 @@ class _SessionCompletionScreenState
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.green.shade50,
+                              color: AppThemeConstants.successLight,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.green.shade200),
+                              border: Border.all(color: AppThemeConstants.accentGreenAlt),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +308,7 @@ class _SessionCompletionScreenState
                                 const Row(
                                   children: [
                                     Icon(Icons.menu_book,
-                                        size: 18, color: Colors.green),
+                                        size: 18, color: AppThemeConstants.success),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -352,7 +352,7 @@ class _SessionCompletionScreenState
                             value: previousHifzRating,
                             onChanged: (val) => setState(
                                 () => previousHifzRating = val.toInt()),
-                            color: Colors.green,
+                            color: AppThemeConstants.success,
                           ),
                           const SizedBox(height: 16),
                         ],
@@ -372,7 +372,7 @@ class _SessionCompletionScreenState
                                 const Row(
                                   children: [
                                     Icon(Icons.history_edu,
-                                        size: 18, color: Colors.blue),
+                                        size: 18, color: AppThemeConstants.accentBlue),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -416,7 +416,7 @@ class _SessionCompletionScreenState
                             value: previousMurajaRating,
                             onChanged: (val) => setState(
                                 () => previousMurajaRating = val.toInt()),
-                            color: Colors.blue,
+                            color: AppThemeConstants.accentBlue,
                           ),
                           const SizedBox(height: 16),
                         ],
@@ -479,12 +479,12 @@ class _SessionCompletionScreenState
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: sessionMistakes.isEmpty
-                              ? Colors.green.shade50
+                              ? AppThemeConstants.successLight
                               : AppThemeConstants.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: sessionMistakes.isEmpty
-                                ? Colors.green.shade200
+                                ? AppThemeConstants.accentGreenAlt
                                 : AppThemeConstants.primary.withValues(alpha: 0.4),
                           ),
                         ),
@@ -495,8 +495,8 @@ class _SessionCompletionScreenState
                                   ? Icons.check_circle
                                   : Icons.error_outline,
                               color: sessionMistakes.isEmpty
-                                  ? Colors.green
-                                  : Colors.orange,
+                                  ? AppThemeConstants.success
+                                  : AppThemeConstants.warning,
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -521,7 +521,7 @@ class _SessionCompletionScreenState
                               child: Icon(
                                 _mistakeIcon(m.type),
                                 size: 16,
-                                color: Colors.white,
+                                color: AppThemeConstants.white,
                               ),
                             ),
                             title: Text(
@@ -529,7 +529,7 @@ class _SessionCompletionScreenState
                             subtitle:
                                 m.wordText != null ? Text(m.wordText!) : null,
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              icon: const Icon(Icons.delete, color: AppThemeConstants.error),
                               onPressed: () {
                                 setState(() {
                                   sessionMistakes.remove(m);
@@ -581,7 +581,7 @@ class _SessionCompletionScreenState
                           ),
                           prefixIcon: const Icon(
                             Icons.menu_book,
-                            color: Colors.green,
+                            color: AppThemeConstants.success,
                           ),
                         ),
                       ),
@@ -598,7 +598,7 @@ class _SessionCompletionScreenState
                           ),
                           prefixIcon: const Icon(
                             Icons.history_edu,
-                            color: Colors.blue,
+                            color: AppThemeConstants.accentBlue,
                           ),
                         ),
                       ),
@@ -613,7 +613,7 @@ class _SessionCompletionScreenState
               _buildSectionHeader(
                 icon: Icons.star,
                 title: 'تقييم الجلسة الحالية',
-                color: Colors.amber,
+                color: AppThemeConstants.accentAmber,
               ),
               const SizedBox(height: 12),
               Card(
@@ -634,7 +634,7 @@ class _SessionCompletionScreenState
                         value: sessionRating,
                         onChanged: (val) =>
                             setState(() => sessionRating = val.toInt()),
-                        color: Colors.amber,
+                        color: AppThemeConstants.accentAmber,
                         showStars: true,
                       ),
                       const SizedBox(height: 20),
@@ -670,7 +670,7 @@ class _SessionCompletionScreenState
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                           ),
                         )
                       : const Icon(Icons.check_circle),
@@ -685,7 +685,7 @@ class _SessionCompletionScreenState
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: widget.isLateCompletion
-                        ? Colors.orange
+                        ? AppThemeConstants.warning
                         : AppThemeConstants.secondary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -767,7 +767,7 @@ class _SessionCompletionScreenState
               ' / 10',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey,
+                color: AppThemeConstants.grey500,
               ),
             ),
           ],
@@ -789,16 +789,16 @@ class _SessionCompletionScreenState
             onChanged: onChanged,
           ),
         ),
-        Row(
+        const Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               'ضعيف',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: AppThemeConstants.grey600),
             ),
             Text(
               'ممتاز',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: AppThemeConstants.grey600),
             ),
           ],
         ),
@@ -809,17 +809,17 @@ class _SessionCompletionScreenState
   Color _mistakeColor(MistakeType type) {
     switch (type) {
       case MistakeType.tajweed:
-        return Colors.orange;
+        return AppThemeConstants.warning;
       case MistakeType.pronunciation:
-        return Colors.red;
+        return AppThemeConstants.error;
       case MistakeType.reading:
-        return Colors.purple;
+        return AppThemeConstants.accentPurple;
       case MistakeType.skip:
-        return Colors.blue;
+        return AppThemeConstants.accentBlue;
       case MistakeType.addition:
-        return Colors.green;
+        return AppThemeConstants.success;
       case MistakeType.other:
-        return Colors.grey;
+        return AppThemeConstants.grey500;
     }
   }
 

@@ -123,7 +123,7 @@ class _TeacherSetupWizardScreenState
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: AppThemeConstants.transparent,
         statusBarIconBrightness: Brightness.light,
       ),
       child: Directionality(
@@ -203,9 +203,9 @@ class _TeacherSetupWizardScreenState
       elevation: 0,
       scrolledUnderElevation: 0,
       backgroundColor: _DS.teal700,
-      surfaceTintColor: Colors.transparent,
+      surfaceTintColor: AppThemeConstants.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.close_rounded, color: Colors.white),
+        icon: const Icon(Icons.close_rounded, color: AppThemeConstants.white),
         onPressed: () {
           if (context.canPop()) {
             context.pop();
@@ -233,7 +233,7 @@ class _TeacherSetupWizardScreenState
                   width: 180, height: 180,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: AppThemeConstants.white.withValues(alpha: 0.04),
                   ),
                 ),
               ),
@@ -243,7 +243,7 @@ class _TeacherSetupWizardScreenState
                   width: 100, height: 100,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: AppThemeConstants.white.withValues(alpha: 0.04),
                   ),
                 ),
               ),
@@ -260,12 +260,12 @@ class _TeacherSetupWizardScreenState
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
+                              color: AppThemeConstants.white.withValues(alpha: 0.15),
                               borderRadius: _DS.r12,
                             ),
                             child: const Icon(
                               Icons.rocket_launch_rounded,
-                              color: Colors.white,
+                              color: AppThemeConstants.white,
                               size: 22,
                             ),
                           ),
@@ -275,7 +275,7 @@ class _TeacherSetupWizardScreenState
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: AppThemeConstants.white,
                               letterSpacing: -0.3,
                             ),
                           ),
@@ -292,7 +292,7 @@ class _TeacherSetupWizardScreenState
                                   '$done من 5 ${done == 5 ? "مكتملة 🎉" : "خطوات مكتملة"}',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.white.withValues(alpha: 0.85),
+                                    color: AppThemeConstants.white.withValues(alpha: 0.85),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -303,7 +303,7 @@ class _TeacherSetupWizardScreenState
                                     value: done / 5,
                                     minHeight: 8,
                                     backgroundColor:
-                                        Colors.white.withValues(alpha: 0.2),
+                                        AppThemeConstants.white.withValues(alpha: 0.2),
                                     valueColor: const AlwaysStoppedAnimation<Color>(
                                       Color(0xFFD4A44A),
                                     ),
@@ -317,17 +317,17 @@ class _TeacherSetupWizardScreenState
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
+                              color: AppThemeConstants.white.withValues(alpha: 0.15),
                               borderRadius: _DS.r12,
                               border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.25)),
+                                  color: AppThemeConstants.white.withValues(alpha: 0.25)),
                             ),
                             child: Text(
                               '$done / 5',
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.white,
+                                color: AppThemeConstants.white,
                               ),
                             ),
                           ),
@@ -401,7 +401,7 @@ class _StepCard extends StatelessWidget {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: _DS.r16,
         border: Border.all(color: borderColor, width: borderWidth),
         boxShadow: isActive
@@ -421,7 +421,7 @@ class _StepCard extends StatelessWidget {
               ],
       ),
       child: Material(
-        color: Colors.transparent,
+        color: AppThemeConstants.transparent,
         borderRadius: _DS.r16,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -482,13 +482,13 @@ class _StepCard extends StatelessWidget {
                                           ? meta.color
                                           : _DS.text3,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  border: Border.all(color: AppThemeConstants.white, width: 1.5),
                                 ),
                                 child: Center(
                                   child: Text(
                                     '${index + 1}',
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: AppThemeConstants.white,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -596,7 +596,7 @@ class _StepCard extends StatelessWidget {
                               label: const Text('افتح الشاشة'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: meta.color,
-                                foregroundColor: Colors.white,
+                                foregroundColor: AppThemeConstants.white,
                                 elevation: 0,
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 12),
@@ -704,7 +704,7 @@ class _CelebrationCard extends StatelessWidget {
               label: const Text('الذهاب للرئيسية'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _DS.green,
-                foregroundColor: Colors.white,
+                foregroundColor: AppThemeConstants.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: const RoundedRectangleBorder(borderRadius: _DS.r12),

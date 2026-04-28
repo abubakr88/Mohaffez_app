@@ -860,24 +860,24 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: AppThemeConstants.accentAmberLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.amber.shade300),
+        border: Border.all(color: AppThemeConstants.accentAmber),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(children: [
-            Icon(Icons.info_outlined, color: Colors.amber, size: 18),
+            Icon(Icons.info_outlined, color: AppThemeConstants.accentAmber, size: 18),
             SizedBox(width: 6),
             Text('تعليمات الدفع',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber,
+                    color: AppThemeConstants.accentAmber,
                     fontSize: 14)),
           ]),
           const SizedBox(height: 10),
-          const Divider(height: 1, color: Colors.amber),
+          const Divider(height: 1, color: AppThemeConstants.accentAmber),
           const SizedBox(height: 10),
           _instructionStep(
             number: '1',
@@ -901,22 +901,22 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             padding: const EdgeInsets.symmetric(
                 horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
+              color: AppThemeConstants.warningLight,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
+              border: Border.all(color: AppThemeConstants.accentOrange),
             ),
-            child: Row(
+            child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.warning_amber_rounded,
-                    color: Colors.orange.shade700, size: 16),
-                const SizedBox(width: 6),
-                const Expanded(
+                    color: AppThemeConstants.warning, size: 16),
+                SizedBox(width: 6),
+                Expanded(
                   child: Text(
                     'لا تضغط تأكيد قبل إتمام التحويل الفعلي',
                     style: TextStyle(
                         fontSize: 12,
-                        color: Colors.deepOrange,
+                        color: AppThemeConstants.accentOrange,
                         fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -940,16 +940,16 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           width: 22,
           height: 22,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-              color: Colors.amber.shade700, shape: BoxShape.circle),
+          decoration: const BoxDecoration(
+              color: AppThemeConstants.accentAmberDark, shape: BoxShape.circle),
           child: Text(number,
               style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.white,
+                  color: AppThemeConstants.white,
                   fontWeight: FontWeight.bold)),
         ),
         const SizedBox(width: 8),
-        Icon(icon, size: 16, color: Colors.amber.shade700),
+        Icon(icon, size: 16, color: AppThemeConstants.accentAmberDark),
         const SizedBox(width: 6),
         Expanded(
           child: Text(text,
@@ -963,12 +963,12 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
+        Icon(icon, size: 16, color: AppThemeConstants.grey600),
         const SizedBox(width: 8),
         Text('$label: ',
-            style: TextStyle(
+            style: const TextStyle(
                 fontSize: 13,
-                color: Colors.grey.shade700,
+                color: AppThemeConstants.grey700,
                 fontWeight: FontWeight.w600)),
         Expanded(
             child: Text(value,

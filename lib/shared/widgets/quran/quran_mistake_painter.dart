@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/quran_mistake_model.dart';
 import '../../utils/quran_mistake_utils.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class QuranMistakePainter extends CustomPainter {
   final List<QuranMistake> mistakes;
@@ -17,7 +18,7 @@ class QuranMistakePainter extends CustomPainter {
         ..color = getMistakeColor(mistake.type).withValues(alpha: 0.85)
         ..style = PaintingStyle.fill;
       final strokePaint = Paint()
-        ..color = Colors.white
+        ..color = AppThemeConstants.white
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
 
@@ -26,10 +27,10 @@ class QuranMistakePainter extends CustomPainter {
 
       if (mistake.hasComment) {
         final commentPaint = Paint()
-          ..color = Colors.blue.shade700
+          ..color = AppThemeConstants.accentBlueDark
           ..style = PaintingStyle.fill;
         final commentStroke = Paint()
-          ..color = Colors.white
+          ..color = AppThemeConstants.white
           ..strokeWidth = 1.5
           ..style = PaintingStyle.stroke;
         final commentOffset = Offset(dx + 12, dy - 12);

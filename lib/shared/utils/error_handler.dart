@@ -13,7 +13,7 @@ class ErrorHandler {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.error_outline, color: Colors.white),
+            const Icon(Icons.error_outline, color: AppThemeConstants.white),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
@@ -33,7 +33,7 @@ class ErrorHandler {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white),
+            const Icon(Icons.check_circle, color: AppThemeConstants.white),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],

@@ -26,7 +26,7 @@ class TeacherPendingScreen extends ConsumerWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: AppThemeConstants.transparent,
         statusBarIconBrightness: Brightness.dark,
       ),
       child: Directionality(
@@ -94,14 +94,14 @@ class TeacherPendingScreen extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                           borderRadius:
                               const BorderRadius.all(Radius.circular(16)),
                           border: Border.all(
                               color: const Color(0xFFE5EDE9)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
+                              color: AppThemeConstants.black.withValues(alpha: 0.04),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),

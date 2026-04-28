@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class PaginatedListView<T> extends StatefulWidget {
   final List<T> items;
@@ -83,7 +84,7 @@ class _PaginatedListViewState<T> extends State<PaginatedListView<T>> {
                     children: [
                       Text(
                         widget.error!,
-                        style: const TextStyle(color: Colors.red),
+                        style: const TextStyle(color: AppThemeConstants.error),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class EmptyStateIllustrations {
   EmptyStateIllustrations._();
@@ -8,24 +9,24 @@ class EmptyStateIllustrations {
     return Container(
       width: 200,
       height: 200,
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+      decoration: const BoxDecoration(
+        color: AppThemeConstants.accentBlueLight,
         shape: BoxShape.circle,
       ),
-      child: Stack(
+      child: const Stack(
         alignment: Alignment.center,
         children: [
           Icon(
             Icons.event_busy,
             size: 100,
-            color: Colors.blue.shade200,
+            color: AppThemeConstants.accentBlue,
           ),
           Positioned(
             bottom: 40,
             child: Icon(
               Icons.close,
               size: 40,
-              color: Colors.blue.shade400,
+              color: AppThemeConstants.accentBlue,
             ),
           ),
         ],
@@ -38,17 +39,17 @@ class EmptyStateIllustrations {
     return Container(
       width: 200,
       height: 200,
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+      decoration: const BoxDecoration(
+        color: AppThemeConstants.warningLight,
         shape: BoxShape.circle,
       ),
-      child: Stack(
+      child: const Stack(
         alignment: Alignment.center,
         children: [
           Icon(
             Icons.location_on,
             size: 80,
-            color: Colors.orange.shade200,
+            color: AppThemeConstants.accentOrange,
           ),
           Positioned(
             top: 50,
@@ -56,7 +57,7 @@ class EmptyStateIllustrations {
             child: Icon(
               Icons.search,
               size: 50,
-              color: Colors.orange.shade300,
+              color: AppThemeConstants.accentOrange,
             ),
           ),
         ],
@@ -69,17 +70,17 @@ class EmptyStateIllustrations {
     return Container(
       width: 200,
       height: 200,
-      decoration: BoxDecoration(
-        color: Colors.purple.shade50,
+      decoration: const BoxDecoration(
+        color: AppThemeConstants.accentPurpleLight,
         shape: BoxShape.circle,
       ),
-      child: Stack(
+      child: const Stack(
         alignment: Alignment.center,
         children: [
           Icon(
             Icons.notifications_off,
             size: 100,
-            color: Colors.purple.shade200,
+            color: AppThemeConstants.accentPurple,
           ),
         ],
       ),
@@ -91,17 +92,17 @@ class EmptyStateIllustrations {
     return Container(
       width: 200,
       height: 200,
-      decoration: BoxDecoration(
-        color: Colors.green.shade50,
+      decoration: const BoxDecoration(
+        color: AppThemeConstants.successLight,
         shape: BoxShape.circle,
       ),
-      child: Stack(
+      child: const Stack(
         alignment: Alignment.center,
         children: [
           Icon(
             Icons.assignment_outlined,
             size: 100,
-            color: Colors.green.shade200,
+            color: AppThemeConstants.accentGreenAlt,
           ),
         ],
       ),
@@ -113,17 +114,17 @@ class EmptyStateIllustrations {
     return Container(
       width: 200,
       height: 200,
-      decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+      decoration: const BoxDecoration(
+        color: AppThemeConstants.accentAmberLight,
         shape: BoxShape.circle,
       ),
-      child: Stack(
+      child: const Stack(
         alignment: Alignment.center,
         children: [
           Icon(
             Icons.pending_actions,
             size: 100,
-            color: Colors.amber.shade300,
+            color: AppThemeConstants.accentAmber,
           ),
         ],
       ),
@@ -135,17 +136,17 @@ class EmptyStateIllustrations {
     return Container(
       width: 200,
       height: 200,
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+      decoration: const BoxDecoration(
+        color: AppThemeConstants.accentBlueLight,
         shape: BoxShape.circle,
       ),
-      child: Stack(
+      child: const Stack(
         alignment: Alignment.center,
         children: [
           Icon(
             Icons.workspace_premium,
             size: 100,
-            color: Colors.blue.shade200,
+            color: AppThemeConstants.accentBlue,
           ),
         ],
       ),

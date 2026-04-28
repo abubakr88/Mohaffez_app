@@ -55,7 +55,7 @@ class _DS {
       offset: const Offset(0, 4),
     ),
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.03),
+      color: AppThemeConstants.black.withValues(alpha: 0.03),
       blurRadius: 4,
       offset: const Offset(0, 1),
     ),
@@ -63,7 +63,7 @@ class _DS {
 
   static List<BoxShadow> subtleShadow = [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.04),
+      color: AppThemeConstants.black.withValues(alpha: 0.04),
       blurRadius: 8,
       offset: const Offset(0, 2),
     ),
@@ -191,7 +191,7 @@ class StudentHomeContent extends ConsumerWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
+        statusBarColor: AppThemeConstants.transparent,
         statusBarIconBrightness: Brightness.light,
       ),
       child: Directionality(
@@ -200,7 +200,7 @@ class StudentHomeContent extends ConsumerWidget {
           backgroundColor: _DS.bg,
           body: RefreshIndicator(
             color: _DS.teal500,
-            backgroundColor: Colors.white,
+            backgroundColor: AppThemeConstants.white,
             onRefresh: () async {
               ref.invalidate(currentUserProvider);
               ref.invalidate(studentSessionsFirstPageProvider(studentId));
@@ -220,7 +220,7 @@ class StudentHomeContent extends ConsumerWidget {
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   backgroundColor: _DS.teal700,
-                  surfaceTintColor: Colors.transparent,
+                  surfaceTintColor: AppThemeConstants.transparent,
                   automaticallyImplyLeading: false,
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
@@ -333,7 +333,7 @@ class _HomeHeader extends StatelessWidget {
               width: 220, height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.04),
+                color: AppThemeConstants.white.withValues(alpha: 0.04),
               ),
             ),
           ),
@@ -343,7 +343,7 @@ class _HomeHeader extends StatelessWidget {
               width: 130, height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.03),
+                color: AppThemeConstants.white.withValues(alpha: 0.03),
               ),
             ),
           ),
@@ -368,7 +368,7 @@ class _HomeHeader extends StatelessWidget {
                               name,
                               style: const TextStyle(
                                 fontSize: 22, fontWeight: FontWeight.w800,
-                                color: Colors.white, letterSpacing: -0.3,
+                                color: AppThemeConstants.white, letterSpacing: -0.3,
                               ),
                               maxLines: 1, overflow: TextOverflow.ellipsis,
                             ),
@@ -376,16 +376,16 @@ class _HomeHeader extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
+                                color: AppThemeConstants.white.withValues(alpha: 0.15),
                                 borderRadius: _DS.r8,
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                                border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.25)),
                               ),
                               child: const Text(
                                 'طالب',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: AppThemeConstants.white,
                                 ),
                               ),
                             ),
@@ -393,13 +393,13 @@ class _HomeHeader extends StatelessWidget {
                             Row(
                               children: [
                                 Icon(Icons.calendar_today_rounded, size: 12,
-                                    color: Colors.white.withValues(alpha: 0.7)),
+                                    color: AppThemeConstants.white.withValues(alpha: 0.7)),
                                 const SizedBox(width: 5),
                                 Text(
                                   dateText,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.white.withValues(alpha: 0.75),
+                                    color: AppThemeConstants.white.withValues(alpha: 0.75),
                                   ),
                                 ),
                               ],
@@ -414,21 +414,21 @@ class _HomeHeader extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.13),
+                      color: AppThemeConstants.white.withValues(alpha: 0.13),
                       borderRadius: _DS.r12,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                      border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.18)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 12),
+                        const Icon(Icons.auto_awesome_rounded, color: AppThemeConstants.white, size: 12),
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
                             greeting,
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.white.withValues(alpha: 0.95),
+                              color: AppThemeConstants.white.withValues(alpha: 0.95),
                               fontWeight: FontWeight.w500,
                             ),
                             maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -458,7 +458,7 @@ class _PaymentAlertBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: AppThemeConstants.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
@@ -626,7 +626,7 @@ class _StatCard extends StatelessWidget {
         boxShadow: _DS.cardShadow,
       ),
       child: Material(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: _DS.r16,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -769,7 +769,7 @@ class _ActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: AppThemeConstants.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
@@ -778,7 +778,7 @@ class _ActionCard extends StatelessWidget {
         borderRadius: _DS.r16,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppThemeConstants.white,
             borderRadius: _DS.r16,
             border: Border.all(color: _DS.border),
             boxShadow: _DS.subtleShadow,
@@ -835,7 +835,7 @@ class _QuizAccessCard extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         Material(
-          color: Colors.transparent,
+          color: AppThemeConstants.transparent,
           child: InkWell(
             onTap: isUnlocked
                 ? () {
@@ -862,7 +862,7 @@ class _QuizAccessCard extends ConsumerWidget {
             borderRadius: _DS.r16,
             child: Ink(
               decoration: BoxDecoration(
-                color: isUnlocked ? const Color(0xFF0E8278) : Colors.white,
+                color: isUnlocked ? const Color(0xFF0E8278) : AppThemeConstants.white,
                 borderRadius: _DS.r16,
                 border: Border.all(
                   color: isUnlocked
@@ -889,7 +889,7 @@ class _QuizAccessCard extends ConsumerWidget {
                       height: 48,
                       decoration: BoxDecoration(
                         color: isUnlocked
-                            ? Colors.white.withValues(alpha: 0.2)
+                            ? AppThemeConstants.white.withValues(alpha: 0.2)
                             : _DS.teal50,
                         borderRadius: _DS.r12,
                       ),
@@ -897,7 +897,7 @@ class _QuizAccessCard extends ConsumerWidget {
                         isUnlocked
                             ? Icons.extension_rounded
                             : Icons.lock_rounded,
-                        color: isUnlocked ? Colors.white : _DS.text3,
+                        color: isUnlocked ? AppThemeConstants.white : _DS.text3,
                         size: 24,
                       ),
                     ),
@@ -911,7 +911,7 @@ class _QuizAccessCard extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
-                              color: isUnlocked ? Colors.white : _DS.text1,
+                              color: isUnlocked ? AppThemeConstants.white : _DS.text1,
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -922,7 +922,7 @@ class _QuizAccessCard extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 12,
                               color: isUnlocked
-                                  ? Colors.white.withValues(alpha: 0.8)
+                                  ? AppThemeConstants.white.withValues(alpha: 0.8)
                                   : _DS.text3,
                             ),
                           ),
@@ -936,7 +936,7 @@ class _QuizAccessCard extends ConsumerWidget {
                           : Icons.lock_outline_rounded,
                       size: 16,
                       color: isUnlocked
-                          ? Colors.white.withValues(alpha: 0.8)
+                          ? AppThemeConstants.white.withValues(alpha: 0.8)
                           : _DS.text3,
                     ),
                   ],
@@ -1093,7 +1093,7 @@ class _AssignmentCard extends StatelessWidget {
     final relDate = _relativeDate(sessionDate);
 
     return Material(
-      color: Colors.transparent,
+      color: AppThemeConstants.transparent,
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
@@ -1102,7 +1102,7 @@ class _AssignmentCard extends StatelessWidget {
         borderRadius: _DS.r16,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppThemeConstants.white,
             borderRadius: _DS.r16,
             border: Border.all(color: _DS.border),
             boxShadow: _DS.subtleShadow,
@@ -1521,7 +1521,7 @@ class _EmptyCard extends StatelessWidget {
           Container(
             width: 52, height: 52,
             decoration: BoxDecoration(
-              color: Colors.white, borderRadius: _DS.r16,
+              color: AppThemeConstants.white, borderRadius: _DS.r16,
               border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Icon(icon, color: color, size: 26),
@@ -1553,9 +1553,9 @@ class _Avatar extends StatelessWidget {
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: AppThemeConstants.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(size / 2),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 2),
+        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.45), width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(size / 2),
@@ -1565,7 +1565,7 @@ class _Avatar extends StatelessWidget {
                 child: Text(
                   initials,
                   style: TextStyle(
-                    fontSize: size * 0.38, fontWeight: FontWeight.w800, color: Colors.white,
+                    fontSize: size * 0.38, fontWeight: FontWeight.w800, color: AppThemeConstants.white,
                   ),
                 ),
               ),

@@ -71,11 +71,11 @@ class StudentChallengesScreen extends ConsumerWidget {
                   style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
-                      color: Colors.white70)),
+                      color: AppThemeConstants.white70)),
             ],
           ),
           backgroundColor: AppThemeConstants.primary,
-          foregroundColor: Colors.white,
+          foregroundColor: AppThemeConstants.white,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () => Navigator.of(context).pop(),
@@ -149,7 +149,7 @@ class StudentChallengesScreen extends ConsumerWidget {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppThemeConstants.transparent,
       builder: (_) => _QuestionSheet(
         type: type,
         existing: existing,
@@ -290,7 +290,7 @@ class _TypeSection extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: _DS.r16,
         border: Border.all(color: _DS.border),
       ),
@@ -608,7 +608,7 @@ class _QuestionSheetState extends State<_QuestionSheet> {
       textDirection: TextDirection.rtl,
       child: Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppThemeConstants.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.only(
@@ -783,14 +783,14 @@ class _QuestionSheetState extends State<_QuestionSheet> {
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.primary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppThemeConstants.white,
                     shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
                   ),
                   child: _saving
                       ? const SizedBox(
                           width: 20, height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2, color: AppThemeConstants.white),
                         )
                       : Text(
                           isEdit ? 'حفظ التعديلات' : 'إضافة السؤال',

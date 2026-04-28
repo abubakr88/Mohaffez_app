@@ -353,22 +353,22 @@ class _EmptyState extends StatelessWidget {
             Icon(
               getIcon(),
               size: 64,
-              color: Colors.grey.shade400,
+              color: AppThemeConstants.grey400,
             ),
             const SizedBox(height: 16),
             Text(
               getTitle(),
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
+                color: AppThemeConstants.grey600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               getSubtitle(),
-              style: TextStyle(
-                  fontSize: 14, color: Colors.grey.shade400),
+              style: const TextStyle(
+                  fontSize: 14, color: AppThemeConstants.grey400),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),

@@ -138,10 +138,10 @@ class _BookingConfirmationScreenState
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppThemeConstants.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: AppThemeConstants.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, -2),
                   ),
@@ -156,7 +156,7 @@ class _BookingConfirmationScreenState
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.secondary,
-                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledBackgroundColor: AppThemeConstants.grey300,
                   ),
                   child: _isSubmitting
                       ? const SizedBox(
@@ -164,7 +164,7 @@ class _BookingConfirmationScreenState
                           width: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                           ),
                         )
                       : Text(
@@ -187,48 +187,48 @@ class _BookingConfirmationScreenState
 
   Widget _buildCancellationPolicyCard() {
     return Card(
-      color: Colors.red.shade50,
+      color: AppThemeConstants.errorLight,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.warning, color: Colors.red, size: 24),
-                const SizedBox(width: 8),
+                Icon(Icons.warning, color: AppThemeConstants.error, size: 24),
+                SizedBox(width: 8),
                 Text(
                   'سياسة الإلغاء',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.red.shade900,
+                    color: AppThemeConstants.errorDark,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _policyItem(Icons.check_circle, Colors.green, 'إلغاء مجاني قبل 24 ساعة من موعد الجلسة'),
-            _policyItem(Icons.warning_amber, Colors.orange, 'خصم 50% من المبلغ للإلغاء قبل 12 ساعة'),
-            _policyItem(Icons.cancel, Colors.red, 'خصم 100% (لا يمكن استرداد المبلغ) للإلغاء بعد ذلك'),
+            _policyItem(Icons.check_circle, AppThemeConstants.success, 'إلغاء مجاني قبل 24 ساعة من موعد الجلسة'),
+            _policyItem(Icons.warning_amber, AppThemeConstants.warning, 'خصم 50% من المبلغ للإلغاء قبل 12 ساعة'),
+            _policyItem(Icons.cancel, AppThemeConstants.error, 'خصم 100% (لا يمكن استرداد المبلغ) للإلغاء بعد ذلك'),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.shade100,
+                color: AppThemeConstants.errorLight,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: const Row(
                 children: [
                   Icon(Icons.info_outline,
-                      size: 16, color: Colors.red.shade700),
-                  const SizedBox(width: 8),
+                      size: 16, color: AppThemeConstants.error),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'في حالة استخدام الباقة، سيتم خصم جلسة واحدة عند الإلغاء المتأخر',
                       style:
-                          TextStyle(fontSize: 12, color: Colors.red.shade700),
+                          TextStyle(fontSize: 12, color: AppThemeConstants.error),
                     ),
                   ),
                 ],
@@ -297,7 +297,7 @@ class _BookingConfirmationScreenState
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 18),
+                          const Icon(Icons.star, color: AppThemeConstants.accentAmber, size: 18),
                           const SizedBox(width: 4),
                           Text(
                             '${details.rating.toStringAsFixed(1)}/10',
@@ -307,7 +307,7 @@ class _BookingConfirmationScreenState
                           Text(
                             '(${details.reviewCount} تقييم)',
                             style: const TextStyle(
-                                color: Colors.grey, fontSize: 12),
+                                color: AppThemeConstants.grey500, fontSize: 12),
                           ),
                         ],
                       ),
@@ -330,11 +330,11 @@ class _BookingConfirmationScreenState
             const Divider(height: 24),
             Row(
               children: [
-                const Icon(Icons.payments, color: Colors.green),
+                const Icon(Icons.payments, color: AppThemeConstants.success),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'التكلفة',
-                  style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 16, color: AppThemeConstants.grey700),
                 ),
                 const Spacer(),
                 Column(
@@ -346,12 +346,12 @@ class _BookingConfirmationScreenState
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                          color: AppThemeConstants.success,
                         ),
                       ),
                       const Text(
                         'سيتم خصم جلسة واحدة',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontSize: 12, color: AppThemeConstants.grey500),
                       ),
                     ] else
                       Text(
@@ -359,7 +359,7 @@ class _BookingConfirmationScreenState
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                          color: AppThemeConstants.success,
                         ),
                       ),
                   ],
@@ -377,10 +377,10 @@ class _BookingConfirmationScreenState
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey.shade600),
+          Icon(icon, size: 20, color: AppThemeConstants.grey600),
           const SizedBox(width: 8),
           Text(label,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+              style: const TextStyle(fontSize: 14, color: AppThemeConstants.grey700)),
           const Spacer(),
           Expanded(
             flex: 2,
@@ -461,7 +461,7 @@ class _BookingConfirmationScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('تم إرسال طلب الحجز بنجاح'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppThemeConstants.success,
             ),
           );
         });

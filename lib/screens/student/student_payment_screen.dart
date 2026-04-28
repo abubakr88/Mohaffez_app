@@ -323,7 +323,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                           padding: EdgeInsets.all(12),
                           child: Text(
                             'جارٍ تحديد خطة الدفع...',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: AppThemeConstants.grey500),
                           ),
                         ),
                       )
@@ -402,12 +402,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                       border: Border.all(
                         color: _selectedDPMethod == _DpMethod.online
                             ? AppThemeConstants.secondary
-                            : Colors.grey.shade300,
+                            : AppThemeConstants.grey300,
                         width: _selectedDPMethod == _DpMethod.online ? 2 : 1,
                       ),
                       color: _selectedDPMethod == _DpMethod.online
                           ? AppThemeConstants.secondary.withValues(alpha: 0.08)
-                          : Colors.white,
+                          : AppThemeConstants.white,
                     ),
                     child: const Row(
                       children: [
@@ -437,17 +437,17 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: _selectedDPMethod == _DpMethod.direct
-                            ? Colors.green
-                            : Colors.grey.shade300,
+                            ? AppThemeConstants.success
+                            : AppThemeConstants.grey300,
                         width: _selectedDPMethod == _DpMethod.direct ? 2 : 1,
                       ),
                       color: _selectedDPMethod == _DpMethod.direct
-                          ? Colors.green.withValues(alpha: 0.08)
-                          : Colors.white,
+                          ? AppThemeConstants.success.withValues(alpha: 0.08)
+                          : AppThemeConstants.white,
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.account_balance_wallet, color: Colors.green),
+                        Icon(Icons.account_balance_wallet, color: AppThemeConstants.success),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -483,17 +483,17 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppThemeConstants.warningLight,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
+                border: Border.all(color: AppThemeConstants.accentOrange),
               ),
               child: const Row(children: [
-                Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                Icon(Icons.info_outline, color: AppThemeConstants.warning, size: 20),
                 SizedBox(width: 8),
                 Expanded(
                     child: Text('يرجى العودة لاختيار الموعد أولاً',
                         style:
-                            TextStyle(fontSize: 13, color: Colors.deepOrange))),
+                            TextStyle(fontSize: 13, color: AppThemeConstants.accentOrange))),
               ]),
             ),
             const SizedBox(height: 12),
@@ -505,7 +505,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 label: const Text('العودة لاختيار الموعد'),
                 style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(color: Colors.orange.shade300)),
+                    side: const BorderSide(color: AppThemeConstants.accentOrange)),
               ),
             ),
           ],
@@ -522,14 +522,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.check_circle, color: Colors.white),
+                      strokeWidth: 2, color: AppThemeConstants.white))
+              : const Icon(Icons.check_circle, color: AppThemeConstants.white),
           label: Text(
             isProcessingPayment
                 ? 'جاري التأكيد...'
                 : 'تأكيد الجلسة المجانية 🎁',
             style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                color: AppThemeConstants.white, fontWeight: FontWeight.bold, fontSize: 16),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppThemeConstants.secondary, // WHY: Replace direct green with themed accent green.
@@ -537,8 +537,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 4,
-            disabledBackgroundColor: Colors.grey.shade300,
-            disabledForegroundColor: Colors.grey.shade600,
+            disabledBackgroundColor: AppThemeConstants.grey300,
+            disabledForegroundColor: AppThemeConstants.grey600,
           ),
         ),
       );
@@ -564,9 +564,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white))
+                    strokeWidth: 2, color: AppThemeConstants.white))
             : Icon(isFreeSession ? Icons.check_circle : Icons.payment,
-                color: Colors.white),
+                color: AppThemeConstants.white),
         label: Text(
           isProcessingPayment
               ? 'جاري المعالجة...'
@@ -574,7 +574,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   ? 'تأكيد الجلسة المجانية 🎁'
                   : '${pricing.finalPrice.toStringAsFixed(0)} ${ArabicLabels.egp} - ${ArabicLabels.payNow}',
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              color: AppThemeConstants.white, fontWeight: FontWeight.bold, fontSize: 16),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: isFreeSession ? AppThemeConstants.secondary : AppThemeConstants.secondary, // WHY: Replace direct green with themed accent green.
@@ -582,8 +582,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: isFreeSession ? 4 : 2,
-          disabledBackgroundColor: Colors.grey.shade300,
-          disabledForegroundColor: Colors.grey.shade600,
+          disabledBackgroundColor: AppThemeConstants.grey300,
+          disabledForegroundColor: AppThemeConstants.grey600,
         ),
       ),
     );
@@ -770,14 +770,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppThemeConstants.surface, // WHY: Replace direct blue shade with themed surface color.
-        border: Border.all(color: Colors.blue, width: 2),
+        border: Border.all(color: AppThemeConstants.accentBlue, width: 2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Icon(Icons.lock, size: 32, color: Colors.blue),
+            const Icon(Icons.lock, size: 32, color: AppThemeConstants.accentBlue),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -793,10 +793,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             const SizedBox(height: 4),
             const Text(
               'راجع تفاصيل جلستك أدناه ثم تابع إلى الدفع',
-              style: TextStyle(fontSize: 13, color: Colors.blue),
+              style: TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
             ),
           ],
-          Divider(height: 24, color: Colors.blue.shade300),
+          const Divider(height: 24, color: AppThemeConstants.accentBlue),
           lockedDetailRow('المحفظ:', widget.mohaffezName),
           lockedDetailRow(ArabicLabels.type, getSessionTypeArabic(sessionType)),
           if (slotDate != null)
@@ -842,8 +842,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           SizedBox(
             width: 80,
             child: Text(label,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600, color: Colors.blue.shade800)),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, color: AppThemeConstants.accentBlueDark)),
           ),
           Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ]),
@@ -864,7 +864,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppThemeConstants.secondary : Colors.grey.shade300,
+            color: selected ? AppThemeConstants.secondary : AppThemeConstants.grey300,
             width: selected ? 2.5 : 1,
           ),
           color: selected ? AppThemeConstants.secondary.withValues(alpha: 0.05) : null,
@@ -888,7 +888,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   plan.sessionsCount > 1
                       ? '${plan.sessionsCount} جلسات'
                       : 'جلسة واحدة',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  style: const TextStyle(fontSize: 13, color: AppThemeConstants.grey600),
                 ),
               ],
             ),
@@ -957,10 +957,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       decoration: BoxDecoration(
         borderRadius: AppThemeConstants.borderRadiusMd,
         border: Border.all(
-          color: isFreeSession ? Colors.green : Colors.grey.shade300,
+          color: isFreeSession ? AppThemeConstants.success : AppThemeConstants.grey300,
           width: isFreeSession ? 2 : 1,
         ),
-        color: isFreeSession ? Colors.green.shade50 : null,
+        color: isFreeSession ? AppThemeConstants.successLight : null,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (isFreeSession && promoCodeValid)
@@ -969,19 +969,19 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                  colors: [Colors.green, Color(0xFF66BB6A)],
+                  colors: [AppThemeConstants.success, Color(0xFF66BB6A)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.green.withValues(alpha: 0.3),
+                    color: AppThemeConstants.success.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4))
               ],
             ),
             child: const Row(children: [
-              Icon(Icons.celebration, color: Colors.white, size: 36),
+              Icon(Icons.celebration, color: AppThemeConstants.white, size: 36),
               SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -989,12 +989,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   children: [
                     Text('جلسة مجانية! 🎁',
                         style: TextStyle(
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold)),
                     SizedBox(height: 4),
                     Text('100% خصم مطبق',
-                        style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        style: TextStyle(color: AppThemeConstants.white70, fontSize: 14)),
                   ],
                 ),
               ),
@@ -1022,7 +1022,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                         padding: EdgeInsets.all(12),
                         child: CircularProgressIndicator(strokeWidth: 2)))
                 : promoCodeValid
-                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    ? const Icon(Icons.check_circle, color: AppThemeConstants.success)
                     : null,
             border: const OutlineInputBorder(),
           ),
@@ -1045,7 +1045,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   }
                 },
           style: ElevatedButton.styleFrom(
-            backgroundColor: promoCodeValid ? Colors.green : null,
+            backgroundColor: promoCodeValid ? AppThemeConstants.success : null,
           ),
           child: Text(isValidatingPromo
               ? '...'
@@ -1057,11 +1057,11 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(children: [
-              const Icon(Icons.error, color: Colors.red, size: 16),
+              const Icon(Icons.error, color: AppThemeConstants.error, size: 16),
               const SizedBox(width: 6),
               Expanded(
                   child: Text(promoError,
-                      style: const TextStyle(color: Colors.red, fontSize: 12))),
+                      style: const TextStyle(color: AppThemeConstants.error, fontSize: 12))),
             ]),
           ),
         if (promoCodeValid && discount > 0 && !isFreeSession)
@@ -1070,12 +1070,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: AppThemeConstants.successLight,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green),
+                border: Border.all(color: AppThemeConstants.success),
               ),
               child: Row(children: [
-                const Icon(Icons.check_circle, color: Colors.green),
+                const Icon(Icons.check_circle, color: AppThemeConstants.success),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -1084,13 +1084,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                       const Text('كود الخصم مطبّق',
                           style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.green)),
+                              color: AppThemeConstants.success)),
                       Text(
                         appliedPromoCode?.type == 'percentage'
                             ? '${ArabicLabels.discount} ${discount.toStringAsFixed(0)}%'
                             : '${ArabicLabels.discount} ${discount.toStringAsFixed(0)} ${ArabicLabels.currency}',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.green.shade700),
+                        style: const TextStyle(
+                            fontSize: 12, color: AppThemeConstants.success),
                       ),
                     ],
                   ),
@@ -1111,12 +1111,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isFreeSession
-            ? Colors.green.withValues(alpha: 0.1)
+            ? AppThemeConstants.success.withValues(alpha: 0.1)
             : AppThemeConstants.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isFreeSession
-              ? Colors.green
+              ? AppThemeConstants.success
               : AppThemeConstants.primary.withValues(alpha: 0.25),
         ),
       ),
@@ -1129,7 +1129,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               style: TextStyle(
                 decoration:
                     pricing.discount > 0 ? TextDecoration.lineThrough : null,
-                color: Colors.grey,
+                color: AppThemeConstants.grey500,
               ),
             ),
           ]),
@@ -1140,7 +1140,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             Text(
               '- ${pricing.discount.toStringAsFixed(2)} ${ArabicLabels.currency}',
               style: const TextStyle(
-                  color: Colors.green, fontWeight: FontWeight.bold),
+                  color: AppThemeConstants.success, fontWeight: FontWeight.bold),
             ),
           ]),
         ],
@@ -1155,7 +1155,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
-                color: isFreeSession ? Colors.green : AppThemeConstants.primary),
+                color: isFreeSession ? AppThemeConstants.success : AppThemeConstants.primary),
           ),
         ]),
       ]),
@@ -1202,7 +1202,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         if (!hasSelectedSlot) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('يرجى اختيار الموعد أولاً'),
-              backgroundColor: Colors.red));
+              backgroundColor: AppThemeConstants.error));
           return;
         }
         slotDate = lockedDate;
@@ -1306,7 +1306,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('🎉 تم تأكيد جلستك المجانية!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
             duration: Duration(seconds: 3),
           ),
         );
@@ -1322,7 +1322,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e.toString()),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
           duration: const Duration(seconds: 5)));
     } finally {
       if (mounted) setState(() => isProcessingPayment = false);
@@ -1406,7 +1406,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       if (success == true && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('تم الدفع بنجاح!'), backgroundColor: Colors.green),
+              content: Text('تم الدفع بنجاح!'), backgroundColor: AppThemeConstants.success),
         );
         Navigator.pop(context, true);
       }

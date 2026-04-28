@@ -171,7 +171,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   'محفظ',
                   style: context.textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppThemeConstants.white,
                     letterSpacing: 4,
                   ),
                 ),
@@ -193,7 +193,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                Colors.transparent,
+                                AppThemeConstants.transparent,
                                 AppThemeConstants.secondary
                                     .withValues(alpha: 0.8),
                               ],
@@ -217,7 +217,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               colors: [
                                 AppThemeConstants.secondary
                                     .withValues(alpha: 0.8),
-                                Colors.transparent,
+                                AppThemeConstants.transparent,
                               ],
                             ),
                           ),
@@ -236,7 +236,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 child: Text(
                   'تطبيق تحفيظ القرآن الكريم',
                   style: context.textTheme.bodyLarge?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.75),
+                    color: AppThemeConstants.white.withValues(alpha: 0.75),
                     letterSpacing: 1,
                   ),
                 ),
@@ -256,19 +256,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white),
+                              AppThemeConstants.white),
                         ),
                       ),
                     if (authAsync.hasError) ...[
                       const Icon(Icons.error_outline,
-                          color: Colors.white, size: 28),
+                          color: AppThemeConstants.white, size: 28),
                       const SizedBox(height: AppThemeConstants.spaceSm),
                       ElevatedButton.icon(
                         onPressed: _retry,
                         icon: const Icon(Icons.refresh),
                         label: const Text('إعادة المحاولة'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
+                          backgroundColor: AppThemeConstants.white,
                           foregroundColor: AppThemeConstants.primary,
                           shape: const StadiumBorder(),
                           padding: const EdgeInsets.symmetric(
@@ -283,7 +283,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       Text(
                         _statusText(authAsync),
                         style: context.textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: AppThemeConstants.white.withValues(alpha: 0.6),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -306,7 +306,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       height: 148,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white,
+        color: AppThemeConstants.white,
         boxShadow: [
           BoxShadow(
             color: AppThemeConstants.secondary.withValues(alpha: 0.45),
@@ -314,7 +314,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             spreadRadius: 6,
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
+            color: AppThemeConstants.black.withValues(alpha: 0.25),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -371,10 +371,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
+                      color: AppThemeConstants.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
+                          color: AppThemeConstants.black.withValues(alpha: 0.2),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -391,7 +391,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     'مشكلة في الاتصال',
                     style: context.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppThemeConstants.white,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -399,7 +399,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   Text(
                     _errorMsg ?? 'حدث خطأ في الاتصال',
                     style: context.textTheme.bodyLarge?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: AppThemeConstants.white.withValues(alpha: 0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -414,7 +414,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         icon: const Icon(Icons.refresh),
                         label: const Text('إعادة المحاولة'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
+                          backgroundColor: AppThemeConstants.white,
                           foregroundColor: AppThemeConstants.primary,
                           shape: const StadiumBorder(),
                           padding: const EdgeInsets.symmetric(
@@ -429,8 +429,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         icon: const Icon(Icons.login),
                         label: const Text('تسجيل الدخول'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white, width: 2),
+                          foregroundColor: AppThemeConstants.white,
+                          side: const BorderSide(color: AppThemeConstants.white, width: 2),
                           shape: const StadiumBorder(),
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppThemeConstants.spaceLg,

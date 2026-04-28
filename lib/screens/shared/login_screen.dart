@@ -337,8 +337,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: ElevatedButton(
                 onPressed: isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
+                  backgroundColor: AppThemeConstants.transparent,
+                  shadowColor: AppThemeConstants.transparent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -399,7 +399,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.transparent,
+                          AppThemeConstants.transparent,
                           _LoginTheme.textMuted.withValues(alpha: 0.3),
                         ],
                       ),
@@ -424,7 +424,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       gradient: LinearGradient(
                         colors: [
                           _LoginTheme.textMuted.withValues(alpha: 0.3),
-                          Colors.transparent,
+                          AppThemeConstants.transparent,
                         ],
                       ),
                     ),

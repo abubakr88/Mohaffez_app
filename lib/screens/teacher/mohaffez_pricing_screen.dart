@@ -280,7 +280,7 @@ class PricingPlanCard extends ConsumerWidget {
                   onPressed: () => _editPlan(context, ref),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                  icon: const Icon(Icons.delete, size: 20, color: AppThemeConstants.error),
                   onPressed: () => _deletePlan(context, ref),
                 ),
               ],

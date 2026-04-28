@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class StatusUtils {
   static Color color(String status) {
     switch (status) {
       case 'accepted':
-        return Colors.green;
+        return AppThemeConstants.success;
       case 'rejected':
-        return Colors.red;
+        return AppThemeConstants.error;
       default:
-        return Colors.orange;
+        return AppThemeConstants.warning;
     }
   }
 

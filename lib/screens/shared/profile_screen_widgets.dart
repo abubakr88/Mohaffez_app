@@ -140,7 +140,7 @@ class ProfileCompletionCard extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: percentage / 100,
                   minHeight: 8,
-                  backgroundColor: Colors.grey.shade200,
+                  backgroundColor: AppThemeConstants.grey200,
                   valueColor: AlwaysStoppedAnimation(
                     isComplete ? AppThemeConstants.secondary : AppThemeConstants.primary,
                   ),
@@ -178,9 +178,9 @@ class ProfileCompletionCard extends StatelessWidget {
                           ),
                           child: Text(
                             field.toString(),
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade700,
+                              color: AppThemeConstants.grey700,
                             ),
                           ),
                         ),
@@ -245,11 +245,11 @@ class BasicInfoSection extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: AppThemeConstants.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -368,9 +368,9 @@ class BasicInfoSection extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: AppThemeConstants.grey600,
                 ),
               ),
               const SizedBox(height: 4),
@@ -411,9 +411,9 @@ class BasicInfoSection extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 label,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: AppThemeConstants.grey600,
                 ),
               ),
             ],
@@ -433,7 +433,7 @@ class BasicInfoSection extends StatelessWidget {
               'اختر من التخصصات الشائعة:',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey,
+                color: AppThemeConstants.grey500,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -537,9 +537,9 @@ class BasicInfoSection extends StatelessWidget {
                 ),
                 Text(
                   label,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
-                    color: Colors.grey.shade600,
+                    color: AppThemeConstants.grey600,
                   ),
                 ),
               ],
@@ -561,11 +561,11 @@ class MohaffezManagementSection extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: AppThemeConstants.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -587,7 +587,7 @@ class MohaffezManagementSection extends StatelessWidget {
             icon: Icons.verified_user,
             title: 'الشهادات والمؤهلات',
             subtitle: 'إدارة شهاداتك وإجازاتك',
-            color: Colors.blue,
+            color: AppThemeConstants.accentBlue,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -664,18 +664,18 @@ class _ManagementCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: AppThemeConstants.grey600,
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(
+            const Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Colors.grey.shade400,
+              color: AppThemeConstants.grey400,
             ),
           ],
         ),
@@ -699,11 +699,11 @@ class AccountManagementSection extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: AppThemeConstants.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -725,7 +725,7 @@ class AccountManagementSection extends StatelessWidget {
             icon: Icons.lock,
             title: 'تغيير كلمة المرور',
             subtitle: 'قم بتحديث كلمة مرورك',
-            color: Colors.orange,
+            color: AppThemeConstants.warning,
             onTap: onChangePassword,
           ),
           const SizedBox(height: 12),
@@ -734,7 +734,7 @@ class AccountManagementSection extends StatelessWidget {
             icon: Icons.privacy_tip,
             title: 'إعدادات الخصوصية',
             subtitle: 'التحكم في من يمكنه رؤية معلوماتك',
-            color: Colors.purple,
+            color: AppThemeConstants.accentPurple,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(

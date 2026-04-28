@@ -457,7 +457,7 @@ class _RequestCardState extends State<_RequestCard> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
                                       AppThemeConstants.primary,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: AppThemeConstants.white,
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 12),
                                   shape: const RoundedRectangleBorder(
@@ -582,7 +582,7 @@ class _CertificatesList extends StatelessWidget {
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) =>
                         const Icon(Icons.broken_image_rounded,
-                            size: 40, color: Colors.grey)),
+                            size: 40, color: AppThemeConstants.grey500)),
               ),
             ),
           ),

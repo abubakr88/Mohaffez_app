@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 /// Wrapper that adapts colors for high contrast mode
 class HighContrastWrapper extends StatelessWidget {
@@ -18,8 +19,8 @@ class HighContrastWrapper extends StatelessWidget {
         data: Theme.of(context).copyWith(
           // Increase contrast for text
           textTheme: Theme.of(context).textTheme.apply(
-            bodyColor: Colors.black,
-            displayColor: Colors.black,
+            bodyColor: AppThemeConstants.black,
+            displayColor: AppThemeConstants.black,
           ),
           
           // Increase border widths
@@ -27,32 +28,32 @@ class HighContrastWrapper extends StatelessWidget {
             elevation: 4,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Colors.black, width: 2),
+              side: const BorderSide(color: AppThemeConstants.black, width: 2),
             ),
           ),
           
           // Higher contrast colors
           colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.amber,
+            seedColor: AppThemeConstants.accentAmber,
             brightness: Brightness.light,
-            primary: Colors.amber.shade800,
-            secondary: Colors.green.shade800,
+            primary: AppThemeConstants.accentAmberDark,
+            secondary: AppThemeConstants.successDark,
           ),
           
           // Higher contrast for buttons
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber.shade800,
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.black, width: 2),
+              backgroundColor: AppThemeConstants.accentAmberDark,
+              foregroundColor: AppThemeConstants.white,
+              side: const BorderSide(color: AppThemeConstants.black, width: 2),
             ),
           ),
           
           // Higher contrast for outlined buttons
           outlinedButtonTheme: OutlinedButtonThemeData(
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.black, width: 2),
-              foregroundColor: Colors.black,
+              side: const BorderSide(color: AppThemeConstants.black, width: 2),
+              foregroundColor: AppThemeConstants.black,
             ),
           ),
           
@@ -60,22 +61,22 @@ class HighContrastWrapper extends StatelessWidget {
           inputDecorationTheme: InputDecorationTheme(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.black, width: 2),
+              borderSide: const BorderSide(color: AppThemeConstants.black, width: 2),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.black, width: 2),
+              borderSide: const BorderSide(color: AppThemeConstants.black, width: 2),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.black, width: 3),
+              borderSide: const BorderSide(color: AppThemeConstants.black, width: 3),
             ),
           ),
           
           // Higher contrast dividers
-          dividerColor: Colors.black,
+          dividerColor: AppThemeConstants.black,
           dividerTheme: const DividerThemeData(
-            color: Colors.black,
+            color: AppThemeConstants.black,
             thickness: 2,
           ),
         ),

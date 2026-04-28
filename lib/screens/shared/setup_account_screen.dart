@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/setup_provider.dart';
 import '../../providers/system_config_provider.dart';
 import '../../providers/user_provider.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class SetupAccountScreen extends ConsumerStatefulWidget {
   const SetupAccountScreen({super.key});
@@ -497,7 +498,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 16),
-            const Icon(Icons.person_outline, size: 64, color: Colors.teal),
+            const Icon(Icons.person_outline, size: 64, color: AppThemeConstants.primary),
             const SizedBox(height: 16),
             const Text(
               'أكمل بيانات حسابك',
@@ -553,7 +554,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                       ? '${_dateOfBirth!.year}/${_dateOfBirth!.month}/${_dateOfBirth!.day}'
                       : 'اختر التاريخ',
                   style: TextStyle(
-                    color: _dateOfBirth != null ? null : Colors.grey,
+                    color: _dateOfBirth != null ? null : AppThemeConstants.grey500,
                     fontSize: 16,
                   ),
                 ),
@@ -597,7 +598,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                           color:
                               (_mainLocationText?.trim().isNotEmpty ?? false)
                                   ? null
-                                  : Colors.grey,
+                                  : AppThemeConstants.grey500,
                           fontSize: 16,
                         ),
                       ),
@@ -612,7 +613,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
               const SizedBox(height: 8),
               Text(
                 'الإحداثيات: ${_mainLocationLat!.toStringAsFixed(4)}, ${_mainLocationLng!.toStringAsFixed(4)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style: const TextStyle(fontSize: 12, color: AppThemeConstants.grey500),
               ),
             ],
             const SizedBox(height: 32),
@@ -628,7 +629,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                         width: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                         ),
                       )
                     : Text(
@@ -655,7 +656,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 24),
-          const Icon(Icons.quiz_outlined, size: 64, color: Colors.orange),
+          const Icon(Icons.quiz_outlined, size: 64, color: AppThemeConstants.warning),
           const SizedBox(height: 16),
           const Text(
             'اختبار تقييم المهارات',
@@ -733,10 +734,10 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
 
     // Timer color: green → orange → red
     final timerColor = _remainingSeconds > 60
-        ? Colors.green
+        ? AppThemeConstants.success
         : _remainingSeconds > 30
-            ? Colors.orange
-            : Colors.red;
+            ? AppThemeConstants.warning
+            : AppThemeConstants.error;
 
     return Column(
       children: [
@@ -759,7 +760,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
               const Spacer(),
               Text(
                 'سؤال ${_currentQuestionIndex + 1} من $total',
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                style: const TextStyle(fontSize: 14, color: AppThemeConstants.grey500),
               ),
             ],
           ),
@@ -803,7 +804,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                           border: Border.all(
                             color: isSelected
                                 ? Theme.of(context).colorScheme.primary
-                                : Colors.grey.shade300,
+                                : AppThemeConstants.grey300,
                             width: isSelected ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(10),
@@ -822,7 +823,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                                   : Icons.radio_button_off,
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
-                                  : Colors.grey,
+                                  : AppThemeConstants.grey500,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -849,7 +850,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
             color: Theme.of(context).colorScheme.surface,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: AppThemeConstants.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: const Offset(0, -2),
               ),
@@ -891,7 +892,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: AppThemeConstants.white,
                                 ),
                               )
                             : const Text('إرسال الإجابات'),
@@ -917,7 +918,7 @@ class _InstructionRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: Colors.teal),
+        Icon(icon, size: 20, color: AppThemeConstants.primary),
         const SizedBox(width: 10),
         Expanded(
           child: Text(text, style: const TextStyle(fontSize: 15)),

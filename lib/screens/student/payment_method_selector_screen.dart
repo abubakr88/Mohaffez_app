@@ -75,8 +75,8 @@ class _PaymentMethodSelectorScreenState
                           'باقي لديك: ${widget.remainingCredits} جلسة',
                           'تكلفة: مجاناً (من الباقة)',
                         ],
-                        backgroundColor: Colors.green.shade50,
-                        borderColor: Colors.green,
+                        backgroundColor: AppThemeConstants.successLight,
+                        borderColor: AppThemeConstants.success,
                         recommended: true,
                       ),
                     if (widget.hasActiveSubscription)
@@ -91,8 +91,8 @@ class _PaymentMethodSelectorScreenState
                         'تكلفة: ${widget.singleSessionPrice.toStringAsFixed(0)} جنيه',
                       ],
                       warning: 'قد يرفض المحفظ الطلب',
-                      backgroundColor: Colors.amber.shade50,
-                      borderColor: Colors.amber,
+                      backgroundColor: AppThemeConstants.accentAmberLight,
+                      borderColor: AppThemeConstants.accentAmber,
                     ),
                     const SizedBox(height: 12),
                     _buildPaymentOption(
@@ -104,8 +104,8 @@ class _PaymentMethodSelectorScreenState
                         'باقة ${widget.packageSessions} جلسات بـ ${widget.packagePrice.toStringAsFixed(0)} جنيه',
                         'متوسط الجلسة: ${_getAverageSessionPrice()} جنيه',
                       ],
-                      backgroundColor: Colors.blue.shade50,
-                      borderColor: Colors.blue,
+                      backgroundColor: AppThemeConstants.accentBlueLight,
+                      borderColor: AppThemeConstants.accentBlue,
                     ),
                     const SizedBox(height: 24),
                     if (!widget.hasActiveSubscription) _buildComparisonTable(),
@@ -115,10 +115,10 @@ class _PaymentMethodSelectorScreenState
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppThemeConstants.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: AppThemeConstants.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, -2),
                   ),
@@ -133,7 +133,7 @@ class _PaymentMethodSelectorScreenState
                       : () => context.pop(selectedMethod),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.secondary,
-                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledBackgroundColor: AppThemeConstants.grey300,
                   ),
                   child: Text(
                     _getButtonLabel(),
@@ -196,13 +196,13 @@ class _PaymentMethodSelectorScreenState
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: AppThemeConstants.success,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       'موصى به',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppThemeConstants.white,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -241,15 +241,15 @@ class _PaymentMethodSelectorScreenState
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.info_outline,
-                      size: 16, color: Colors.orange.shade700),
+                  const Icon(Icons.info_outline,
+                      size: 16, color: AppThemeConstants.warning),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       warning,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: Colors.orange.shade700,
+                        color: AppThemeConstants.warning,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -267,7 +267,7 @@ class _PaymentMethodSelectorScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: AppThemeConstants.accentBlue),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -279,10 +279,10 @@ class _PaymentMethodSelectorScreenState
           ),
           const SizedBox(height: 12),
           Table(
-            border: TableBorder.all(color: Colors.grey.shade300),
+            border: TableBorder.all(color: AppThemeConstants.grey300),
             children: [
               TableRow(
-                decoration: BoxDecoration(color: Colors.grey.shade100),
+                decoration: const BoxDecoration(color: AppThemeConstants.grey100),
                 children: [
                   _tableCell('', isHeader: true),
                   _tableCell('باقة', isHeader: true),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/accessibility_utils.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 /// Main error display widget with multiple factory constructors
 class ErrorDisplay extends StatelessWidget {
@@ -28,7 +29,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'لا يوجد اتصال بالإنترنت',
       message: 'يرجى التحقق من الاتصال والمحاولة مرة أخرى',
       icon: Icons.wifi_off,
-      iconColor: Colors.orange,
+      iconColor: AppThemeConstants.warning,
       onRetry: onRetry,
     );
   }
@@ -42,7 +43,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'الإذن مطلوب',
       message: 'يرجى منح إذن $permissionName للمتابعة',
       icon: Icons.lock_outline,
-      iconColor: Colors.red.shade400,
+      iconColor: AppThemeConstants.accentRed,
       onRetry: onRetry,
     );
   }
@@ -53,7 +54,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'فشل تحميل البيانات',
       message: 'حدث خطأ أثناء تحميل البيانات. يرجى المحاولة مرة أخرى',
       icon: Icons.error_outline,
-      iconColor: Colors.red,
+      iconColor: AppThemeConstants.error,
       onRetry: onRetry,
     );
   }
@@ -67,7 +68,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'لم يتم العثور على ${itemName ?? "البيانات"}',
       message: 'العنصر المطلوب غير موجود أو تم حذفه',
       icon: Icons.search_off,
-      iconColor: Colors.grey.shade600,
+      iconColor: AppThemeConstants.grey600,
       onRetry: onRetry,
     );
   }
@@ -78,7 +79,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'انتهت مهلة الطلب',
       message: 'استغرق الطلب وقتاً طويلاً. يرجى المحاولة مرة أخرى',
       icon: Icons.timer_off,
-      iconColor: Colors.orange,
+      iconColor: AppThemeConstants.warning,
       onRetry: onRetry,
     );
   }
@@ -89,7 +90,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'خطأ في الخادم',
       message: 'حدث خطأ في الخادم. يرجى المحاولة لاحقاً',
       icon: Icons.cloud_off,
-      iconColor: Colors.red,
+      iconColor: AppThemeConstants.error,
       onRetry: onRetry,
     );
   }
@@ -100,7 +101,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'خدمات الموقع معطلة',
       message: 'يرجى تفعيل خدمات الموقع من الإعدادات',
       icon: Icons.location_off,
-      iconColor: Colors.orange,
+      iconColor: AppThemeConstants.warning,
       onRetry: onRetry,
     );
   }
@@ -111,7 +112,7 @@ class ErrorDisplay extends StatelessWidget {
       title: 'خطأ في المصادقة',
       message: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى',
       icon: Icons.lock_clock,
-      iconColor: Colors.red.shade400,
+      iconColor: AppThemeConstants.accentRed,
       onRetry: onRetry,
     );
   }
@@ -159,7 +160,7 @@ class ErrorDisplay extends StatelessWidget {
                   child: Icon(
                     icon,
                     size: 64,
-                    color: iconColor ?? Colors.red.shade300,
+                    color: iconColor ?? AppThemeConstants.accentRed,
                   ),
                 ),
               ),
@@ -169,10 +170,10 @@ class ErrorDisplay extends StatelessWidget {
               ExcludeSemantics(
                 child: Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
+                    color: AppThemeConstants.grey700,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -184,9 +185,9 @@ class ErrorDisplay extends StatelessWidget {
                 ExcludeSemantics(
                   child: Text(
                     message!, // ✅ FIXED: Non-null assertion
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade600,
+                      color: AppThemeConstants.grey600,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -244,8 +245,8 @@ class ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ✅ FIX: Define local variables instead of undefined ones
-    final bgColor = backgroundColor ?? Colors.red.shade50;
-    final txtColor = textColor ?? Colors.red.shade700;
+    final bgColor = backgroundColor ?? AppThemeConstants.errorLight;
+    final txtColor = textColor ?? AppThemeConstants.error;
 
     return Semantics(
       liveRegion: true,
@@ -255,7 +256,7 @@ class ErrorBanner extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: bgColor,
-          border: Border.all(color: Colors.red.shade200),
+          border: Border.all(color: AppThemeConstants.accentRed),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -335,16 +336,16 @@ class WarningBanner extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          border: Border.all(color: Colors.orange.shade200),
+          color: AppThemeConstants.warningLight,
+          border: Border.all(color: AppThemeConstants.accentOrange),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            ExcludeSemantics(
+            const ExcludeSemantics(
               child: Icon(
                 Icons.warning_amber_rounded,
-                color: Colors.orange.shade700,
+                color: AppThemeConstants.warning,
                 size: 20,
               ),
             ),
@@ -352,8 +353,8 @@ class WarningBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
-                  color: Colors.orange.shade900,
+                style: const TextStyle(
+                  color: AppThemeConstants.warningDark,
                   fontSize: 13,
                 ),
               ),
@@ -366,7 +367,7 @@ class WarningBanner extends StatelessWidget {
                   onPressed: onAction,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    foregroundColor: Colors.orange.shade900,
+                    foregroundColor: AppThemeConstants.warningDark,
                   ),
                   child: Text(actionLabel ?? 'تفعيل'),
                 ),
@@ -376,10 +377,10 @@ class WarningBanner extends StatelessWidget {
                 button: true,
                 label: 'إغلاق التحذير',
                 child: IconButton(
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.close,
                     size: 18,
-                    color: Colors.orange.shade700,
+                    color: AppThemeConstants.warning,
                   ),
                   onPressed: onDismiss,
                   padding: EdgeInsets.zero,
@@ -420,16 +421,16 @@ class SuccessBanner extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.green.shade50,
-          border: Border.all(color: Colors.green.shade200),
+          color: AppThemeConstants.successLight,
+          border: Border.all(color: AppThemeConstants.accentGreenAlt),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            ExcludeSemantics(
+            const ExcludeSemantics(
               child: Icon(
                 Icons.check_circle_outline,
-                color: Colors.green.shade700,
+                color: AppThemeConstants.success,
                 size: 20,
               ),
             ),
@@ -437,8 +438,8 @@ class SuccessBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
-                  color: Colors.green.shade900,
+                style: const TextStyle(
+                  color: AppThemeConstants.successDark,
                   fontSize: 13,
                 ),
               ),
@@ -451,7 +452,7 @@ class SuccessBanner extends StatelessWidget {
                   onPressed: onAction,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    foregroundColor: Colors.green.shade900,
+                    foregroundColor: AppThemeConstants.successDark,
                   ),
                   child: Text(actionLabel ?? 'عرض'),
                 ),
@@ -461,10 +462,10 @@ class SuccessBanner extends StatelessWidget {
                 button: true,
                 label: 'إغلاق الرسالة',
                 child: IconButton(
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.close,
                     size: 18,
-                    color: Colors.green.shade700,
+                    color: AppThemeConstants.success,
                   ),
                   onPressed: onDismiss,
                   padding: EdgeInsets.zero,
@@ -505,16 +506,16 @@ class InfoBanner extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          border: Border.all(color: Colors.blue.shade200),
+          color: AppThemeConstants.accentBlueLight,
+          border: Border.all(color: AppThemeConstants.accentBlue),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            ExcludeSemantics(
+            const ExcludeSemantics(
               child: Icon(
                 Icons.info_outline,
-                color: Colors.blue.shade700,
+                color: AppThemeConstants.accentBlueDark,
                 size: 20,
               ),
             ),
@@ -522,8 +523,8 @@ class InfoBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
-                  color: Colors.blue.shade900,
+                style: const TextStyle(
+                  color: AppThemeConstants.accentBlueDark,
                   fontSize: 13,
                 ),
               ),
@@ -536,7 +537,7 @@ class InfoBanner extends StatelessWidget {
                   onPressed: onAction,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    foregroundColor: Colors.blue.shade900,
+                    foregroundColor: AppThemeConstants.accentBlueDark,
                   ),
                   child: Text(actionLabel ?? 'المزيد'),
                 ),
@@ -546,10 +547,10 @@ class InfoBanner extends StatelessWidget {
                 button: true,
                 label: 'إغلاق المعلومة',
                 child: IconButton(
-                  icon: Icon(
+                  icon: const Icon(
                     Icons.close,
                     size: 18,
-                    color: Colors.blue.shade700,
+                    color: AppThemeConstants.accentBlueDark,
                   ),
                   onPressed: onDismiss,
                   padding: EdgeInsets.zero,
@@ -584,20 +585,20 @@ class LoadingBanner extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          border: Border.all(color: Colors.grey.shade300),
+          color: AppThemeConstants.grey100,
+          border: Border.all(color: AppThemeConstants.grey300),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            ExcludeSemantics(
+            const ExcludeSemantics(
               child: SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.grey.shade600,
+                    AppThemeConstants.grey600,
                   ),
                 ),
               ),
@@ -606,8 +607,8 @@ class LoadingBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
-                  color: Colors.grey.shade700,
+                style: const TextStyle(
+                  color: AppThemeConstants.grey700,
                   fontSize: 13,
                 ),
               ),

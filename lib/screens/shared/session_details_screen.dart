@@ -1,4 +1,4 @@
-﻿// lib/screens/session_details_screen.dart
+// lib/screens/session_details_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -122,8 +122,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                     )
                   : null,
               title: const Text('مراجعة التلاوة'),
-              backgroundColor: Colors.green.shade700,
-              foregroundColor: Colors.white,
+              backgroundColor: AppThemeConstants.success,
+              foregroundColor: AppThemeConstants.white,
             ),
             body: InteractiveQuranPage(
               pageNumber: moshafStartPage,
@@ -153,13 +153,13 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
     if (hoursUntilSession >= 24) {
       refundPolicy = 'استرداد كامل للمبلغ';
-      policyColor = Colors.green;
+      policyColor = AppThemeConstants.success;
     } else if (hoursUntilSession >= 2) {
       refundPolicy = 'استرداد جزئي 50% من المبلغ';
-      policyColor = Colors.orange;
+      policyColor = AppThemeConstants.warning;
     } else {
       refundPolicy = 'لا يوجد استرداد للمبلغ';
-      policyColor = Colors.red;
+      policyColor = AppThemeConstants.error;
     }
 
     final confirmed = await showDialog<bool>(
@@ -171,7 +171,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Row(
             children: [
-              Icon(Icons.warning, color: Colors.red),
+              Icon(Icons.warning, color: AppThemeConstants.error),
               SizedBox(width: 8),
               Text('إلغاء الجلسة'),
             ],
@@ -217,10 +217,10 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
               style:
-                  ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
               child: const Text(
                 'تأكيد الإلغاء',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: AppThemeConstants.white),
               ),
             ),
           ],
@@ -261,7 +261,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم إلغاء الجلسة بنجاح'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
       }
@@ -271,7 +271,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -286,7 +286,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تعذّر تحديد الجلسة'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -308,7 +308,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('شكراً على تقييمك!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppThemeConstants.success,
         ),
       );
     }
@@ -348,15 +348,15 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'accepted':
-        return Colors.green;
+        return AppThemeConstants.success;
       case 'pending':
-        return Colors.orange;
+        return AppThemeConstants.warning;
       case 'completed':
-        return Colors.blue;
+        return AppThemeConstants.accentBlue;
       case 'cancelled':
-        return Colors.red;
+        return AppThemeConstants.error;
       default:
-        return Colors.grey;
+        return AppThemeConstants.grey500;
     }
   }
 
@@ -412,14 +412,14 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color:
-                                          Colors.white.withValues(alpha: 0.2),
+                                          AppThemeConstants.white.withValues(alpha: 0.2),
                                       borderRadius:
                                           BorderRadius.circular(16),
                                     ),
                                     child: const Icon(
                                       Icons.school,
                                       size: 32,
-                                      color: Colors.white,
+                                      color: AppThemeConstants.white,
                                     ),
                                   ),
                                 ),
@@ -436,7 +436,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                         style: const TextStyle(
                                           fontSize: 24,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                                          color: AppThemeConstants.white,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -447,7 +447,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                           vertical: 6,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white
+                                          color: AppThemeConstants.white
                                               .withValues(alpha: 0.2),
                                           borderRadius:
                                               BorderRadius.circular(20),
@@ -458,7 +458,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                           style: const TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                            color: AppThemeConstants.white,
                                           ),
                                         ),
                                       ),
@@ -484,7 +484,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                     _SectionCard(
                       title: 'معلومات الجلسة',
                       icon: Icons.info_outline,
-                      color: Colors.blue,
+                      color: AppThemeConstants.accentBlue,
                       child: Column(
                         children: [
                           _InfoRow(
@@ -544,7 +544,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                 false)
                               _AssignmentCard(
                                 icon: Icons.menu_book,
-                                color: Colors.green,
+                                color: AppThemeConstants.success,
                                 label: 'حفظ',
                                 value: session.hifzAssignment!,
                               ),
@@ -552,7 +552,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                 false)
                               _AssignmentCard(
                                 icon: Icons.refresh,
-                                color: Colors.blue,
+                                color: AppThemeConstants.accentBlue,
                                 label: 'مراجعة',
                                 value: session.murajaAssignment!,
                               ),
@@ -568,7 +568,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                       _SectionCard(
                         title: 'ملاحظات الأداء',
                         icon: Icons.note,
-                        color: Colors.purple,
+                        color: AppThemeConstants.accentPurple,
                         child: Text(
                           session.performanceNotes!,
                           style: const TextStyle(
@@ -582,7 +582,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                       _SectionCard(
                         title: 'ملاحظات الجلسة',
                         icon: Icons.notes,
-                        color: Colors.blueGrey,
+                        color: AppThemeConstants.grey600,
                         child: Text(
                           session.sessionNotes!,
                           style: const TextStyle(
@@ -637,7 +637,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     return _SectionCard(
       title: 'الأخطاء القرآنية',
       icon: Icons.menu_book,
-      color: Colors.green.shade700,
+      color: AppThemeConstants.success,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -660,32 +660,32 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.green.shade50,
+        color: AppThemeConstants.successLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
+        border: Border.all(color: AppThemeConstants.accentGreenAlt),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _StatCell(
             icon: Icons.warning_amber_rounded,
-            color: Colors.orange,
+            color: AppThemeConstants.warning,
             label: 'مجموع الأخطاء',
             value: loadedMistakes.length,
           ),
           Container(
-              width: 1, height: 36, color: Colors.green.shade200),
+              width: 1, height: 36, color: AppThemeConstants.accentGreenAlt),
           _StatCell(
             icon: Icons.chat_bubble,
-            color: Colors.blue.shade700,
+            color: AppThemeConstants.accentBlueDark,
             label: 'مع تعليق',
             value: withComment,
           ),
           Container(
-              width: 1, height: 36, color: Colors.green.shade200),
+              width: 1, height: 36, color: AppThemeConstants.accentGreenAlt),
           _StatCell(
             icon: Icons.auto_stories,
-            color: Colors.green.shade700,
+            color: AppThemeConstants.success,
             label: 'صفحات',
             value: loadedMistakes.map((m) => m.pageNumber).toSet().length,
           ),
@@ -703,10 +703,10 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       runSpacing: 6,
       children: groups.entries.map((e) {
         return Chip(
-          avatar: Icon(getMistakeIcon(e.key), size: 14, color: Colors.white),
+          avatar: Icon(getMistakeIcon(e.key), size: 14, color: AppThemeConstants.white),
           label: Text(
             '${e.key.arabicLabel}  ${e.value}',
-            style: const TextStyle(fontSize: 11, color: Colors.white),
+            style: const TextStyle(fontSize: 11, color: AppThemeConstants.white),
           ),
           backgroundColor: getMistakeColor(e.key),
           padding: EdgeInsets.zero,
@@ -725,21 +725,21 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         final pageMistakes = getMistakesOnPage(loadedMistakes, page);
         return Theme(
           data: Theme.of(context)
-              .copyWith(dividerColor: Colors.transparent),
+              .copyWith(dividerColor: AppThemeConstants.transparent),
           child: ExpansionTile(
             tilePadding: EdgeInsets.zero,
             leading: Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.green.shade100,
+                color: AppThemeConstants.successLight,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 'ص $page',
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade800,
+                  color: AppThemeConstants.successDark,
                 ),
               ),
             ),
@@ -831,7 +831,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: AppThemeConstants.grey100,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -858,7 +858,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.grey),
+          Icon(icon, size: 16, color: AppThemeConstants.grey500),
           const SizedBox(width: 8),
           Text('$label: ',
               style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -877,8 +877,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         icon: const Icon(Icons.menu_book),
         label: const Text('فتح المصحف'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green.shade700,
-          foregroundColor: Colors.white,
+          backgroundColor: AppThemeConstants.success,
+          foregroundColor: AppThemeConstants.white,
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12)),
@@ -932,13 +932,13 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
       if (hoursUntil >= 24) {
         refundPolicy = 'استرداد كامل للمبلغ';
-        policyColor = Colors.green;
+        policyColor = AppThemeConstants.success;
       } else if (hoursUntil >= 2) {
         refundPolicy = 'استرداد جزئي 50% من المبلغ';
-        policyColor = Colors.orange;
+        policyColor = AppThemeConstants.warning;
       } else {
         refundPolicy = 'لا يوجد استرداد للمبلغ';
-        policyColor = Colors.red;
+        policyColor = AppThemeConstants.error;
       }
 
       return SafeArea(
@@ -971,7 +971,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                   icon: const Icon(Icons.cancel),
                   label: const Text('إلغاء الجلسة'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
+                    backgroundColor: AppThemeConstants.error,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
@@ -992,13 +992,13 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () => navigateToRating(session),
-              icon: const Icon(Icons.star, color: Colors.white),
+              icon: const Icon(Icons.star, color: AppThemeConstants.white),
               label: const Text(
                 'تقييم الجلسة',
                 style: TextStyle(fontSize: 16),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber,
+                backgroundColor: AppThemeConstants.accentAmber,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
@@ -1075,14 +1075,14 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: Colors.grey.shade600),
+        Icon(icon, size: 18, color: AppThemeConstants.grey600),
         const SizedBox(width: 10),
         Text(
           '$label: ',
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
+            color: AppThemeConstants.grey700,
           ),
         ),
         Expanded(
@@ -1169,7 +1169,7 @@ class _StatCell extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          style: const TextStyle(fontSize: 11, color: AppThemeConstants.grey600),
         ),
       ],
     );

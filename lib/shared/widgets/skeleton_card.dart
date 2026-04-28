@@ -15,13 +15,13 @@ class SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
+      baseColor: AppThemeConstants.grey300,
+      highlightColor: AppThemeConstants.grey100,
       child: Container(
         height: height,
         margin: const EdgeInsets.only(bottom: AppThemeConstants.spaceMd),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppThemeConstants.white,
           borderRadius: BorderRadius.circular(borderRadius),
         ),
       ),

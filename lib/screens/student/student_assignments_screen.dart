@@ -369,7 +369,7 @@ class _CompletedAssignmentCardState
                   ArabicLabels.previousHifz,
                   previousHifzCompleted,
                   previousHifzRating,
-                  Colors.green,
+                  AppThemeConstants.success,
                 ),
               if (previousMurajaCompleted != null) ...[
                 const SizedBox(height: 8),
@@ -377,7 +377,7 @@ class _CompletedAssignmentCardState
                   ArabicLabels.previousMuraja,
                   previousMurajaCompleted,
                   previousMurajaRating,
-                  Colors.blue,
+                  AppThemeConstants.accentBlue,
                 ),
               ],
               if (performanceNotes != null && performanceNotes.isNotEmpty) ...[
@@ -820,11 +820,11 @@ class _MistakeReviewCard extends StatelessWidget {
                 avatar: Icon(
                   getMistakeIcon(entry.key),
                   size: 14,
-                  color: Colors.white,
+                  color: AppThemeConstants.white,
                 ),
                 label: Text(
                   '${entry.key.arabicLabel} (${entry.value})',
-                  style: const TextStyle(fontSize: 12, color: Colors.white),
+                  style: const TextStyle(fontSize: 12, color: AppThemeConstants.white),
                 ),
                 backgroundColor: getMistakeColor(entry.key),
                 visualDensity: VisualDensity.compact,

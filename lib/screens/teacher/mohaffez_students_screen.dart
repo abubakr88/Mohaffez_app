@@ -144,7 +144,7 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: AppThemeConstants.grey300,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -173,7 +173,7 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                                       size: 16,
                                       color: _sortBy == opt
                                           ? AppThemeConstants.primary
-                                          : Colors.grey),
+                                          : AppThemeConstants.grey500),
                                   const SizedBox(width: 8),
                                   Text(opt.label),
                                 ],
@@ -242,10 +242,10 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                     child: Container(
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
+                        color: AppThemeConstants.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: AppThemeConstants.white.withValues(alpha: 0.3),
                         ),
                       ),
                       child: TextField(
@@ -253,22 +253,22 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                         onChanged: (v) =>
                             setState(() => _searchQuery = v),
                         style: const TextStyle(
-                            color: Colors.white, fontSize: 14),
-                        cursorColor: Colors.white,
+                            color: AppThemeConstants.white, fontSize: 14),
+                        cursorColor: AppThemeConstants.white,
                         decoration: InputDecoration(
                           border: InputBorder.none,
                           hintText: 'ابحث باسم الطالب...',
                           hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.65),
+                            color: AppThemeConstants.white.withValues(alpha: 0.65),
                             fontSize: 14,
                           ),
                           prefixIcon: const Icon(Icons.search,
-                              color: Colors.white70, size: 18),
+                              color: AppThemeConstants.white70, size: 18),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
                                   padding: EdgeInsets.zero,
                                   icon: const Icon(Icons.clear,
-                                      color: Colors.white70, size: 18),
+                                      color: AppThemeConstants.white70, size: 18),
                                   onPressed: () {
                                     _searchCtrl.clear();
                                     setState(() => _searchQuery = '');
@@ -302,7 +302,7 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: AppThemeConstants.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Icon(Icons.groups,
@@ -329,7 +329,7 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                                     '$totalCount طالب',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.white
+                                      color: AppThemeConstants.white
                                           .withValues(alpha: 0.75),
                                       height: 1.2,
                                     ),
@@ -495,8 +495,8 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade200),
+        border: const Border(
+          bottom: BorderSide(color: AppThemeConstants.grey200),
         ),
       ),
       child: SingleChildScrollView(
@@ -518,17 +518,17 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
               onSelected: onHifzToggle,
               avatar: Icon(Icons.menu_book,
                   size: 14,
-                  color: filterHifz ? Colors.green : Colors.grey),
-              selectedColor: Colors.green.withValues(alpha: 0.12),
-              checkmarkColor: Colors.green,
+                  color: filterHifz ? AppThemeConstants.success : AppThemeConstants.grey500),
+              selectedColor: AppThemeConstants.success.withValues(alpha: 0.12),
+              checkmarkColor: AppThemeConstants.success,
               showCheckmark: false,
               labelStyle: TextStyle(
                 fontSize: 12,
                 fontWeight: filterHifz ? FontWeight.w700 : FontWeight.normal,
-                color: filterHifz ? Colors.green.shade700 : null,
+                color: filterHifz ? AppThemeConstants.success : null,
               ),
               side: filterHifz
-                  ? BorderSide(color: Colors.green.shade300)
+                  ? const BorderSide(color: AppThemeConstants.accentGreenAlt)
                   : null,
               padding: const EdgeInsets.symmetric(horizontal: 4),
             ),
@@ -540,18 +540,18 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
               onSelected: onMurajaToggle,
               avatar: Icon(Icons.refresh,
                   size: 14,
-                  color: filterMuraja ? Colors.blue : Colors.grey),
-              selectedColor: Colors.blue.withValues(alpha: 0.12),
-              checkmarkColor: Colors.blue,
+                  color: filterMuraja ? AppThemeConstants.accentBlue : AppThemeConstants.grey500),
+              selectedColor: AppThemeConstants.accentBlue.withValues(alpha: 0.12),
+              checkmarkColor: AppThemeConstants.accentBlue,
               showCheckmark: false,
               labelStyle: TextStyle(
                 fontSize: 12,
                 fontWeight:
                     filterMuraja ? FontWeight.w700 : FontWeight.normal,
-                color: filterMuraja ? Colors.blue.shade700 : null,
+                color: filterMuraja ? AppThemeConstants.accentBlueDark : null,
               ),
               side: filterMuraja
-                  ? BorderSide(color: Colors.blue.shade300)
+                  ? const BorderSide(color: AppThemeConstants.accentBlue)
                   : null,
               padding: const EdgeInsets.symmetric(horizontal: 4),
             ),
@@ -561,12 +561,12 @@ class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
               ActionChip(
                 label: Text('مسح ($activeFilterCount)'),
                 onPressed: onClearAll,
-                avatar: const Icon(Icons.close, size: 14, color: Colors.red),
-                backgroundColor: Colors.red.withValues(alpha: 0.08),
-                side: BorderSide(color: Colors.red.shade200),
-                labelStyle: TextStyle(
+                avatar: const Icon(Icons.close, size: 14, color: AppThemeConstants.error),
+                backgroundColor: AppThemeConstants.error.withValues(alpha: 0.08),
+                side: const BorderSide(color: AppThemeConstants.accentRed),
+                labelStyle: const TextStyle(
                   fontSize: 12,
-                  color: Colors.red.shade700,
+                  color: AppThemeConstants.error,
                   fontWeight: FontWeight.w600,
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -733,12 +733,12 @@ class StudentCard extends StatelessWidget {
                         Row(
                           children: [
                             const Icon(Icons.calendar_today,
-                                size: 12, color: Colors.grey),
+                                size: 12, color: AppThemeConstants.grey500),
                             const SizedBox(width: 4),
                             Text(
                               formattedDate,
                               style: const TextStyle(
-                                  fontSize: 12, color: Colors.grey),
+                                  fontSize: 12, color: AppThemeConstants.grey500),
                             ),
                           ],
                         ),
@@ -752,7 +752,7 @@ class StudentCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   const Icon(Icons.arrow_forward_ios,
-                      size: 14, color: Colors.grey),
+                      size: 14, color: AppThemeConstants.grey500),
                 ],
               ),
 
@@ -764,7 +764,7 @@ class StudentCard extends StatelessWidget {
                   icon: Icons.menu_book,
                   label: 'حفظ',
                   value: student.hifzAssignment,
-                  color: Colors.green,
+                  color: AppThemeConstants.success,
                 ),
                 const SizedBox(height: 6),
               ],
@@ -773,7 +773,7 @@ class StudentCard extends StatelessWidget {
                   icon: Icons.refresh,
                   label: 'مراجعة',
                   value: student.murajaAssignment,
-                  color: Colors.blue,
+                  color: AppThemeConstants.accentBlue,
                 ),
 
               // ── Rating ──────────────────────────────────────────────────
@@ -781,14 +781,14 @@ class StudentCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.star, size: 16, color: Colors.amber),
+                    const Icon(Icons.star, size: 16, color: AppThemeConstants.accentAmber),
                     const SizedBox(width: 4),
                     Text(
                       '${student.sessionRating} / 10',
                       style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.amber),
+                          color: AppThemeConstants.accentAmber),
                     ),
                   ],
                 ),
@@ -800,7 +800,7 @@ class StudentCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Text(
                   'الجلسة السابقة:',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: AppThemeConstants.grey500),
                 ),
                 const SizedBox(height: 4),
                 Row(
@@ -812,8 +812,8 @@ class StudentCard extends StatelessWidget {
                             : Icons.cancel,
                         size: 14,
                         color: student.previousHifzCompleted!
-                            ? Colors.green
-                            : Colors.red,
+                            ? AppThemeConstants.success
+                            : AppThemeConstants.error,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -829,8 +829,8 @@ class StudentCard extends StatelessWidget {
                             : Icons.cancel,
                         size: 14,
                         color: student.previousMurajaCompleted!
-                            ? Colors.green
-                            : Colors.red,
+                            ? AppThemeConstants.success
+                            : AppThemeConstants.error,
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -849,18 +849,18 @@ class StudentCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: AppThemeConstants.grey100,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.notes, size: 14, color: Colors.grey),
+                      const Icon(Icons.notes, size: 14, color: AppThemeConstants.grey500),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           student.performanceNotes!,
                           style: const TextStyle(
-                              fontSize: 12, color: Colors.black87),
+                              fontSize: 12, color: AppThemeConstants.black87),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -980,7 +980,7 @@ class _SkeletonCard extends StatelessWidget {
               children: [
                 const _Shimmer(
                   child: CircleAvatar(
-                      radius: 28, backgroundColor: Colors.white),
+                      radius: 28, backgroundColor: AppThemeConstants.white),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -992,7 +992,7 @@ class _SkeletonCard extends StatelessWidget {
                           height: 16,
                           width: 140,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -1003,7 +1003,7 @@ class _SkeletonCard extends StatelessWidget {
                           height: 12,
                           width: 100,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppThemeConstants.white,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -1016,7 +1016,7 @@ class _SkeletonCard extends StatelessWidget {
                     height: 32,
                     width: 52,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppThemeConstants.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -1029,7 +1029,7 @@ class _SkeletonCard extends StatelessWidget {
                 height: 12,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppThemeConstants.white,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -1040,7 +1040,7 @@ class _SkeletonCard extends StatelessWidget {
                 height: 12,
                 width: 200,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppThemeConstants.white,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -1060,7 +1060,7 @@ class _Shimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(color: Colors.grey.shade200),
+      decoration: const BoxDecoration(color: AppThemeConstants.grey200),
       child: child,
     );
   }

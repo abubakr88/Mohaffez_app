@@ -41,7 +41,7 @@ class _AdminTeacherCommissionsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor:
-                st.hasError ? AppThemeConstants.error : Colors.green,
+                st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
             content: Text(st.hasError
                 ? st.error.toString()
                 : 'تم تسجيل الدفع بنجاح ✓'),
@@ -52,7 +52,7 @@ class _AdminTeacherCommissionsScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
             content: Text('خطأ: ${e.toString()}'),
           ),
         );
@@ -172,8 +172,8 @@ class _AdminTeacherCommissionsScreenState
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: totalPending > 0
-                              ? Colors.red.shade700
-                              : Colors.green,
+                              ? AppThemeConstants.error
+                              : AppThemeConstants.success,
                         ),
                       ),
                     ],
@@ -225,12 +225,12 @@ class _AdminTeacherCommissionsScreenState
 
                       // Color priority: overdue > awaiting > pending > paid
                       final chipColor = hasOverdue
-                          ? Colors.red.shade700
+                          ? AppThemeConstants.error
                           : hasAwaiting
-                              ? Colors.blue.shade700
+                              ? AppThemeConstants.accentBlueDark
                               : pendingAmount > 0
-                                  ? Colors.orange.shade700
-                                  : Colors.green.shade700;
+                                  ? AppThemeConstants.warning
+                                  : AppThemeConstants.success;
 
                       return Card(
                         margin: const EdgeInsets.only(
@@ -247,7 +247,7 @@ class _AdminTeacherCommissionsScreenState
                                   ? mohaffezName[0]
                                   : '?',
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppThemeConstants.white,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -287,7 +287,7 @@ class _AdminTeacherCommissionsScreenState
                                 hasAwaiting ? 'بانتظار التأكيد' : 'مستحق',
                                 style: const TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey,
+                                  color: AppThemeConstants.grey500,
                                 ),
                               ),
                             ],
@@ -360,8 +360,8 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: totalPending > 0
-                      ? [Colors.amber.shade700, Colors.amber.shade400]
-                      : [Colors.green.shade700, Colors.green.shade400],
+                      ? [AppThemeConstants.accentAmberDark, AppThemeConstants.accentAmber]
+                      : [AppThemeConstants.success, AppThemeConstants.accentGreenAlt],
                 ),
                 borderRadius: AppThemeConstants.borderRadiusMd,
               ),
@@ -373,14 +373,14 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
                       const Text(
                         'المدفوع:',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: AppThemeConstants.white70,
                           fontSize: 14,
                         ),
                       ),
                       Text(
                         '${totalPaid.toStringAsFixed(2)} ج.م',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -394,14 +394,14 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
                       const Text(
                         'المستحق:',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: AppThemeConstants.white70,
                           fontSize: 14,
                         ),
                       ),
                       Text(
                         '${totalPending.toStringAsFixed(2)} ج.م',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -413,17 +413,17 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           'بانتظار التاكد:',
                           style: TextStyle(
-                            color: Colors.lightBlue.shade200,
+                            color: AppThemeConstants.accentBlue,
                             fontSize: 14,
                           ),
                         ),
                         Text(
                           '${totalAwaiting.toStringAsFixed(2)} ج.م',
-                          style: TextStyle(
-                            color: Colors.lightBlue.shade200,
+                          style: const TextStyle(
+                            color: AppThemeConstants.accentBlue,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -473,10 +473,10 @@ class _WeekSummaryCard extends StatelessWidget {
   });
 
   Color get _statusColor => switch (summary.status) {
-        'paid' => Colors.green,
-        'overdue' => Colors.red,
-        'awaiting_confirmation' => Colors.blue,
-        _ => Colors.orange,
+        'paid' => AppThemeConstants.success,
+        'overdue' => AppThemeConstants.error,
+        'awaiting_confirmation' => AppThemeConstants.accentBlue,
+        _ => AppThemeConstants.warning,
       };
 
   String get _statusLabel => switch (summary.status) {
@@ -511,14 +511,14 @@ class _WeekSummaryCard extends StatelessWidget {
             Text(
               '${summary.totalSessions} جلسة • '
               'إجمالي: ${summary.totalRevenue.toStringAsFixed(0)} ج.م',
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: const TextStyle(fontSize: 11, color: AppThemeConstants.grey500),
             ),
             if (due.isNotEmpty && !summary.isPaid)
               Text('الاستحقاق: $due',
                   style: TextStyle(
                       fontSize: 11,
                       color:
-                          summary.isOverdue ? Colors.red : Colors.grey)),
+                          summary.isOverdue ? AppThemeConstants.error : AppThemeConstants.grey500)),
           ],
         ),
         trailing: ConstrainedBox(
@@ -541,8 +541,8 @@ class _WeekSummaryCard extends StatelessWidget {
                     onPressed: isMarkingPaid ? null : onMarkAsPaid,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 6),
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppThemeConstants.success,
+                      foregroundColor: AppThemeConstants.white,
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -552,7 +552,7 @@ class _WeekSummaryCard extends StatelessWidget {
                             height: 12,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: AppThemeConstants.white,
                             ),
                           )
                         : const Text('تم الدفع',

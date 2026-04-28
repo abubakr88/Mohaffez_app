@@ -184,7 +184,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
               title: const Text(
                 'لوحة التحكم',
                 style: TextStyle(
-                    color: Colors.white,
+                    color: AppThemeConstants.white,
                     fontSize: 17,
                     fontWeight: FontWeight.w600),
               ),
@@ -586,7 +586,7 @@ class _NavCard extends StatelessWidget {
                   child: Text(
                     '$badgeCount',
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppThemeConstants.white,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),

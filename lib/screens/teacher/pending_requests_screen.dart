@@ -1022,9 +1022,6 @@ class _PendingRequestCard extends ConsumerWidget {
 
             const SizedBox(height: 16),
 
-            _buildPaymentTypeInfo(ref),
-
-            const SizedBox(height: 8),
             RequestPaymentTypeBadge(
               requestData: request,
             ),
@@ -1111,101 +1108,4 @@ class _PendingRequestCard extends ConsumerWidget {
     }
   }
 
-  Widget _buildPaymentTypeInfo(WidgetRef ref) {
-    final paymentType = request['paymentType'] as String?;
-    final subscriptionId = request['subscriptionId'] as String?;
-    final planType = request['planType'] as String?;
-
-    final isBundleOrSubscription = paymentType == 'bundle' ||
-        paymentType == 'subscription' ||
-        planType == 'bundle' ||
-        planType == 'subscription';
-
-    if (isBundleOrSubscription) {
-      if (subscriptionId != null) {
-        final bundleAsync = ref.watch(bundleByIdProvider(subscriptionId));
-        return bundleAsync.when(
-          loading: () => const LinearProgressIndicator(),
-          error: (_, __) => const SizedBox.shrink(),
-          data: (bundle) {
-            if (bundle == null) return const SizedBox.shrink();
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppThemeConstants.successBackground,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppThemeConstants.success.withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.collections_bookmark_outlined,
-                          size: 18, color: AppThemeConstants.success),
-                      SizedBox(width: 8),
-                      Text('نوع الحجز: باقة',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppThemeConstants.success)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text('اسم الباقة: ${bundle.planTitle}'),
-                  Text(
-                      'الجلسات المتبقية: ${bundle.remainingSessions} / ${bundle.totalSessions}'),
-                ],
-              ),
-            );
-          },
-        );
-      } else {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppThemeConstants.warningBackground,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppThemeConstants.warning.withValues(alpha: 0.3)),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.card_membership,
-                  size: 18, color: AppThemeConstants.warning),
-              SizedBox(width: 8),
-              Text(
-                'نوع الحجز: باقة — في انتظار تأكيد الدفع المباشر',
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppThemeConstants.warning),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-
-    // Single direct payment (not a bundle)
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppThemeConstants.info.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.3)),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.payment, size: 18, color: AppThemeConstants.info),
-          SizedBox(width: 8),
-          Text(
-            'نوع الحجز: دفع مباشر',
-            style: TextStyle(
-                fontWeight: FontWeight.w600, color: AppThemeConstants.info),
-          ),
-        ],
-      ),
-    );
-  }
 }

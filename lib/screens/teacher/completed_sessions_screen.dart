@@ -162,7 +162,7 @@ class _CompletedSessionsScreenState
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
-                          fillColor: Colors.grey.shade100,
+                          fillColor: AppThemeConstants.grey100,
                         ),
                       ),
                     ),
@@ -183,7 +183,7 @@ class _CompletedSessionsScreenState
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 filled: true,
-                                fillColor: Colors.grey.shade100,
+                                fillColor: AppThemeConstants.grey100,
                               ),
                               items: const [
                                 DropdownMenuItem(
@@ -216,7 +216,7 @@ class _CompletedSessionsScreenState
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 filled: true,
-                                fillColor: Colors.grey.shade100,
+                                fillColor: AppThemeConstants.grey100,
                               ),
                               items: [
                                 const DropdownMenuItem(
@@ -305,7 +305,7 @@ class _CompletedSessionsScreenState
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 4),
-                                    foregroundColor: Colors.grey.shade600,
+                                    foregroundColor: AppThemeConstants.grey600,
                                   ),
                                 ),
                               ],
@@ -488,8 +488,8 @@ class CompletedSessionCard extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.calendar_today,
-                    size: 12, color: Colors.grey.shade600),
+                const Icon(Icons.calendar_today,
+                    size: 12, color: AppThemeConstants.grey600),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
@@ -498,7 +498,7 @@ class CompletedSessionCard extends StatelessWidget {
                         : ArabicLabels.notSpecified,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: const TextStyle(fontSize: 12, color: AppThemeConstants.grey600),
                   ),
                 ),
               ],
@@ -510,20 +510,20 @@ class CompletedSessionCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.1),
+                      color: AppThemeConstants.accentAmber.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                      border: Border.all(color: AppThemeConstants.accentAmber.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        const Icon(Icons.star, size: 14, color: AppThemeConstants.accentAmber),
                         const SizedBox(width: 4),
                         Text(
                           '$sessionRating/10',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.amber,
+                            color: AppThemeConstants.accentAmber,
                           ),
                         ),
                       ],
@@ -544,7 +544,7 @@ class CompletedSessionCard extends StatelessWidget {
             _buildSectionHeader(
               icon: Icons.assignment_turned_in,
               title: ArabicLabels.previousAssignments,
-              color: Colors.blue,
+              color: AppThemeConstants.accentBlue,
             ),
             const SizedBox(height: 12),
             if (previousHifzCompleted != null)
@@ -552,7 +552,7 @@ class CompletedSessionCard extends StatelessWidget {
                 label: ArabicLabels.hifz,
                 completed: previousHifzCompleted,
                 rating: previousHifzRating,
-                color: Colors.green,
+                color: AppThemeConstants.success,
               ),
             if (previousMurajaCompleted != null) ...[
               const SizedBox(height: 8),
@@ -560,7 +560,7 @@ class CompletedSessionCard extends StatelessWidget {
                 label: ArabicLabels.muraja,
                 completed: previousMurajaCompleted,
                 rating: previousMurajaRating,
-                color: Colors.blue,
+                color: AppThemeConstants.accentBlue,
               ),
             ],
             if (performanceNotes != null && performanceNotes.isNotEmpty) ...[
@@ -568,16 +568,16 @@ class CompletedSessionCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: AppThemeConstants.warningLight,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: AppThemeConstants.accentOrange),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.note, size: 16, color: Colors.orange),
+                        Icon(Icons.note, size: 16, color: AppThemeConstants.warning),
                         SizedBox(width: 6),
                         Text(
                           '${ArabicLabels.performanceNotes}:',
@@ -612,7 +612,7 @@ class CompletedSessionCard extends StatelessWidget {
               _buildAssignmentDisplay(
                 label: ArabicLabels.hifz,
                 content: hifzAssignment,
-                color: Colors.green,
+                color: AppThemeConstants.success,
                 isHifz: true,
               ),
             if (murajaAssignment != null && murajaAssignment.isNotEmpty) ...[
@@ -620,7 +620,7 @@ class CompletedSessionCard extends StatelessWidget {
               _buildAssignmentDisplay(
                 label: ArabicLabels.muraja,
                 content: murajaAssignment,
-                color: Colors.blue,
+                color: AppThemeConstants.accentBlue,
               ),
             ],
             const SizedBox(height: 16),
@@ -654,7 +654,7 @@ class CompletedSessionCard extends StatelessWidget {
           _buildSectionHeader(
             icon: Icons.info_outline,
             title: ArabicLabels.sessionDetails,
-            color: Colors.grey,
+            color: AppThemeConstants.grey500,
           ),
           const SizedBox(height: 12),
           _buildInfoRow(
@@ -713,7 +713,7 @@ class CompletedSessionCard extends StatelessWidget {
         children: [
           Icon(
             completed ? Icons.check_circle : Icons.cancel,
-            color: completed ? color : Colors.red,
+            color: completed ? color : AppThemeConstants.error,
             size: 20,
           ),
           const SizedBox(width: 8),
@@ -730,32 +730,32 @@ class CompletedSessionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.1),
+                color: AppThemeConstants.accentAmber.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                border: Border.all(color: AppThemeConstants.accentAmber.withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.star, size: 14, color: Colors.amber),
+                  const Icon(Icons.star, size: 14, color: AppThemeConstants.accentAmber),
                   const SizedBox(width: 4),
                   Text(
                     '$rating/10',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.amber,
+                      color: AppThemeConstants.accentAmber,
                     ),
                   ),
                 ],
               ),
             ),
           ] else
-            Text(
+            const Text(
               ArabicLabels.assignmentNotCompleted,
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.red.shade700,
+                color: AppThemeConstants.error,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -813,13 +813,13 @@ class CompletedSessionCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.grey.shade600),
+          Icon(icon, size: 16, color: AppThemeConstants.grey600),
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
-              color: Colors.grey.shade700,
+              color: AppThemeConstants.grey700,
               fontWeight: FontWeight.w600,
             ),
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class ProfileCompletionIndicator extends StatelessWidget {
   final double percentage;
@@ -14,9 +15,9 @@ class ProfileCompletionIndicator extends StatelessWidget {
   });
 
   Color _getColor() {
-    if (percentage >= 80) return Colors.green;
-    if (percentage >= 50) return Colors.orange;
-    return Colors.red;
+    if (percentage >= 80) return AppThemeConstants.success;
+    if (percentage >= 50) return AppThemeConstants.warning;
+    return AppThemeConstants.error;
   }
 
   @override
@@ -73,11 +74,11 @@ class ProfileCompletionIndicator extends StatelessWidget {
                                 color: color,
                               ),
                             ),
-                            Text(
+                            const Text(
                               'مكتمل',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey.shade600,
+                                color: AppThemeConstants.grey600,
                               ),
                             ),
                           ],
@@ -103,9 +104,9 @@ class ProfileCompletionIndicator extends StatelessWidget {
                           percentage >= 80
                               ? 'ملفك الشخصي مكتمل ممتاز!'
                               : 'أكمل ملفك للحصول على المزيد من الطلاب',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade700,
+                            color: AppThemeConstants.grey700,
                           ),
                         ),
                         if (percentage < 80 && missingFields.isNotEmpty) ...{
@@ -120,17 +121,17 @@ class ProfileCompletionIndicator extends StatelessWidget {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: AppThemeConstants.white,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.grey.shade300,
+                                    color: AppThemeConstants.grey300,
                                   ),
                                 ),
                                 child: Text(
                                   field,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 10,
-                                    color: Colors.grey.shade700,
+                                    color: AppThemeConstants.grey700,
                                   ),
                                 ),
                               );
@@ -141,10 +142,10 @@ class ProfileCompletionIndicator extends StatelessWidget {
                     ),
                   ),
                   if (percentage < 80)
-                    Icon(
+                    const Icon(
                       Icons.arrow_forward_ios,
                       size: 16,
-                      color: Colors.grey.shade400,
+                      color: AppThemeConstants.grey400,
                     ),
                 ],
               ),
@@ -172,7 +173,7 @@ class _CircularProgressPainter extends CustomPainter {
 
     // Background circle
     final backgroundPaint = Paint()
-      ..color = Colors.grey.shade200
+      ..color = AppThemeConstants.grey200
       ..style = PaintingStyle.stroke
       ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;

@@ -147,7 +147,7 @@ class _StudentPaymentConfirmationScreenState
                     child: Text(
                       '${ArabicLabels.payNow} ${selectedPlan!.priceEGP.toStringAsFixed(0)} جنيه',
                       style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold),
+                          color: AppThemeConstants.white, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -164,21 +164,21 @@ class _StudentPaymentConfirmationScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: AppThemeConstants.accentBlueLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: AppThemeConstants.accentBlue),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              Icon(Icons.lock, color: Colors.blue.shade700),
-              const SizedBox(width: 8),
+              Icon(Icons.lock, color: AppThemeConstants.accentBlueDark),
+              SizedBox(width: 8),
               Text(
                 'تفاصيل الجلسة المطلوبة',
                 style: TextStyle(
-                    fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+                    fontWeight: FontWeight.bold, color: AppThemeConstants.accentBlueDark),
               ),
             ],
           ),
@@ -207,7 +207,7 @@ class _StudentPaymentConfirmationScreenState
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color:
-                selected ? AppThemeConstants.secondary : Colors.grey.shade300,
+                selected ? AppThemeConstants.secondary : AppThemeConstants.grey300,
             width: selected ? 2 : 1,
           ),
         ),
@@ -292,7 +292,7 @@ class _StudentPaymentConfirmationScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم تأكيد الجلسة المجانية بنجاح!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
         Navigator.of(context).popUntil((route) => route.isFirst);

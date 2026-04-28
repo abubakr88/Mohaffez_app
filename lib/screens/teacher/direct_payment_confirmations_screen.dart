@@ -288,7 +288,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         messenger.showSnackBar(
           const SnackBar(
             content: Text('✅ تم قبول الجلسة وإشعار الطالب!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppThemeConstants.success,
           ),
         );
         // Defer navigation to avoid Navigator lock during dialog dismissal
@@ -325,7 +325,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(msg),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } on Exception catch (e) {
@@ -352,7 +352,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       messenger.showSnackBar(
         SnackBar(
           content: Text('خطأ غير متوقع — يرجى المحاولة مجدداً: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } finally {
@@ -411,12 +411,12 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('تم إرسال إشعار الرفض للطالب'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppThemeConstants.warning,
         ),
       );
     } on Exception catch (e) {
       messenger.showSnackBar(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red));
+          SnackBar(content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error));
     } catch (e, stack) {
       // Same safety net for the reject path.
       debugPrint('❌ [BUNDLE_FLOW] Reject_UNHANDLED_ERROR: '
@@ -426,7 +426,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       messenger.showSnackBar(
         SnackBar(
           content: Text('خطأ غير متوقع: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppThemeConstants.error,
         ),
       );
     } finally {
@@ -591,7 +591,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     label: const Text(
                       'استلمت الدفع',
                       style: TextStyle(
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                           fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(

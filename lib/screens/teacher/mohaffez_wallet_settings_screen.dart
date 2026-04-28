@@ -130,35 +130,35 @@ class _MohaffezWalletSettingsScreenState
                     label: 'InstaPay',
                     hint: 'رقم الهاتف أو اسم المستخدم',
                     icon: Icons.account_balance,
-                    color: Colors.purple,
+                    color: AppThemeConstants.accentPurple,
                   ),
                   _walletField(
                     controller: _vodafoneCtrl,
                     label: 'فودافون كاش',
                     hint: '01xxxxxxxxx',
                     icon: Icons.phone_android,
-                    color: Colors.red,
+                    color: AppThemeConstants.error,
                   ),
                   _walletField(
                     controller: _orangeCtrl,
                     label: 'أورانج موني',
                     hint: '01xxxxxxxxx',
                     icon: Icons.phone_android,
-                    color: Colors.deepOrange,
+                    color: AppThemeConstants.accentOrange,
                   ),
                   _walletField(
                     controller: _etisalatCtrl,
                     label: 'اتصالات كاش',
                     hint: '01xxxxxxxxx',
                     icon: Icons.phone_android,
-                    color: Colors.green,
+                    color: AppThemeConstants.success,
                   ),
                   _walletField(
                     controller: _wePayCtrl,
                     label: 'WE Pay',
                     hint: '01xxxxxxxxx',
                     icon: Icons.phone_android,
-                    color: Colors.blue,
+                    color: AppThemeConstants.accentBlue,
                   ),
 
                   const SizedBox(height: 32),
@@ -171,14 +171,14 @@ class _MohaffezWalletSettingsScreenState
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.save, color: Colors.white),
+                                  strokeWidth: 2, color: AppThemeConstants.white))
+                          : const Icon(Icons.save, color: AppThemeConstants.white),
                       label: Text(
                         _saving ? 'جاري الحفظ...' : 'حفظ الأرقام',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: AppThemeConstants.white,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(

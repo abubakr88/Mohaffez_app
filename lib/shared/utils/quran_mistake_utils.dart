@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import '../../models/quran_mistake_model.dart';
+import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COLOR
@@ -13,12 +14,12 @@ import '../../models/quran_mistake_model.dart';
 
 Color getMistakeColor(MistakeType type) {
   switch (type) {
-    case MistakeType.tajweed:       return Colors.orange;
-    case MistakeType.pronunciation: return Colors.red;
-    case MistakeType.reading:       return Colors.purple;
-    case MistakeType.skip:          return Colors.blue;
-    case MistakeType.addition:      return Colors.green;
-    case MistakeType.other:         return Colors.grey;
+    case MistakeType.tajweed:       return AppThemeConstants.warning;
+    case MistakeType.pronunciation: return AppThemeConstants.error;
+    case MistakeType.reading:       return AppThemeConstants.accentPurple;
+    case MistakeType.skip:          return AppThemeConstants.accentBlue;
+    case MistakeType.addition:      return AppThemeConstants.success;
+    case MistakeType.other:         return AppThemeConstants.grey500;
   }
 }
 
@@ -58,10 +59,10 @@ extension MistakeTypeUI on MistakeType {
   /// Compact chip for displaying the mistake type inline.
   Widget buildChip() {
     return Chip(
-      avatar: Icon(icon, size: 14, color: Colors.white),
+      avatar: Icon(icon, size: 14, color: AppThemeConstants.white),
       label: Text(
         arabicLabel,
-        style: const TextStyle(fontSize: 11, color: Colors.white),
+        style: const TextStyle(fontSize: 11, color: AppThemeConstants.white),
       ),
       backgroundColor: color,
       padding: EdgeInsets.zero,
@@ -96,16 +97,16 @@ extension QuranMistakeUI on QuranMistake {
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.85),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+                border: Border.all(color: AppThemeConstants.white, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: AppThemeConstants.black.withValues(alpha: 0.3),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Icon(icon, size: 16, color: Colors.white),
+              child: Icon(icon, size: 16, color: AppThemeConstants.white),
             ),
           ),
 
@@ -118,18 +119,18 @@ extension QuranMistakeUI on QuranMistake {
                 width: 15,
                 height: 15,
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade700,
+                  color: AppThemeConstants.accentBlueDark,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  border: Border.all(color: AppThemeConstants.white, width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withValues(alpha: 0.4),
+                      color: AppThemeConstants.accentBlue.withValues(alpha: 0.4),
                       blurRadius: 3,
                     ),
                   ],
                 ),
                 child:
-                    const Icon(Icons.chat_bubble, size: 8, color: Colors.white),
+                    const Icon(Icons.chat_bubble, size: 8, color: AppThemeConstants.white),
               ),
             ),
         ],
@@ -178,8 +179,8 @@ extension QuranMistakeUI on QuranMistake {
                   const SizedBox(height: 2),
                   Text(
                     locationText,
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.grey.shade600),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppThemeConstants.grey600),
                   ),
                 ],
               ),
@@ -187,14 +188,14 @@ extension QuranMistakeUI on QuranMistake {
 
             // Comment indicator
             if (hasComment)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
+              const Padding(
+                padding: EdgeInsets.only(right: 6),
                 child: Icon(Icons.chat_bubble,
-                    size: 16, color: Colors.blue.shade700),
+                    size: 16, color: AppThemeConstants.accentBlueDark),
               ),
 
             const Icon(Icons.chevron_left,
-                size: 18, color: Colors.grey),
+                size: 18, color: AppThemeConstants.grey500),
           ],
         ),
       ),

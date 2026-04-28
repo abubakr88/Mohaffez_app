@@ -202,7 +202,7 @@ PreferredSizeWidget _buildAppBar(
         ],
       ),
       child: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppThemeConstants.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: showBackButton
@@ -336,7 +336,7 @@ Widget _buildWizardNavBar(
             // Close button
             IconButton(
               onPressed: exitWizard,
-              icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+              icon: const Icon(Icons.close_rounded, color: AppThemeConstants.white70, size: 22),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               tooltip: 'إغلاق',
@@ -351,7 +351,7 @@ Widget _buildWizardNavBar(
                   Text(
                     stepLabel,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppThemeConstants.white,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -360,7 +360,7 @@ Widget _buildWizardNavBar(
                   Text(
                     'الخطوة ${stepIdx + 1} من ${stepRoutes.length}',
                     style: const TextStyle(
-                      color: Colors.white60,
+                      color: AppThemeConstants.white60,
                       fontSize: 11,
                     ),
                   ),
@@ -382,7 +382,7 @@ Widget _buildWizardNavBar(
                         ? const Color(0xFF4CAF82)
                         : isActive
                             ? const Color(0xFFD4A44A)
-                            : Colors.white24,
+                            : AppThemeConstants.white24,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 );
@@ -396,7 +396,7 @@ Widget _buildWizardNavBar(
                 backgroundColor: isLast
                     ? const Color(0xFF2E8B57)
                     : const Color(0xFFD4A44A),
-                foregroundColor: Colors.white,
+                foregroundColor: AppThemeConstants.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 shape: RoundedRectangleBorder(
@@ -531,7 +531,7 @@ class _NavItem extends StatelessWidget {
 
     return Expanded(
       child: Material(
-        color: Colors.transparent,
+        color: AppThemeConstants.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
@@ -553,12 +553,12 @@ class _NavItem extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: selected
                             ? _ShellDS.white40
-                            : Colors.transparent,
+                            : AppThemeConstants.transparent,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: selected
                               ? accent.withValues(alpha: 0.55)
-                              : Colors.transparent,
+                              : AppThemeConstants.transparent,
                           width: 1.2,
                         ),
                       ),
@@ -1025,7 +1025,7 @@ class _SetupGuideDrawerTile extends ConsumerWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: AppThemeConstants.white,
                 ),
               ),
             ),

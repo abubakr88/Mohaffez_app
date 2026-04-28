@@ -77,7 +77,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('بيانات الطلب غير مكتملة'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
         return;
@@ -134,7 +134,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('حدث خطأ: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -278,11 +278,11 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppThemeConstants.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(Icons.request_page,
-                            size: 24, color: Colors.white),
+                            size: 24, color: AppThemeConstants.white),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -294,14 +294,14 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppThemeConstants.white,
                               ),
                             ),
                             SizedBox(height: 4),
                             Text(
                               'إدارة طلبات الحجز',
                               style: TextStyle(
-                                  fontSize: 13, color: Colors.white70),
+                                  fontSize: 13, color: AppThemeConstants.white70),
                             ),
                           ],
                         ),
@@ -344,7 +344,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12)),
             filled: true,
-            fillColor: Colors.grey.shade100,
+            fillColor: AppThemeConstants.grey100,
           ),
         ),
       ),
@@ -378,14 +378,14 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             return ChoiceChip(
               avatar: Icon(icon,
                   size: 18,
-                  color: isSelected ? Colors.white : Colors.grey.shade700),
+                  color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700),
               label: Text(label),
               selected: isSelected,
               onSelected: (_) =>
                   ref.read(requestFilterProvider.notifier).state = filter,
               selectedColor: AppThemeConstants.primary,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey.shade700,
+                color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700,
                 fontWeight:
                     isSelected ? FontWeight.bold : FontWeight.normal,
               ),
@@ -534,7 +534,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('لا يمكن إلغاء هذا الطلب في حالته الحالية'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppThemeConstants.warning,
         ),
       );
       return;
@@ -558,9 +558,9 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
               style:
-                  ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
               child: const Text('إلغاء الطلب',
-                  style: TextStyle(color: Colors.white)),
+                  style: TextStyle(color: AppThemeConstants.white)),
             ),
           ],
         ),
@@ -579,7 +579,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('تم إلغاء الطلب بنجاح'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppThemeConstants.success,
             ),
           );
         }
@@ -595,7 +595,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطأ في الإلغاء: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppThemeConstants.error,
           ),
         );
       }
@@ -707,7 +707,7 @@ class _RequestCard extends StatelessWidget {
               if (canCancel && !isAwaitingDirectConfirmation)
                 IconButton(
                   icon:
-                      const Icon(Icons.cancel_outlined, color: Colors.red),
+                      const Icon(Icons.cancel_outlined, color: AppThemeConstants.error),
                   onPressed: onCancel,
                   tooltip: 'إلغاء الطلب',
                 ),
@@ -736,8 +736,8 @@ class _RequestCard extends StatelessWidget {
 
             // ── Date row ────────────────────────────────────────────────
             Row(children: [
-              Icon(Icons.calendar_today,
-                  size: 14, color: Colors.grey.shade600),
+              const Icon(Icons.calendar_today,
+                  size: 14, color: AppThemeConstants.grey600),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -746,8 +746,8 @@ class _RequestCard extends StatelessWidget {
                       : 'التاريخ غير محدد',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey.shade700),
+                  style: const TextStyle(
+                      fontSize: 13, color: AppThemeConstants.grey700),
                 ),
               ),
               Flexible(
@@ -757,8 +757,8 @@ class _RequestCard extends StatelessWidget {
                       : '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.grey.shade500),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppThemeConstants.grey500),
                 ),
               ),
             ]),
@@ -774,7 +774,7 @@ class _RequestCard extends StatelessWidget {
                   label: const Text('ادفع الآن'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.secondary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppThemeConstants.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
@@ -792,17 +792,17 @@ class _RequestCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppThemeConstants.accentBlueLight,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                      color: Colors.blue.shade200),
+                      color: AppThemeConstants.accentBlue),
                 ),
-                child: Row(
+                child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.hourglass_top,
-                        color: Colors.blue.shade600, size: 20),
-                    const SizedBox(width: 10),
+                        color: AppThemeConstants.accentBlueDark, size: 20),
+                    SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -812,11 +812,11 @@ class _RequestCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
+                              color: AppThemeConstants.accentBlueDark,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
+                          SizedBox(height: 4),
+                          Text(
                             'في انتظار تأكيد المعلم باستلام المبلغ.'
                             ' ستصلك إشعار فور التأكيد.',
                             style: TextStyle(
@@ -833,9 +833,9 @@ class _RequestCard extends StatelessWidget {
               TextButton.icon(
                 onPressed: onCancel,
                 icon: const Icon(Icons.cancel_outlined,
-                    color: Colors.red, size: 18),
+                    color: AppThemeConstants.error, size: 18),
                 label: const Text('إلغاء الطلب',
-                    style: TextStyle(color: Colors.red)),
+                    style: TextStyle(color: AppThemeConstants.error)),
               ),
             ],
           ],
@@ -848,17 +848,17 @@ class _RequestCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: AppThemeConstants.grey100,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.grey.shade700),
+          Icon(icon, size: 16, color: AppThemeConstants.grey700),
           const SizedBox(width: 6),
           Text(label,
-              style: TextStyle(
-                  fontSize: 13, color: Colors.grey.shade800)),
+              style: const TextStyle(
+                  fontSize: 13, color: AppThemeConstants.grey800)),
         ],
       ),
     );
@@ -867,7 +867,7 @@ class _RequestCard extends StatelessWidget {
   (String, Color, IconData) _getStatusInfo(String status) {
     switch (status.trim().toLowerCase()) {
       case 'pending':
-        return ('قيد الانتظار', Colors.orange, Icons.pending);
+        return ('قيد الانتظار', AppThemeConstants.warning, Icons.pending);
       case 'awaitingpayment':
       case 'awaiting_payment':
         return ('في انتظار الدفع', AppThemeConstants.primary,
@@ -877,25 +877,25 @@ class _RequestCard extends StatelessWidget {
             Icons.payment);
       case 'awaitingdirectpaymentconfirmation':
       case 'awaiting_direct_payment_confirmation':
-        return ('في انتظار تأكيد المعلم', Colors.blue,
+        return ('في انتظار تأكيد المعلم', AppThemeConstants.accentBlue,
             Icons.hourglass_top);
       case 'accepted':
       case 'confirmed':
-        return ('مقبول', Colors.green, Icons.check_circle);
+        return ('مقبول', AppThemeConstants.success, Icons.check_circle);
       case 'rejected':
       case 'declined':
-        return ('مرفوض', Colors.red, Icons.cancel);
+        return ('مرفوض', AppThemeConstants.error, Icons.cancel);
       case 'cancelled':
       case 'canceled':
-        return ('ملغي', Colors.grey, Icons.block);
+        return ('ملغي', AppThemeConstants.grey500, Icons.block);
       case 'completed':
       case 'done':
-        return ('مكتمل', Colors.purple, Icons.done_all);
+        return ('مكتمل', AppThemeConstants.accentPurple, Icons.done_all);
       case 'expired':
-        return ('منتهي', Colors.red.shade300, Icons.timer_off);
+        return ('منتهي', AppThemeConstants.accentRed, Icons.timer_off);
       default:
         debugPrint('⚠️ Unknown request status: "$status"');
-        return ('غير معروف', Colors.grey, Icons.help_outline);
+        return ('غير معروف', AppThemeConstants.grey500, Icons.help_outline);
     }
   }
 
@@ -940,10 +940,10 @@ class _RejectedRequestCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      color: Colors.red.shade50,
+      color: AppThemeConstants.errorLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.red.shade300, width: 2),
+        side: const BorderSide(color: AppThemeConstants.accentRed, width: 2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -955,25 +955,25 @@ class _RejectedRequestCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: AppThemeConstants.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cancel, size: 16, color: Colors.red),
+                    Icon(Icons.cancel, size: 16, color: AppThemeConstants.error),
                     SizedBox(width: 6),
                     Text('مرفوض',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.red)),
+                            color: AppThemeConstants.error)),
                   ],
                 ),
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.grey),
+                icon: const Icon(Icons.close, color: AppThemeConstants.grey500),
                 onPressed: onDismiss,
                 tooltip: 'حذف',
               ),
@@ -994,8 +994,8 @@ class _RejectedRequestCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Row(children: [
-              Icon(Icons.calendar_today,
-                  size: 14, color: Colors.grey.shade600),
+              const Icon(Icons.calendar_today,
+                  size: 14, color: AppThemeConstants.grey600),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -1004,8 +1004,8 @@ class _RejectedRequestCard extends StatelessWidget {
                       : 'التاريخ غير محدد',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey.shade700),
+                  style: const TextStyle(
+                      fontSize: 13, color: AppThemeConstants.grey700),
                 ),
               ),
               Flexible(
@@ -1015,8 +1015,8 @@ class _RejectedRequestCard extends StatelessWidget {
                       : '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 12, color: Colors.grey.shade500),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppThemeConstants.grey500),
                 ),
               ),
             ]),
@@ -1059,19 +1059,19 @@ class _RejectedRequestCard extends StatelessWidget {
       padding:
           const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: AppThemeConstants.grey100,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.grey.shade700),
+          Icon(icon, size: 16, color: AppThemeConstants.grey700),
           const SizedBox(width: 6),
           Text(label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 13, color: Colors.grey.shade800)),
+              style: const TextStyle(
+                  fontSize: 13, color: AppThemeConstants.grey800)),
         ],
       ),
     );

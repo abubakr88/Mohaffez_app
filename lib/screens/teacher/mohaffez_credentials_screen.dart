@@ -141,7 +141,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                                       style: TextStyle(
                                         fontSize: 26,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: AppThemeConstants.white,
                                       ),
                                     ),
                                     SizedBox(height: 4),
@@ -149,7 +149,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                                       'أضف شهاداتك لتوثيق حسابك',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: Colors.white70,
+                                        color: AppThemeConstants.white70,
                                       ),
                                     ),
                                   ],
@@ -197,7 +197,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                           icon: const Icon(Icons.add),
                           label: const Text('إضافة شهادة'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
+                            backgroundColor: AppThemeConstants.accentPurple,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 24,
                               vertical: 14,
@@ -236,7 +236,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
           onPressed: _showAddCredentialDialog,
           icon: const Icon(Icons.add),
           label: const Text('إضافة شهادة'),
-          backgroundColor: Colors.purple,
+          backgroundColor: AppThemeConstants.accentPurple,
         ),
       ),
     );
@@ -325,9 +325,9 @@ class _CredentialCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         organization,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: AppThemeConstants.grey600,
                         ),
                       ),
                     ],
@@ -402,14 +402,14 @@ class _CredentialCard extends StatelessWidget {
                 if (issueDate != null)
                   Row(
                     children: [
-                      Icon(Icons.date_range,
-                          size: 16, color: Colors.grey.shade600),
+                      const Icon(Icons.date_range,
+                          size: 16, color: AppThemeConstants.grey600),
                       const SizedBox(width: 8),
                       Text(
                         DateFormat('yyyy/MM/dd').format(issueDate),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: AppThemeConstants.grey600,
                         ),
                       ),
                     ],
@@ -435,7 +435,7 @@ class _CredentialCard extends StatelessWidget {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.grey.shade300,
+                                  color: AppThemeConstants.grey300,
                                   width: 2,
                                 ),
                               ),
@@ -445,7 +445,7 @@ class _CredentialCard extends StatelessWidget {
                                   imageUrl: imageUrls[index],
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) => Container(
-                                    color: Colors.grey.shade200,
+                                    color: AppThemeConstants.grey200,
                                     child: const Center(
                                       child: CircularProgressIndicator(),
                                     ),
@@ -466,19 +466,19 @@ class _CredentialCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: AppThemeConstants.grey100,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
                         Icon(Icons.info_outline,
-                            size: 18, color: Colors.grey.shade600),
-                        const SizedBox(width: 8),
+                            size: 18, color: AppThemeConstants.grey600),
+                        SizedBox(width: 8),
                         Text(
                           'لا توجد صور مرفقة',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade600,
+                            color: AppThemeConstants.grey600,
                           ),
                         ),
                       ],
@@ -494,27 +494,27 @@ class _CredentialCard extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.05),
+                      color: AppThemeConstants.error.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                      border: Border.all(color: AppThemeConstants.error.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
                             Icon(
                               Icons.info_outline,
                               size: 16,
-                              color: Colors.red.shade700,
+                              color: AppThemeConstants.error,
                             ),
-                            const SizedBox(width: 6),
+                            SizedBox(width: 6),
                             Text(
                               'سبب الرفض:',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.red.shade700,
+                                color: AppThemeConstants.error,
                               ),
                             ),
                           ],
@@ -522,9 +522,9 @@ class _CredentialCard extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           data['rejectionReason'],
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: Colors.red.shade900,
+                            color: AppThemeConstants.errorDark,
                           ),
                         ),
                       ],
@@ -542,8 +542,8 @@ class _CredentialCard extends StatelessWidget {
                     icon: const Icon(Icons.delete, size: 18),
                     label: const Text('حذف الشهادة'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
+                      foregroundColor: AppThemeConstants.error,
+                      side: const BorderSide(color: AppThemeConstants.error),
                     ),
                   ),
                 ),
@@ -558,11 +558,11 @@ class _CredentialCard extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'approved':
-        return Colors.green;
+        return AppThemeConstants.success;
       case 'rejected':
-        return Colors.red;
+        return AppThemeConstants.error;
       default:
-        return Colors.orange;
+        return AppThemeConstants.warning;
     }
   }
 
@@ -591,15 +591,15 @@ class _CredentialCard extends StatelessWidget {
   Color _getTypeColor(String type) {
     switch (type) {
       case 'ijazah':
-        return Colors.purple;
+        return AppThemeConstants.accentPurple;
       case 'education':
-        return Colors.blue;
+        return AppThemeConstants.accentBlue;
       case 'license':
-        return Colors.green;
+        return AppThemeConstants.success;
       case 'award':
-        return Colors.amber;
+        return AppThemeConstants.accentAmber;
       default:
-        return Colors.grey;
+        return AppThemeConstants.grey500;
     }
   }
 
@@ -671,7 +671,7 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppThemeConstants.black,
       appBar: AppBar(
         leading: context.canPop()
             ? IconButton(
@@ -680,11 +680,11 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
                 tooltip: 'رجوع',
               )
             : null,
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: AppThemeConstants.black,
+        iconTheme: const IconThemeData(color: AppThemeConstants.white),
         title: Text(
           '${currentIndex + 1} / ${widget.imageUrls.length}',
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppThemeConstants.white),
         ),
       ),
       body: PageView.builder(
@@ -702,11 +702,11 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
                 imageUrl: widget.imageUrls[index],
                 fit: BoxFit.contain,
                 placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
+                  child: CircularProgressIndicator(color: AppThemeConstants.white),
                 ),
                 errorWidget: (context, url, error) => const Icon(
                   Icons.broken_image,
-                  color: Colors.white,
+                  color: AppThemeConstants.white,
                   size: 64,
                 ),
               ),
@@ -943,10 +943,10 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                     child: Container(
                       height: 150,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: AppThemeConstants.grey100,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.grey.shade300,
+                          color: AppThemeConstants.grey300,
                           width: 2,
                           style: BorderStyle.solid,
                         ),
@@ -956,7 +956,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.add_photo_alternate,
-                                size: 48, color: Colors.grey),
+                                size: 48, color: AppThemeConstants.grey500),
                             SizedBox(height: 8),
                             Text('اضغط لإضافة صور (اختياري)'),
                           ],
@@ -978,7 +978,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                               margin: const EdgeInsets.only(left: 8),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade300),
+                                border: Border.all(color: AppThemeConstants.grey300),
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
@@ -1012,7 +1012,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: uploading
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const CircularProgressIndicator(color: AppThemeConstants.white)
                         : const Text(
                             'إضافة الشهادة',
                             style: TextStyle(fontSize: 16),
