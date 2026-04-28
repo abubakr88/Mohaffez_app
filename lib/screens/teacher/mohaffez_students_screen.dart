@@ -231,13 +231,18 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
             slivers: [
               // ── AppBar with embedded search ──────────────────────────────
               SliverAppBar(
-                expandedHeight: 100,
+                expandedHeight: 140,
                 floating: true,
                 pinned: true,
+                automaticallyImplyLeading: false,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                backgroundColor: AppThemeConstants.deepTeal,
+                surfaceTintColor: AppThemeConstants.transparent,
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(52),
                   child: Container(
-                    color: AppThemeConstants.primary,
+                    color: AppThemeConstants.deepTeal,
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                     child: Container(
                       height: 40,
@@ -286,17 +291,14 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          AppThemeConstants.primary,
-                          AppThemeConstants.primaryVariant,
-                        ],
+                        colors: AppThemeConstants.tealGradient,
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                     ),
                     child: SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 58),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 62),
                         child: Row(
                           children: [
                             Container(
@@ -318,7 +320,7 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                                 const Text(
                                   'طلابي',
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                     color: AppThemeConstants.onPrimary,
                                     height: 1.2,
@@ -328,7 +330,7 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                                   Text(
                                     '$totalCount طالب',
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 16,
                                       color: AppThemeConstants.white
                                           .withValues(alpha: 0.75),
                                       height: 1.2,

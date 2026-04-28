@@ -79,6 +79,7 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                 expandedHeight: 130,
                 floating: true,
                 pinned: true,
+                automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -853,6 +854,5 @@ class _MistakeReviewCard extends StatelessWidget {
     );
   }
 }
-
 
 

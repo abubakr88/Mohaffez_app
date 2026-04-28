@@ -380,13 +380,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                 expandedHeight: 160,
                 floating: true,
                 pinned: true,
-                leading: context.canPop()
-                    ? IconButton(
-                        icon: const Icon(Icons.arrow_back_ios),
-                        onPressed: context.pop,
-                        tooltip: 'رجوع',
-                      )
-                    : null,
+                automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
@@ -1175,3 +1169,4 @@ class _StatCell extends StatelessWidget {
     );
   }
 }
+

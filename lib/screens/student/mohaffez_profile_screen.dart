@@ -987,6 +987,7 @@ class _MohaffezProfileScreenState
     return SliverAppBar(
       expandedHeight: 248,
       pinned: true,
+      automaticallyImplyLeading: false,
       backgroundColor: AppThemeConstants.deepTeal,
       title: Text(
         name,

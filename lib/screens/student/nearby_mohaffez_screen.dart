@@ -238,11 +238,16 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
       expandedHeight: 100,
       floating: true,
       pinned: true,
+      automaticallyImplyLeading: false,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      backgroundColor: AppThemeConstants.deepTeal,
+      surfaceTintColor: AppThemeConstants.transparent,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color.fromARGB(255, 91, 233, 202), Color.fromARGB(192, 13, 224, 196)],
+              colors: AppThemeConstants.tealGradient,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

@@ -98,6 +98,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
               expandedHeight: 120,
               floating: true,
               pinned: true,
+              automaticallyImplyLeading: false,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(

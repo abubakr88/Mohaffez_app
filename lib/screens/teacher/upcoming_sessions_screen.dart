@@ -65,11 +65,16 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                 expandedHeight: 130,
                 floating: true,
                 pinned: true,
+                automaticallyImplyLeading: false,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                backgroundColor: AppThemeConstants.deepTeal,
+                surfaceTintColor: AppThemeConstants.transparent,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppThemeConstants.secondary, Color(0xFF66BB6A)],
+                        colors: AppThemeConstants.tealGradient,
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),

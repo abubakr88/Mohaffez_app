@@ -83,6 +83,7 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
             SliverAppBar(
               expandedHeight: 156,
               pinned: true,
+              automaticallyImplyLeading: false,
               backgroundColor: AppThemeConstants.deepTeal,
               elevation: 0,
               flexibleSpace: FlexibleSpaceBar(

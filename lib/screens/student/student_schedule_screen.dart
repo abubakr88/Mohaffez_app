@@ -152,15 +152,15 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
       expandedHeight: 100,
       floating: true,
       pinned: true,
+      automaticallyImplyLeading: false,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      backgroundColor: AppThemeConstants.deepTeal,
+      surfaceTintColor: AppThemeConstants.transparent,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppThemeConstants.accentPurple,
-                Color(0xFFAB47BC),
-              ],
-            ),
+            gradient: LinearGradient(colors: AppThemeConstants.tealGradient),
           ),
           child: SafeArea(
             child: Padding(
@@ -340,4 +340,3 @@ class _SessionCard extends StatelessWidget {
     }
   }
 }
-

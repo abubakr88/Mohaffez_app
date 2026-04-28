@@ -74,10 +74,7 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                 expandedHeight: 80,
                 floating: true,
                 pinned: true,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.pop(),
-                ),
+                automaticallyImplyLeading: false,
                 title: Text(student.studentName),
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(

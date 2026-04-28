@@ -104,15 +104,17 @@ class _PendingRequestsScreenState
       expandedHeight: 120,
       floating: true,
       pinned: true,
+      automaticallyImplyLeading: false,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      backgroundColor: AppThemeConstants.deepTeal,
+      surfaceTintColor: AppThemeConstants.transparent,
       title: const Text('الطلبات المعلقة'),
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                AppThemeConstants.primary,
-                AppThemeConstants.primaryVariant,
-              ],
+              colors: AppThemeConstants.tealGradient,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

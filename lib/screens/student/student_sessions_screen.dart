@@ -188,19 +188,18 @@ class _StudentSessionsScreenState
       expandedHeight: 130,
       floating: false,
       pinned: true,
+      automaticallyImplyLeading: false,
       elevation: 0,
-      backgroundColor: AppThemeConstants.secondary,
+      scrolledUnderElevation: 0,
+      backgroundColor: AppThemeConstants.deepTeal,
+      surfaceTintColor: AppThemeConstants.transparent,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                AppThemeConstants.secondary.withValues(alpha: 0.9),
-                AppThemeConstants.secondary,
-                AppThemeConstants.secondary.withValues(alpha: 0.7),
-              ],
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
+              colors: AppThemeConstants.tealGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
           child: SafeArea(

@@ -257,11 +257,16 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       expandedHeight: 120,
       floating: true,
       pinned: true,
+      automaticallyImplyLeading: false,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      backgroundColor: AppThemeConstants.deepTeal,
+      surfaceTintColor: AppThemeConstants.transparent,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppThemeConstants.primary, Color(0xFFFFB74D)],
+              colors: AppThemeConstants.tealGradient,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),

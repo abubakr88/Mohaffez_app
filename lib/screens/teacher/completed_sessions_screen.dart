@@ -58,19 +58,17 @@ class _CompletedSessionsScreenState
                 expandedHeight: 130,
                 floating: true,
                 pinned: true,
+                automaticallyImplyLeading: false,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                backgroundColor: AppThemeConstants.deepTeal,
+                surfaceTintColor: AppThemeConstants.transparent,
                 title: const Text(ArabicLabels.completedSessions),
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          AppThemeConstants.primary,
-                          AppThemeConstants.primaryVariant
-                        ],
+                        colors: AppThemeConstants.tealGradient,
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),

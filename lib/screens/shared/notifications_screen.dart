@@ -66,6 +66,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 expandedHeight: 100,
                 floating: true,
                 pinned: true,
+                automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(

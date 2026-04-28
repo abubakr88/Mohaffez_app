@@ -200,20 +200,11 @@ class _TeacherSetupWizardScreenState
     return SliverAppBar(
       expandedHeight: 180,
       pinned: true,
+      automaticallyImplyLeading: false,
       elevation: 0,
       scrolledUnderElevation: 0,
       backgroundColor: _DS.teal700,
       surfaceTintColor: AppThemeConstants.transparent,
-      leading: IconButton(
-        icon: const Icon(Icons.close_rounded, color: AppThemeConstants.white),
-        onPressed: () {
-          if (context.canPop()) {
-            context.pop();
-          } else {
-            context.go('/mohaffez-home');
-          }
-        },
-      ),
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.pin,
         background: Container(
