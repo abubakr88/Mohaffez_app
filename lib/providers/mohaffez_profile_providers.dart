@@ -41,16 +41,22 @@ final followStatusProvider = StreamProvider.family<bool, String>(
 );
 
 /// Provider for credentials
+///
+/// Fetches all credentials then filters client-side. The COLLECTION-scope
+/// single-field index for `credentials.status` was disabled by a fieldOverride,
+/// so a server-side `.where('status', isEqualTo: 'approved')` throws
+/// FAILED_PRECONDITION. The Firestore rules already allow `list` for all
+/// authenticated users and document "rely on client query filter".
 final credentialsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>(
   (ref, mohaffezId) {
     return FirebaseFirestore.instance
         .collection('users')
         .doc(mohaffezId)
         .collection('credentials')
-        .where('status', isEqualTo: 'approved')
         .snapshots()
         .map((snapshot) {
           return snapshot.docs
+              .where((doc) => doc.data()['status'] == 'approved')
               .map((doc) => {
                     ...doc.data(),
                     'id': doc.id,
