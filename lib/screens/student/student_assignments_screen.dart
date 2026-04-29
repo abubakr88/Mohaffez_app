@@ -246,6 +246,11 @@ class _CompletedAssignmentCardState
         session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
+    // Ayah range fields
+    final hifzFromAyah = session['hifzFromAyah'] as String?;
+    final hifzToAyah = session['hifzToAyah'] as String?;
+    final murajaFromAyah = session['murajaFromAyah'] as String?;
+    final murajaToAyah = session['murajaToAyah'] as String?;
     // FIX: Firestore stores dates as Timestamp, convert to DateTime
     final sessionDateRaw = session['sessionDate'];
     final sessionDate = sessionDateRaw is Timestamp
@@ -450,6 +455,8 @@ class _CompletedAssignmentCardState
                   icon: Icons.book,
                   label: ArabicLabels.hifz,
                   content: hifz,
+                  fromAyah: hifzFromAyah,
+                  toAyah: hifzToAyah,
                   color: AppThemeConstants.success,
                 ),
               if (hifz.isNotEmpty && muraja.isNotEmpty)
@@ -459,6 +466,8 @@ class _CompletedAssignmentCardState
                   icon: Icons.refresh,
                   label: ArabicLabels.muraja,
                   content: muraja,
+                  fromAyah: murajaFromAyah,
+                  toAyah: murajaToAyah,
                   color: AppThemeConstants.primaryVariant,
                 ),
             ],
@@ -656,12 +665,16 @@ class _CompletedAssignmentItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final String content;
+  final String? fromAyah;
+  final String? toAyah;
   final Color color;
 
   const _CompletedAssignmentItem({
     required this.icon,
     required this.label,
     required this.content,
+    this.fromAyah,
+    this.toAyah,
     required this.color,
   });
 
@@ -717,6 +730,36 @@ class _CompletedAssignmentItemState extends State<_CompletedAssignmentItem> {
                   maxLines: _isExpanded ? null : 3,
                   overflow: _isExpanded ? null : TextOverflow.ellipsis,
                 ),
+                // Display ayah range if available
+                if (widget.fromAyah != null || widget.toAyah != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: widget.color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.format_list_numbered,
+                          size: 14,
+                          color: widget.color,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'من آية ${widget.fromAyah ?? '?'} إلى آية ${widget.toAyah ?? '?'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: widget.color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (!_isExpanded)
                   InkWell(
                     onTap: () => setState(() => _isExpanded = true),

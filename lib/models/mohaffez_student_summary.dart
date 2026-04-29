@@ -13,6 +13,10 @@ class MohaffezStudentSummary {
   final int previousHifzRating;
   final bool? previousMurajaCompleted;
   final int previousMurajaRating;
+  final String? previousHifzFromAyah;
+  final String? previousHifzToAyah;
+  final String? previousMurajaFromAyah;
+  final String? previousMurajaToAyah;
   final String? performanceNotes;
 
   const MohaffezStudentSummary({
@@ -28,6 +32,10 @@ class MohaffezStudentSummary {
     this.previousHifzRating = 0,
     this.previousMurajaCompleted,
     this.previousMurajaRating = 0,
+    this.previousHifzFromAyah,
+    this.previousHifzToAyah,
+    this.previousMurajaFromAyah,
+    this.previousMurajaToAyah,
     this.performanceNotes,
   });
 
@@ -45,6 +53,10 @@ class MohaffezStudentSummary {
       previousHifzRating: previousHifzRating,
       previousMurajaCompleted: previousMurajaCompleted,
       previousMurajaRating: previousMurajaRating,
+      previousHifzFromAyah: previousHifzFromAyah,
+      previousHifzToAyah: previousHifzToAyah,
+      previousMurajaFromAyah: previousMurajaFromAyah,
+      previousMurajaToAyah: previousMurajaToAyah,
       performanceNotes: performanceNotes,
     );
   }
@@ -65,6 +77,10 @@ class MohaffezStudentSummary {
       previousHifzRating: json['previousHifzRating'] as int? ?? 0,
       previousMurajaCompleted: json['previousMurajaCompleted'] as bool?,
       previousMurajaRating: json['previousMurajaRating'] as int? ?? 0,
+      previousHifzFromAyah: json['previousHifzFromAyah'] as String?,
+      previousHifzToAyah: json['previousHifzToAyah'] as String?,
+      previousMurajaFromAyah: json['previousMurajaFromAyah'] as String?,
+      previousMurajaToAyah: json['previousMurajaToAyah'] as String?,
       performanceNotes: json['performanceNotes'] as String?,
     );
   }
@@ -83,6 +99,10 @@ class MohaffezStudentSummary {
       'previousHifzRating': previousHifzRating,
       'previousMurajaCompleted': previousMurajaCompleted,
       'previousMurajaRating': previousMurajaRating,
+      'previousHifzFromAyah': previousHifzFromAyah,
+      'previousHifzToAyah': previousHifzToAyah,
+      'previousMurajaFromAyah': previousMurajaFromAyah,
+      'previousMurajaToAyah': previousMurajaToAyah,
       'performanceNotes': performanceNotes,
     };
   }

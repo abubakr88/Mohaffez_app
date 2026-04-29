@@ -10,7 +10,11 @@ import 'quiz/games/order_ayahs_game.dart';
 import 'quiz/games/tajweed_rule_game.dart';
 import 'quiz/state/quiz_session_controller.dart';
 import 'quiz/widgets/confetti_overlay.dart';
+import 'quiz/widgets/quiz_background.dart';
 import 'quiz/widgets/score_badge.dart';
+import 'quiz/state/quiz_session_controller.dart'
+    show quizSessionControllerProvider;
+import 'package:mohaffez_finder_app/providers/quiz_access_provider.dart';
 import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 enum _GameMode {
@@ -26,12 +30,14 @@ class SessionQuizScreen extends ConsumerStatefulWidget {
   final String? studentName;
   final String? mohaffezId;
   final String? studentId;
+  final String? sessionId;
 
   const SessionQuizScreen({
     super.key,
     this.studentName,
     this.mohaffezId,
     this.studentId,
+    this.sessionId,
   });
 
   @override
@@ -63,6 +69,20 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
     super.dispose();
   }
 
+  void _saveQuizResults() {
+    final sid = widget.sessionId;
+    if (sid == null) return;
+    final s = ref.read(quizSessionControllerProvider);
+    if (s.asked == 0) return;
+    saveQuizResults(
+      sessionId: sid,
+      correct: s.correct,
+      asked: s.asked,
+      bestStreak: s.bestStreak,
+      accuracyPct: s.accuracyPct,
+    ).catchError((_) {});
+  }
+
   void _goTo(_GameMode m) {
     HapticFeedback.lightImpact();
     setState(() => _mode = m);
@@ -81,13 +101,18 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _saveQuizResults();
+      },
+      child: Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF0F9FF),
-        body: ConfettiOverlay(
-          controller: _confetti,
-          child: Column(
+        backgroundColor: Colors.transparent,
+        body: QuizBackground(
+          child: ConfettiOverlay(
+            controller: _confetti,
+            child: Column(
             children: [
               _buildHeader(),
               Expanded(
@@ -104,6 +129,8 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
             ],
           ),
         ),
+        ),
+      ),
       ),
     );
   }

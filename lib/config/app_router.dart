@@ -662,6 +662,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 studentName: p['studentName'],
                 mohaffezId: p['mohaffezId'],
                 studentId: p['studentId'],
+                sessionId: p['sessionId'],
               );
             },
           ),

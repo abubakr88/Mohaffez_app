@@ -1221,6 +1221,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     String? performanceNotes,
     String? newHifzAssignment,
     String? newMurajaAssignment,
+    String? newHifzFromAyah,
+    String? newHifzToAyah,
+    String? newMurajaFromAyah,
+    String? newMurajaToAyah,
     int sessionRating = 7,
     String? generalNotes,
     bool isLateCompletion = false,
@@ -1258,6 +1262,20 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       }
       if (newMurajaAssignment != null && newMurajaAssignment.isNotEmpty) {
         updates['murajaAssignment'] = newMurajaAssignment;
+      }
+      // Ayah range for new hifz
+      if (newHifzFromAyah != null && newHifzFromAyah.isNotEmpty) {
+        updates['hifzFromAyah'] = newHifzFromAyah;
+      }
+      if (newHifzToAyah != null && newHifzToAyah.isNotEmpty) {
+        updates['hifzToAyah'] = newHifzToAyah;
+      }
+      // Ayah range for new muraja
+      if (newMurajaFromAyah != null && newMurajaFromAyah.isNotEmpty) {
+        updates['murajaFromAyah'] = newMurajaFromAyah;
+      }
+      if (newMurajaToAyah != null && newMurajaToAyah.isNotEmpty) {
+        updates['murajaToAyah'] = newMurajaToAyah;
       }
       if (generalNotes != null && generalNotes.isNotEmpty) {
         updates['sessionNotes'] = generalNotes;
@@ -1385,6 +1403,10 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
         previousHifzRating: data['previousHifzRating'] as int? ?? 0,
         previousMurajaCompleted: data['previousMurajaCompleted'] as bool?,
         previousMurajaRating: data['previousMurajaRating'] as int? ?? 0,
+        previousHifzFromAyah: data['hifzFromAyah'] as String?,
+        previousHifzToAyah: data['hifzToAyah'] as String?,
+        previousMurajaFromAyah: data['murajaFromAyah'] as String?,
+        previousMurajaToAyah: data['murajaToAyah'] as String?,
         performanceNotes: data['performanceNotes'] as String?,
       );
     }

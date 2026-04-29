@@ -843,7 +843,8 @@ class _QuizAccessCard extends ConsumerWidget {
                     context.push(
                       '/session-quiz'
                       '?mohaffezId=${unlockInfo.mohaffezId}'
-                      '&studentId=$studentId',
+                      '&studentId=$studentId'
+                      '&sessionId=${unlockInfo.sessionId}',
                     );
                   }
                 : () {

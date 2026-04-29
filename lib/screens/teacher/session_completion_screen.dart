@@ -47,6 +47,12 @@ class _SessionCompletionScreenState
   // New assignments
   final newHifzController = TextEditingController();
   final newMurajaController = TextEditingController();
+  // Ayah range for new hifz
+  final newHifzFromAyahController = TextEditingController();
+  final newHifzToAyahController = TextEditingController();
+  // Ayah range for new muraja
+  final newMurajaFromAyahController = TextEditingController();
+  final newMurajaToAyahController = TextEditingController();
 
   // General session rating
   int sessionRating = 7;
@@ -63,6 +69,10 @@ class _SessionCompletionScreenState
     performanceNotesController.dispose();
     newHifzController.dispose();
     newMurajaController.dispose();
+    newHifzFromAyahController.dispose();
+    newHifzToAyahController.dispose();
+    newMurajaFromAyahController.dispose();
+    newMurajaToAyahController.dispose();
     generalNotesController.dispose();
     super.dispose();
   }
@@ -95,6 +105,20 @@ class _SessionCompletionScreenState
             newMurajaAssignment: newMurajaController.text.trim().isEmpty
                 ? null
                 : newMurajaController.text.trim(),
+            // Ayah range for new hifz
+            newHifzFromAyah: newHifzFromAyahController.text.trim().isEmpty
+                ? null
+                : newHifzFromAyahController.text.trim(),
+            newHifzToAyah: newHifzToAyahController.text.trim().isEmpty
+                ? null
+                : newHifzToAyahController.text.trim(),
+            // Ayah range for new muraja
+            newMurajaFromAyah: newMurajaFromAyahController.text.trim().isEmpty
+                ? null
+                : newMurajaFromAyahController.text.trim(),
+            newMurajaToAyah: newMurajaToAyahController.text.trim().isEmpty
+                ? null
+                : newMurajaToAyahController.text.trim(),
             // General rating
             sessionRating: sessionRating,
             generalNotes: generalNotesController.text.trim().isEmpty
@@ -575,7 +599,7 @@ class _SessionCompletionScreenState
                         maxLines: 2,
                         decoration: InputDecoration(
                           labelText: 'الحفظ المطلوب',
-                          hintText: 'مثال: سورة الكهف من آية 1 إلى 10',
+                          hintText: 'مثال: سورة الكهف',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -585,6 +609,49 @@ class _SessionCompletionScreenState
                           ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      // Hifz ayah range
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: newHifzFromAyahController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'من آية رقم',
+                                hintText: 'مثال: 1',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.format_list_numbered,
+                                  color: AppThemeConstants.success,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: newHifzToAyahController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'إلى آية رقم',
+                                hintText: 'مثال: 10',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.format_list_numbered,
+                                  color: AppThemeConstants.success,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 16),
                       // New muraja
                       TextFormField(
@@ -592,7 +659,7 @@ class _SessionCompletionScreenState
                         maxLines: 2,
                         decoration: InputDecoration(
                           labelText: 'المراجعة المطلوبة',
-                          hintText: 'مثال: سورة البقرة الربع الأول',
+                          hintText: 'مثال: سورة البقرة',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -601,6 +668,49 @@ class _SessionCompletionScreenState
                             color: AppThemeConstants.accentBlue,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Muraja ayah range
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: newMurajaFromAyahController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'من آية رقم',
+                                hintText: 'مثال: 1',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.format_list_numbered,
+                                  color: AppThemeConstants.accentBlue,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: newMurajaToAyahController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'إلى آية رقم',
+                                hintText: 'مثال: 50',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.format_list_numbered,
+                                  color: AppThemeConstants.accentBlue,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

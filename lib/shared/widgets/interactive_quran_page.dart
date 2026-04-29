@@ -35,12 +35,20 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   bool isLoading = true;
 
   final GlobalKey _imageKey = GlobalKey();
+  final TransformationController _transformController =
+      TransformationController();
 
   @override
   void initState() {
     super.initState();
     currentPage = widget.pageNumber;
     _loadPageData();
+  }
+
+  @override
+  void dispose() {
+    _transformController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPageData() async {
@@ -61,6 +69,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
 
   void _changePage(int newPage) {
     if (newPage < 1 || newPage > QuranService.totalPages) return;
+    _transformController.value = Matrix4.identity();
     setState(() => currentPage = newPage);
     widget.onPageChanged?.call(newPage);
     _loadPageData();
@@ -99,7 +108,16 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       children: [
         if (widget.isEditable) _buildMistakeTypeSelector(),
         Expanded(
-          child: _buildQuranPageImage(),
+          child: Stack(
+            children: [
+              _buildQuranPageImage(),
+              Positioned(
+                bottom: 12,
+                left: 12,
+                child: _buildZoomControls(),
+              ),
+            ],
+          ),
         ),
         if (_hasAnyComments()) _buildCommentLegend(),
         _buildPageNavigation(),
@@ -112,14 +130,71 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   Widget _buildQuranPageImage() {
-    return QuranPageImage(
-      imageKey: _imageKey,
-      currentPage: currentPage,
-      pageInfo: pageInfo,
-      mistakes: widget.existingMistakes
-          .where((m) => m.pageNumber == currentPage)
-          .toList(),
-      onTapDown: _handleTapDown,
+    return InteractiveViewer(
+      transformationController: _transformController,
+      minScale: 1.0,
+      maxScale: 4.0,
+      child: QuranPageImage(
+        imageKey: _imageKey,
+        currentPage: currentPage,
+        pageInfo: pageInfo,
+        mistakes: widget.existingMistakes
+            .where((m) => m.pageNumber == currentPage)
+            .toList(),
+        onTapDown: _handleTapDown,
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ZOOM CONTROLS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  void _zoomIn() {
+    final s = _transformController.value.getMaxScaleOnAxis();
+    if (s >= 4.0) return;
+    _transformController.value = _transformController.value.clone()
+      ..scaleByDouble(1.25, 1.25, 1.0, 1.0);
+  }
+
+  void _zoomOut() {
+    final s = _transformController.value.getMaxScaleOnAxis();
+    if (s <= 1.0) return;
+    _transformController.value = _transformController.value.clone()
+      ..scaleByDouble(0.8, 0.8, 1.0, 1.0);
+  }
+
+  void _resetZoom() {
+    _transformController.value = Matrix4.identity();
+  }
+
+  Widget _buildZoomControls() {
+    return AnimatedBuilder(
+      animation: _transformController,
+      builder: (context, _) {
+        final scale = _transformController.value.getMaxScaleOnAxis();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ZoomButton(
+              icon: Icons.add,
+              onTap: scale < 3.99 ? _zoomIn : null,
+            ),
+            const SizedBox(height: 4),
+            _ZoomButton(
+              icon: Icons.remove,
+              onTap: scale > 1.01 ? _zoomOut : null,
+            ),
+            if (scale > 1.01) ...[
+              const SizedBox(height: 4),
+              _ZoomButton(
+                icon: Icons.fit_screen,
+                onTap: _resetZoom,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -510,6 +585,47 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
       case MistakeType.addition:      return Icons.add_circle_outline;
       case MistakeType.other:         return Icons.help_outline;
     }
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ZOOM BUTTON
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _ZoomButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _ZoomButton({required this.icon, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppThemeConstants.primary.withValues(alpha: 0.82)
+              : AppThemeConstants.grey300,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: AppThemeConstants.black.withValues(alpha: 0.18),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Icon(icon,
+            color: enabled ? AppThemeConstants.white : AppThemeConstants.grey500,
+            size: 18),
+      ),
+    );
   }
 }
 

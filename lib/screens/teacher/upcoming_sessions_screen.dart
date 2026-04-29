@@ -403,6 +403,10 @@ class SessionCard extends ConsumerWidget {
       return {
         'hifz': data['hifzAssignment'] as String?,
         'muraja': data['murajaAssignment'] as String?,
+        'hifzFromAyah': data['hifzFromAyah'] as String?,
+        'hifzToAyah': data['hifzToAyah'] as String?,
+        'murajaFromAyah': data['murajaFromAyah'] as String?,
+        'murajaToAyah': data['murajaToAyah'] as String?,
       };
     } catch (e) {
       return {'hifz': null, 'muraja': null};

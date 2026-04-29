@@ -30,6 +30,12 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
   bool mistakesLoading = true;
   int moshafStartPage = 1;
 
+  // Quiz result state (loaded from Firestore alongside mistakes)
+  int? quizCorrect;
+  int? quizAsked;
+  int? quizBestStreak;
+  int? quizAccuracyPct;
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   @override
   void initState() {
@@ -55,6 +61,18 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
       final data = doc.data();
       if (data != null) {
+        // ── Quiz results ────────────────────────────────────────────────────
+        final qAsked = data['quizAsked'] as int?;
+        if (qAsked != null && qAsked > 0 && mounted) {
+          setState(() {
+            quizCorrect = data['quizCorrect'] as int?;
+            quizAsked = qAsked;
+            quizBestStreak = data['quizBestStreak'] as int?;
+            quizAccuracyPct = data['quizAccuracyPct'] as int?;
+          });
+        }
+
+        // ── Mistakes ────────────────────────────────────────────────────────
         final raw = data['mistakes'];
         if (raw is List && raw.isNotEmpty) {
           final mistakes = raw
@@ -582,6 +600,17 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                           style: const TextStyle(
                               fontSize: 15, height: 1.6),
                         ),
+                      ),
+                    ],
+
+                    // Quiz Results Section
+                    if (quizAsked != null && quizAsked! > 0) ...[
+                      const SizedBox(height: 16),
+                      _QuizResultsCard(
+                        correct: quizCorrect ?? 0,
+                        asked: quizAsked!,
+                        bestStreak: quizBestStreak ?? 0,
+                        accuracyPct: quizAccuracyPct ?? 0,
                       ),
                     ],
 
@@ -1132,6 +1161,170 @@ class _AssignmentCard extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUIZ RESULTS CARD
+// ─────────────────────────────────────────────────────────────────────────────
+class _QuizResultsCard extends StatelessWidget {
+  final int correct;
+  final int asked;
+  final int bestStreak;
+  final int accuracyPct;
+
+  const _QuizResultsCard({
+    required this.correct,
+    required this.asked,
+    required this.bestStreak,
+    required this.accuracyPct,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accentColor = accuracyPct >= 80
+        ? AppThemeConstants.success
+        : accuracyPct >= 50
+            ? AppThemeConstants.warning
+            : AppThemeConstants.error;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeConstants.primary.withValues(alpha: 0.07),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.quiz_rounded,
+                    color: AppThemeConstants.primary, size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'نتيجة التحدي التفاعلي',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeConstants.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Accuracy ring + stats row
+          Row(
+            children: [
+              // Circular accuracy indicator
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: accuracyPct / 100,
+                      strokeWidth: 7,
+                      backgroundColor: AppThemeConstants.grey200,
+                      valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                    ),
+                    Text(
+                      '$accuracyPct%',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: accentColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+
+              // Stats grid
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _QuizStat(
+                      icon: Icons.check_circle_outline,
+                      color: AppThemeConstants.success,
+                      value: '$correct / $asked',
+                      label: 'إجابات صحيحة',
+                    ),
+                    _QuizStat(
+                      icon: Icons.local_fire_department,
+                      color: AppThemeConstants.accentOrange,
+                      value: '$bestStreak',
+                      label: 'أفضل تسلسل',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuizStat extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String value;
+  final String label;
+
+  const _QuizStat({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+              fontSize: 10, color: AppThemeConstants.textSecondary),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _StatCell extends StatelessWidget {
   final IconData icon;

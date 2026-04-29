@@ -34,6 +34,27 @@ final sessionQuizStateProvider =
       .map((doc) => (doc.data()?['quizUnlocked'] as bool?) == true);
 });
 
+/// Persists the quiz session results to `hafizSessions/{sessionId}`.
+/// Safe to call fire-and-forget; only writes when [asked] > 0.
+Future<void> saveQuizResults({
+  required String sessionId,
+  required int correct,
+  required int asked,
+  required int bestStreak,
+  required int accuracyPct,
+}) async {
+  if (asked == 0) return;
+  await FirebaseFirestore.instance
+      .collection('hafizSessions')
+      .doc(sessionId)
+      .update({
+    'quizCorrect': correct,
+    'quizAsked': asked,
+    'quizBestStreak': bestStreak,
+    'quizAccuracyPct': accuracyPct,
+  });
+}
+
 /// Writes [unlocked] to `hafizSessions/{sessionId}.quizUnlocked`.
 /// When enabling, atomically clears quizUnlocked on all other sessions for the
 /// same student+teacher pair so only one session can be unlocked at a time.
