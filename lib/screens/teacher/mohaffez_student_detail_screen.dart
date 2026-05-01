@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../models/mohaffez_student_summary.dart';
+import '../../providers/student_rewards_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
@@ -94,30 +96,44 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                 child: _StudentSummaryCard(student: student),
               ),
 
-              // ── Manage challenges button ───────────────────────────────
+              // ── Action buttons ────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: OutlinedButton.icon(
-                    onPressed: () => context.push(
-                      '/student-challenges',
-                      extra: {
-                        'mohaffezId': mohaffezId,
-                        'studentId': student.studentId,
-                        'studentName': student.studentName,
-                      },
-                    ),
-                    icon: const Icon(Icons.extension_rounded, size: 18),
-                    label: const Text('إدارة تحديات الجلسة'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppThemeConstants.primary,
-                      side: const BorderSide(color: AppThemeConstants.primary),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      textStyle: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700),
-                    ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push(
+                            '/student-challenges',
+                            extra: {
+                              'mohaffezId': mohaffezId,
+                              'studentId': student.studentId,
+                              'studentName': student.studentName,
+                            },
+                          ),
+                          icon: const Icon(Icons.extension_rounded, size: 18),
+                          label: const Text('التحديات'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppThemeConstants.primary,
+                            side: const BorderSide(color: AppThemeConstants.primary),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            textStyle: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _MarkSurahButton(
+                          studentId: student.studentId,
+                          studentName: student.studentName,
+                          mohaffezId: mohaffezId,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -498,6 +514,308 @@ class _SessionHistoryCard extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Mark surah button ────────────────────────────────────────────────────────
+class _MarkSurahButton extends ConsumerWidget {
+  final String studentId;
+  final String studentName;
+  final String mohaffezId;
+
+  const _MarkSurahButton({
+    required this.studentId,
+    required this.studentName,
+    required this.mohaffezId,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final surahsAsync = ref.watch(memorizedSurahsProvider(studentId));
+    final memorized   = surahsAsync.valueOrNull?.toSet() ?? {};
+
+    return OutlinedButton.icon(
+      onPressed: () => _showSurahSheet(context, ref, memorized),
+      icon: const Icon(Icons.military_tech_rounded, size: 18),
+      label: Text('سور (${memorized.length})'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFFB7791F),
+        side: const BorderSide(color: Color(0xFFD4A44A)),
+        backgroundColor: const Color(0xFFFFFBEB),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  void _showSurahSheet(
+    BuildContext context,
+    WidgetRef ref,
+    Set<int> memorized,
+  ) {
+    final mohaffezAsync = ref.read(currentUserProvider);
+    final mohaffezName  = mohaffezAsync.valueOrNull?.name ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SurahMarkSheet(
+        studentId: studentId,
+        studentName: studentName,
+        mohaffezId: mohaffezId,
+        mohaffezName: mohaffezName,
+        memorized: memorized,
+      ),
+    );
+  }
+}
+
+// ─── Surah mark bottom sheet ──────────────────────────────────────────────────
+class _SurahMarkSheet extends ConsumerStatefulWidget {
+  final String studentId;
+  final String studentName;
+  final String mohaffezId;
+  final String mohaffezName;
+  final Set<int> memorized;
+
+  const _SurahMarkSheet({
+    required this.studentId,
+    required this.studentName,
+    required this.mohaffezId,
+    required this.mohaffezName,
+    required this.memorized,
+  });
+
+  @override
+  ConsumerState<_SurahMarkSheet> createState() => _SurahMarkSheetState();
+}
+
+class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
+  late Set<int> _memorized;
+  String _search = '';
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _memorized = Set.from(widget.memorized);
+  }
+
+  Future<void> _toggle(int surahNum) async {
+    final wasMemorized = _memorized.contains(surahNum);
+    setState(() {
+      if (wasMemorized) {
+        _memorized.remove(surahNum);
+      } else {
+        _memorized.add(surahNum);
+      }
+      _busy = true;
+    });
+    try {
+      await toggleMemorizedSurah(
+        studentId: widget.studentId,
+        surahNumber: surahNum,
+        isCurrentlyMemorized: wasMemorized,
+        mohaffezId: widget.mohaffezId,
+        mohaffezName: widget.mohaffezName,
+      );
+    } catch (e) {
+      // revert on error
+      setState(() {
+        if (wasMemorized) {
+          _memorized.add(surahNum);
+        } else {
+          _memorized.remove(surahNum);
+        }
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ: $e'),
+            backgroundColor: AppThemeConstants.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Filter surahs by search
+    final filtered = List.generate(114, (i) => i + 1).where((n) {
+      if (_search.isEmpty) return true;
+      return surahNames[n - 1].contains(_search) ||
+          '$n'.contains(_search);
+    }).toList();
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (_, controller) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              const SizedBox(height: 10),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.military_tech_rounded,
+                        color: Color(0xFFB7791F)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'السور المحفوظة',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          Text(
+                            widget.studentName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: const Color(0xFFD4A44A).withValues(alpha: 0.5)),
+                      ),
+                      child: Text(
+                        '${_memorized.length} / 114',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFB7791F),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Search
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v.trim()),
+                  decoration: InputDecoration(
+                    hintText: 'ابحث عن سورة...',
+                    prefixIcon:
+                        const Icon(Icons.search_rounded, size: 20),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFE5EDE9)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: Color(0xFFE5EDE9)),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF4F7F6),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+
+              // List
+              Expanded(
+                child: AbsorbPointer(
+                  absorbing: _busy,
+                  child: ListView.builder(
+                    controller: controller,
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final num  = filtered[i];
+                      final name = surahNames[num - 1];
+                      final done = _memorized.contains(num);
+                      return ListTile(
+                        onTap: () => _toggle(num),
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: done
+                              ? const Color(0xFFFFF8E1)
+                              : const Color(0xFFF4F7F6),
+                          child: Text(
+                            '$num',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: done
+                                  ? const Color(0xFFB7791F)
+                                  : const Color(0xFF9CA3AF),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: done
+                                ? FontWeight.w800
+                                : FontWeight.w500,
+                            color: done
+                                ? const Color(0xFF095752)
+                                : const Color(0xFF111827),
+                          ),
+                        ),
+                        trailing: done
+                            ? const Icon(Icons.check_circle_rounded,
+                                color: Color(0xFFD4A44A))
+                            : Icon(Icons.radio_button_unchecked_rounded,
+                                color: Colors.grey[300]),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

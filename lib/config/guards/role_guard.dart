@@ -31,6 +31,7 @@ class RoleGuard implements RouteGuard {
   static const List<String> sharedRoutePrefixes = <String>[
     '/notifications',
     '/profile',
+    '/student-rewards',
     '/session', // session details
     '/teacher-pending',
     '/teacher-rejected',

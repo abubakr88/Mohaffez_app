@@ -23,6 +23,7 @@ import '../screens/shared/setup_account_screen.dart';
 import '../screens/shared/exam_result_screen.dart';
 import '../screens/shared/notifications_screen.dart';
 import '../screens/shared/profile_screen.dart';
+import '../screens/student/student_rewards_screen.dart';
 import '../screens/shared/settings_screen.dart';
 import '../screens/shared/location_settings_screen.dart';
 import '../screens/shared/privacy_settings_screen.dart';
@@ -424,6 +425,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/profile',
             name: 'profile',
             builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/student-rewards',
+            name: 'student-rewards',
+            builder: (context, state) => const StudentRewardsScreen(),
           ),
           GoRoute(
             path: '/settings',

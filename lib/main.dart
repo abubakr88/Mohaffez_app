@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
-import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -9,8 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'firebase_options.dart';
 import 'config/app_router.dart';
@@ -23,8 +22,10 @@ import 'shared/widgets/dev_mode_overlay.dart';
 
 /// Firebase Cloud Messaging background handler
 /// Must be top-level function for isolate entry point
+/// Note: Web does not support background messages the same way
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (kIsWeb) return;
   await Firebase.initializeApp();
   debugPrint('📨 Background message received: ${message.messageId}');
   debugPrint('📨 Title: ${message.notification?.title}');
@@ -48,31 +49,36 @@ void main() async {
         // ============================================
     // 3. Initialize Firebase App Check
     // ============================================
-    if (kReleaseMode) {
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.playIntegrity,
-        appleProvider: AppleProvider.deviceCheck,
-      );
-      debugPrint('Firebase App Check activated (production mode)');
+    if (!kIsWeb) {
+      // Mobile platforms: Android/iOS
+      if (kReleaseMode) {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: AndroidProvider.playIntegrity,
+          appleProvider: AppleProvider.deviceCheck,
+        );
+        debugPrint('Firebase App Check activated (production mode)');
+      } else {
+        await FirebaseAppCheck.instance.activate(
+          androidProvider: AndroidProvider.debug,
+          appleProvider: AppleProvider.debug,
+        );
+        debugPrint('Firebase App Check activated (debug mode)');
+      }
+
+      // Auto-refresh only needed in production
+      if (kReleaseMode) {
+        await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+      }
+
+      if (kDebugMode) {
+        FirebaseAppCheck.instance.onTokenChange.listen((token) {
+          final hasToken = token != null && token.isNotEmpty;
+          debugPrint('App Check token state: ${hasToken ? 'valid' : 'null_or_empty'}');
+        });
+      }
     } else {
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.debug,
-        appleProvider: AppleProvider.debug,
-      );
-      debugPrint('Firebase App Check activated (debug mode)');
-    }
-
-    // Auto-refresh only needed in production — debug provider has a strict
-    // rate limit and the SDK handles tokens automatically on emulators.
-    if (kReleaseMode) {
-      await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
-    }
-
-    if (kDebugMode) {
-      FirebaseAppCheck.instance.onTokenChange.listen((token) {
-        final hasToken = token != null && token.isNotEmpty;
-        debugPrint('App Check token state: ${hasToken ? 'valid' : 'null_or_empty'}');
-      });
+      // Web platform
+      debugPrint('ℹ️ Firebase App Check skipped for web platform');
     }
 
     // ============================================
@@ -85,11 +91,15 @@ void main() async {
     debugPrint('✅ Firestore configured with offline persistence');
 
     // ============================================
-    // 5. Setup Firebase Cloud Messaging
+    // 5. Setup Firebase Cloud Messaging (Mobile only)
     // ============================================
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    await NotificationService.initialize();
-    debugPrint('✅ NotificationService initialized');
+    if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      await NotificationService.initialize();
+      debugPrint('✅ NotificationService initialized');
+    } else {
+      debugPrint('ℹ️ Firebase Messaging skipped for web platform');
+    }
 
     // ============================================
     // 6. Initialize Arabic Date Formatting
@@ -115,29 +125,22 @@ void main() async {
     }
 
     // ============================================
-    // 8. Configure System UI
+    // 8. Configure System UI (Mobile only)
     // ============================================
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: AppThemeConstants.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: AppThemeConstants.surface,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ));
+    if (!kIsWeb) {
+      SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+        statusBarColor: AppThemeConstants.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: AppThemeConstants.surface,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ));
 
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-    debugPrint('✅ System UI configured');
-
-    // ============================================
-    // 9. Google Maps — switch to AndroidViewSurface to prevent
-    //    SurfaceProducer NPE crash when a map view is disposed during resize.
-    // ============================================
-    final mapsImpl = GoogleMapsFlutterPlatform.instance;
-    if (mapsImpl is GoogleMapsFlutterAndroid) {
-      mapsImpl.useAndroidViewSurface = true;
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+      debugPrint('✅ System UI configured');
     }
 
     // ============================================

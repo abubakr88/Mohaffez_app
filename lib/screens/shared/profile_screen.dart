@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../providers/student_rewards_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../repositories/user_repository.dart';
 import '../../shared/theme/app_theme_constants.dart';
@@ -471,6 +472,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                           ),
                           const SizedBox(height: 12),
+
+                          // Rewards card — students only
+                          if (!isMohaffez) ...[
+                            _RewardsTeaserCard(userId: user.uid, dateOfBirth: user.dateOfBirth),
+                            const SizedBox(height: 12),
+                          ],
 
                           // Contact info
                           _SectionCard(
@@ -1186,6 +1193,121 @@ class ErrorDisplay extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Rewards teaser card (student profile) ────────────────────────────────────
+class _RewardsTeaserCard extends ConsumerWidget {
+  final String userId;
+  final DateTime? dateOfBirth;
+
+  const _RewardsTeaserCard({required this.userId, required this.dateOfBirth});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final surahsAsync   = ref.watch(memorizedSurahsProvider(userId));
+    final sessionsAsync = ref.watch(studentCompletedSessionsProvider(userId));
+
+    final age      = calculateAge(dateOfBirth);
+    final sessions = sessionsAsync.valueOrNull ?? 0;
+    final memorized = surahsAsync.valueOrNull?.length ?? 0;
+    final level    = resolveLevel(sessions, age);
+
+    return GestureDetector(
+      onTap: () => context.push('/student-rewards'),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF095752), Color(0xFF0C6F6A)],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF095752).withValues(alpha: 0.25),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4A44A).withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFD4A44A).withValues(alpha: 0.5),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(level.emoji, style: const TextStyle(fontSize: 26)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'لوحة المكافآت',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      level.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          '$sessions حلقة',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 3,
+                          height: 3,
+                          decoration: const BoxDecoration(
+                            color: Colors.white38,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$memorized سورة محفوظة',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white54,
+                size: 16,
+              ),
+            ],
+          ),
         ),
       ),
     );

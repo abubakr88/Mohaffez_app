@@ -160,6 +160,18 @@ service cloud.firestore {
         allow update: if isOwner(userId);
         allow delete: if isOwner(userId);
       }
+
+      // ── Memorized surahs (teacher-marked per student) ──
+      // Path: users/{studentId}/memorizedSurahs/{surahNumber}
+      // Any authenticated user can read (student sees own badges, teacher sees progress).
+      // Only a mohaffez (role == 'mohaffez') can write or delete.
+      match /memorizedSurahs/{surahNumber} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated() &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mohaffez';
+        allow delete: if isAuthenticated() &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mohaffez';
+      }
     }
 
     // ============================================
