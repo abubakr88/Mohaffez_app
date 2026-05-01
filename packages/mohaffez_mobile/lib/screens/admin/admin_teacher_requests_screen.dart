@@ -12,7 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../services/notification_service.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 
 // ─── Provider ────────────────────────────────────────────────────────────────

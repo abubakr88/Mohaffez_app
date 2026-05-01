@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:go_router/go_router.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';

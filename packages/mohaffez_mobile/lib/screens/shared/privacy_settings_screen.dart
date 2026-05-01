@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:mohaffez_core/src/utils/error_handler.dart';
 
 class PrivacySettingsScreen extends ConsumerStatefulWidget {

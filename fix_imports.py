@@ -40,6 +40,11 @@ REPLACEMENTS = [
     (r"import ['\"]\.\./shared/utils/", "import 'package:mohaffez_core/src/utils/"),
     (r"import ['\"]\.\./\.\./shared/utils/", "import 'package:mohaffez_core/src/utils/"),
     (r"import ['\"]\.\./\.\./\.\./shared/utils/", "import 'package:mohaffez_core/src/utils/"),
+
+    # Theme
+    (r"import ['\"]\.\./shared/theme/app_theme_constants\.dart['\"]", "import 'package:mohaffez_core/src/theme/app_theme_constants.dart'"),
+    (r"import ['\"]\.\./\.\./shared/theme/app_theme_constants\.dart['\"]", "import 'package:mohaffez_core/src/theme/app_theme_constants.dart'"),
+    (r"import ['\"]\.\./\.\./\.\./shared/theme/app_theme_constants\.dart['\"]", "import 'package:mohaffez_core/src/theme/app_theme_constants.dart'"),
 ]
 
 def fix_imports_in_file(filepath):

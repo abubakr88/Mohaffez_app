@@ -12,7 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mohaffez_core/src/providers/auth_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 class TeacherPendingScreen extends ConsumerWidget {
   const TeacherPendingScreen({super.key});

@@ -10,7 +10,7 @@ import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'package:mohaffez_core/src/repositories/pricing_repository.dart';
 import 'package:mohaffez_core/src/services/direct_payment_service.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 class DirectPaymentScreen extends ConsumerStatefulWidget {
   final String? requestId;

@@ -6,7 +6,7 @@ import 'package:mohaffez_core/src/models/subscription_model.dart';
 import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
 import 'package:mohaffez_core/src/providers/subscription_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 // Tab config

@@ -8,7 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:mohaffez_core/src/models/payment_model.dart';
 import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
 import 'package:mohaffez_core/src/providers/payment_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 class PaymentWebViewScreen extends ConsumerStatefulWidget {
   const PaymentWebViewScreen({

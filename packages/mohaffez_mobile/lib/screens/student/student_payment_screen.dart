@@ -15,7 +15,7 @@ import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'package:mohaffez_core/src/providers/booking_provider.dart';
 import 'package:mohaffez_core/src/providers/booking_flow_provider.dart' as bf;
 import 'package:mohaffez_core/src/services/pricing_service.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 import 'package:mohaffez_core/src/services/direct_payment_service.dart';

@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mohaffez_core/src/providers/booking_provider.dart';
 import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'direct_payment_screen.dart';

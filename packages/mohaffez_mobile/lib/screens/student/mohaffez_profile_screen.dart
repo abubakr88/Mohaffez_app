@@ -8,7 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../shared/widgets/skeleton_card.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../providers/mohaffez_profile_providers.dart';
 import 'package:mohaffez_core/src/providers/pricing_provider.dart';
 import '../../providers/student_count_provider.dart';

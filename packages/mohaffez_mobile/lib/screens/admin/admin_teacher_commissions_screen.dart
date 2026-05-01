@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:mohaffez_core/src/models/direct_payment_model.dart';
 import 'package:mohaffez_core/src/providers/admin_provider.dart';
 import 'package:mohaffez_core/src/services/direct_payment_service.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 import '../../shared/widgets/admin_empty_state.dart';
 

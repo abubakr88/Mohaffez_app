@@ -23,7 +23,7 @@ import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 import 'package:mohaffez_core/src/models/slot_context.dart';
 import 'package:mohaffez_core/src/models/session_request_model.dart';
 import 'package:mohaffez_core/src/models/subscription_model.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {

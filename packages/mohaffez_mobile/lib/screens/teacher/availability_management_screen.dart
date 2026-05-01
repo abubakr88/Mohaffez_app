@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mohaffez_core/src/services/prayer_time_service.dart';
 import 'package:mohaffez_core/src/constants/schedule_constants.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 // ─── Data classes ─────────────────────────────────────────────────────────────
 

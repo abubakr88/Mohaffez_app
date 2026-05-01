@@ -28,7 +28,7 @@ import 'package:intl/intl.dart';
 import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
 import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 
 // ── Plan badge colours ──────────────────────────────────────────────────────

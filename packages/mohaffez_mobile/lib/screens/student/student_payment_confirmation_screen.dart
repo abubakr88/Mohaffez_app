@@ -11,7 +11,7 @@ import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
 import 'package:mohaffez_core/src/providers/payment_provider.dart';
 import 'package:mohaffez_core/src/providers/pricing_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 

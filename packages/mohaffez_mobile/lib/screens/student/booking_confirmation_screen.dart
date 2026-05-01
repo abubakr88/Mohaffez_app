@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../providers/booking_provider.dart' show legacyBookingFlowProvider, BookingPaymentMethod;
-import '../../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 class BookingConfirmationDetails {
   final String mohaffezId;

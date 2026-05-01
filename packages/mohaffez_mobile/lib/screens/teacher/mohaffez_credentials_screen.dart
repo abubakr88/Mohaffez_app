@@ -7,7 +7,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../shared/widgets/empty_state.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../services/credential_service.dart';
 import 'dart:io';
 

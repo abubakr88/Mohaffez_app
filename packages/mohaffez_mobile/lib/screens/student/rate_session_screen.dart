@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 
 class RateSessionScreen extends ConsumerStatefulWidget {

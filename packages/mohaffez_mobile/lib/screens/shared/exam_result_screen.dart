@@ -8,7 +8,7 @@ import 'package:mohaffez_core/src/models/system_config_model.dart';
 import 'package:mohaffez_core/src/models/user_model.dart';
 import 'package:mohaffez_core/src/providers/system_config_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:mohaffez_core/src/services/cache_service.dart';
 
 class ExamResultScreen extends ConsumerWidget {

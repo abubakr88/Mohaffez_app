@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mohaffez_core/src/models/challenge_question.dart';
 import 'package:mohaffez_core/src/providers/challenge_questions_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _DS {

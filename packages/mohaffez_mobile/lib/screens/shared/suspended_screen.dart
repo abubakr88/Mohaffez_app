@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mohaffez_core/src/providers/auth_provider.dart';
 import 'package:mohaffez_core/src/providers/suspension_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class SuspendedScreen extends ConsumerStatefulWidget {

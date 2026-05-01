@@ -7,7 +7,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:mohaffez_core/src/models/session_model.dart';
 import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
 import 'package:mohaffez_core/src/utils/quran_mistake_utils.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 import '../../shared/widgets/interactive_quran_page.dart';

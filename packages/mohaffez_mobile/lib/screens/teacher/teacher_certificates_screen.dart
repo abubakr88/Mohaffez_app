@@ -15,7 +15,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../services/credential_service.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import 'package:mohaffez_core/src/utils/specialization_constants.dart';
 
 // ─── Design tokens (matching app teal theme) ─────────────────────────────────

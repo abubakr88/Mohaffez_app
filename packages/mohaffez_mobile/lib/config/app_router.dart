@@ -86,7 +86,7 @@ import '../screens/admin/admin_teacher_commissions_screen.dart';
 import '../screens/admin/admin_teacher_requests_screen.dart';
 import '../screens/admin/commission_dashboard_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
-import '../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
 

@@ -6,7 +6,7 @@ import 'package:flutter_google_maps_webservices/places.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../config/env_config.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 class PickLocationScreen extends StatefulWidget {
   final double? initialLat;

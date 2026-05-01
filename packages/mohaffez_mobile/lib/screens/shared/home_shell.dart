@@ -11,7 +11,7 @@ import 'package:mohaffez_core/src/providers/system_config_provider.dart';
 import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'package:mohaffez_core/src/providers/teacher_setup_provider.dart';
 import 'package:mohaffez_core/src/models/user_model.dart';
-import '../../shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/offline_banner.dart';
 import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
