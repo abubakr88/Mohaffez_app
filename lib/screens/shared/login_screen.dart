@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -109,76 +110,88 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final state = ref.watch(authNotifierProvider);
     final isLoading = state.isLoading;
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // ── Gradient Background ─────────────────────────────
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: _LoginTheme.tealGradient,
-                ),
-              ),
+    final loginBody = Stack(
+      children: [
+        // ── Gradient Background ─────────────────────────────
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _LoginTheme.tealGradient,
             ),
-            
-            // ── Islamic Geometric Pattern (Subtle) ──────────────
-            CustomPaint(
-              size: Size.infinite,
-              painter: _IslamicPatternPainter(),
-            ),
-            
-            const OfflineBanner(),
-            
-            SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: SlideTransition(
-                      position: _slideAnimation,
-                      child: Column(
-                        children: [
-                          // ── Logo with Soft Shadow ─────────────────
-                          _buildLogo(),
-                          const SizedBox(height: 32),
-                          
-                          // ── Title & Subtitle ─────────────────────
-                          const Text(
-                            'تسجيل الدخول',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: AppThemeConstants.onPrimary,
-                              fontFamily: 'Cairo',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'مرحباً بعودتك 👋',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-                          
-                          // ── Login Card ────────────────────────────
-                          _buildLoginCard(isLoading),
-                        ],
+          ),
+        ),
+
+        // ── Islamic Geometric Pattern (Subtle) ──────────────
+        CustomPaint(
+          size: Size.infinite,
+          painter: _IslamicPatternPainter(),
+        ),
+
+        const OfflineBanner(),
+
+        SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: Column(
+                    children: [
+                      // ── Logo with Soft Shadow ─────────────────
+                      _buildLogo(),
+                      const SizedBox(height: 32),
+
+                      // ── Title & Subtitle ─────────────────────
+                      const Text(
+                        'تسجيل الدخول',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: AppThemeConstants.onPrimary,
+                          fontFamily: 'Cairo',
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'مرحباً بعودتك 👋',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+
+                      // ── Login Card ────────────────────────────
+                      _buildLoginCard(isLoading),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
+      ],
+    );
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        body: kIsWeb
+            ? Container(
+                color: const Color(0xFF0B7A75), // AppThemeConstants.primary
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: ClipRect(child: loginBody),
+                  ),
+                ),
+              )
+            : loginBody,
       ),
     );
   }

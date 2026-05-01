@@ -28,7 +28,7 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.imam.mohaffez_app"
+    namespace = "app.mohafezy"
     compileSdk = 36
 
     signingConfigs {
@@ -41,7 +41,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.imam.mohaffez_app"
+        applicationId = "app.mohafezy"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode

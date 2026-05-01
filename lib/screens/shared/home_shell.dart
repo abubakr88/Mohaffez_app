@@ -1,4 +1,5 @@
 // lib/screens/home_shell.dart
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -115,47 +116,59 @@ class HomeShell extends ConsumerWidget {
         final wizardStepIdx =
             isInWizardFlow ? wizardStepRoutes.indexOf(currentPath) : -1;
 
+        final shellScaffold = Scaffold(
+          backgroundColor: const Color(0xFFF4F7F6),
+          appBar: isWizard ? null : _buildAppBar(
+            context, ref,
+            isMohaffez: isMohaffez,
+            isAdmin: isAdmin,
+            currentIndex: currentIndex,
+            userId: user.uid,
+            unreadCount: unreadCount,
+          ),
+          drawer: (isWizard || isInWizardFlow) ? null : _buildDrawer(
+            context, ref,
+            isMohaffez: isMohaffez,
+            isAdmin: isAdmin,
+            isDevModeActive: isDevModeActive,
+            user: user,
+          ),
+          body: Column(
+            children: [
+              const OfflineBanner(),
+              Expanded(child: child),
+            ],
+          ),
+          bottomNavigationBar: isWizard
+              ? null
+              : isInWizardFlow
+                  ? _buildWizardNavBar(
+                      context, ref,
+                      stepIdx: wizardStepIdx,
+                      stepRoutes: wizardStepRoutes,
+                    )
+                  : _buildBottomNavBar(
+                      context, ref,
+                      isMohaffez: isMohaffez,
+                      isAdmin: isAdmin,
+                      currentIndex: currentIndex,
+                      unreadCount: unreadCount,
+                    ),
+        );
+
         return Directionality(
           textDirection: TextDirection.rtl,
-          child: Scaffold(
-            backgroundColor: const Color(0xFFF4F7F6),
-            appBar: isWizard ? null : _buildAppBar(
-              context, ref,
-              isMohaffez: isMohaffez,
-              isAdmin: isAdmin,
-              currentIndex: currentIndex,
-              userId: user.uid,
-              unreadCount: unreadCount,
-            ),
-            drawer: (isWizard || isInWizardFlow) ? null : _buildDrawer(
-              context, ref,
-              isMohaffez: isMohaffez,
-              isAdmin: isAdmin,
-              isDevModeActive: isDevModeActive,
-              user: user,
-            ),
-            body: Column(
-              children: [
-                const OfflineBanner(),
-                Expanded(child: child),
-              ],
-            ),
-            bottomNavigationBar: isWizard
-                ? null
-                : isInWizardFlow
-                    ? _buildWizardNavBar(
-                        context, ref,
-                        stepIdx: wizardStepIdx,
-                        stepRoutes: wizardStepRoutes,
-                      )
-                    : _buildBottomNavBar(
-                        context, ref,
-                        isMohaffez: isMohaffez,
-                        isAdmin: isAdmin,
-                        currentIndex: currentIndex,
-                        unreadCount: unreadCount,
-                      ),
-          ),
+          child: kIsWeb
+              ? Container(
+                  color: const Color(0xFF0B7A75), // AppThemeConstants.primary
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: ClipRect(child: shellScaffold),
+                    ),
+                  ),
+                )
+              : shellScaffold,
         );
       },
     );

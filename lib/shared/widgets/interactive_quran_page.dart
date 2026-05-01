@@ -462,9 +462,12 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
           ),
 
           // ── Center: page info + jump button ──────────────────────────
-          GestureDetector(
-            onTap: _openJumpSheet,
-            child: Container(
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _openJumpSheet,
+              child: Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
@@ -536,6 +539,7 @@ class _InteractiveQuranPageState extends State<InteractiveQuranPage> {
               ),
             ),
           ),
+          ),
 
           // ── Next page (← RTL)
           IconButton(
@@ -601,29 +605,33 @@ class _ZoomButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: enabled
-              ? AppThemeConstants.primary.withValues(alpha: 0.82)
-              : AppThemeConstants.grey300,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: enabled
-              ? [
-                  BoxShadow(
-                    color: AppThemeConstants.black.withValues(alpha: 0.18),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [],
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.forbidden,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: enabled
+                ? AppThemeConstants.primary.withValues(alpha: 0.82)
+                : AppThemeConstants.grey300,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: AppThemeConstants.black.withValues(alpha: 0.18),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Icon(icon,
+              color: enabled ? AppThemeConstants.white : AppThemeConstants.grey500,
+              size: 18),
         ),
-        child: Icon(icon,
-            color: enabled ? AppThemeConstants.white : AppThemeConstants.grey500,
-            size: 18),
       ),
     );
   }

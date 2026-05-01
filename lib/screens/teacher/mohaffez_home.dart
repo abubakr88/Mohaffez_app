@@ -749,17 +749,26 @@ class _ActionsSection extends StatelessWidget {
           subtitle: 'اختصارات سريعة لإدارة يومك',
         ),
         const SizedBox(height: 14),
-        GridView.builder(
-          itemCount: actions.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.88,
-          ),
-          itemBuilder: (_, i) => _ActionCard(data: actions[i]),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cols = constraints.maxWidth > 600
+                ? 6
+                : constraints.maxWidth > 380
+                    ? 4
+                    : 3;
+            return GridView.builder(
+              itemCount: actions.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 0.88,
+              ),
+              itemBuilder: (_, i) => _ActionCard(data: actions[i]),
+            );
+          },
         ),
       ],
     );
