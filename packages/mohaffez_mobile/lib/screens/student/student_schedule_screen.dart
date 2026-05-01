@@ -7,8 +7,8 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
-import '../../providers/user_provider.dart';
-import '../../providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 
 /// Dedicated screen for calendar/timeline view of all sessions
 class StudentScheduleScreen extends ConsumerStatefulWidget {

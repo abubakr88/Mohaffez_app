@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../models/quran_mistake_model.dart';
+import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
 import '../../utils/quran_mistake_utils.dart';
 import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 

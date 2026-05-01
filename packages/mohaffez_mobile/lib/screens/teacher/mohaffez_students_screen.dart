@@ -5,13 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:go_router/go_router.dart';
 
-import '../../models/mohaffez_student_summary.dart';
-import '../../providers/session_provider_paginated.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/models/mohaffez_student_summary.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sort options

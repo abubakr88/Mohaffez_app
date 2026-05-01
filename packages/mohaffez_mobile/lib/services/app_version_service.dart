@@ -4,7 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/system_config_provider.dart';
+import 'package:mohaffez_core/src/providers/system_config_provider.dart';
 
 class AppVersionService {
   static Future<void> checkOnStartup(BuildContext context) async {

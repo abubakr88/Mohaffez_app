@@ -10,10 +10,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../route_guard.dart';
-import '../../models/user_model.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/system_config_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/models/user_model.dart';
+import 'package:mohaffez_core/src/providers/auth_provider.dart';
+import 'package:mohaffez_core/src/providers/system_config_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 /// Redirects authenticated users from splash/login and enforces role-based access.
 class RoleGuard implements RouteGuard {

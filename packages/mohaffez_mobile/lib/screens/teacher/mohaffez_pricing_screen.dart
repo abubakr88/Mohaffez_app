@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/pricing_plan_model.dart';
-import '../../providers/pricing_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
+import 'package:mohaffez_core/src/providers/pricing_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/add_pricing_plan_sheet.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class MohaffezPricingScreen extends ConsumerWidget {
   const MohaffezPricingScreen({super.key});

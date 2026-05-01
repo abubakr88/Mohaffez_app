@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/challenge_question.dart';
-import '../../providers/challenge_questions_provider.dart';
+import 'package:mohaffez_core/src/models/challenge_question.dart';
+import 'package:mohaffez_core/src/providers/challenge_questions_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────

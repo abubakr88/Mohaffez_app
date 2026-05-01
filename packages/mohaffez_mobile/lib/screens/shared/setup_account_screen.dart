@@ -6,12 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../models/exam_question_model.dart';
+import 'package:mohaffez_core/src/models/exam_question_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../providers/auth_provider.dart';
+import 'package:mohaffez_core/src/providers/auth_provider.dart';
 import '../../providers/setup_provider.dart';
-import '../../providers/system_config_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/system_config_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class SetupAccountScreen extends ConsumerStatefulWidget {

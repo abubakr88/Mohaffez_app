@@ -6,11 +6,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/theme/app_theme_constants.dart';
 import '../../providers/quiz_access_provider.dart';
-import '../../providers/session_provider_paginated.dart';
-import '../../shared/utils/error_handler.dart';
-import '../../models/quran_mistake_model.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/utils/error_handler.dart';
+import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
 import '../../shared/widgets/interactive_quran_page.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String sessionId;

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/theme/app_theme_constants.dart';
-import '../../providers/user_provider.dart';
-import '../../repositories/user_repository.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/repositories/user_repository.dart';
 
 class LocationSettingsScreen extends ConsumerStatefulWidget {
   const LocationSettingsScreen({super.key});

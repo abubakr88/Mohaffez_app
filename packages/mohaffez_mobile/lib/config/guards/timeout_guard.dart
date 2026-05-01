@@ -13,8 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../route_guard.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/auth_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 /// Prevents infinite loading by enforcing timeouts (splash only).
 class TimeoutGuard implements RouteGuard {

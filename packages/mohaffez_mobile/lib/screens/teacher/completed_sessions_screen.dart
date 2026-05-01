@@ -5,8 +5,8 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
-import '../../providers/session_provider_paginated.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class CompletedSessionsScreen extends ConsumerStatefulWidget {
   final String mohaffezId;

@@ -1,8 +1,8 @@
 // lib/shared/widgets/interactive_quran_page.dart
 
 import 'package:flutter/material.dart';
-import '../../models/quran_mistake_model.dart';
-import '../../services/quran_service.dart';
+import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
+import 'package:mohaffez_core/src/services/quran_service.dart';
 import 'quran/mistake_detail_dialog.dart';
 import 'quran/mistake_type_selector.dart';
 import 'quran/quran_page_image.dart';

@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/direct_payment_model.dart';
-import '../../models/pricing_plan_model.dart';
-import '../../providers/booking_flow_provider.dart';
-import '../../providers/user_provider.dart';
-import '../../repositories/pricing_repository.dart';
-import '../../services/direct_payment_service.dart';
+import 'package:mohaffez_core/src/models/direct_payment_model.dart';
+import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
+import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/repositories/pricing_repository.dart';
+import 'package:mohaffez_core/src/services/direct_payment_service.dart';
 import '../../shared/theme/app_theme_constants.dart';
 
 class DirectPaymentScreen extends ConsumerStatefulWidget {

@@ -8,10 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
-import '../../providers/payment_provider.dart';
+import 'package:mohaffez_core/src/providers/payment_provider.dart';
 import '../../providers/quiz_access_provider.dart';
-import '../../providers/session_provider_paginated.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../services/app_version_service.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/error_widgets.dart';

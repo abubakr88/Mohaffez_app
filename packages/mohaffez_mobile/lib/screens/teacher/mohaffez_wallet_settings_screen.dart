@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../shared/theme/app_theme_constants.dart';
-import '../../services/direct_payment_service.dart';
+import 'package:mohaffez_core/src/services/direct_payment_service.dart';
 
 class MohaffezWalletSettingsScreen extends StatefulWidget {
   const MohaffezWalletSettingsScreen({super.key});

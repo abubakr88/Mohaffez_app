@@ -2,9 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/dev_mode_model.dart';
-import '../../providers/system_config_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/models/dev_mode_model.dart';
+import 'package:mohaffez_core/src/providers/system_config_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../theme/app_theme_constants.dart';
 
 class DevModeOverlay extends ConsumerStatefulWidget {

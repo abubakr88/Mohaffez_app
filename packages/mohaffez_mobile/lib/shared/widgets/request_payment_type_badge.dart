@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../models/subscription_model.dart';
-import '../../providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/models/subscription_model.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 /// Shows a payment-type info card on the teacher's session request detail screen.

@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/auth_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/auth_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 // Reads rejection note directly from Firestore (not in UserModel)

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/challenge_questions_provider.dart';
+import 'package:mohaffez_core/src/providers/challenge_questions_provider.dart';
 import 'quiz/games/complete_ayah_game.dart';
 import 'quiz/games/custom_questions_game.dart';
 import 'quiz/games/name_surah_game.dart';

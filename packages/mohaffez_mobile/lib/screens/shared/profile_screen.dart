@@ -8,13 +8,13 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../providers/auth_provider.dart';
-import '../../providers/student_rewards_provider.dart';
-import '../../providers/user_provider.dart';
-import '../../repositories/user_repository.dart';
+import 'package:mohaffez_core/src/providers/auth_provider.dart';
+import 'package:mohaffez_core/src/providers/student_rewards_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/repositories/user_repository.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/cached_avatar.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (consistent with home screens)

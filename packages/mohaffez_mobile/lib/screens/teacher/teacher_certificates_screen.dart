@@ -13,10 +13,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../services/credential_service.dart';
 import '../../shared/theme/app_theme_constants.dart';
-import '../../shared/utils/specialization_constants.dart';
+import 'package:mohaffez_core/src/utils/specialization_constants.dart';
 
 // ─── Design tokens (matching app teal theme) ─────────────────────────────────
 class _DS {

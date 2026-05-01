@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../models/payment_model.dart';
-import '../../models/pricing_plan_model.dart';
-import '../../providers/payment_provider.dart';
+import 'package:mohaffez_core/src/models/payment_model.dart';
+import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
+import 'package:mohaffez_core/src/providers/payment_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 
 class PaymentWebViewScreen extends ConsumerStatefulWidget {

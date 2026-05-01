@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/dev_mode_model.dart';
-import '../../providers/system_config_provider.dart';
+import 'package:mohaffez_core/src/models/dev_mode_model.dart';
+import 'package:mohaffez_core/src/providers/system_config_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/admin_app_bar.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class AdminDevModeScreen extends ConsumerStatefulWidget {
   const AdminDevModeScreen({super.key});

@@ -3,10 +3,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/system_config_provider.dart';
+import 'package:mohaffez_core/src/providers/system_config_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/admin_app_bar.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class AdminBroadcastScreen extends ConsumerStatefulWidget {
   const AdminBroadcastScreen({super.key});

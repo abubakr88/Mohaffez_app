@@ -8,11 +8,11 @@ import 'package:go_router/go_router.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
-import '../../providers/session_provider_paginated.dart';
-import '../../providers/user_provider.dart';
-import '../../shared/utils/arabic_labels.dart';
-import '../../models/quran_mistake_model.dart';
-import '../../shared/utils/quran_mistake_utils.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
+import 'package:mohaffez_core/src/utils/quran_mistake_utils.dart';
 
 class StudentAssignmentsScreen extends ConsumerWidget {
   const StudentAssignmentsScreen({super.key});

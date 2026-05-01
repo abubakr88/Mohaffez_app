@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/connectivity_service.dart';
+import 'package:mohaffez_core/src/services/connectivity_service.dart';
 import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class OfflineBanner extends StatelessWidget {

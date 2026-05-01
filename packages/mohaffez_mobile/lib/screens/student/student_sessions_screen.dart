@@ -6,8 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:go_router/go_router.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
-import '../../providers/user_provider.dart';
-import '../../providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 
 DateTime? _toDateTime(dynamic value) {
   if (value == null) return null;

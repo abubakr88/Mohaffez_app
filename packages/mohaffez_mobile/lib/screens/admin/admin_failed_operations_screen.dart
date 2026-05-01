@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/admin_provider.dart';
+import 'package:mohaffez_core/src/providers/admin_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 import '../../shared/widgets/admin_empty_state.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class AdminFailedOperationsScreen extends ConsumerStatefulWidget {
   const AdminFailedOperationsScreen({super.key});

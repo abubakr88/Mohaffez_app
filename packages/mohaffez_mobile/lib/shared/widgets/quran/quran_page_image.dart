@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../../models/quran_mistake_model.dart';
+import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
 import '../../../services/quran_service.dart';
 import 'quran_mistake_painter.dart';
 import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';

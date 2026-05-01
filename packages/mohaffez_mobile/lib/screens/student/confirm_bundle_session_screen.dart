@@ -16,15 +16,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../providers/booking_flow_provider.dart';
-import '../../providers/user_provider.dart';
-import '../../providers/booking_provider.dart';
-import '../../providers/session_provider_paginated.dart';
-import '../../models/slot_context.dart';
-import '../../models/session_request_model.dart';
-import '../../models/subscription_model.dart';
+import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/booking_provider.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/models/slot_context.dart';
+import 'package:mohaffez_core/src/models/session_request_model.dart';
+import 'package:mohaffez_core/src/models/subscription_model.dart';
 import '../../shared/theme/app_theme_constants.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {
   final String? requestId;

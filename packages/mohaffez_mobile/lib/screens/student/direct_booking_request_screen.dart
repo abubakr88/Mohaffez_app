@@ -13,8 +13,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../shared/theme/app_theme_constants.dart';
-import '../../providers/booking_flow_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 class DirectBookingRequestScreen extends ConsumerStatefulWidget {
   const DirectBookingRequestScreen({super.key});

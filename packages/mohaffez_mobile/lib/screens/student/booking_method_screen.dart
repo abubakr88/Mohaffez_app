@@ -3,12 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../models/pricing_plan_model.dart';
-import '../../models/subscription_model.dart';
-import '../../providers/booking_flow_provider.dart';
-import '../../providers/user_provider.dart';
-import '../../providers/session_provider_paginated.dart';
-import '../../providers/pricing_provider.dart';
+import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
+import 'package:mohaffez_core/src/models/subscription_model.dart';
+import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
+import 'package:mohaffez_core/src/providers/pricing_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────

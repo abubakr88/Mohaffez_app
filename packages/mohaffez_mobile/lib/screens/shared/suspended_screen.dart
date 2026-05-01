@@ -4,11 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../providers/auth_provider.dart';
-import '../../providers/suspension_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/auth_provider.dart';
+import 'package:mohaffez_core/src/providers/suspension_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
-import '../../shared/utils/arabic_labels.dart';
+import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class SuspendedScreen extends ConsumerStatefulWidget {
   const SuspendedScreen({super.key});

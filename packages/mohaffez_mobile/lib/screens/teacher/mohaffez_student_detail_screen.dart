@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
-import '../../models/mohaffez_student_summary.dart';
-import '../../providers/student_rewards_provider.dart';
-import '../../providers/user_provider.dart';
+import 'package:mohaffez_core/src/models/mohaffez_student_summary.dart';
+import 'package:mohaffez_core/src/providers/student_rewards_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../shared/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';

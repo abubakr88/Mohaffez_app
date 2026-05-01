@@ -8,8 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../providers/suspension_provider.dart';
-import '../providers/user_provider.dart';
+import 'package:mohaffez_core/src/providers/suspension_provider.dart';
+import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'route_guard.dart';
 import 'guards/timeout_guard.dart';
 import 'guards/auth_guard.dart';
