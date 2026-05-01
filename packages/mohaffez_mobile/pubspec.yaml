@@ -11,6 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Core shared package
+  mohaffez_core:
+    path: ../mohaffez_core
+
   flutter_localizations:
     sdk: flutter
 

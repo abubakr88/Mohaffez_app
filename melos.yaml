@@ -1,0 +1,10 @@
+name: mohaffez_workspace
+packages:
+  - packages/**
+command:
+  bootstrap:
+    runPubGetInParallelPackageFilter: noPrivate
+scripts:
+  analyze: melos exec -- "flutter analyze"
+  test: melos exec -- "flutter test"
+  gen: melos exec --depends-on=build_runner -- "dart run build_runner build --delete-conflicting-outputs"
