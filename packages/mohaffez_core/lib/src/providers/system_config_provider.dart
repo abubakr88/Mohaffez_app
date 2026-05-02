@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/dev_mode_model.dart';
 import '../models/system_config_model.dart';
 import '../repositories/system_config_repository.dart';
-import '../shared/utils/arabic_labels.dart';
+import '../utils/arabic_labels.dart';
 import 'user_provider.dart';
 
 final systemConfigRepositoryProvider = Provider<SystemConfigRepository>((ref) {

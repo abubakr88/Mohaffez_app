@@ -1,7 +1,9 @@
 ﻿import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
+import '../../services/photo_upload_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -156,8 +158,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         },
       );
 
-      final repository = ref.read(userRepositoryProvider);
-      await repository.uploadProfilePhoto(userId, File(cropped.path));
+      await PhotoUploadService.uploadProfilePhoto(
+        userId,
+        File(cropped.path),
+        FirebaseFirestore.instance,
+      );
 
       if (!mounted) return;
       final ctx = loadingCtx;

@@ -15,9 +15,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/cache_service.dart';
-import '../services/notification_service.dart';
-import '../services/notification_service.dart';
-
 import 'booking_flow_provider.dart';
 
 final authStateProvider = StreamProvider<User?>((ref) {
@@ -221,15 +218,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> _saveFCMTokenWithRetry() async {
-    for (var attempt = 1; attempt <= 2; attempt++) {
-      try {
-        await NotificationService.saveFCMToken();
-        return;
-      } catch (e) {
-        if (attempt == 2) rethrow;
-        await Future.delayed(const Duration(seconds: 1));
-      }
-    }
+    // NOTE: FCM token saving moved to mobile package
+    // await NotificationService.saveFCMToken();
+    // This is intentionally left as a no-op in core; mobile handles this after sign-in
   }
 
   /// Ensures existing users have all UserModel fields initialized.

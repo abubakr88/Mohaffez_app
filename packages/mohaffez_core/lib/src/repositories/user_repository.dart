@@ -1,12 +1,9 @@
 // lib/repositories/user_repository.dart - OPTIMIZED
 import 'dart:async';
 import 'dart:math';
-import 'dart:io';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../models/user_model.dart';
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
@@ -385,40 +382,6 @@ class UserRepository {
     } catch (e) {
       debugPrint('[UserRepository] Error updating FCM token: $e');
       // Don't rethrow - FCM token update is not critical
-    }
-  }
-
-  /// Upload profile photo to Firebase Storage
-  Future<String> uploadProfilePhoto(String userId, File imageFile) async {
-    try {
-      debugPrint('[UserRepository] Uploading profile photo for $userId');
-
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_photos')
-          .child('$userId.jpg');
-
-      final compressed = await FlutterImageCompress.compressWithFile(
-        imageFile.absolute.path,
-        minWidth: 400,
-        minHeight: 400,
-        quality: 85,
-      );
-      if (compressed != null) {
-        await storageRef.putData(compressed);
-      } else {
-        await storageRef.putFile(imageFile);
-      }
-      final downloadUrl = await storageRef.getDownloadURL();
-
-      // Update user document
-      await updateUser(userId, {'photoUrl': downloadUrl});
-
-      debugPrint('[UserRepository] Photo uploaded: $downloadUrl');
-      return downloadUrl;
-    } catch (e) {
-      debugPrint('[UserRepository] Error uploading photo: $e');
-      rethrow;
     }
   }
 
