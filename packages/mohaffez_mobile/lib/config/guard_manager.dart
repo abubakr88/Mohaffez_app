@@ -1,15 +1,14 @@
-// FILE: lib/config/guard_manager.dart
+﻿// FILE: lib/config/guard_manager.dart
 // CHANGES:
 // - Added loop protection: if a guard returns a redirect identical to the current URI (path+query), ignore it.
 // - Added small helper to compare redirect target with current location safely.
 // - Reduced noisy logs (kept logs but made them conditional in debug mode).
 
 import 'package:flutter/foundation.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:mohaffez_core/src/providers/suspension_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 import 'route_guard.dart';
 import 'guards/timeout_guard.dart';
 import 'guards/auth_guard.dart';

@@ -11,13 +11,11 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'package:mohaffez_core/mohaffez_core.dart';
+
 import 'firebase_options.dart';
 import 'config/app_router.dart';
-import 'shared/theme/app_theme_constants.dart';
-import 'shared/theme/app_theme_data.dart';
-import 'services/cache_service.dart';
 import 'services/notification_service.dart';
-import 'providers/system_config_provider.dart';
 import 'shared/widgets/dev_mode_overlay.dart';
 
 /// Firebase Cloud Messaging background handler

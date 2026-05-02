@@ -1,4 +1,4 @@
-// lib/screens/direct_booking_request_screen.dart
+﻿// lib/screens/direct_booking_request_screen.dart
 // WHY THIS SCREEN EXISTS: Path C direct single-session booking previously jumped
 // straight to the payment screen, forcing the student to pay before the teacher
 // agreed to the slot. This screen inserts the missing "request first" step:
@@ -7,14 +7,12 @@
 //   Teacher confirms receipt (DirectPaymentConfirmationsScreen) → Session created
 
 import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
-import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 class DirectBookingRequestScreen extends ConsumerStatefulWidget {
   const DirectBookingRequestScreen({super.key});

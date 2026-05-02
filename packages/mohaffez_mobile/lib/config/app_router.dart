@@ -1,17 +1,10 @@
-// FILE: lib/config/app_router.dart
+﻿// FILE: lib/config/app_router.dart
 import 'package:flutter/foundation.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:mohaffez_core/src/models/session_model.dart';
-import 'package:mohaffez_core/src/models/user_model.dart';
-import 'package:mohaffez_core/src/models/mohaffez_student_summary.dart';
-import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
-import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/suspension_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 // Shared screens
 import '../screens/shared/home_shell.dart';
 import '../screens/shared/login_screen.dart';
@@ -62,7 +55,6 @@ import '../screens/teacher/completed_sessions_screen.dart';
 import '../screens/teacher/upcoming_sessions_screen.dart';
 import '../screens/teacher/session_quiz_screen.dart';
 import '../screens/teacher/student_challenges_screen.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart' show UpcomingFilter;
 import '../screens/teacher/session_completion_screen.dart';
 import '../screens/teacher/teacher_certificates_screen.dart';
 import '../screens/teacher/teacher_pending_screen.dart';
@@ -86,7 +78,6 @@ import '../screens/admin/admin_teacher_commissions_screen.dart';
 import '../screens/admin/admin_teacher_requests_screen.dart';
 import '../screens/admin/commission_dashboard_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
 

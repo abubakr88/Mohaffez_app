@@ -1,10 +1,8 @@
-// lib/screens/student/student_rewards_screen.dart
+﻿// lib/screens/student/student_rewards_screen.dart
 import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:mohaffez_core/src/models/user_model.dart';
-import 'package:mohaffez_core/src/providers/student_rewards_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _C {

@@ -1,5 +1,6 @@
-// lib/screens/mohaffez_credentials_screen.dart
+﻿// lib/screens/mohaffez_credentials_screen.dart
 import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +8,6 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../shared/widgets/empty_state.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../services/credential_service.dart';
 import 'dart:io';
 

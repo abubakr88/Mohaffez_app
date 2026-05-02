@@ -1,4 +1,4 @@
-// lib/screens/direct_payment_confirmations_screen.dart
+﻿// lib/screens/direct_payment_confirmations_screen.dart
 // CHANGES vs original:
 // • _confirm(): replaced `rethrow` in `on FirebaseFunctionsException` with
 //   inline error handling + snackbar. In Dart, rethrow inside a catch block
@@ -16,16 +16,13 @@
 // • All other logic, UI, reject flow, commission hint, bundle badge: UNCHANGED.
 
 import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
-import 'package:mohaffez_core/src/models/direct_payment_model.dart';
-import 'package:mohaffez_core/src/providers/system_config_provider.dart';
-import 'package:mohaffez_core/src/services/direct_payment_service.dart';
 
 class DirectPaymentConfirmationsScreen extends ConsumerWidget {
   final String? directPaymentRequestId;

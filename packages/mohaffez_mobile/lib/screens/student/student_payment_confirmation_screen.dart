@@ -1,4 +1,5 @@
-import 'dart:ui' as ui;
+﻿import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -6,14 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import 'package:mohaffez_core/src/models/payment_model.dart';
-import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
-import 'package:mohaffez_core/src/providers/payment_provider.dart';
-import 'package:mohaffez_core/src/providers/pricing_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class StudentPaymentConfirmationScreen extends ConsumerStatefulWidget {
   final String requestId;

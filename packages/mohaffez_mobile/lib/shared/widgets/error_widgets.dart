@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/accessibility_utils.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 /// Main error display widget with multiple factory constructors
 class ErrorDisplay extends StatelessWidget {

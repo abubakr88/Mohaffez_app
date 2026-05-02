@@ -1,17 +1,15 @@
-// lib/screens/teacher_rejected_screen.dart
+﻿// lib/screens/teacher_rejected_screen.dart
 //
 // Shown when admin rejects a teacher's registration request.
 // The user's status == 'rejected'.
 // Options: contact support or logout.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 // Reads rejection note directly from Firestore (not in UserModel)
 final _rejectionNoteProvider = StreamProvider.autoDispose<String?>((ref) {

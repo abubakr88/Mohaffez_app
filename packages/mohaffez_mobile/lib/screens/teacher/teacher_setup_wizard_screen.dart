@@ -1,10 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:mohaffez_core/src/providers/teacher_setup_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _DS {

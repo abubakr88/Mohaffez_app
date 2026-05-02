@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme_data.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
+import '../theme/app_theme_constants.dart';
 
 /// @deprecated Use AppThemeConstants and AppThemeData instead.
 /// Kept for backward compatibility during migration.

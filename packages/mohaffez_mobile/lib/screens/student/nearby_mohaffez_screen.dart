@@ -1,19 +1,15 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/widgets/cached_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
-import 'package:mohaffez_core/src/providers/mohaffez_provider.dart';
-import 'package:mohaffez_core/src/models/mohaffez_model.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
-import 'package:mohaffez_core/src/utils/specialization_constants.dart';
 
 class NearbyMohaffezScreen extends ConsumerStatefulWidget {
   const NearbyMohaffezScreen({super.key});

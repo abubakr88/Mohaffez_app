@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../repositories/session_repository.dart';
-import '../services/notification_service.dart';
 import '../models/request_status.dart';
 import '../models/quran_mistake_model.dart';
 import '../models/mohaffez_student_summary.dart';
@@ -1311,37 +1310,9 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
           .update(updates);
 
       // Send notification to student that session is completed and ready for rating
-      try {
-        final sessionDoc = await _firestore
-            .collection('hafizSessions')
-            .doc(sessionId)
-            .get();
-        if (sessionDoc.exists) {
-          final data = sessionDoc.data()!;
-          final studentId = data['studentId'] as String?;
-          final mohaffezId = data['mohaffezId'] as String?;
-
-          if (studentId != null && mohaffezId != null) {
-            // Get teacher name
-            final mohaffezDoc = await _firestore
-                .collection('users')
-                .doc(mohaffezId)
-                .get();
-            final mohaffezName = mohaffezDoc.exists
-                ? (mohaffezDoc.data()?['name'] as String? ?? 'المحفظ')
-                : 'المحفظ';
-
-            await NotificationService.sendSessionCompletedNotification(
-              studentId: studentId,
-              mohaffezName: mohaffezName,
-              sessionId: sessionId,
-            );
-          }
-        }
-      } catch (e) {
-        // Non-fatal: don't block session completion if notification fails
-        debugPrint('Failed to send session completion notification: $e');
-      }
+      // NOTE: Session completion notification moved to UI layer
+      // The mobile package calls NotificationService.sendSessionCompletedNotification
+      // after successful session completion. Keep this try-catch placeholder for future use.
 
       state = const AsyncValue.data(null);
     } catch (e, stack) {

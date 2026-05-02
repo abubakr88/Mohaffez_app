@@ -1,4 +1,4 @@
-// FILE: lib/config/guards/role_guard.dart
+﻿// FILE: lib/config/guards/role_guard.dart
 // CHANGES:
 // - Made types explicit (AsyncValue<UserModel?>) for better null-safety/readability.
 // - Improved route matching: checks by path prefix, plus explicit shared routes bypass.
@@ -6,14 +6,11 @@
 // - Avoided redirects while user doc is still loading (TimeoutGuard will handle hard timeouts).
 
 import 'package:flutter/foundation.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../route_guard.dart';
-import 'package:mohaffez_core/src/models/user_model.dart';
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/system_config_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 /// Redirects authenticated users from splash/login and enforces role-based access.
 class RoleGuard implements RouteGuard {

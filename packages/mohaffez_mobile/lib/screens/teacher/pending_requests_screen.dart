@@ -1,5 +1,6 @@
-// lib/screens/pending_requests_screen.dart
+﻿// lib/screens/pending_requests_screen.dart
 import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,19 +8,13 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 import '../../shared/widgets/request_payment_type_badge.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
-import 'package:mohaffez_core/src/models/request_status.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 // FIX Bug 1: import BookingPaymentMethod so we can reference
 // BookingPaymentMethod.subscriptionCredit.value ('subscription_credit')
 // instead of the hard-coded typo 'subscriptioncredit'.
-import 'package:mohaffez_core/src/providers/booking_provider.dart';
 
 class PendingRequestsScreen extends ConsumerStatefulWidget {
   const PendingRequestsScreen({super.key});

@@ -1,14 +1,11 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'package:mohaffez_core/src/models/payment_model.dart';
-import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
-import 'package:mohaffez_core/src/providers/payment_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 class PaymentWebViewScreen extends ConsumerStatefulWidget {
   const PaymentWebViewScreen({

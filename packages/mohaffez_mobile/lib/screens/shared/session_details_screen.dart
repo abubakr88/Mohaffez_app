@@ -1,15 +1,10 @@
-// lib/screens/session_details_screen.dart
+﻿// lib/screens/session_details_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import 'package:mohaffez_core/src/models/session_model.dart';
-import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
-import 'package:mohaffez_core/src/utils/quran_mistake_utils.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 import '../../shared/widgets/interactive_quran_page.dart';
 import '../student/rate_session_screen.dart';
 
@@ -768,12 +763,15 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
             ),
             title: Text('${pageMistakes.length} أخطاء'),
             children: pageMistakes
-                .map((m) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: m.buildSummaryTile(
-                        onTap: () => showMistakeDetailDialog(m),
-                      ),
-                    ))
+                .map((m) {
+                  final mistake = m as QuranMistake;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: mistake.buildSummaryTile(
+                      onTap: () => showMistakeDetailDialog(mistake),
+                    ),
+                  );
+                })
                 .toList(),
           ),
         );

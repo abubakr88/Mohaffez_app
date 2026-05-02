@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../utils/arabic_labels.dart';
-import '../theme/app_theme_constants.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 class PaymentDeadlineTimer extends StatefulWidget {
   const PaymentDeadlineTimer({

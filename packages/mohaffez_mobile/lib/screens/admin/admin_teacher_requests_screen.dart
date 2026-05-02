@@ -1,10 +1,11 @@
-// lib/screens/admin_teacher_requests_screen.dart
+﻿// lib/screens/admin_teacher_requests_screen.dart
 //
 // Admin screen: lists all teachers with status == 'pending_approval'.
 // Admin can expand each card to review profile data + certificates,
 // then approve (→ status: 'active') or reject (→ status: 'rejected' + note).
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +13,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../services/notification_service.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 
 // ─── Provider ────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// lib/screens/teacher_pending_screen.dart
+﻿// lib/screens/teacher_pending_screen.dart
 //
 // Shown after the teacher submits registration for approval.
 // Watches the user's status field in real-time:
@@ -7,12 +7,10 @@
 //   'rejected'         → admin rejected  → push to /teacher-rejected
 
 import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 class TeacherPendingScreen extends ConsumerWidget {
   const TeacherPendingScreen({super.key});

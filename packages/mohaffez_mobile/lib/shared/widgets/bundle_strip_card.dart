@@ -1,9 +1,7 @@
-// lib/widgets/bundle_strip_card.dart
+﻿// lib/widgets/bundle_strip_card.dart
 import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mohaffez_core/src/models/subscription_model.dart';
-import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
-import '../theme/app_theme_constants.dart';
 
 class BundleStripCard extends StatelessWidget {
   final SubscriptionModel sub;

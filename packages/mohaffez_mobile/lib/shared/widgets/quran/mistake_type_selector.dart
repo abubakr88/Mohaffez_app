@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
-import '../../utils/quran_mistake_utils.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 class MistakeTypeSelector extends StatelessWidget {
   final MistakeType selectedType;

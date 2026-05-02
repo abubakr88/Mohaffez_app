@@ -1,4 +1,4 @@
-// FILE: lib/config/guards/timeout_guard.dart
+﻿// FILE: lib/config/guards/timeout_guard.dart
 // CHANGES:
 // - Replaced fragile “single static start time” with a safer state machine:
 //   - Debounces repeated redirects while GoRouter is still resolving.
@@ -9,12 +9,11 @@
 // - Arabic user-facing messages are not shown here (guard layer remains UI-free).
 
 import 'package:flutter/foundation.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../route_guard.dart';
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 /// Prevents infinite loading by enforcing timeouts (splash only).
 class TimeoutGuard implements RouteGuard {

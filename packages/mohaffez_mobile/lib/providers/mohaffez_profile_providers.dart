@@ -1,7 +1,7 @@
 // lib/providers/mohaffez_profile_providers.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_provider.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 /// Provider for mohaffez profile data
 final mohaffezProfileProvider = FutureProvider.family<Map<String, dynamic>, String>(

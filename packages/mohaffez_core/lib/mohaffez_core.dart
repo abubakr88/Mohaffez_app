@@ -76,6 +76,7 @@ export 'src/services/quran_service.dart';
 // THEME
 // ═══════════════════════════════════════════════════════════════════════════════
 export 'src/theme/app_theme_constants.dart';
+export 'src/theme/app_theme_data.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS

@@ -1,10 +1,8 @@
-// lib/screens/profile_screen_widgets.dart
+﻿// lib/screens/profile_screen_widgets.dart
 import 'package:flutter/material.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import '../../shared/widgets/cached_avatar.dart';
-import 'package:mohaffez_core/src/models/user_model.dart';
 import '../../services/profile_completion_service.dart';
-import 'package:mohaffez_core/src/utils/specialization_constants.dart';
 
 /// App bar with profile photo and name
 class ProfileAppBar extends StatelessWidget {

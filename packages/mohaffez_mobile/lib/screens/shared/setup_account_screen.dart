@@ -1,18 +1,14 @@
-// lib/screens/setup_account_screen.dart
+﻿// lib/screens/setup_account_screen.dart
 
 import 'dart:async';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:mohaffez_core/src/models/exam_question_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
 import '../../providers/setup_provider.dart';
-import 'package:mohaffez_core/src/providers/system_config_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class SetupAccountScreen extends ConsumerStatefulWidget {
   const SetupAccountScreen({super.key});

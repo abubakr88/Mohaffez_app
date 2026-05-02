@@ -1,10 +1,9 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+﻿import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/offline_banner.dart';
 
 // ============================================================

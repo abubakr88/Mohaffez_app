@@ -1,15 +1,13 @@
-// lib/screens/mohaffez_schedule_screen.dart
+﻿// lib/screens/mohaffez_schedule_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
 
 class MohaffezScheduleScreen extends ConsumerStatefulWidget {
   const MohaffezScheduleScreen({super.key});

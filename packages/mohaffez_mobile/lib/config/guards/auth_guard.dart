@@ -1,4 +1,4 @@
-// FILE: lib/config/guards/auth_guard.dart
+﻿// FILE: lib/config/guards/auth_guard.dart
 // CHANGES:
 // - Fixed stuck on splash when auth is resolved but user is unauthenticated
 // - Added loop protection (never redirect if already at login)
@@ -6,12 +6,11 @@
 // - [FIX] Orphan account detection: authenticated + no Firestore doc → redirect to login
 
 import 'package:flutter/foundation.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../route_guard.dart';
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 class AuthGuard implements RouteGuard {
   @override

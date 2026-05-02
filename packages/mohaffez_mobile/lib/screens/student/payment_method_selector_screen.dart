@@ -1,10 +1,10 @@
-import 'dart:ui' as ui;
+﻿import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../providers/booking_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
+// booking_provider is exported from package:mohaffez_core/mohaffez_core.dart
 
 class PaymentMethodSelectorScreen extends StatefulWidget {
   const PaymentMethodSelectorScreen({

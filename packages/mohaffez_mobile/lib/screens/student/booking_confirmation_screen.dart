@@ -1,12 +1,12 @@
-import 'dart:ui' as ui;
+﻿import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../providers/booking_provider.dart' show legacyBookingFlowProvider, BookingPaymentMethod;
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
+// legacyBookingFlowProvider and BookingPaymentMethod are exported from package:mohaffez_core/mohaffez_core.dart
 
 class BookingConfirmationDetails {
   final String mohaffezId;

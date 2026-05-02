@@ -1,6 +1,6 @@
 // lib/providers/session_provider.dart
 
-import 'session_provider_paginated.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 // ============================================================================
 // RE-EXPORT PAGINATED PROVIDERS (for backward compatibility)

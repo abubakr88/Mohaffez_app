@@ -1,19 +1,13 @@
-// lib/screens/home_shell.dart
+﻿// lib/screens/home_shell.dart
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../providers/navigation_provider.dart';
-import 'package:mohaffez_core/src/providers/notification_provider_paginated.dart';
-import 'package:mohaffez_core/src/providers/system_config_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/providers/teacher_setup_provider.dart';
-import 'package:mohaffez_core/src/models/user_model.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/offline_banner.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHELL DESIGN TOKENS — keep in sync with mohaffez_home.dart _DS

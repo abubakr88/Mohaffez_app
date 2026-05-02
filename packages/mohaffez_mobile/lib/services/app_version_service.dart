@@ -1,10 +1,10 @@
-import 'package:cloud_functions/cloud_functions.dart';
+﻿import 'package:cloud_functions/cloud_functions.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:mohaffez_core/src/providers/system_config_provider.dart';
 
 class AppVersionService {
   static Future<void> checkOnStartup(BuildContext context) async {

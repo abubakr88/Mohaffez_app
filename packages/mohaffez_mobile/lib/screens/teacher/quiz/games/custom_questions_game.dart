@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../models/challenge_question.dart';
-import '../../../../providers/challenge_questions_provider.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import '../state/quiz_session_controller.dart';
 import '../widgets/confetti_overlay.dart';
 import '../widgets/quiz_buttons.dart';
 import '../widgets/quiz_design_tokens.dart';
 import '../widgets/result_banner.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class CustomQuestionsGame extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -288,7 +286,7 @@ class _CustomQuestionsGameState extends ConsumerState<CustomQuestionsGame> {
                     runSpacing: 6,
                     children: [
                       InfoBadge(
-                        label: q.type.label,
+                        label: ChallengeTypeX(q.type).label,
                         color: typeColor,
                         bg: typeBg,
                       ),

@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mohaffez_core/src/models/pagination_state.dart';
 import 'pagination_result.dart';
 
 /// Generic state notifier for paginated lists

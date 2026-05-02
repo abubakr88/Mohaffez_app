@@ -1,15 +1,12 @@
-// screens/upcoming_sessions_screen.dart
+﻿// screens/upcoming_sessions_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:go_router/go_router.dart';
-import 'package:mohaffez_core/src/providers/system_config_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 

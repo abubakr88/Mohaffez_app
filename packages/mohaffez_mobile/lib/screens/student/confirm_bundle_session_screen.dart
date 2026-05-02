@@ -1,4 +1,4 @@
-// lib/screens/confirm_bundle_session_screen.dart
+﻿// lib/screens/confirm_bundle_session_screen.dart
 //
 // PURPOSE: Used ONLY when the student already has an active bundle and wants
 // to consume one session from it (subscriptionCredit path).
@@ -10,21 +10,13 @@
 // see select_bundle_plan_screen.dart where requiresPaymentOnAcceptance = true.
 
 import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:mohaffez_core/src/providers/booking_flow_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/providers/booking_provider.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
-import 'package:mohaffez_core/src/models/slot_context.dart';
-import 'package:mohaffez_core/src/models/session_request_model.dart';
-import 'package:mohaffez_core/src/models/subscription_model.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {
   final String? requestId;

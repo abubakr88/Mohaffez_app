@@ -1,16 +1,12 @@
-// screens/session_completion_screen.dart
+﻿// screens/session_completion_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../providers/quiz_access_provider.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
-import 'package:mohaffez_core/src/utils/error_handler.dart';
-import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
 import '../../shared/widgets/interactive_quran_page.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String sessionId;

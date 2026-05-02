@@ -1,15 +1,12 @@
-// lib/screens/mohaffez_student_detail_screen.dart
+﻿// lib/screens/mohaffez_student_detail_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
-import 'package:mohaffez_core/src/models/mohaffez_student_summary.dart';
-import 'package:mohaffez_core/src/providers/student_rewards_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 

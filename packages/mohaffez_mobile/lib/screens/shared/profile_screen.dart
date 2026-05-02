@@ -1,4 +1,5 @@
-import 'dart:io';
+﻿import 'dart:io';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,13 +9,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/student_rewards_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/repositories/user_repository.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/cached_avatar.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (consistent with home screens)

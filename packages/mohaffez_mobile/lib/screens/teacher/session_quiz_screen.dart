@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:mohaffez_core/src/providers/challenge_questions_provider.dart';
 import 'quiz/games/complete_ayah_game.dart';
 import 'quiz/games/custom_questions_game.dart';
 import 'quiz/games/name_surah_game.dart';
@@ -15,7 +15,6 @@ import 'quiz/widgets/score_badge.dart';
 import 'quiz/state/quiz_session_controller.dart'
     show quizSessionControllerProvider;
 import 'package:mohaffez_finder_app/providers/quiz_access_provider.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 enum _GameMode {
   selector,

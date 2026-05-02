@@ -1,4 +1,5 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -7,14 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
-import 'package:mohaffez_core/src/models/request_status.dart';
-import 'package:mohaffez_core/src/providers/session_provider_paginated.dart';
-import 'package:mohaffez_core/src/providers/teacher_setup_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 import '../../services/app_version_service.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/error_widgets.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS

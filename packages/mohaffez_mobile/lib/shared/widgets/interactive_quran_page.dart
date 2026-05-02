@@ -1,12 +1,10 @@
-// lib/shared/widgets/interactive_quran_page.dart
+﻿// lib/shared/widgets/interactive_quran_page.dart
 
 import 'package:flutter/material.dart';
-import 'package:mohaffez_core/src/models/quran_mistake_model.dart';
-import 'package:mohaffez_core/src/services/quran_service.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'quran/mistake_detail_dialog.dart';
 import 'quran/mistake_type_selector.dart';
 import 'quran/quran_page_image.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
 
 class InteractiveQuranPage extends StatefulWidget {
   final int pageNumber;

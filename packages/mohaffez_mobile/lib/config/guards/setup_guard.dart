@@ -1,12 +1,10 @@
-// lib/config/guards/setup_guard.dart
+﻿// lib/config/guards/setup_guard.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:go_router/go_router.dart';
 
 import '../route_guard.dart';
-import 'package:mohaffez_core/src/models/user_model.dart';
-import 'package:mohaffez_core/src/providers/auth_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
 
 /// Redirects users who haven't completed account setup to /setup.
 /// Priority 15 — runs AFTER AuthGuard (10), BEFORE RoleGuard (20).

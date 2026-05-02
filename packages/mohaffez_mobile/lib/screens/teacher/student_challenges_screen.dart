@@ -1,10 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:mohaffez_core/src/models/challenge_question.dart';
-import 'package:mohaffez_core/src/providers/challenge_questions_provider.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _DS {
@@ -316,7 +314,7 @@ class _TypeSection extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    type.label,
+                    ChallengeTypeX(type).label,
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -652,7 +650,7 @@ class _QuestionSheetState extends State<_QuestionSheet> {
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w800),
                         ),
-                        Text(widget.type.label,
+                        Text(ChallengeTypeX(widget.type).label,
                             style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
                       ],
                     ),

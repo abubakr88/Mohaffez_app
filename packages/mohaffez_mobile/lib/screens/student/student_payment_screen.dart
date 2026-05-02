@@ -1,24 +1,12 @@
-// lib/screens/student_payment_screen.dart
+﻿// lib/screens/student_payment_screen.dart
 import 'dart:ui' as ui;
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:mohaffez_core/src/models/payment_model.dart';
-import 'package:mohaffez_core/src/models/pricing_plan_model.dart';
-import 'package:mohaffez_core/src/models/promo_code_model.dart';
-import 'package:mohaffez_core/src/providers/payment_provider.dart';
-import 'package:mohaffez_core/src/providers/pricing_provider.dart';
-import 'package:mohaffez_core/src/providers/promo_code_provider.dart';
-import 'package:mohaffez_core/src/providers/user_provider.dart';
-import 'package:mohaffez_core/src/providers/booking_provider.dart';
-import 'package:mohaffez_core/src/providers/booking_flow_provider.dart' as bf;
-import 'package:mohaffez_core/src/services/pricing_service.dart';
-import 'package:mohaffez_core/src/theme/app_theme_constants.dart';
 import '../../shared/widgets/empty_state.dart';
-import 'package:mohaffez_core/src/utils/arabic_labels.dart';
-import 'package:mohaffez_core/src/services/direct_payment_service.dart';
 
 enum _DpMethod { online, direct }
 
@@ -637,7 +625,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       // Read slot context from booking flow provider when autoBookFirstSession is true
       Map<String, String>? slotData;
       if (widget.autoBookFirstSession) {
-        final flow = ref.read(bf.bookingFlowProvider);
+        final flow = ref.read(bookingFlowProvider);
         final slotCtx = flow.slotContext;
         if (slotCtx != null) {
           slotData = {
