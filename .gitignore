@@ -70,3 +70,15 @@ functions/serviceAccountKey.json
 **/windows/flutter/generated_plugin_registrant.h
 **/windows/flutter/generated_plugins.cmake
 **/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Flutter generated Android plugin registrant
+**/android/app/src/main/java/
+
+# Melos workspace symlinks (created by melos bootstrap)
+packages/*/packages/
+
+# Kotlin build logs
+**/android/.kotlin/
+
+# Claude Code local app data
+.claude/
