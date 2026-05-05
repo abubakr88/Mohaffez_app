@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Al-Mohaffez — منصة تحفيظ القرآن الكريم</title>
+  
+  <!-- Critical CSS Inline -->
+  <style>
+    :root {
+      --primary: #0B7A75;
+      --primary-deep: #075550;
+      --primary-light: #1A9B95;
+      --secondary: #D4A44A;
+      --bg: #FAFAF8;
+      --surface: #FFFFFF;
+      --text-1: #1A1A1A;
+      --text-2: #4A5568;
+      --text-3: #94A3B8;
+      --border: #E2E8F0;
+      --success: #10B981;
+      --error: #EF4444;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    @font-face {
+      font-family: 'Tajawal';
+      src: url('https://fonts.gstatic.com/s/tajawal/v9/Iura6YBj_oCad4k1rUqtLpGp8DU.woff2') format('woff2');
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Tajawal';
+      src: url('https://fonts.gstatic.com/s/tajawal/v9/Iurf6YBj_oCad4k1r5PSjLqO8bT.woff2') format('woff2');
+      font-weight: 500;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Tajawal';
+      src: url('https://fonts.gstatic.com/s/tajawal/v9/Iurd6YBj_oCad4k1r8PiSHqO9bT.woff2') format('woff2');
+      font-weight: 700;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Tajawal';
+      src: url('https://fonts.gstatic.com/s/tajawal/v9/Iurf6YBj_oCad4k1r4TfjLqO8bT.woff2') format('woff2');
+      font-weight: 800;
+      font-display: swap;
+    }
+    
+    body {
+      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    
+    /* Splash screen */
+    #splash {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #075550 0%, #0B7A75 50%, #1A9B95 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    #splash.hidden { opacity: 0; visibility: hidden; }
+    #splash .logo-text {
+      color: white;
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+    }
+    #splash .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Header */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      z-index: 1000;
+      transition: all 0.3s ease;
+    }
+    .header.scrolled { box-shadow: var(--shadow-sm); }
+    .header-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-icon svg { width: 24px; height: 24px; }
+    .logo-text { font-size: 1.5rem; font-weight: 800; color: var(--text-1); }
+    .nav { display: none; }
+    .nav a {
+      color: var(--text-2);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s ease;
+    }
+    .nav a:hover { color: var(--primary); background: rgba(11,122,117,0.05); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(11,122,117,0.3);
+    }
+    .btn-primary:hover {
+      background: var(--primary-deep);
+      box-shadow: 0 6px 16px rgba(11,122,117,0.4);
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: transparent;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+    .btn-secondary:hover { background: rgba(11,122,117,0.05); }
+    .btn-ghost { background: transparent; color: var(--text-2); }
+    .btn-ghost:hover { color: var(--primary); }
+    .mobile-menu-btn {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+    .mobile-menu-btn span {
+      width: 24px;
+      height: 2px;
+      background: var(--text-1);
+      transition: all 0.3s ease;
+    }
+    
+    /* Mobile Menu Overlay */
+    .mobile-menu {
+      position: fixed;
+      inset: 0;
+      background: var(--surface);
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      padding: 2rem;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+    .mobile-menu.open { transform: translateX(0); }
+    .mobile-menu-close {
+      align-self: flex-end;
+      background: none;
+      border: none;
+      font-size: 2rem;
+      color: var(--text-1);
+      cursor: pointer;
+    }
+    .mobile-menu-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-top: 3rem;
+    }
+    .mobile-menu-nav a {
+      color: var(--text-1);
+      text-decoration: none;
+      font-size: 1.25rem;
+      font-weight: 600;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    /* Main content */
+    main { opacity: 1; }
+    
+    /* Hero */
+    .hero {
+      padding: 8rem 1.5rem 4rem;
+      background: linear-gradient(135deg, #075550 0%, #0B7A75 50%, #1A9B95 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30z' fill='none' stroke='white' stroke-opacity='0.03'/%3E%3C/svg%3E") repeat;
+      opacity: 0.5;
+    }
+    .hero-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      gap: 3rem;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-content { text-align: center; }
+    .hero h1 {
+      color: white;
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.3;
+      margin-bottom: 1.5rem;
+    }
+    .hero p {
+      color: rgba(255,255,255,0.9);
+      font-size: 1.125rem;
+      margin-bottom: 2rem;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .hero-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .hero-buttons .btn-secondary {
+      border-color: white;
+      color: white;
+    }
+    .hero-buttons .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .hero-mockup {
+      background: rgba(255,255,255,0.1);
+      border-radius: var(--radius-lg);
+      aspect-ratio: 4/3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .hero-mockup-text {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.9rem;
+    }
+    
+    /* Trust Strip */
+    .trust-strip {
+      background: var(--surface);
+      padding: 2rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .trust-strip-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      text-align: center;
+    }
+    .trust-item h3 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+    .trust-item p {
+      color: var(--text-2);
+      font-size: 0.875rem;
+    }
+    
+    /* Features */
+    .features {
+      padding: 4rem 1.5rem;
+    }
+    .section-header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .section-header h2 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+    }
+    .section-header p {
+      color: var(--text-2);
+    }
+    .features-grid {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+    .feature-card {
+      background: var(--surface);
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      transition: all 0.3s ease;
+    }
+    .feature-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-4px);
+    }
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(11,122,117,0.1);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .feature-icon svg {
+      width: 24px;
+      height: 24px;
+      color: var(--primary);
+    }
+    .feature-card h3 {
+      font-size: 1.125rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .feature-card p {
+      color: var(--text-2);
+      font-size: 0.95rem;
+    }
+    
+    /* How it works */
+    .how-it-works {
+      padding: 4rem 1.5rem;
+      background: var(--surface);
+    }
+    .steps {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1.5rem;
+    }
+    .step-number {
+      width: 56px;
+      height: 56px;
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .step-content h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .step-content p {
+      color: var(--text-2);
+    }
+    
+    /* Pricing */
+    .pricing {
+      padding: 4rem 1.5rem;
+    }
+    .pricing-grid {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+    .pricing-card {
+      background: var(--surface);
+      padding: 2rem;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      border: 2px solid transparent;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    .pricing-card:hover { box-shadow: var(--shadow-md); }
+    .pricing-card.featured {
+      border-color: var(--secondary);
+      transform: scale(1.02);
+    }
+    .featured-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--secondary);
+      color: white;
+      padding: 0.25rem 1rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+    .pricing-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .pricing-price {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin: 1rem 0;
+    }
+    .pricing-price span {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--text-3);
+    }
+    .pricing-features {
+      list-style: none;
+      margin: 1.5rem 0;
+    }
+    .pricing-features li {
+      padding: 0.5rem 0;
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--success);
+      font-weight: 700;
+    }
+    .pricing-card .btn { width: 100%; }
+    
+    /* For Teachers */
+    .for-teachers {
+      padding: 4rem 1.5rem;
+      background: linear-gradient(135deg, rgba(11,122,117,0.05) 0%, rgba(212,164,74,0.05) 100%);
+    }
+    .for-teachers-inner {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      gap: 2rem;
+    }
+    .for-teachers-content h2 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+    }
+    .for-teachers-content p {
+      color: var(--text-2);
+      margin-bottom: 1.5rem;
+    }
+    .for-teachers-list {
+      list-style: none;
+      margin-bottom: 2rem;
+    }
+    .for-teachers-list li {
+      padding: 0.75rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--text-2);
+    }
+    .for-teachers-list li::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--secondary);
+      border-radius: 50%;
+    }
+    .for-teachers-image {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      aspect-ratio: 4/3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-md);
+    }
+    
+    /* Testimonials */
+    .testimonials {
+      padding: 4rem 1.5rem;
+    }
+    .testimonials-grid {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+    .testimonial-card {
+      background: var(--surface);
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+    .testimonial-quote {
+      color: var(--text-2);
+      font-style: italic;
+      margin-bottom: 1.5rem;
+      line-height: 1.8;
+    }
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .testimonial-avatar {
+      width: 48px;
+      height: 48px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+    }
+    .testimonial-info h4 {
+      font-weight: 700;
+    }
+    .testimonial-info p {
+      color: var(--text-3);
+      font-size: 0.875rem;
+    }
+    
+    /* FAQ */
+    .faq {
+      padding: 4rem 1.5rem;
+      background: var(--surface);
+    }
+    .faq-list {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    details {
+      background: var(--bg);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    summary {
+      padding: 1.25rem;
+      cursor: pointer;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      list-style: none;
+      transition: background 0.2s ease;
+    }
+    summary:hover { background: rgba(11,122,117,0.03); }
+    summary::-webkit-details-marker { display: none; }
+    summary::after {
+      content: '+';
+      font-size: 1.5rem;
+      color: var(--primary);
+      transition: transform 0.3s ease;
+    }
+    details[open] summary::after { transform: rotate(45deg); }
+    details p {
+      padding: 0 1.25rem 1.25rem;
+      color: var(--text-2);
+    }
+    
+    /* Final CTA */
+    .final-cta {
+      padding: 4rem 1.5rem;
+      background: linear-gradient(135deg, #075550 0%, #0B7A75 50%, #1A9B95 100%);
+      text-align: center;
+      position: relative;
+    }
+    .final-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30z' fill='none' stroke='white' stroke-opacity='0.03'/%3E%3C/svg%3E") repeat;
+    }
+    .final-cta-content {
+      position: relative;
+      z-index: 1;
+    }
+    .final-cta h2 {
+      color: white;
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+    }
+    .final-cta p {
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 2rem;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .final-cta .btn-primary {
+      background: white;
+      color: var(--primary);
+      font-size: 1.1rem;
+      padding: 1rem 2.5rem;
+    }
+    .final-cta .btn-primary:hover {
+      background: var(--secondary);
+      color: white;
+    }
+    
+    /* Footer */
+    .footer {
+      background: var(--text-1);
+      color: white;
+      padding: 3rem 1.5rem 1.5rem;
+    }
+    .footer-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    .footer-col h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--secondary);
+    }
+    .footer-col ul {
+      list-style: none;
+    }
+    .footer-col li {
+      margin-bottom: 0.5rem;
+    }
+    .footer-col a {
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .footer-col a:hover { color: white; }
+    .footer-bottom {
+      max-width: 1280px;
+      margin: 2rem auto 0;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+    .footer-social {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
+    .footer-social a {
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .footer-social a:hover { background: var(--primary); }
+    .footer-social svg {
+      width: 20px;
+      height: 20px;
+      color: white;
+    }
+    
+    /* Animations */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .fade-up.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    /* Responsive */
+    @media (min-width: 640px) {
+      .hero h1 { font-size: 2.5rem; }
+      .hero-buttons {
+        flex-direction: row;
+        justify-content: center;
+      }
+      .trust-strip-inner { grid-template-columns: repeat(4, 1fr); }
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    
+    @media (min-width: 1024px) {
+      .mobile-menu-btn { display: none; }
+      .nav { display: flex; gap: 0.5rem; }
+      .hero { padding-top: 10rem; }
+      .hero-inner { grid-template-columns: 1fr 1fr; align-items: center; }
+      .hero-content { text-align: right; }
+      .hero h1 { font-size: 3rem; }
+      .hero p { margin-right: 0; margin-left: 0; }
+      .hero-buttons { margin: 0; }
+      .steps { flex-direction: row; justify-content: space-between; }
+      .step { flex-direction: column; text-align: center; flex: 1; }
+      .pricing-grid { grid-template-columns: repeat(3, 1fr); }
+      .for-teachers-inner { grid-template-columns: 1fr 1fr; align-items: center; }
+      .testimonials-grid { grid-template-columns: repeat(3, 1fr); }
+      .footer-inner { grid-template-columns: repeat(4, 1fr); }
+      .footer-bottom { flex-direction: row; justify-content: space-between; }
+    }
+    
+    @media (min-width: 1280px) {
+      .hero h1 { font-size: 3.5rem; }
+    }
+    
+    /* Focus rings for accessibility */
+    a:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="منصة المحفظ — احفظ القرآن الكريم مع محفظ مؤهل وأكفأ. جلسات أونلاين وفي المنزل والمسجد. ابدأ رحلة الحفظ اليوم بإذن الله.">
+  <meta name="keywords" content="تحفيظ القرآن, محفظ, تعليم القرآن, حفظ القرآن, قرآن أونلاين, معلم قرآن">
+  <meta name="author" content="Al-Mohaffez">
+  <meta name="robots" content="index, follow">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Al-Mohaffez — منصة تحفيظ القرآن الكريم">
+  <meta property="og:description" content="احفظ القرآن مع محفظ مؤهل، أينما كنت. جلسات أونلاين وفي المنزل والمسجد.">
+  <meta property="og:image" content="https://mohafezy.com/og-image.png">
+  <meta property="og:url" content="https://mohafezy.com">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ar_AR">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Al-Mohaffez — منصة تحفيظ القرآن الكريم">
+  <meta name="twitter:description" content="احفظ القرآن مع محفظ مؤهل، أينما كنت.">
+  <meta name="twitter:image" content="https://mohafezy.com/og-image.png">
+  
+  <!-- Theme -->
+  <meta name="theme-color" content="#0B7A75">
+  <meta name="msapplication-TileColor" content="#0B7A75">
+  
+  <!-- Canonical -->
+  <link rel="canonical" href="https://mohafezy.com">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/icons/icon-512.png">
+  
+  <!-- Preload Font -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "name": "Al-Mohaffez",
+        "alternateName": "المحفظ",
+        "url": "https://mohafezy.com",
+        "logo": "https://mohafezy.com/assets/logo.svg",
+        "description": "منصة تحفيظ القرآن الكريم مع محفظين مؤهلين",
+        "sameAs": [
+          "https://facebook.com/mohafezy",
+          "https://twitter.com/mohafezy",
+          "https://instagram.com/mohafezy"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "url": "https://mohafezy.com",
+        "name": "Al-Mohaffez",
+        "inLanguage": "ar",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://app.mohafezy.com/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <!-- Splash Screen -->
+  <div id="splash">
+    <div class="logo-text">المحفظ</div>
+    <div class="spinner"></div>
+  </div>
+  
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <button class="mobile-menu-close" aria-label="إغلاق القائمة">×</button>
+    <nav class="mobile-menu-nav">
+      <a href="#features">الميزات</a>
+      <a href="#how-it-works">كيف يعمل</a>
+      <a href="#pricing">الأسعار</a>
+      <a href="#contact">تواصل</a>
+      <a href="https://app.mohafezy.com/login" class="btn btn-primary">ابدأ الآن</a>
+    </nav>
+  </div>
+  
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="header-inner">
+      <a href="#" class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/>
+          </svg>
+        </div>
+        <span class="logo-text">المحفظ</span>
+      </a>
+      
+      <nav class="nav">
+        <a href="#features">الميزات</a>
+        <a href="#how-it-works">كيف يعمل</a>
+        <a href="#pricing">الأسعار</a>
+        <a href="#contact">تواصل</a>
+      </nav>
+      
+      <div style="display: flex; gap: 1rem; align-items: center;">
+        <a href="https://app.mohafezy.com/login" class="btn btn-primary hidden-sm">ابدأ الآن</a>
+        <button class="mobile-menu-btn" id="menuBtn" aria-label="القائمة">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+  
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="hero-content fade-up">
+          <h1>احفظ القرآن مع محفظ مؤهل، أينما كنت</h1>
+          <p>منصة المحفظ تجمع بين الطلاب والمحفظين المؤهلين لتعليم القرآن الكريم. جلسات مرنة أونلاين أو في المنزل أو المسجد.</p>
+          <div class="hero-buttons">
+            <a href="https://app.mohafezy.com/login" class="btn btn-secondary">سجّل كطالب</a>
+            <a href="#for-teachers" class="btn btn-primary">انضم كمحفظ</a>
+          </div>
+        </div>
+        <div class="hero-mockup fade-up">
+          <span class="hero-mockup-text">تطبيق المحفظ</span>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Trust Strip -->
+    <section class="trust-strip">
+      <div class="trust-strip-inner">
+        <div class="trust-item fade-up">
+          <h3>+500</h3>
+          <p>محفظ معتمد</p>
+        </div>
+        <div class="trust-item fade-up">
+          <h3>+10,000</h3>
+          <p>طالب</p>
+        </div>
+        <div class="trust-item fade-up">
+          <h3>4.9/5</h3>
+          <p>تقييم التطبيق</p>
+        </div>
+        <div class="trust-item fade-up">
+          <h3>24/7</h3>
+          <p>متاح طوال الأسبوع</p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Features -->
+    <section class="features" id="features">
+      <div class="section-header fade-up">
+        <h2>ميزات تجعل التحفيظ أسهل</h2>
+        <p>كل ما تحتاجه لتعلم وحفظ القرآن الكريم في مكان واحد</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card fade-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="12" rx="2"/>
+              <path d="M7 20h10M9 16v4M15 16v4"/>
+            </svg>
+          </div>
+          <h3>جلسات أونلاين وفي المسجد والمنزل</h3>
+          <p>اختر مكان الجلسة الذي يناسبك — أونلاين عبر الفيديو، أو في منزلك، أو في مسجد قريب</p>
+        </div>
+        <div class="feature-card fade-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <h3>اختيار المحفظ</h3>
+          <p>تصفح ملفات المحفظين، اقرأ التقييمات، واختر المحفظ المناسب لأولوياتك</p>
+        </div>
+        <div class="feature-card fade-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <path d="M16 2v4M8 2v4M3 10h18"/>
+            </svg>
+          </div>
+          <h3>اشتراكات مرنة</h3>
+          <p>اشتراكات يومية أو أسبوعية أو شهرية تناسب جدولك ووتيرتك في الحفظ</p>
+        </div>
+        <div class="feature-card fade-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9M12 20V10M12 20l-4-4M8 16V6"/>
+              <circle cx="12" cy="12" r="10"/>
+            </svg>
+          </div>
+          <h3>تتبع التقدم</h3>
+          <p>سجل تقدمك في الحفظ والمراجعة مع تقارير دورية وإحصائيات مفصلة</p>
+        </div>
+        <div class="feature-card fade-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
+          <h3>شهادات حفظ</h3>
+          <p>احصل على شهادات إلكترونية معتمدة عند إتمام الأجزاء والسور</p>
+        </div>
+        <div class="feature-card fade-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="5" width="20" height="14" rx="2"/>
+              <line x1="2" y1="10" x2="22" y2="10"/>
+            </svg>
+          </div>
+          <h3>مدفوعات آمنة</h3>
+          <p>دفع إلكتروني آمن مع فواتير رقمية وخيارات دفع متعددة</p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- How it Works -->
+    <section class="how-it-works" id="how-it-works">
+      <div class="section-header fade-up">
+        <h2>كيف يعمل المحفظ؟</h2>
+        <p>ابدأ رحلة التحفيظ في ثلاث خطوات بسيطة</p>
+      </div>
+      <div class="steps">
+        <div class="step fade-up">
+          <div class="step-number">١</div>
+          <div class="step-content">
+            <h3>ابحث عن محفظ</h3>
+            <p>تصفح قائمة المحفظين المعتمدين، شاهد التقييمات والخبرات، واختر المناسب لك</p>
+          </div>
+        </div>
+        <div class="step fade-up">
+          <div class="step-number">٢</div>
+          <div class="step-content">
+            <h3>احجز جلسة</h3>
+            <p>حدد الوقت والمكان المفضل، واحجز جلستك الأولى بضغطة زر</p>
+          </div>
+        </div>
+        <div class="step fade-up">
+          <div class="step-number">٣</div>
+          <div class="step-content">
+            <h3>ابدأ الحفظ</h3>
+            <p>تواصل مع محفظك وابدأ رحلة حفظ القرآن الكريم بإذن الله</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Pricing -->
+    <section class="pricing" id="pricing">
+      <div class="section-header fade-up">
+        <h2>خطط تناسب الجميع</h2>
+        <p>اختر الخطة المناسبة لاحتياجاتك</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card fade-up">
+          <h3>تجريبي مجاني</h3>
+          <div class="pricing-price">٠ <span>ج.م</span></div>
+          <ul class="pricing-features">
+            <li>جلسة واحدة مجانية</li>
+            <li>تقييم مستوى الحفظ</li>
+            <li>توصية بخطة التحفيظ</li>
+            <li>دعم فني</li>
+          </ul>
+          <a href="https://app.mohafezy.com/login" class="btn btn-secondary">ابدأ التجربة</a>
+        </div>
+        <div class="pricing-card featured fade-up">
+          <div class="featured-badge">الأكثر شيوعاً</div>
+          <h3>اشتراك شهري</h3>
+          <div class="pricing-price">٣٠٠ <span>ج.م/شهر</span></div>
+          <ul class="pricing-features">
+            <li>٨ جلسات شهرياً</li>
+            <li>جميع الميزات الأساسية</li>
+            <li>تتبع التقدم</li>
+            <li>تقارير دورية</li>
+            <li>أولوية في الحجز</li>
+          </ul>
+          <a href="https://app.mohafezy.com/login" class="btn btn-primary">اشترك الآن</a>
+        </div>
+        <div class="pricing-card fade-up">
+          <h3>اشتراك فصلي</h3>
+          <div class="pricing-price">٨٠٠ <span>ج.م/٣ أشهر</span></div>
+          <ul class="pricing-features">
+            <li>٢٤ جلسة (٨ شهرياً)</li>
+            <li>جميع ميزات الاشتراك الشهري</li>
+            <li>خصم ١١٪</li>
+            <li>جلسة مراجعة إضافية</li>
+            <li>شهادة تقدم</li>
+          </ul>
+          <a href="https://app.mohafezy.com/login" class="btn btn-secondary">اشترك الآن</a>
+        </div>
+      </div>
+    </section>
+    
+    <!-- For Teachers -->
+    <section class="for-teachers" id="for-teachers">
+      <div class="for-teachers-inner">
+        <div class="for-teachers-content fade-up">
+          <h2>هل أنت محفظ؟ انضم إلينا</h2>
+          <p>شارك في تعليم كتاب الله واكسب دخلاً إضافياً مع جدول مرن يناسبك</p>
+          <ul class="for-teachers-list">
+            <li>دخل إضافي شهري</li>
+            <li>جدول مرن حسب أوقات فراغك</li>
+            <li>طلاب من جميع الدول العربية</li>
+            <li>أدوات تعليمية متكاملة</li>
+            <li>دعم فني على مدار الساعة</li>
+          </ul>
+          <a href="https://app.mohafezy.com/login" class="btn btn-primary">سجّل كمحفظ</a>
+        </div>
+        <div class="for-teachers-image fade-up">
+          <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#0B7A75" stroke-width="1.5">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Testimonials -->
+    <section class="testimonials">
+      <div class="section-header fade-up">
+        <h2>ماذا يقول طلابنا؟</h2>
+        <p>تجارب حقيقية من مجتمع المحفظ</p>
+      </div>
+      <div class="testimonials-grid">
+        <div class="testimonial-card fade-up">
+          <p class="testimonial-quote">"بفضل المحفظ، أكملت حفظ الجزء الثلاثين في شهرين فقط. المحفظ كان متفهماً وصبوراً جداً معي."</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">أ</div>
+            <div class="testimonial-info">
+              <h4>أحمد محمد</h4>
+              <p>طالب — القاهرة</p>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card fade-up">
+          <p class="testimonial-quote">"المنصة سهلة الاستخدام والمحفظون محترفون. أنصح كل من يريد حفظ القرآن بالتسجيل."</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">ف</div>
+            <div class="testimonial-info">
+              <h4>فاطمة علي</h4>
+              <p>طالبة — جدة</p>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card fade-up">
+          <p class="testimonial-quote">"كنت أبحث عن محفظ مناسب لبناتي، ووجدت في المحفظ ما كنت أبحث عنه. جودة عالية وراحة تامة."</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">س</div>
+            <div class="testimonial-info">
+              <h4>سمية عبدالله</h4>
+              <p>والدة — دبي</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+      <div class="section-header fade-up">
+        <h2>الأسئلة الشائعة</h2>
+        <p>إجابات على استفساراتكم</p>
+      </div>
+      <div class="faq-list">
+        <details class="fade-up">
+          <summary>كيف يمكنني اختيار المحفظ المناسب؟</summary>
+          <p>يمكنك تصفح ملفات المحفظين المعتمدين، قراءة التقييمات من الطلاب السابقين، ومشاهدة تخصصات كل محفظ (حفظ، تجويد، تفسير). نوصي بحجز جلسة تجريبية أولاً.</p>
+        </details>
+        <details class="fade-up">
+          <summary>هل الجلسات أونلاين فقط أم يمكن حضورها شخصياً؟</summary>
+          <p>نقدم خيارات متعددة: جلسات أونلاين عبر الفيديو، جلسات في المنزل، وجلسات في المسجد. يمكنك اختيار ما يناسبك عند الحجز.</p>
+        </details>
+        <details class="fade-up">
+          <summary>ما هي مؤهلات المحفظين في المنصة؟</summary>
+          <p>جميع المحفظين في منصة المحفظ معتمدون وخاضعون لعملية تحقق صارمة. نتأكد من إجازاتهم وخبراتهم التعليمية قبل قبولهم.</p>
+        </details>
+        <details class="fade-up">
+          <summary>هل يمكنني تغيير المحفظ بعد الاشتراك؟</summary>
+          <p>نعم، يمكنك تغيير المحفظ في أي وقت. اشتراكك ينقل تلقائياً للمحفظ الجديد دون فقدان أي جلسات.</p>
+        </details>
+        <details class="fade-up">
+          <summary>كيف يتم الدفع وهل هو آمن؟</summary>
+          <p>نستخدم بوابات دفع إلكترونية آمنة ومعتمدة. يمكنك الدفع بالبطاقة الائتمانية أو فودافون كاش أو غيرها من وسائل الدفع المتاحة في بلدك.</p>
+        </details>
+        <details class="fade-up">
+          <summary>هل هناك ضمان استعادة المال؟</summary>
+          <p>نعم، إذا لم تكن راضياً عن الجلسة التجريبية الأولى، يمكنك طلب استعادة كامل المبلغ خلال 7 أيام.</p>
+        </details>
+      </div>
+    </section>
+    
+    <!-- Final CTA -->
+    <section class="final-cta">
+      <div class="final-cta-content">
+        <h2>ابدأ رحلة الحفظ اليوم</h2>
+        <p>لا تؤجل حفظ كتاب الله، سجّل الآن واحصل على جلستك الأولى المجانية بإذن الله</p>
+        <a href="https://app.mohafezy.com/login" class="btn btn-primary">ابدأ الآن مجاناً</a>
+      </div>
+    </section>
+  </main>
+  
+  <!-- Footer -->
+  <footer class="footer" id="contact">
+    <div class="footer-inner">
+      <div class="footer-col">
+        <h4>المنصة</h4>
+        <ul>
+          <li><a href="#features">الميزات</a></li>
+          <li><a href="#how-it-works">كيف يعمل</a></li>
+          <li><a href="#pricing">الأسعار</a></li>
+          <li><a href="#">تحميل التطبيق</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>المحفظون</h4>
+        <ul>
+          <li><a href="#for-teachers">الانضمام كمحفظ</a></li>
+          <li><a href="#">شروط المحفظ</a></li>
+          <li><a href="#">الدعم الفني</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>قانوني</h4>
+        <ul>
+          <li><a href="#">شروط الاستخدام</a></li>
+          <li><a href="#">سياسة الخصوصية</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>تواصل معنا</h4>
+        <ul>
+          <li><a href="mailto:support@mohafezy.com">support@mohafezy.com</a></li>
+          <li><a href="tel:+20123456789">+٢٠ ١٢٣٤٥٦٧٨٩</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© ٢٠٢٤ المحفظ. جميع الحقوق محفوظة.</p>
+      <div class="footer-social">
+        <a href="#" aria-label="فيسبوك">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+        </a>
+        <a href="#" aria-label="تويتر">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/></svg>
+        </a>
+        <a href="#" aria-label="إنستغرام">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" fill="none" stroke="currentColor" stroke-width="2"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" stroke="currentColor" stroke-width="2"/></svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+  
+  <!-- Scripts -->
+  <script>
+    // Hide splash screen
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        document.getElementById('splash').classList.add('hidden');
+      }, 500);
+    });
+    
+    // Mobile menu toggle
+    const menuBtn = document.getElementById('menuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    const menuClose = document.querySelector('.mobile-menu-close');
+    
+    menuBtn.addEventListener('click', () => {
+      mobileMenu.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    });
+    
+    menuClose.addEventListener('click', () => {
+      mobileMenu.classList.remove('open');
+      document.body.style.overflow = '';
+    });
+    
+    // Close mobile menu when clicking a link
+    mobileMenu.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.remove('open');
+        document.body.style.overflow = '';
+      });
+    });
+    
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const href = this.getAttribute('href');
+        if (href !== '#') {
+          e.preventDefault();
+          const target = document.querySelector(href);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      });
+    });
+    
+    // Header scroll effect
+    const header = document.getElementById('header');
+    let lastScroll = 0;
+    
+    window.addEventListener('scroll', () => {
+      const currentScroll = window.pageYOffset;
+      if (currentScroll > 50) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+      lastScroll = currentScroll;
+    });
+    
+    // Intersection Observer for fade-up animations
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.1
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+    
+    document.querySelectorAll('.fade-up').forEach(el => {
+      observer.observe(el);
+    });
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 
 **Document Version:** 1.0  
 **Date:** April 19, 2026  
-**Project:** Mohaffez Finder App  
+**Project:** Mohafezy App  
 **Platform:** Flutter (Mobile - Android/iOS/Web)  
 **Backend:** Firebase (Firestore, Auth, Storage, Cloud Functions)  
 
