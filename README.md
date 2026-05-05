@@ -42,10 +42,14 @@ The repo uses [Melos](https://melos.invertase.dev/) for managing the workspace.
 
 ## Environments
 
-| Environment | Firebase project   | Web URL                         |
-|-------------|--------------------|---------------------------------|
-| Development | `mohaffez-dev`     | (deployed by GitHub Actions)    |
-| Production  | `mohaffez-ba2ec`   | `app.mohafezy.com` / `mohafezy.com` |
+| Environment | Firebase project   | Web hosting        | URLs                              |
+|-------------|--------------------|--------------------|-----------------------------------|
+| Development | `mohaffez-dev`     | Firebase Hosting   | (GitHub Actions on `develop` push) |
+| Production  | `mohaffez-ba2ec`   | **Hostinger**      | `app.mohafezy.com` / `mohafezy.com` |
+
+**Backend:** Firebase (Firestore, Auth, Storage, Cloud Functions) for both environments.
+
+**Web/marketing frontend (prod):** Hosted on Hostinger — deployed manually via FTP upload after `flutter build web --release`.
 
 Mobile app flavors: `dev` flavor → `mohaffez-dev`, `prod` flavor → `mohaffez-ba2ec`. Dev installs alongside prod (`app.mohafezy.dev` vs `app.mohafezy`).
 
