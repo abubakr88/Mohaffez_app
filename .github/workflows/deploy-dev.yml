@@ -1,0 +1,79 @@
+name: Deploy to DEV (mohaffez-dev)
+
+# Auto-deploys backend (rules, indexes, functions) and web hosting to the
+# DEV Firebase project whenever the `develop` branch is updated.
+# Mobile builds are NOT deployed here — they ship via Play Store separately.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch: {}
+
+env:
+  FLUTTER_VERSION: 'stable'
+  PROJECT_ID: 'mohaffez-dev'
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install & build Cloud Functions
+        working-directory: functions
+        run: |
+          npm ci
+          npm run build
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}
+
+      - name: Setup Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Deploy Firestore rules + indexes + Storage rules + Functions
+        run: |
+          firebase deploy \
+            --only firestore:rules,firestore:indexes,storage,functions \
+            --project=${{ env.PROJECT_ID }} \
+            --non-interactive
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap Melos
+        run: melos bootstrap
+
+      - name: Build Web (dev)
+        run: |
+          cd packages/mohaffez_web
+          flutter build web --release --pwa-strategy offline-first
+
+      - name: Deploy Web to DEV Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}'
+          projectId: ${{ env.PROJECT_ID }}
+          channelId: live
+          target: app

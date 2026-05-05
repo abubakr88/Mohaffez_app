@@ -1,0 +1,111 @@
+name: Deploy Web and Marketing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/mohaffez_web/**'
+      - 'marketing_site/**'
+      - '.github/workflows/web_deploy.yml'
+
+env:
+  FLUTTER_VERSION: 'stable'
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      marketing: ${{ steps.filter.outputs.marketing }}
+    steps:r
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web:
+              - 'packages/mohaffez_web/**'
+              - '.github/workflows/web_deploy.yml'
+            marketing:
+              - 'marketing_site/**'
+              - '.github/workflows/web_deploy.yml'
+
+  build-web:
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap Melos
+        run: melos bootstrap
+
+      - name: Analyze
+        run: flutter analyze packages/mohaffez_web --no-fatal-infos
+
+      - name: Run Tests
+        run: flutter test packages/mohaffez_web
+
+      - name: Build Web
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          cd packages/mohaffez_web
+          flutter build web \
+            --release \
+            --web-renderer canvaskit \
+            --pwa-strategy offline-first \
+            --dart-define=SENTRY_DSN="$SENTRY_DSN"
+
+      - name: Archive Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: packages/mohaffez_web/build/web
+
+  deploy-web:
+    needs: [build-web, changes]
+    if: ${{ needs.changes.outputs.web == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: packages/mohaffez_web/build/web
+
+      - name: Deploy to Firebase (App)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          channelId: live
+          target: app
+
+  deploy-marketing:
+    needs: changes
+    if: ${{ needs.changes.outputs.marketing == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Firebase (Marketing)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          channelId: live
+          target: marketing

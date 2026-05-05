@@ -1,0 +1,162 @@
+import 'package:flutter/material.dart';
+import 'app_theme_constants.dart';
+
+/// Generates complete ThemeData using the Turquoise/Gold design system.
+class AppThemeData {
+  AppThemeData._();
+
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      fontFamily: 'Cairo',
+      fontFamilyFallback: const ['Roboto', 'Noto Sans Arabic'],
+      colorScheme: const ColorScheme(
+        brightness: Brightness.light,
+        primary: AppThemeConstants.primary,
+        onPrimary: AppThemeConstants.onPrimary,
+        primaryContainer: AppThemeConstants.primaryVariant,
+        onPrimaryContainer: AppThemeConstants.onPrimary,
+        secondary: AppThemeConstants.secondary,
+        onSecondary: AppThemeConstants.onSecondary,
+        secondaryContainer: AppThemeConstants.secondaryContainer,
+        onSecondaryContainer: AppThemeConstants.onSecondary,
+        surface: AppThemeConstants.surface,
+        onSurface: AppThemeConstants.textPrimary,
+        surfaceContainerHighest: AppThemeConstants.background,
+        onSurfaceVariant: AppThemeConstants.textSecondary,
+        error: AppThemeConstants.error,
+        onError: Colors.white,
+        errorContainer: AppThemeConstants.errorBackground,
+        onErrorContainer: AppThemeConstants.error,
+        outline: AppThemeConstants.outline,
+        shadow: AppThemeConstants.shadow,
+      ),
+      scaffoldBackgroundColor: AppThemeConstants.background,
+      appBarTheme: AppBarTheme(
+        elevation: AppThemeConstants.elevationNone,
+        scrolledUnderElevation: AppThemeConstants.elevationXs,
+        centerTitle: true,
+        backgroundColor: AppThemeConstants.primary,
+        foregroundColor: AppThemeConstants.onPrimary,
+        titleTextStyle: AppThemeConstants.titleLarge.copyWith(
+          color: AppThemeConstants.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        iconTheme: const IconThemeData(
+          color: AppThemeConstants.onPrimary,
+          size: AppThemeConstants.iconMd,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: AppThemeConstants.surfaceCream,
+        elevation: AppThemeConstants.elevationSm,
+        shadowColor: AppThemeConstants.shadow,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppThemeConstants.borderRadiusLg,
+          side: BorderSide(
+            color: AppThemeConstants.secondary.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        margin: const EdgeInsets.symmetric(
+          horizontal: AppThemeConstants.spaceMd,
+          vertical: AppThemeConstants.spaceSm,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppThemeConstants.primary,
+          foregroundColor: AppThemeConstants.onPrimary,
+          minimumSize: const Size(AppThemeConstants.buttonMinWidthMedium, AppThemeConstants.buttonHeightMedium),
+          padding: AppThemeConstants.buttonPaddingMedium,
+          shape: const RoundedRectangleBorder(borderRadius: AppThemeConstants.borderRadiusMd),
+          elevation: AppThemeConstants.elevationSm,
+          textStyle: AppThemeConstants.labelLarge.copyWith(color: AppThemeConstants.onPrimary),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppThemeConstants.primary,
+          minimumSize: const Size(AppThemeConstants.buttonMinWidthMedium, AppThemeConstants.buttonHeightMedium),
+          padding: AppThemeConstants.buttonPaddingMedium,
+          shape: const RoundedRectangleBorder(borderRadius: AppThemeConstants.borderRadiusMd),
+          side: const BorderSide(color: AppThemeConstants.primary, width: 1.5),
+          textStyle: AppThemeConstants.labelLarge,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppThemeConstants.primary,
+          padding: AppThemeConstants.buttonPaddingMedium,
+          textStyle: AppThemeConstants.labelLarge,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppThemeConstants.surface,
+        border: const OutlineInputBorder(borderRadius: AppThemeConstants.borderRadiusMd, borderSide: BorderSide(color: AppThemeConstants.outline)),
+        enabledBorder: const OutlineInputBorder(borderRadius: AppThemeConstants.borderRadiusMd, borderSide: BorderSide(color: AppThemeConstants.outline)),
+        focusedBorder: const OutlineInputBorder(borderRadius: AppThemeConstants.borderRadiusMd, borderSide: BorderSide(color: AppThemeConstants.primary, width: 2)),
+        errorBorder: const OutlineInputBorder(borderRadius: AppThemeConstants.borderRadiusMd, borderSide: BorderSide(color: AppThemeConstants.error)),
+        contentPadding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+        labelStyle: AppThemeConstants.bodyMedium,
+        hintStyle: AppThemeConstants.bodyMedium,
+        helperStyle: AppThemeConstants.bodySmall,
+        errorStyle: AppThemeConstants.bodySmall,
+      ),
+      tabBarTheme: TabBarThemeData(
+        labelColor: AppThemeConstants.onPrimary,
+        unselectedLabelColor: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
+        indicatorColor: AppThemeConstants.onPrimary,
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelStyle: AppThemeConstants.titleMedium.copyWith(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: AppThemeConstants.titleMedium,
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppThemeConstants.divider,
+        thickness: 1,
+        space: AppThemeConstants.spaceMd,
+      ),
+      iconTheme: const IconThemeData(size: AppThemeConstants.iconMd, color: AppThemeConstants.textPrimary),
+      textTheme: const TextTheme(
+        displayLarge: AppThemeConstants.displayLarge,
+        displayMedium: AppThemeConstants.displayMedium,
+        displaySmall: AppThemeConstants.displaySmall,
+        headlineLarge: AppThemeConstants.headlineLarge,
+        headlineMedium: AppThemeConstants.headlineMedium,
+        headlineSmall: AppThemeConstants.headlineSmall,
+        titleLarge: AppThemeConstants.titleLarge,
+        titleMedium: AppThemeConstants.titleMedium,
+        titleSmall: AppThemeConstants.titleSmall,
+        bodyLarge: AppThemeConstants.bodyLarge,
+        bodyMedium: AppThemeConstants.bodyMedium,
+        bodySmall: AppThemeConstants.bodySmall,
+        labelLarge: AppThemeConstants.labelLarge,
+        labelMedium: AppThemeConstants.labelMedium,
+        labelSmall: AppThemeConstants.labelSmall,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppThemeConstants.textPrimary,
+        contentTextStyle: AppThemeConstants.bodyMedium.copyWith(color: Colors.white),
+        shape: const RoundedRectangleBorder(borderRadius: AppThemeConstants.borderRadiusMd),
+        behavior: SnackBarBehavior.floating,
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: AppThemeConstants.primary,
+        selectedItemColor: AppThemeConstants.secondary,
+        unselectedItemColor: Colors.white.withValues(alpha: 0.7),
+        selectedLabelStyle: AppThemeConstants.labelSmall.copyWith(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: AppThemeConstants.labelSmall,
+        type: BottomNavigationBarType.fixed,
+        elevation: AppThemeConstants.elevationLg,
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppThemeConstants.primary,
+        foregroundColor: AppThemeConstants.onPrimary,
+        elevation: AppThemeConstants.elevationMd,
+        shape: RoundedRectangleBorder(borderRadius: AppThemeConstants.borderRadiusRound),
+      ),
+    );
+  }
+}

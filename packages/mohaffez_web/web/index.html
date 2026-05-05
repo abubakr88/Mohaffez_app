@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- SEO Meta Tags -->
+  <title>المحفظ — منصة تحفيظ القرآن</title>
+  <meta name="description" content="منصة المحفظ — احفظ القرآن الكريم مع محفظ مؤهل وأكفأ. جلسات أونلاين وفي المنزل والمسجد.">
+  <meta name="keywords" content="تحفيظ القرآن, محفظ, تعليم القرآن, حفظ القرآن, قرآن أونلاين">
+  <meta name="author" content="Al-Mohaffez">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="المحفظ — منصة تحفيظ القرآن">
+  <meta property="og:description" content="احفظ القرآن مع محفظ مؤهل، أينما كنت.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://app.mohafezy.com">
+  <meta property="og:image" content="https://app.mohafezy.com/icons/og-image.png">
+  <meta property="og:locale" content="ar_AR">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="المحفظ — منصة تحفيظ القرآن">
+  <meta name="twitter:description" content="احفظ القرآن مع محفظ مؤهل، أينما كنت.">
+  <meta name="twitter:image" content="https://app.mohafezy.com/icons/og-image.png">
+
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#0B7A75">
+  <meta name="msapplication-TileColor" content="#0B7A75">
+
+  <!-- Preload fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Critical Splash Screen CSS -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #075550 0%, #0B7A75 50%, #1A9B95 100%);
+      overflow: hidden;
+    }
+
+    /* Splash Screen */
+    #splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      background: linear-gradient(135deg, #075550 0%, #0B7A75 50%, #1A9B95 100%);
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+
+    #splash.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .splash-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .splash-icon {
+      width: 56px;
+      height: 56px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .splash-icon svg {
+      width: 32px;
+      height: 32px;
+      color: #D4A44A;
+    }
+
+    .splash-text {
+      color: white;
+      font-size: 2.5rem;
+      font-weight: 800;
+    }
+
+    .splash-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #D4A44A;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .splash-hint {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.875rem;
+      margin-top: 16px;
+    }
+
+    /* Flutter Glass Pane - will be injected by Flutter */
+    flt-glass-pane {
+      position: fixed;
+      inset: 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Splash Screen -->
+  <div id="splash">
+    <div class="splash-logo">
+      <div class="splash-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/>
+        </svg>
+      </div>
+      <span class="splash-text">المحفظ</span>
+    </div>
+    <div class="splash-spinner"></div>
+    <p class="splash-hint">جاري التحميل...</p>
+  </div>
+
+  <!-- Flutter Bootstrap -->
+  <script src="flutter_bootstrap.js" async></script>
+
+  <!-- Remove splash when Flutter loads -->
+  <script>
+    // Watch for flt-glass-pane to be added
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.tagName && node.tagName.toLowerCase() === 'flt-glass-pane') {
+            // Flutter is ready, hide splash
+            document.getElementById('splash').classList.add('hidden');
+            observer.disconnect();
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Fallback: hide splash after 10 seconds regardless
+    setTimeout(() => {
+      document.getElementById('splash').classList.add('hidden');
+    }, 10000);
+  </script>
+</body>
+</html>
