@@ -4,11 +4,26 @@ This project uses a **branch-based deploy model**. The branch your code is on
 decides which Firebase project it gets deployed to. You never type a project
 ID by hand — git decides.
 
-| Branch     | Firebase project   | Deployed automatically? |
-| ---------- | ------------------ | ----------------------- |
-| `develop`  | `mohaffez-dev`     | Yes (on push)           |
-| `main`     | `mohaffez-ba2ec`   | Yes (with approval)     |
-| `feature/*`| nothing            | No                      |
+| Branch     | Firebase project   | Deployed automatically?                   |
+| ---------- | ------------------ | ----------------------------------------- |
+| `develop`  | `mohaffez-dev`     | Yes — backend (rules/functions) on push   |
+| `main`     | `mohaffez-ba2ec`   | Yes — backend only, with manual approval  |
+| `feature/*`| nothing            | No                                        |
+
+### What "deployed automatically" covers
+
+**Firebase backend** (auto via GitHub Actions):
+- Firestore security rules + indexes
+- Firebase Storage rules
+- Cloud Functions
+
+**Not automated — must be done manually:**
+- Web app (`app.mohafezy.com`) → Hostinger FTP upload (see below)
+- Marketing site (`mohafezy.com`) → Hostinger FTP upload (see below)
+- Mobile APK/AAB → Play Store / App Store Console
+
+The `web_deploy.yml` workflow deploys to **Firebase Hosting** (for dev preview
+only). Production web hosting lives on **Hostinger** and is uploaded manually.
 
 ---
 
@@ -69,9 +84,9 @@ git push -u origin feature/my-thing
 
 Open a PR: `feature/my-thing` → `develop`. Review, merge.
 
-**On merge to `develop`** → GitHub Actions auto-deploys backend + web to
-`mohaffez-dev`. Open the dev app and verify your change works against
-real-ish data.
+**On merge to `develop`** → GitHub Actions auto-deploys the **backend**
+(rules, indexes, functions) to `mohaffez-dev`. Test your change in the
+dev mobile app against real-ish data.
 
 ### B. Releasing to production
 
@@ -87,14 +102,36 @@ git push
 Or open a PR `develop` → `main` and merge through the UI (recommended —
 gives you a release-style review of the full diff).
 
-**On merge to `main`** → GitHub Actions queues a prod deploy. You'll see a
-yellow "Waiting for review" banner on the workflow run. Click **Review
-deployments → Approve and deploy**. Backend deploys to `mohaffez-ba2ec`.
+**On merge to `main`** → GitHub Actions queues a **backend** prod deploy.
+You'll see a yellow "Waiting for review" banner on the workflow run. Click
+**Review deployments → Approve and deploy**. Rules/functions deploy to
+`mohaffez-ba2ec`.
 
-Web hosting also auto-deploys via `web_deploy.yml` (path-filtered to web
-changes only).
+### C. Web app release (Hostinger)
 
-### C. Mobile app release (Play Store / App Store)
+The Flutter web build is deployed **manually** to Hostinger via FTP. GitHub
+Actions does **not** push to Hostinger.
+
+```bash
+cd packages/mohaffez_web
+flutter build web --release --web-renderer canvaskit --pwa-strategy offline-first
+
+# Upload packages/mohaffez_web/build/web/ to Hostinger via FTP
+# Target: app.mohafezy.com → public_html/app/ (or root, depending on your Hostinger setup)
+```
+
+For the marketing site:
+```bash
+# Upload marketing_site/ to Hostinger via FTP
+# Target: mohafezy.com → public_html/
+```
+
+Use FileZilla (or Hostinger's file manager) to upload. No automation yet.
+
+> **Note:** The `web_deploy.yml` workflow deploys to Firebase Hosting for
+> dev preview purposes only. Do not use it for the production Hostinger site.
+
+### D. Mobile app release (Play Store / App Store)
 
 The CI pipeline does NOT publish mobile binaries — those go through the
 stores manually:
@@ -107,8 +144,8 @@ stores manually:
 iOS releases use Xcode → Archive → Upload to App Store Connect.
 
 The mobile app talks to whichever Firebase project its flavor was built
-with (`dev` flavor → mohaffez-dev, `prod` flavor → mohaffez-ba2ec). The
-release builds always use the prod flavor.
+with (`dev` flavor → `mohaffez-dev`, `prod` flavor → `mohaffez-ba2ec`).
+Release builds always use the prod flavor.
 
 ---
 
@@ -157,7 +194,7 @@ export in `gs://mohaffez-ba2ec.firebasestorage.app/exports/`.
 
 Before merging `develop` → `main`:
 
-- [ ] All features work in dev app (`https://mohaffez-dev.web.app` or dev mobile flavor)
+- [ ] All features work in dev mobile flavor (`app.mohafezy.dev`)
 - [ ] `flutter analyze` is clean
 - [ ] `flutter test` passes
 - [ ] Cloud Function changes have been smoke-tested in dev
