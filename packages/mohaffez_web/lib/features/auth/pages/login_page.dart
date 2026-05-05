@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../design_system/design_system.dart';
@@ -13,36 +12,28 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  final _phoneCtrl = TextEditingController();
-  final _otpCtrl = TextEditingController();
-  final _phoneFocus = FocusNode();
+  final _emailCtrl    = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _obscure = true;
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
-    _otpCtrl.dispose();
-    _phoneFocus.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
     super.dispose();
   }
 
-  String get _phone => _phoneCtrl.text.trim();
-  String get _otp => _otpCtrl.text.trim();
-
-  void _sendOtp() {
-    if (_phone.length < 9) return;
-    ref.read(authProvider.notifier).sendOtp(_phone);
-  }
-
-  void _verifyOtp() {
-    if (_otp.length != 6) return;
-    ref.read(authProvider.notifier).verifyOtp(_otp);
+  void _submit() {
+    final email    = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    if (email.isEmpty || password.isEmpty) return;
+    ref.read(authProvider.notifier).signIn(email, password);
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
 
-    // Navigate on successful auth
     ref.listen<AuthState>(authProvider, (_, next) {
       if (!mounted) return;
       if (next.step == AuthStep.done && next.role != null) {
@@ -53,6 +44,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         }
       }
     });
+
+    final isLoading = auth.step == AuthStep.loading;
 
     return Scaffold(
       backgroundColor: DSColors.primary,
@@ -73,11 +66,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 const Divider(height: 1, color: DSColors.border),
                 Padding(
                   padding: const EdgeInsets.all(DSSpacing.xxl),
-                  child: switch (auth.step) {
-                    AuthStep.loading => _buildLoading(context),
-                    AuthStep.otp    => _buildOtpForm(context, auth),
-                    _               => _buildPhoneForm(context, auth),
-                  },
+                  child: _buildForm(context, auth, isLoading),
                 ),
               ],
             ),
@@ -115,25 +104,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  Widget _buildPhoneForm(BuildContext context, AuthState auth) {
+  Widget _buildForm(BuildContext context, AuthState auth, bool isLoading) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('تسجيل الدخول', style: DSText.h2(context)),
         const SizedBox(height: DSSpacing.xs),
         Text(
-          'أدخل رقم هاتفك لتلقّي رمز التحقق',
+          'أدخل بريدك الإلكتروني وكلمة المرور',
           style: DSText.body(context, color: DSColors.text2),
         ),
         const SizedBox(height: DSSpacing.xl),
         DSTextField(
-          controller: _phoneCtrl,
-          label: 'رقم الهاتف',
-          hint: '+966XXXXXXXXX',
-          keyboardType: TextInputType.phone,
-          focusNode: _phoneFocus,
-          leading: const Icon(Icons.phone_outlined, size: 18, color: DSColors.text3),
-          onSubmitted: (_) => _sendOtp(),
+          controller: _emailCtrl,
+          label: 'البريد الإلكتروني',
+          hint: 'example@email.com',
+          keyboardType: TextInputType.emailAddress,
+          leading: const Icon(Icons.email_outlined, size: 18, color: DSColors.text3),
+          onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+        ),
+        const SizedBox(height: DSSpacing.md),
+        DSTextField(
+          controller: _passwordCtrl,
+          label: 'كلمة المرور',
+          hint: '••••••••',
+          obscureText: _obscure,
+          leading: const Icon(Icons.lock_outline, size: 18, color: DSColors.text3),
+          trailing: IconButton(
+            icon: Icon(
+              _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 18,
+              color: DSColors.text3,
+            ),
+            onPressed: () => setState(() => _obscure = !_obscure),
+          ),
+          onSubmitted: (_) => _submit(),
         ),
         if (auth.errorMessage != null) ...[
           const SizedBox(height: DSSpacing.md),
@@ -144,10 +149,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ],
         const SizedBox(height: DSSpacing.xl),
         DSButton(
-          label: 'إرسال رمز التحقق',
+          label: isLoading ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول',
           fullWidth: true,
           size: DSButtonSize.lg,
-          onPressed: _sendOtp,
+          onPressed: isLoading ? null : _submit,
         ),
         const SizedBox(height: DSSpacing.lg),
         Center(
@@ -157,91 +162,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             textAlign: TextAlign.center,
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildOtpForm(BuildContext context, AuthState auth) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('رمز التحقق', style: DSText.h2(context)),
-        const SizedBox(height: DSSpacing.xs),
-        Text(
-          'أُرسل رمز مكوّن من 6 أرقام إلى ${auth.phone ?? ''}',
-          style: DSText.body(context, color: DSColors.text2),
-        ),
-        const SizedBox(height: DSSpacing.xl),
-        TextFormField(
-          controller: _otpCtrl,
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          maxLength: 6,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: DSText.h1(context).copyWith(letterSpacing: 8),
-          decoration: InputDecoration(
-            hintText: '------',
-            hintStyle: DSText.h1(context, color: DSColors.text3).copyWith(letterSpacing: 8),
-            counterText: '',
-            filled: true,
-            fillColor: DSColors.surface,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: DSSpacing.lg,
-              vertical: DSSpacing.lg,
-            ),
-            border: const OutlineInputBorder(
-              borderRadius: DSRadius.mdAll,
-              borderSide: BorderSide(color: DSColors.border),
-            ),
-            enabledBorder: const OutlineInputBorder(
-              borderRadius: DSRadius.mdAll,
-              borderSide: BorderSide(color: DSColors.border),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: DSRadius.mdAll,
-              borderSide: BorderSide(color: DSColors.primary, width: 2),
-            ),
-          ),
-          onChanged: (v) {
-            if (v.length == 6) _verifyOtp();
-          },
-        ),
-        if (auth.errorMessage != null) ...[
-          const SizedBox(height: DSSpacing.md),
-          DSBanner(
-            message: auth.errorMessage!,
-            variant: DSBannerVariant.error,
-          ),
-        ],
-        const SizedBox(height: DSSpacing.xl),
-        DSButton(
-          label: 'تحقق',
-          fullWidth: true,
-          size: DSButtonSize.lg,
-          onPressed: _verifyOtp,
-        ),
-        const SizedBox(height: DSSpacing.md),
-        Center(
-          child: TextButton(
-            onPressed: () => ref.read(authProvider.notifier).backToPhone(),
-            child: Text(
-              'تغيير رقم الهاتف',
-              style: DSText.body(context, color: DSColors.primary),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoading(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: DSSpacing.xl),
-        const CircularProgressIndicator(color: DSColors.primary),
-        const SizedBox(height: DSSpacing.lg),
-        Text('جارٍ التحقق...', style: DSText.body(context, color: DSColors.text2)),
-        const SizedBox(height: DSSpacing.xl),
       ],
     );
   }

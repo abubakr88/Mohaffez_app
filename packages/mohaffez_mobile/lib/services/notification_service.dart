@@ -21,8 +21,8 @@ class NotificationService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Centralized channel configuration
-  static const String channelId = 'mohaffez_finder_channel';
-  static const String channelName = 'Mohaffez Finder Notifications';
+  static const String channelId = 'mohafezy_channel';
+  static const String channelName = 'Mohafezy Notifications';
   static const String channelDescription = 'Notifications for Quran sessions and lessons';
   
   static int _tokenRetryCount = 0;

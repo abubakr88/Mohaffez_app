@@ -1,5 +1,15 @@
 {
   "projects": {
-    "default": "mohaffez-ba2ec"
+    "default": "mohaffez-ba2ec",
+    "prod": "mohaffez-ba2ec",
+    "dev": "mohaffez-dev"
+  },
+  "targets": {
+    "mohaffez-ba2ec": {
+      "hosting": {
+        "app": ["mohaffez-app"],
+        "marketing": ["mohaffez-marketing"]
+      }
+    }
   }
 }

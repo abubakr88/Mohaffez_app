@@ -154,8 +154,7 @@ class _DSDataTableState<T> extends State<DSDataTable<T>> {
   }
 
   Widget _cellWrapper(double? width, Widget child, {VoidCallback? onTap}) {
-    Widget w = width != null ? SizedBox(width: width, child: child) : Expanded(child: child);
-    if (onTap != null) w = GestureDetector(onTap: onTap, child: w);
-    return w;
+    final inner = onTap != null ? GestureDetector(onTap: onTap, child: child) : child;
+    return width != null ? SizedBox(width: width, child: inner) : Expanded(child: inner);
   }
 }

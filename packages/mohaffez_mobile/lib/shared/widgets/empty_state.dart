@@ -31,10 +31,11 @@ class EmptyState extends StatelessWidget {
     );
 
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // ⭐ FIXED: Animated icon with safe scale and fade
             if (animated)

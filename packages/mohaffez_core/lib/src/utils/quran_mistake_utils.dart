@@ -5,8 +5,8 @@
 // Keep quran_mistake_model.dart free of Flutter imports.
 
 import 'package:flutter/material.dart';
-import '../../models/quran_mistake_model.dart';
-import 'package:mohaffez_finder_app/shared/theme/app_theme_constants.dart';
+import '../models/quran_mistake_model.dart';
+import '../theme/app_theme_constants.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COLOR

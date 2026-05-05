@@ -558,57 +558,38 @@ class _IslamicPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppThemeConstants.surface.withValues(alpha: 0.03)
-      ..strokeWidth = 1
+      ..color = AppThemeConstants.surface.withValues(alpha: 0.07)
+      ..strokeWidth = 1.2
       ..style = PaintingStyle.stroke;
 
-    const spacing = 60.0;
-    
-    for (double x = 0; x < size.width + spacing; x += spacing) {
-      for (double y = 0; y < size.height + spacing; y += spacing) {
-        _drawStar(canvas, Offset(x, y), 15, paint);
+    const spacing = 64.0;
+    bool rowOffset = false;
+
+    for (double y = spacing * 0.5; y < size.height + spacing; y += spacing) {
+      final xStart = rowOffset ? spacing * 0.5 : 0.0;
+      for (double x = xStart; x < size.width + spacing; x += spacing) {
+        _drawCrescent(canvas, Offset(x, y), 12, paint);
       }
+      rowOffset = !rowOffset;
     }
   }
 
-  void _drawStar(Canvas canvas, Offset center, double radius, Paint paint) {
+  void _drawCrescent(Canvas canvas, Offset center, double r, Paint paint) {
     final path = Path();
-    const points = 8;
-    
-    for (int i = 0; i < points * 2; i++) {
-      final angle = (i * 3.14159 / points) - 3.14159 / 2;
-      final r = i.isEven ? radius : radius * 0.4;
-      final x = center.dx + r * 0.8 * _cos(angle);
-      final y = center.dy + r * _sin(angle);
-      
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
+    // Outer arc: full circle
+    path.addArc(
+      Rect.fromCircle(center: center, radius: r),
+      3.14159 * 0.25,   // start at ~bottom-left
+      3.14159 * 1.5,    // sweep 270° (leaving right side open)
+    );
+    // Inner arc: offset circle that creates the crescent cutout
+    final innerCenter = Offset(center.dx + r * 0.35, center.dy);
+    path.addArc(
+      Rect.fromCircle(center: innerCenter, radius: r * 0.78),
+      3.14159 * 1.25,
+      -3.14159 * 1.5,
+    );
     canvas.drawPath(path, paint);
-  }
-
-  double _cos(double angle) {
-    return switch (angle.toStringAsFixed(2)) {
-      '0.00' || '-0.00' => 1.0,
-      '1.57' => 0.0,
-      '3.14' || '-3.14' => -1.0,
-      '-1.57' => 0.0,
-      _ => 0.0,
-    };
-  }
-  
-  double _sin(double angle) {
-    return switch (angle.toStringAsFixed(2)) {
-      '0.00' || '-0.00' => 0.0,
-      '1.57' => 1.0,
-      '3.14' || '-3.14' => 0.0,
-      '-1.57' => -1.0,
-      _ => 0.0,
-    };
   }
 
   @override

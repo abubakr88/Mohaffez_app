@@ -81,7 +81,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
             if (mounted) setState(() => _loading = false);
           },
         ),
-        DSButton(label: 'Disabled'),
+        const DSButton(label: 'Disabled'),
         DSButton(
           label: 'With Icon',
           leading: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
@@ -95,10 +95,10 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
   }
 
   Widget _badges(BuildContext context) {
-    return Wrap(
+    return const Wrap(
       spacing: DSSpacing.sm,
       runSpacing: DSSpacing.sm,
-      children: const [
+      children: [
         DSBadge(label: 'Primary', variant: DSBadgeVariant.primary),
         DSBadge(label: 'Success', variant: DSBadgeVariant.success, dot: true),
         DSBadge(label: 'Warning', variant: DSBadgeVariant.warning, dot: true),
@@ -113,9 +113,9 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
     return DSGrid(
       desktopColumns: 2,
       children: [
-        DSTextField(label: 'اسم الطالب', hint: 'أدخل الاسم'),
-        DSTextField(label: 'البريد الإلكتروني', hint: 'example@email.com', keyboardType: TextInputType.emailAddress),
-        DSTextField(label: 'مع خطأ', hint: 'اكتب هنا', error: 'هذا الحقل مطلوب'),
+        const DSTextField(label: 'اسم الطالب', hint: 'أدخل الاسم'),
+        const DSTextField(label: 'البريد الإلكتروني', hint: 'example@email.com', keyboardType: TextInputType.emailAddress),
+        const DSTextField(label: 'مع خطأ', hint: 'اكتب هنا', error: 'هذا الحقل مطلوب'),
         DSSearchField(hint: 'ابحث عن معلم...', controller: _searchCtrl),
         DSSelect<String>(
           label: 'الدور',
@@ -128,7 +128,7 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
             DSSelectItem(value: 'admin', label: 'مدير'),
           ],
         ),
-        DSTextField(label: 'ملاحظات', hint: 'اكتب ملاحظاتك...', maxLines: 3),
+        const DSTextField(label: 'ملاحظات', hint: 'اكتب ملاحظاتك...', maxLines: 3),
       ],
     );
   }
@@ -137,20 +137,20 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
     return DSGrid(
       desktopColumns: 3,
       children: [
-        DSStatCard(
+        const DSStatCard(
           label: 'إجمالي الطلاب',
           value: '١٢٤',
           icon: Icons.people_outline_rounded,
           trend: '+٥ هذا الشهر',
           trendPositive: true,
         ),
-        DSStatCard(
+        const DSStatCard(
           label: 'الجلسات المكتملة',
           value: '٨٩',
           icon: Icons.check_circle_outline_rounded,
           iconColor: DSColors.success,
         ),
-        DSStatCard(
+        const DSStatCard(
           label: 'الإيرادات',
           value: '٢٤٥٠ ج',
           icon: Icons.account_balance_wallet_outlined,
@@ -238,9 +238,9 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
         const SizedBox(height: DSSpacing.lg),
         Text('Skeleton', style: DSText.h3(context)),
         const SizedBox(height: DSSpacing.sm),
-        DSGrid(
+        const DSGrid(
           desktopColumns: 3,
-          children: const [DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard()],
+          children: [DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard()],
         ),
       ],
     );
@@ -283,10 +283,10 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
   }
 
   Widget _avatars(BuildContext context) {
-    return Wrap(
+    return const Wrap(
       spacing: DSSpacing.md,
       crossAxisAlignment: WrapCrossAlignment.center,
-      children: const [
+      children: [
         DSAvatar(name: 'محمد أحمد', size: 32),
         DSAvatar(name: 'فاطمة علي', size: 40),
         DSAvatar(name: 'عمر خالد', size: 48, color: DSColors.secondary),
@@ -296,12 +296,12 @@ class _ComponentGalleryPageState extends State<ComponentGalleryPage> {
   }
 
   Widget _progress(BuildContext context) {
-    return Column(
+    return const Column(
       children: [
         DSProgressBar(value: 0.3, label: 'التقدم في الحفظ', showPercent: true),
-        const SizedBox(height: DSSpacing.md),
+        SizedBox(height: DSSpacing.md),
         DSProgressBar(value: 0.65, label: 'الجلسات المكتملة', color: DSColors.success, showPercent: true),
-        const SizedBox(height: DSSpacing.md),
+        SizedBox(height: DSSpacing.md),
         DSProgressBar(value: 0.85, color: DSColors.secondary, height: 12),
       ],
     );

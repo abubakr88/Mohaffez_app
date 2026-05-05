@@ -29,9 +29,9 @@ class StudentDashboardPage extends ConsumerWidget {
           ),
           const SizedBox(height: DSSpacing.xxl),
           sessionsAsync.when(
-            loading: () => DSGrid(
+            loading: () => const DSGrid(
               desktopColumns: 4,
-              children: const [DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard()],
+              children: [DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard()],
             ),
             error: (_, __) => const SizedBox.shrink(),
             data: (sessions) {
@@ -75,13 +75,13 @@ class StudentDashboardPage extends ConsumerWidget {
             desktopColumns: 2,
             children: [
               _UpcomingSessionsCard(uid: uid),
-              DSCard(
+              const DSCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionHeader(title: 'المهام المعلقة'),
-                    const SizedBox(height: DSSpacing.lg),
-                    const DSEmptyState(
+                    SectionHeader(title: 'المهام المعلقة'),
+                    SizedBox(height: DSSpacing.lg),
+                    DSEmptyState(
                       title: 'لا توجد مهام معلقة',
                       subtitle: 'ستظهر هنا المهام المعيّنة من محفظك',
                       icon: Icons.assignment_outlined,

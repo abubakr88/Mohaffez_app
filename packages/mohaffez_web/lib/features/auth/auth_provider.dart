@@ -2,24 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum AuthStep { phone, otp, loading, done, error }
+enum AuthStep { idle, loading, done, error }
 
 class AuthState {
   const AuthState({
-    this.step = AuthStep.phone,
+    this.step = AuthStep.idle,
     this.user,
     this.role,
     this.errorMessage,
-    this.phone,
-    this.verificationId,
   });
 
   final AuthStep step;
   final User? user;
   final String? role;
   final String? errorMessage;
-  final String? phone;
-  final String? verificationId;
 
   bool get isAuthenticated => user != null && role != null;
 
@@ -28,16 +24,12 @@ class AuthState {
     User? user,
     String? role,
     String? errorMessage,
-    String? phone,
-    String? verificationId,
   }) =>
       AuthState(
         step: step ?? this.step,
         user: user ?? this.user,
         role: role ?? this.role,
         errorMessage: errorMessage ?? this.errorMessage,
-        phone: phone ?? this.phone,
-        verificationId: verificationId ?? this.verificationId,
       );
 }
 
@@ -51,7 +43,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _init() async {
     final user = _auth.currentUser;
     if (user == null) {
-      state = const AuthState(step: AuthStep.phone);
+      state = const AuthState(step: AuthStep.idle);
       return;
     }
     await _fetchRole(user);
@@ -81,33 +73,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> sendOtp(String phone) async {
-    state = state.copyWith(step: AuthStep.loading, phone: phone);
+  Future<void> signIn(String email, String password) async {
+    state = state.copyWith(step: AuthStep.loading, errorMessage: null);
     try {
-      await _auth.verifyPhoneNumber(
-        phoneNumber: phone,
-        verificationCompleted: (credential) async {
-          final result = await _auth.signInWithCredential(credential);
-          if (result.user != null) await _fetchRole(result.user!);
-        },
-        verificationFailed: (e) {
-          state = state.copyWith(
-            step: AuthStep.error,
-            errorMessage: e.message ?? 'فشل إرسال الكود',
-          );
-        },
-        codeSent: (verificationId, _) {
-          state = state.copyWith(
-            step: AuthStep.otp,
-            verificationId: verificationId,
-          );
-        },
-        codeAutoRetrievalTimeout: (_) {},
+      final result = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
       );
+      if (result.user != null) await _fetchRole(result.user!);
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
         step: AuthStep.error,
-        errorMessage: e.message ?? 'خطأ في إرسال الكود',
+        errorMessage: _mapError(e.code),
       );
     } catch (e) {
       state = state.copyWith(
@@ -117,34 +94,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> verifyOtp(String otp) async {
-    state = state.copyWith(step: AuthStep.loading);
-    try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: state.verificationId ?? '',
-        smsCode: otp,
-      );
-      final result = await _auth.signInWithCredential(credential);
-      if (result.user != null) await _fetchRole(result.user!);
-    } on FirebaseAuthException catch (e) {
-      state = state.copyWith(
-        step: AuthStep.otp,
-        errorMessage: e.message ?? 'كود خاطئ، حاول مجدداً',
-      );
-    } catch (e) {
-      state = state.copyWith(
-        step: AuthStep.otp,
-        errorMessage: 'خطأ في التحقق: $e',
-      );
-    }
-  }
-
-  void backToPhone() =>
-      state = state.copyWith(step: AuthStep.phone, errorMessage: null);
+  String _mapError(String code) => switch (code) {
+        'user-not-found'   => 'البريد الإلكتروني غير مسجل',
+        'wrong-password'   => 'كلمة المرور غير صحيحة',
+        'invalid-email'    => 'صيغة البريد الإلكتروني غير صحيحة',
+        'user-disabled'    => 'هذا الحساب موقوف',
+        'too-many-requests'=> 'محاولات كثيرة، حاول لاحقاً',
+        _                  => 'فشل تسجيل الدخول، تحقق من بياناتك',
+      };
 
   Future<void> signOut() async {
     await _auth.signOut();
-    state = const AuthState(step: AuthStep.phone);
+    state = const AuthState(step: AuthStep.idle);
   }
 }
 

@@ -8,9 +8,12 @@ plugins {
 }
 
 val dotenv = Properties().apply {
-    val envFile = rootProject.file(".env")
+    // .env lives at repo root (3 levels above the android/ folder)
+    val envFile = rootProject.file("../../../.env")
     if (envFile.exists()) {
         envFile.inputStream().use { load(it) }
+    } else {
+        logger.warn("[build.gradle.kts] .env not found at: ${envFile.absolutePath}")
     }
 }
 
@@ -48,6 +51,18 @@ android {
         versionName = flutter.versionName
         multiDexEnabled = true
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
+        create("prod") {
+            dimension = "environment"
+        }
     }
 
     buildTypes {

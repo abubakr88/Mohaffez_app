@@ -29,9 +29,9 @@ class TeacherPricingPage extends ConsumerWidget {
           ),
           const SizedBox(height: DSSpacing.xxl),
           async.when(
-            loading: () => DSGrid(
+            loading: () => const DSGrid(
               desktopColumns: 3,
-              children: const [DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard()],
+              children: [DSSkeletonCard(), DSSkeletonCard(), DSSkeletonCard()],
             ),
             error: (e, _) => DSBanner(message: '$e', variant: DSBannerVariant.error),
             data: (plans) {
