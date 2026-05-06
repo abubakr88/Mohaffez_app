@@ -1,7 +1,7 @@
 name: Deploy to DEV (mohaffez-dev)
 
-# Auto-deploys backend (Firestore rules, indexes, Cloud Functions) to the
-# DEV Firebase project whenever the `develop` branch is updated.
+# Auto-deploys backend (Firestore rules+indexes, Storage rules, Cloud Functions)
+# to the DEV Firebase project whenever the `develop` branch is updated.
 # Web is hosted on Hostinger — not deployed here.
 # Mobile builds are NOT deployed here — they ship via Play Store separately.
 
@@ -39,10 +39,10 @@ jobs:
       - name: Setup Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Deploy Firestore indexes + Functions
+      - name: Deploy Firestore rules + indexes + Storage rules + Functions
         run: |
           firebase deploy \
-            --only firestore:indexes,functions \
+            --only firestore:rules,firestore:indexes,storage,functions \
             --project=${{ env.PROJECT_ID }} \
             --non-interactive
 
