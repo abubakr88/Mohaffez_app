@@ -10,7 +10,6 @@ on:
   workflow_dispatch: {}
 
 env:
-  FLUTTER_VERSION: 'stable'
   PROJECT_ID: 'mohaffez-dev'
 
 jobs:
@@ -55,7 +54,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
       - name: Install Melos
