@@ -152,14 +152,18 @@ class _MohaffezWeekSummaryCard extends StatelessWidget {
   Color get _statusColor => switch (summary.status) {
         'paid' => AppThemeConstants.success,
         'overdue' => AppThemeConstants.error,
-        'awaiting_confirmation' => AppThemeConstants.accentBlue,
+        'pendingVerification' ||
+        'awaiting_confirmation' =>
+          AppThemeConstants.accentBlue,
         _ => AppThemeConstants.warning,
       };
 
   String get _statusLabel => switch (summary.status) {
         'paid' => 'مدفوع',
         'overdue' => 'متأخر',
-        'awaiting_confirmation' => 'بانتظار التأكيد',
+        'pendingVerification' ||
+        'awaiting_confirmation' =>
+          'بانتظار التأكيد',
         _ => 'قيد الانتظار',
       };
 
@@ -366,8 +370,19 @@ class _PayNowSheet extends StatefulWidget {
 
 class _PayNowSheetState extends State<_PayNowSheet> {
   final _noteController = TextEditingController();
+  final _referenceController = TextEditingController();
+  String? _selectedMethod;
   bool _isLoading = false;
   Map<String, String?> _adminWallets = {};
+
+  static const Map<String, String> _methodLabels = {
+    'instapay': 'إنستاباي',
+    'vodafonecash': 'فودافون كاش',
+    'orangemoney': 'أورنج موني',
+    'etisalatcash': 'اتصالات كاش',
+    'wepay': 'WE Pay',
+    'bank': 'تحويل بنكي',
+  };
 
   @override
   void initState() {
@@ -390,6 +405,7 @@ class _PayNowSheetState extends State<_PayNowSheet> {
   @override
   void dispose() {
     _noteController.dispose();
+    _referenceController.dispose();
     super.dispose();
   }
 
@@ -480,6 +496,47 @@ class _PayNowSheetState extends State<_PayNowSheet> {
               ),
               const SizedBox(height: 16),
 
+              // Payment method
+              DropdownButtonFormField<String>(
+                initialValue: _selectedMethod,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  hintText: 'طريقة التحويل',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                ),
+                items: _methodLabels.entries
+                    .map((e) => DropdownMenuItem<String>(
+                          value: e.key,
+                          child: Text(e.value),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedMethod = v),
+              ),
+              const SizedBox(height: 12),
+
+              // Reference / transaction id (required)
+              TextField(
+                controller: _referenceController,
+                decoration: InputDecoration(
+                  hintText: 'رقم المرجع / المعاملة *',
+                  helperText: 'الرقم الذي ظهر بعد التحويل من المحفظة أو البنك',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
               // Note field
               TextField(
                 controller: _noteController,
@@ -545,6 +602,26 @@ class _PayNowSheetState extends State<_PayNowSheet> {
   // FIX: Call the mohaffezReportCommissionPayment Cloud Function directly.
   // Admin SDK inside the CF bypasses security rules entirely.
   Future<void> _submitPayment() async {
+    final reference = _referenceController.text.trim();
+    if (_selectedMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('اختر طريقة التحويل'),
+        ),
+      );
+      return;
+    }
+    if (reference.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('أدخل رقم المرجع / المعاملة'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       // FIXED: FIX-COMMISSION — replaced broken client batch with CF call
@@ -553,6 +630,9 @@ class _PayNowSheetState extends State<_PayNowSheet> {
 
       await callable.call({
         'weeklyCommissionSummaryId': widget.summary.id,
+        'paymentMethod': _selectedMethod,
+        'paymentReference': reference,
+        'paidAmount': widget.summary.commissionAmount,
         'note': _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),

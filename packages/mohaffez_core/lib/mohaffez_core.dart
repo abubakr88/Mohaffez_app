@@ -43,6 +43,7 @@ export 'src/repositories/user_repository.dart';
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROVIDERS
 // ═══════════════════════════════════════════════════════════════════════════════
+export 'src/providers/admin_metrics_provider.dart';
 export 'src/providers/admin_provider.dart';
 export 'src/providers/auth_provider.dart';
 export 'src/providers/booking_flow_provider.dart';

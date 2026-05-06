@@ -45,11 +45,13 @@ export { checkAppVersion } from './admin/appVersionCheck';
 export { checkMaintenanceMode } from './admin/maintenanceCheck';
 export { checkVersion } from './admin/appVersion';
 export { setAdminClaim } from './setAdminClaim';
+export { getAdminMetrics, refreshAdminMetrics } from './admin/metrics';
 
 export {
   processWeeklyCommissions,
   markCommissionPaid,
   mohaffezReportCommissionPayment,
+  rejectCommissionPayment,
 } from './payments/commissions';
 
 // Suspension triggers

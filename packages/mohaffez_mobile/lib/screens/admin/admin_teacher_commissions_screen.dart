@@ -27,24 +27,72 @@ class _AdminTeacherCommissionsScreenState
     super.dispose();
   }
 
-  Future<void> _markAsPaid(String commissionId) async {
+  Future<void> _openReviewDialog(WeeklyCommissionSummary summary) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _CommissionReviewDialog(
+        summary: summary,
+        onConfirm: (paidAmount, adminNote) =>
+            _confirmPayment(summary.id, paidAmount, adminNote),
+        onReject: (reason) => _rejectPayment(summary.id, reason),
+      ),
+    );
+  }
+
+  Future<void> _confirmPayment(
+    String commissionId,
+    double? paidAmount,
+    String? adminNote,
+  ) async {
+    setState(() => _markingPaid[commissionId] = true);
+    try {
+      await ref.read(adminActionsProvider.notifier).markCommissionPaid(
+            commissionId,
+            paidAmount: paidAmount,
+            adminNote: adminNote,
+          );
+      final st = ref.read(adminActionsProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor:
+              st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
+          content: Text(st.hasError
+              ? st.error.toString()
+              : 'تم تأكيد الدفع بنجاح ✓'),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppThemeConstants.error,
+            content: Text('خطأ: ${e.toString()}'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _markingPaid.remove(commissionId));
+    }
+  }
+
+  Future<void> _rejectPayment(String commissionId, String reason) async {
     setState(() => _markingPaid[commissionId] = true);
     try {
       await ref
           .read(adminActionsProvider.notifier)
-          .markCommissionPaid(commissionId);
+          .rejectCommissionPayment(commissionId, reason: reason);
       final st = ref.read(adminActionsProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor:
-                st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
-            content: Text(st.hasError
-                ? st.error.toString()
-                : 'تم تسجيل الدفع بنجاح ✓'),
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor:
+              st.hasError ? AppThemeConstants.error : AppThemeConstants.warning,
+          content: Text(st.hasError
+              ? st.error.toString()
+              : 'تم رفض الدفعة وإبلاغ المحفظ'),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -297,7 +345,7 @@ class _AdminTeacherCommissionsScreenState
                                   mohaffezName: mohaffezName,
                                   summaries: summaries,
                                   markingPaid: _markingPaid,
-                                  onMarkAsPaid: _markAsPaid,
+                                  onReview: _openReviewDialog,
                                 ),
                               ),
                             );
@@ -321,14 +369,14 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
   final String mohaffezName;
   final List<WeeklyCommissionSummary> summaries;
   final Map<String, bool> markingPaid;
-  final Future<void> Function(String) onMarkAsPaid;
+  final Future<void> Function(WeeklyCommissionSummary) onReview;
 
   const _TeacherCommissionDetailScreen({
     required this.mohaffezId,
     required this.mohaffezName,
     required this.summaries,
     required this.markingPaid,
-    required this.onMarkAsPaid,
+    required this.onReview,
   });
 
   @override
@@ -443,7 +491,7 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
                   return _WeekSummaryCard(
                     summary: summary,
                     isMarkingPaid: markingPaid[summary.id] ?? false,
-                    onMarkAsPaid: () => onMarkAsPaid(summary.id),
+                    onReview: () => onReview(summary),
                     showAdminActions: true,
                   );
                 },
@@ -459,27 +507,31 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
 class _WeekSummaryCard extends StatelessWidget {
   final WeeklyCommissionSummary summary;
   final bool isMarkingPaid;
-  final VoidCallback onMarkAsPaid;
+  final VoidCallback onReview;
   final bool showAdminActions;
 
   const _WeekSummaryCard({
     required this.summary,
     required this.isMarkingPaid,
-    required this.onMarkAsPaid,
+    required this.onReview,
     this.showAdminActions = true,
   });
 
   Color get _statusColor => switch (summary.status) {
         'paid' => AppThemeConstants.success,
         'overdue' => AppThemeConstants.error,
-        'awaiting_confirmation' => AppThemeConstants.accentBlue,
+        'pendingVerification' ||
+        'awaiting_confirmation' =>
+          AppThemeConstants.accentBlue,
         _ => AppThemeConstants.warning,
       };
 
   String get _statusLabel => switch (summary.status) {
         'paid' => '✅ مدفوع',
         'overdue' => '⚠️ متأخر',
-        'awaiting_confirmation' => '⏳ بانتظار التأكيد',
+        'pendingVerification' ||
+        'awaiting_confirmation' =>
+          '⏳ بانتظار التأكيد',
         _ => '⏳ مستحق',
       };
 
@@ -492,76 +544,369 @@ class _WeekSummaryCard extends StatelessWidget {
     final due = summary.dueDate != null
         ? DateFormat('dd/MM/yyyy').format(summary.dueDate!)
         : '';
+    final showActionButton =
+        showAdminActions && !summary.isPaid && summary.isAwaitingConfirmation;
+    final buttonLabel =
+        summary.isAwaitingConfirmation ? 'مراجعة الدفعة' : 'تأكيد يدوي';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        title: Text(weekLabel,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${summary.totalSessions} جلسة • '
-              'إجمالي: ${summary.totalRevenue.toStringAsFixed(0)} ج.م',
-              style: const TextStyle(fontSize: 11, color: AppThemeConstants.grey500),
-            ),
-            if (due.isNotEmpty && !summary.isPaid)
-              Text('الاستحقاق: $due',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color:
-                          summary.isOverdue ? AppThemeConstants.error : AppThemeConstants.grey500)),
-          ],
-        ),
-        trailing: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 90),
+      child: InkWell(
+        onTap: showAdminActions && !summary.isPaid ? onReview : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${summary.commissionAmount.toStringAsFixed(2)} ج.م',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: _statusColor)),
-              Text(_statusLabel,
-                  style: TextStyle(fontSize: 10, color: _statusColor)),
-              if (showAdminActions && !summary.isPaid)
-                SizedBox(
-                  height: 20,
-                  child: ElevatedButton(
-                    onPressed: isMarkingPaid ? null : onMarkAsPaid,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      backgroundColor: AppThemeConstants.success,
-                      foregroundColor: AppThemeConstants.white,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(weekLabel,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${summary.totalSessions} جلسة • '
+                          'إجمالي: ${summary.totalRevenue.toStringAsFixed(0)} ج.م',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppThemeConstants.grey500),
+                        ),
+                        if (due.isNotEmpty && !summary.isPaid)
+                          Text('الاستحقاق: $due',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: summary.isOverdue
+                                      ? AppThemeConstants.error
+                                      : AppThemeConstants.grey500)),
+                      ],
                     ),
-                    child: isMarkingPaid
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                          '${summary.commissionAmount.toStringAsFixed(2)} ج.م',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: _statusColor)),
+                      Text(_statusLabel,
+                          style: TextStyle(fontSize: 11, color: _statusColor)),
+                    ],
+                  ),
+                ],
+              ),
+              if (summary.isAwaitingConfirmation) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.accentBlue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (summary.paymentMethod != null)
+                        Text(
+                            'الطريقة: ${_methodLabel(summary.paymentMethod!)}',
+                            style: const TextStyle(fontSize: 12)),
+                      if (summary.paymentReference != null &&
+                          summary.paymentReference!.isNotEmpty)
+                        Text('المرجع: ${summary.paymentReference}',
+                            style: const TextStyle(fontSize: 12)),
+                      if (summary.reportedAmount != null)
+                        Text(
+                            'المبلغ المُعلَن: ${summary.reportedAmount!.toStringAsFixed(2)} ج.م',
+                            style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ],
+              if (showActionButton) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: isMarkingPaid ? null : onReview,
+                    icon: isMarkingPaid
                         ? const SizedBox(
-                            width: 12,
-                            height: 12,
+                            width: 14,
+                            height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               color: AppThemeConstants.white,
                             ),
                           )
-                        : const Text('تم الدفع',
-                            style: TextStyle(fontSize: 9)),
+                        : const Icon(Icons.fact_check_outlined, size: 16),
+                    label: Text(buttonLabel),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppThemeConstants.primary,
+                      foregroundColor: AppThemeConstants.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
                   ),
                 ),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+
+  static String _methodLabel(String value) => switch (value) {
+        'instapay' => 'إنستاباي',
+        'vodafonecash' => 'فودافون كاش',
+        'orangemoney' => 'أورنج موني',
+        'etisalatcash' => 'اتصالات كاش',
+        'wepay' => 'WE Pay',
+        'bank' => 'تحويل بنكي',
+        _ => value,
+      };
 }
 
+class _CommissionReviewDialog extends StatefulWidget {
+  final WeeklyCommissionSummary summary;
+  final Future<void> Function(double? paidAmount, String? adminNote) onConfirm;
+  final Future<void> Function(String reason) onReject;
 
+  const _CommissionReviewDialog({
+    required this.summary,
+    required this.onConfirm,
+    required this.onReject,
+  });
+
+  @override
+  State<_CommissionReviewDialog> createState() =>
+      _CommissionReviewDialogState();
+}
+
+class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
+  late final TextEditingController _amountController;
+  final _adminNoteController = TextEditingController();
+  final _rejectReasonController = TextEditingController();
+  bool _showRejectForm = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.summary.reportedAmount ??
+        widget.summary.commissionAmount;
+    _amountController =
+        TextEditingController(text: initial.toStringAsFixed(2));
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _adminNoteController.dispose();
+    _rejectReasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleConfirm() async {
+    final raw = _amountController.text.trim();
+    final parsed = double.tryParse(raw);
+    if (parsed == null || parsed <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('أدخل مبلغ صحيح'),
+        ),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    await widget.onConfirm(
+      parsed,
+      _adminNoteController.text.trim().isEmpty
+          ? null
+          : _adminNoteController.text.trim(),
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _handleReject() async {
+    final reason = _rejectReasonController.text.trim();
+    if (reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('اكتب سبب الرفض'),
+        ),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    await widget.onReject(reason);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.summary;
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: AlertDialog(
+        title: Text('مراجعة عمولة الأسبوع ${s.weekNumber}'),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _kv('المحفظ', s.mohaffezName),
+                _kv(
+                    'المبلغ المتوقع',
+                    '${s.commissionAmount.toStringAsFixed(2)} ج.م'),
+                if (s.paymentMethod != null)
+                  _kv('طريقة التحويل',
+                      _WeekSummaryCard._methodLabel(s.paymentMethod!)),
+                if (s.paymentReference != null &&
+                    s.paymentReference!.isNotEmpty)
+                  _kv('رقم المرجع', s.paymentReference!),
+                if (s.reportedAmount != null)
+                  _kv('المبلغ الذي أعلنه المحفظ',
+                      '${s.reportedAmount!.toStringAsFixed(2)} ج.م'),
+                if (s.mohaffezNote != null && s.mohaffezNote!.isNotEmpty)
+                  _kv('ملاحظة المحفظ', s.mohaffezNote!),
+                if (s.mohaffezReportedAt != null)
+                  _kv('تم الإرسال في',
+                      DateFormat('dd/MM/yyyy HH:mm', 'ar')
+                          .format(s.mohaffezReportedAt!)),
+                const Divider(height: 24),
+                if (!_showRejectForm) ...[
+                  const Text('المبلغ المُستلَم فعلياً:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _amountController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    decoration: const InputDecoration(
+                      suffixText: 'ج.م',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _adminNoteController,
+                    decoration: const InputDecoration(
+                      labelText: 'ملاحظة الإدارة (اختياري)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ] else ...[
+                  const Text('سبب رفض الدفعة:',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppThemeConstants.error)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _rejectReasonController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText:
+                          'مثال: لم نستلم المبلغ، رقم المرجع غير صحيح…',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          if (!_showRejectForm) ...[
+            TextButton(
+              onPressed: _busy ? null : () => Navigator.of(context).pop(),
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() => _showRejectForm = true),
+              style: TextButton.styleFrom(
+                foregroundColor: AppThemeConstants.error,
+              ),
+              child: const Text('رفض الدفعة'),
+            ),
+            ElevatedButton.icon(
+              onPressed: _busy ? null : _handleConfirm,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppThemeConstants.white),
+                    )
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: const Text('تأكيد الاستلام'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.success,
+                foregroundColor: AppThemeConstants.white,
+              ),
+            ),
+          ] else ...[
+            TextButton(
+              onPressed:
+                  _busy ? null : () => setState(() => _showRejectForm = false),
+              child: const Text('رجوع'),
+            ),
+            ElevatedButton(
+              onPressed: _busy ? null : _handleReject,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.error,
+                foregroundColor: AppThemeConstants.white,
+              ),
+              child: _busy
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppThemeConstants.white),
+                    )
+                  : const Text('تأكيد الرفض'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 140,
+              child: Text(label,
+                  style: const TextStyle(
+                      color: AppThemeConstants.grey600, fontSize: 13)),
+            ),
+            Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 13)),
+            ),
+          ],
+        ),
+      );
+}

@@ -165,10 +165,25 @@ export const markCommissionPaid = functions.https.onCall(async (data, context) =
     throw new functions.https.HttpsError('permission-denied', 'للمسؤولين فقط');
   }
 
-  const { weeklyCommissionSummaryId } = data as { weeklyCommissionSummaryId: string };
+  // Backwards-compat: old client builds sent the param as `commissionId`.
+  const payload = data as {
+    weeklyCommissionSummaryId?: string;
+    commissionId?: string;
+    paidAmount?: number;
+    adminNote?: string;
+  };
+  const weeklyCommissionSummaryId =
+    payload.weeklyCommissionSummaryId ?? payload.commissionId;
 
   if (!weeklyCommissionSummaryId) {
     throw new functions.https.HttpsError('invalid-argument', 'معرّف الملخص مطلوب');
+  }
+
+  if (
+    payload.paidAmount !== undefined &&
+    (typeof payload.paidAmount !== 'number' || payload.paidAmount < 0)
+  ) {
+    throw new functions.https.HttpsError('invalid-argument', 'المبلغ المدفوع غير صحيح');
   }
 
   const summaryRef = await resolveWeeklySummaryRef(weeklyCommissionSummaryId);
@@ -181,25 +196,36 @@ export const markCommissionPaid = functions.https.onCall(async (data, context) =
     const snap = await tx.get(summaryRef);
     if (!snap.exists) return false;
     const d = snap.data()!;
-    
+
     // Idempotency: if already paid, return false
     if (d.status === 'paid') return false;
-    
-    const allowedStatuses = ['pending', 'overdue', 'pendingVerification'];
+
+    // Accept both legacy 'awaiting_confirmation' and current 'pendingVerification'
+    const allowedStatuses = [
+      'pending',
+      'overdue',
+      'pendingVerification',
+      'awaiting_confirmation',
+    ];
     if (!allowedStatuses.includes(d.status)) {
       throw new functions.https.HttpsError(
         'failed-precondition',
         `Cannot mark as paid: current status is '${d.status}'.`
       );
     }
-    
-    tx.update(summaryRef, {
+
+    const updates: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
       status: 'paid',
       paidAt: FieldValue.serverTimestamp(),
       markedPaidBy: context.auth!.uid,
       updatedAt: FieldValue.serverTimestamp(),
-    });
-    
+    };
+    if (payload.paidAmount !== undefined) updates.paidAmount = payload.paidAmount;
+    if (payload.adminNote !== undefined && payload.adminNote.length > 0) {
+      updates.adminConfirmationNote = payload.adminNote;
+    }
+    tx.update(summaryRef, updates);
+
     summaryData = d;
     return true;
   });
@@ -256,13 +282,24 @@ export const mohaffezReportCommissionPayment = functions.https.onCall(
     }
 
     const mohaffezId = context.auth.uid;
-    const { weeklyCommissionSummaryId, note } = data as {
-      weeklyCommissionSummaryId: string;
-      note?: string;
-    };
+    const { weeklyCommissionSummaryId, note, paymentReference, paymentMethod, paidAmount } =
+      data as {
+        weeklyCommissionSummaryId: string;
+        note?: string;
+        paymentReference?: string;
+        paymentMethod?: string;
+        paidAmount?: number;
+      };
 
     if (!weeklyCommissionSummaryId) {
       throw new functions.https.HttpsError('invalid-argument', 'معرّف الملخص مطلوب');
+    }
+
+    if (
+      paidAmount !== undefined &&
+      (typeof paidAmount !== 'number' || paidAmount <= 0)
+    ) {
+      throw new functions.https.HttpsError('invalid-argument', 'المبلغ المرسل غير صحيح');
     }
 
     const summaryRef = await resolveWeeklySummaryRef(weeklyCommissionSummaryId);
@@ -284,7 +321,11 @@ export const mohaffezReportCommissionPayment = functions.https.onCall(
       }
 
       // Idempotency (atomic — inside transaction)
-      if (d.status === 'pendingVerification' || d.status === 'paid') {
+      if (
+        d.status === 'pendingVerification' ||
+        d.status === 'awaiting_confirmation' ||
+        d.status === 'paid'
+      ) {
         return false;
       }
 
@@ -297,12 +338,20 @@ export const mohaffezReportCommissionPayment = functions.https.onCall(
         );
       }
 
-      tx.update(summaryRef, {
+      const updates: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> = {
         status: 'pendingVerification',
         mohaffezReportedAt: FieldValue.serverTimestamp(),
         mohaffezNote: note ?? null,
+        paymentReference: paymentReference ?? null,
+        paymentMethod: paymentMethod ?? null,
+        // Clear any previous rejection so a fresh report starts clean
+        rejectionReason: FieldValue.delete(),
+        rejectedAt: FieldValue.delete(),
+        rejectedBy: FieldValue.delete(),
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      };
+      if (paidAmount !== undefined) updates.reportedAmount = paidAmount;
+      tx.update(summaryRef, updates);
 
       summaryForNotification = d;
       return true;
@@ -345,6 +394,109 @@ export const mohaffezReportCommissionPayment = functions.https.onCall(
       mohaffezId,
       weekNumber: summaryForNotification!.weekNumber,
       amount: summaryForNotification!.commissionAmount,
+    });
+
+    return { success: true };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CALLABLE: admin rejects a mohaffez's commission payment claim
+// Bounces the summary back to 'pending' (or 'overdue' if still past due) and
+// notifies the mohaffez so they can correct + resubmit.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const rejectCommissionPayment = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
+    }
+
+    const callerDoc = await db.collection('users').doc(context.auth.uid).get();
+    if (callerDoc.data()?.role !== 'admin') {
+      throw new functions.https.HttpsError('permission-denied', 'للمسؤولين فقط');
+    }
+
+    const { weeklyCommissionSummaryId, reason } = data as {
+      weeklyCommissionSummaryId: string;
+      reason: string;
+    };
+
+    if (!weeklyCommissionSummaryId) {
+      throw new functions.https.HttpsError('invalid-argument', 'معرّف الملخص مطلوب');
+    }
+    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'سبب الرفض مطلوب');
+    }
+
+    const summaryRef = await resolveWeeklySummaryRef(weeklyCommissionSummaryId);
+    const resolvedSummaryId = summaryRef.id;
+
+    let summaryData: FirebaseFirestore.DocumentData | undefined;
+
+    const committed = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(summaryRef);
+      if (!snap.exists) return false;
+      const d = snap.data()!;
+
+      // Only a claim that's currently awaiting verification can be rejected.
+      const allowed = ['pendingVerification', 'awaiting_confirmation'];
+      if (!allowed.includes(d.status)) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `لا يمكن رفض دفعة بحالة: ${d.status}`
+        );
+      }
+
+      // If due date has passed, return to 'overdue', otherwise 'pending'.
+      const now = admin.firestore.Timestamp.now();
+      const due = d.dueDate as admin.firestore.Timestamp | undefined;
+      const nextStatus =
+        due && due.toMillis() <= now.toMillis() ? 'overdue' : 'pending';
+
+      tx.update(summaryRef, {
+        status: nextStatus,
+        rejectionReason: reason.trim(),
+        rejectedAt: FieldValue.serverTimestamp(),
+        rejectedBy: context.auth!.uid,
+        // Preserve the prior reported amount/reference for audit but clear
+        // the active claim flag so the mohaffez can re-report.
+        mohaffezReportedAt: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      summaryData = d;
+      return true;
+    });
+
+    if (!committed) return { success: true };
+
+    const s = summaryData!;
+    if (s.mohaffezId) {
+      await createAndSendNotification({
+        userId: s.mohaffezId,
+        senderId: context.auth.uid,
+        title: 'رُفض تأكيد العمولة',
+        body: `لم يتم قبول إثبات الدفع للأسبوع ${s.weekNumber}. السبب: ${reason.trim()}`,
+        type: 'commission_payment_rejected',
+        isRead: false,
+        highPriority: true,
+        data: {
+          weeklyCommissionSummaryId: resolvedSummaryId,
+          reason: reason.trim(),
+        },
+      }).catch((err) =>
+        functions.logger.warn('Failed to notify mohaffez of rejection', {
+          mohaffezId: s.mohaffezId,
+          err,
+        })
+      );
+    }
+
+    functions.logger.info('Commission payment rejected by admin', {
+      weeklyCommissionSummaryId: resolvedSummaryId,
+      adminId: context.auth.uid,
+      reason: reason.trim(),
     });
 
     return { success: true };

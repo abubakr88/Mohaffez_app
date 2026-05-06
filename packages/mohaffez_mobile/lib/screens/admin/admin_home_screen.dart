@@ -2,8 +2,10 @@
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/app_version_service.dart';
 
@@ -193,6 +195,9 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
               padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+                  // Web-admin pointer
+                  const _WebAdminBanner(),
+
                   // Maintenance banner
                   if (config?.maintenanceMode == true)
                     _MaintenanceBanner(
@@ -751,6 +756,104 @@ class _AttentionBanner extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 13, color: AppThemeConstants.error),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WebAdminBanner extends StatelessWidget {
+  const _WebAdminBanner();
+
+  static const _webUrl = 'https://app.mohafezy.com';
+
+  Future<void> _open(BuildContext context) async {
+    final uri = Uri.parse(_webUrl);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (ok) return;
+    await Clipboard.setData(const ClipboardData(text: _webUrl));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تعذّر فتح المتصفح — تم نسخ الرابط'),
+      ),
+    );
+  }
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(const ClipboardData(text: _webUrl));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ الرابط')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppThemeConstants.spaceMd),
+      padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: AppThemeConstants.tealGradient,
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: AppThemeConstants.borderRadiusMd,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.desktop_windows_outlined,
+                  color: AppThemeConstants.onPrimary, size: 22),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'لوحة الإدارة الكاملة على الويب',
+                  style: TextStyle(
+                    color: AppThemeConstants.onPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'الإحصائيات التفصيلية، تقارير الإيرادات، الرسوم البيانية، وإدارة المستخدمين متاحة فقط على الويب.',
+            style: TextStyle(
+              color: AppThemeConstants.onPrimary.withValues(alpha: 0.85),
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _open(context),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('فتح app.mohafezy.com'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppThemeConstants.onPrimary,
+                    foregroundColor: AppThemeConstants.deepTeal,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'نسخ الرابط',
+                onPressed: () => _copy(context),
+                icon: const Icon(Icons.copy_rounded,
+                    color: AppThemeConstants.onPrimary, size: 18),
+              ),
+            ],
           ),
         ],
       ),

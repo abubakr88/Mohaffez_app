@@ -39,6 +39,12 @@ dependencies:
   # Utils
   intl: ^0.20.0
 
+  # Charts (admin metrics)
+  fl_chart: ^0.69.0
+
+  # Cloud Functions (admin actions / metrics refresh)
+  cloud_functions: ^5.1.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

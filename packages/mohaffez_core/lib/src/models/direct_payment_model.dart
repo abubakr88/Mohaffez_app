@@ -183,11 +183,28 @@ class WeeklyCommissionSummary {
   final double totalRevenue;
   final double commissionAmount;
   final double commissionRate;
-  final String status; // 'pending' | 'paid' | 'overdue'
+  // 'pending' | 'overdue' | 'pendingVerification' (or legacy
+  // 'awaiting_confirmation') | 'paid'
+  final String status;
   final DateTime? weekStart;
   final DateTime? weekEnd;
   final DateTime? dueDate;
   final DateTime? paidAt;
+
+  // ── Mohaffez-reported claim fields (set when teacher submits proof) ──
+  final DateTime? mohaffezReportedAt;
+  final String?   mohaffezNote;
+  final String?   paymentReference;     // bank/wallet transaction reference
+  final String?   paymentMethod;        // 'instapay' | 'vodafonecash' | …
+  final double?   reportedAmount;       // amount the teacher claims to have sent
+
+  // ── Admin-side fields ──
+  final double?   paidAmount;           // actual amount confirmed by admin
+  final String?   adminConfirmationNote;
+  final String?   markedPaidBy;
+  final String?   rejectionReason;
+  final DateTime? rejectedAt;
+  final String?   rejectedBy;
 
   const WeeklyCommissionSummary({
     required this.id,
@@ -204,13 +221,27 @@ class WeeklyCommissionSummary {
     this.weekEnd,
     this.dueDate,
     this.paidAt,
+    this.mohaffezReportedAt,
+    this.mohaffezNote,
+    this.paymentReference,
+    this.paymentMethod,
+    this.reportedAmount,
+    this.paidAmount,
+    this.adminConfirmationNote,
+    this.markedPaidBy,
+    this.rejectionReason,
+    this.rejectedAt,
+    this.rejectedBy,
   });
 
   bool get isPending             => status == 'pending';
   bool get isOverdue             => status == 'overdue';
   bool get isPaid                => status == 'paid';
-  bool get isAwaitingConfirmation => status == 'awaiting_confirmation';
+  // Both legacy and current "claim awaiting admin verification" labels.
+  bool get isAwaitingConfirmation =>
+      status == 'awaiting_confirmation' || status == 'pendingVerification';
   bool get isActionable          => isPending || isOverdue;
+  bool get wasRejected           => rejectionReason != null && rejectionReason!.isNotEmpty;
 
   factory WeeklyCommissionSummary.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -235,6 +266,17 @@ class WeeklyCommissionSummary {
       weekEnd:          ts(d['weekEnd']),
       dueDate:          ts(d['dueDate']),
       paidAt:           ts(d['paidAt']),
+      mohaffezReportedAt: ts(d['mohaffezReportedAt']),
+      mohaffezNote:       d['mohaffezNote']         as String?,
+      paymentReference:   d['paymentReference']     as String?,
+      paymentMethod:      d['paymentMethod']        as String?,
+      reportedAmount:     (d['reportedAmount']     as num?)?.toDouble(),
+      paidAmount:         (d['paidAmount']         as num?)?.toDouble(),
+      adminConfirmationNote: d['adminConfirmationNote'] as String?,
+      markedPaidBy:       d['markedPaidBy']         as String?,
+      rejectionReason:    d['rejectionReason']      as String?,
+      rejectedAt:         ts(d['rejectedAt']),
+      rejectedBy:         d['rejectedBy']           as String?,
     );
   }
 }
