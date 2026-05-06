@@ -31,6 +31,8 @@ class NotificationService {
 
   /// Initialize notifications with better error handling
   static Future<void> initialize() async {
+    // Service workers don't work in Flutter's dev web server — skip on web.
+    if (kIsWeb) return;
     try {
       // Request permissions
       final settings = await messaging.requestPermission(
@@ -104,6 +106,7 @@ class NotificationService {
 
   /// Save FCM token with retry logic
   static Future<void> saveFCMToken() async {
+    if (kIsWeb) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (kDebugMode) debugPrint('NotificationService: No authenticated user');
@@ -166,6 +169,7 @@ class NotificationService {
 
   // FIX: Refresh and upsert the latest FCM token when app returns to foreground.
   static Future<void> refreshTokenIfNeeded() async {
+    if (kIsWeb) return;
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
