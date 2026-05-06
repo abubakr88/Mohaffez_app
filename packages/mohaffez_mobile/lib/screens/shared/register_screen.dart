@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signUpWithGoogle() async {
+    if (kIsWeb) return;
+
+    final notifier = ref.read(authNotifierProvider.notifier);
+    await notifier.signInWithGoogle();
+
+    if (!mounted) return;
+    final state = ref.read(authNotifierProvider);
+
+    if (state.hasError && state.error is NeedsRoleSelectionException) {
+      // New Google user — use the role and gender already selected on this screen.
+      await notifier.completeGoogleSignIn(
+        role: _selectedRole,
+        gender: _selectedGender,
+      );
+      return;
+    }
+
+    if (state.hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.error.toString()),
+          backgroundColor: AppThemeConstants.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _submit() async {
@@ -298,6 +328,61 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
+                          ),
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceMd),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 1,
+                                color: AppThemeConstants.divider,
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'أو',
+                                style: TextStyle(
+                                  color: AppThemeConstants.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                height: 1,
+                                color: AppThemeConstants.divider,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceMd),
+                        SizedBox(
+                          width: double.infinity,
+                          height: AppThemeConstants.buttonHeightLarge,
+                          child: OutlinedButton.icon(
+                            onPressed: isLoading ? null : _signUpWithGoogle,
+                            icon: const Icon(Icons.g_mobiledata_rounded, size: 24),
+                            label: const Text(
+                              'إنشاء حساب بـ Google',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Cairo',
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppThemeConstants.textPrimary,
+                              side: const BorderSide(
+                                color: Color(0xFFE5E7EB),
+                                width: 1.5,
+                              ),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
+                              ),
+                              backgroundColor: AppThemeConstants.surface,
+                            ),
                           ),
                         ),
                         const SizedBox(height: AppThemeConstants.spaceMd),

@@ -78,6 +78,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.dispose();
   }
 
+  Future<void> _signInWithGoogle() async {
+    if (kIsWeb) return;
+
+    final notifier = ref.read(authNotifierProvider.notifier);
+    await notifier.signInWithGoogle();
+
+    if (!mounted) return;
+    final state = ref.read(authNotifierProvider);
+
+    if (state.hasError) {
+      final error = state.error;
+      if (error is NeedsRoleSelectionException) {
+        context.push('/google-role-selection', extra: {
+          'name': error.name,
+          'email': error.email,
+          'photoUrl': error.photoUrl,
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString()),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _submit() async {
     setState(() {
       _autoValidate = true;
@@ -446,7 +476,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
             
             const SizedBox(height: 24),
-            
+
+            // ── Google Sign-In Button ─────────────────────
+            SizedBox(
+              height: 54,
+              child: OutlinedButton.icon(
+                onPressed: isLoading ? null : _signInWithGoogle,
+                icon: const Icon(Icons.login, size: 20),
+                label: const Text(
+                  'تسجيل الدخول بحساب Google',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _LoginTheme.textPrimary,
+                  side: BorderSide(
+                    color: Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  backgroundColor: AppThemeConstants.surface,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
             // ── Secondary Button ──────────────────────────
             SizedBox(
               height: 54,
