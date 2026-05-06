@@ -16,6 +16,8 @@ class AdminShell extends StatelessWidget {
     SidebarItem(icon: Icons.discount_outlined,       label: 'أكواد الخصم',   path: '/admin/promos'),
     SidebarItem(icon: Icons.tune_rounded,            label: 'إعدادات النظام', path: '/admin/config'),
     SidebarItem(icon: Icons.bar_chart_rounded,       label: 'التقارير',      path: '/admin/reports'),
+    SidebarItem(icon: Icons.event_note_outlined,     label: 'أحداث الدفع',  path: '/admin/payment-events'),
+    SidebarItem(icon: Icons.history_rounded,         label: 'سجل العمليات', path: '/admin/audit-log'),
   ];
 
   @override

@@ -218,9 +218,25 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
     await _callFunction('triggerCommissionJobManually', const {});
   }
 
-  Future<void> markCommissionPaid(String commissionId) async {
+  Future<void> markCommissionPaid(
+    String weeklyCommissionSummaryId, {
+    double? paidAmount,
+    String? adminNote,
+  }) async {
     await _callFunction('markCommissionPaid', {
-      'commissionId': commissionId,
+      'weeklyCommissionSummaryId': weeklyCommissionSummaryId,
+      if (paidAmount != null) 'paidAmount': paidAmount,
+      if (adminNote != null && adminNote.isNotEmpty) 'adminNote': adminNote,
+    });
+  }
+
+  Future<void> rejectCommissionPayment(
+    String weeklyCommissionSummaryId, {
+    required String reason,
+  }) async {
+    await _callFunction('rejectCommissionPayment', {
+      'weeklyCommissionSummaryId': weeklyCommissionSummaryId,
+      'reason': reason,
     });
   }
 

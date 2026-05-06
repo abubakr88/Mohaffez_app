@@ -6,12 +6,7 @@ import 'package:flutter/foundation.dart'
 
 class DevFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (kIsWeb) {
-      throw UnsupportedError(
-        'DevFirebaseOptions not configured for web. '
-        'Add a web app to the mohaffez-dev Firebase project and re-run flutterfire configure.',
-      );
-    }
+    if (kIsWeb) return web;
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -21,6 +16,16 @@ class DevFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyCfHpFSKV2pGanreNzowMo59Xc2UubZaKw',
+    appId: '1:389775667878:web:847be3b6c2c9a1d3b87a67',
+    messagingSenderId: '389775667878',
+    projectId: 'mohaffez-dev',
+    authDomain: 'mohaffez-dev.firebaseapp.com',
+    storageBucket: 'mohaffez-dev.firebasestorage.app',
+    measurementId: 'G-1S2SRKZGZC',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBmTp0UTPt4IN6GLMO25uHZoq72MS9cNNM',

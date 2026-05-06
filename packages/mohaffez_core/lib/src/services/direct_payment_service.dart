@@ -34,6 +34,18 @@ class DirectPaymentService {
       weekEnd: current.weekEnd ?? legacy.weekEnd,
       dueDate: current.dueDate ?? legacy.dueDate,
       paidAt: current.paidAt ?? legacy.paidAt,
+      mohaffezReportedAt: current.mohaffezReportedAt ?? legacy.mohaffezReportedAt,
+      mohaffezNote: current.mohaffezNote ?? legacy.mohaffezNote,
+      paymentReference: current.paymentReference ?? legacy.paymentReference,
+      paymentMethod: current.paymentMethod ?? legacy.paymentMethod,
+      reportedAmount: current.reportedAmount ?? legacy.reportedAmount,
+      paidAmount: current.paidAmount ?? legacy.paidAmount,
+      adminConfirmationNote:
+          current.adminConfirmationNote ?? legacy.adminConfirmationNote,
+      markedPaidBy: current.markedPaidBy ?? legacy.markedPaidBy,
+      rejectionReason: current.rejectionReason ?? legacy.rejectionReason,
+      rejectedAt: current.rejectedAt ?? legacy.rejectedAt,
+      rejectedBy: current.rejectedBy ?? legacy.rejectedBy,
     );
   }
 
@@ -349,49 +361,6 @@ class DirectPaymentService {
       'vodafonecash': wallets['vodafonecash'] as String?,
       'orangemoney':  wallets['orangemoney']  as String?,
     };
-  }
-
-  // ── Notify admin of commission payment ───────────────────────────────────
-  static Future<void> notifyAdminOfCommissionPayment({
-    required String mohaffezId,
-    required String mohaffezName,
-    required String summaryId,
-    required double amount,
-    String? note,
-  }) async {
-    final batch = _db.batch();
-
-    // 1. Update summary status → awaiting_confirmation
-    final summaryRef =
-        _db.collection('weeklyCommissionSummaries').doc(summaryId);
-    batch.update(summaryRef, {
-      'status':           'awaiting_confirmation',
-      'paymentClaimedAt': FieldValue.serverTimestamp(),
-      'paymentClaimedBy': mohaffezId,
-      'paymentNote':      note,
-      'updatedAt':        FieldValue.serverTimestamp(),
-    });
-
-    // 2. Notify admin
-    final notifRef = _db.collection('notifications').doc();
-    batch.set(notifRef, {
-      'type':          'commission_payment_claimed',
-      'userId':        'admin',
-      'senderId':      mohaffezId,
-      'title':         'طلب تأكيد عمولة',
-      'body':          '$mohaffezName أرسل دفعة بقيمة ${amount.toStringAsFixed(2)} ج.م',
-      'isRead':        false,
-      'highPriority':  true,
-      'data': {
-        'weeklyCommissionSummaryId': summaryId,
-        'mohaffezId':                mohaffezId,
-        'amount':                    amount.toString(),
-        'note':                      note,
-      },
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
   }
 
   // ── Simple JSON parser for error messages ────────────────────────────────
