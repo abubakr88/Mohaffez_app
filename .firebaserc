@@ -7,9 +7,21 @@
   "targets": {
     "mohaffez-ba2ec": {
       "hosting": {
-        "app": ["mohaffez-app"],
-        "marketing": ["mohaffez-marketing"]
+        "app": [
+          "mohaffez-app"
+        ],
+        "marketing": [
+          "mohaffez-marketing"
+        ]
+      }
+    },
+    "mohaffez-dev": {
+      "hosting": {
+        "app": [
+          "mohaffez-web-dev"
+        ]
       }
     }
-  }
+  },
+  "etags": {}
 }
