@@ -1,7 +1,8 @@
 name: Deploy to DEV (mohaffez-dev)
 
-# Auto-deploys backend (rules, indexes, functions) and web hosting to the
+# Auto-deploys backend (Firestore rules, indexes, Cloud Functions) to the
 # DEV Firebase project whenever the `develop` branch is updated.
+# Web is hosted on Hostinger — not deployed here.
 # Mobile builds are NOT deployed here — they ship via Play Store separately.
 
 on:
@@ -45,34 +46,3 @@ jobs:
             --project=${{ env.PROJECT_ID }} \
             --non-interactive
 
-  deploy-web:
-    runs-on: ubuntu-latest
-    environment: development
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: Install Melos
-        run: dart pub global activate melos
-
-      - name: Bootstrap Melos
-        run: melos bootstrap
-
-      - name: Build Web (dev)
-        run: |
-          cd packages/mohaffez_web
-          flutter build web --release --pwa-strategy offline-first \
-            -t lib/main_dev.dart
-
-      - name: Deploy Web to DEV Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_DEV }}'
-          projectId: ${{ env.PROJECT_ID }}
-          channelId: live
-          target: app
