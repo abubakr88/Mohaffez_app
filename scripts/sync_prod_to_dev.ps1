@@ -26,7 +26,13 @@ gcloud firestore export "gs://$PROD_BUCKET/$EXPORT_PATH" --project=$PROD
 
 # 2. Ensure regional import bucket exists in DEV
 Write-Host "`n[2/5] Preparing import bucket gs://$IMPORT_BUCKET ($REGION)..." -ForegroundColor Yellow
-$bucketExists = gcloud storage buckets describe "gs://$IMPORT_BUCKET" --project=$DEV 2>$null
+$bucketExists = $false
+try {
+    $null = gcloud storage buckets describe "gs://$IMPORT_BUCKET" --project=$DEV 2>$null
+    $bucketExists = ($LASTEXITCODE -eq 0)
+} catch {
+    $bucketExists = $false
+}
 if (-not $bucketExists) {
     gcloud storage buckets create "gs://$IMPORT_BUCKET" --location=$REGION --project=$DEV
 }

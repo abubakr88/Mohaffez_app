@@ -42,6 +42,9 @@ dependencies:
   # Network
   connectivity_plus: ^6.0.5
 
+  # Auth providers
+  google_sign_in: ^6.2.1
+
   # Cache & Storage
   shared_preferences: ^2.2.2
 

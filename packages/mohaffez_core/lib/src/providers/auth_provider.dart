@@ -13,9 +13,25 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../services/cache_service.dart';
 import 'booking_flow_provider.dart';
+
+/// Thrown when a new Google user has authenticated but has no Firestore doc yet.
+/// The UI catches this and shows role/gender selection before calling
+/// [AuthNotifier.completeGoogleSignIn].
+class NeedsRoleSelectionException implements Exception {
+  final String name;
+  final String email;
+  final String? photoUrl;
+
+  const NeedsRoleSelectionException({
+    required this.name,
+    required this.email,
+    this.photoUrl,
+  });
+}
 
 final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges().asyncMap((firebaseUser) async {
@@ -173,6 +189,120 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
+  /// Triggers the Google account picker and signs into Firebase.
+  /// For existing users: completes sign-in normally.
+  /// For new users (no Firestore doc): throws [NeedsRoleSelectionException]
+  /// so the UI can collect role and gender, then call [completeGoogleSignIn].
+  Future<void> signInWithGoogle() async {
+    state = const AsyncValue.loading();
+
+    state = await AsyncValue.guard(() async {
+      final cred = await _authService.signInWithGoogle();
+      if (cred.user == null) throw Exception('فشل تسجيل الدخول');
+
+      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+
+      final userId = cred.user!.uid;
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        // New Google user — let UI collect role/gender first.
+        throw NeedsRoleSelectionException(
+          name: cred.user!.displayName ?? '',
+          email: cred.user!.email ?? '',
+          photoUrl: cred.user!.photoURL,
+        );
+      }
+
+      final data = userDoc.data() as Map<String, dynamic>;
+
+      final status = data['status'] as String? ?? 'active';
+      if (status == 'suspended') {
+        await _authService.logout();
+        throw Exception('تم تعليق حسابك. يرجى التواصل مع الدعم.');
+      }
+
+      final suspensionDoc = await FirebaseFirestore.instance
+          .collection('userSuspensions')
+          .doc(userId)
+          .get();
+      if (suspensionDoc.exists && suspensionDoc.data()?['isActive'] == true) {
+        await _authService.logout();
+        throw Exception('تم تعليق حسابك. يرجى التواصل مع الدعم.');
+      }
+
+      await CacheService.saveUserId(userId);
+      await CacheService.saveUserRole(data['role'] as String);
+      await CacheService.saveUserName(data['name'] as String);
+      await _ensureUserFields(userId, data);
+      await _saveFCMTokenWithRetry();
+    });
+  }
+
+  /// Called after the user selects role and gender for a new Google account.
+  /// The Firebase Auth user is already signed in; this creates the Firestore doc.
+  Future<void> completeGoogleSignIn({
+    required String role,
+    required String gender,
+  }) async {
+    state = const AsyncValue.loading();
+
+    state = await AsyncValue.guard(() async {
+      final user = _authService.currentUser;
+      if (user == null) throw Exception('الجلسة انتهت، يرجى المحاولة مجدداً');
+
+      final userId = user.uid;
+      final name = user.displayName ?? '';
+      final email = user.email ?? '';
+      final photoUrl = user.photoURL;
+
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(userId).set({
+          'uid': userId,
+          'name': name,
+          'email': email,
+          'role': role,
+          'status': 'active',
+          'photoUrl': photoUrl,
+          'bio': null,
+          'youtubeVideoUrl': null,
+          'specialization': null,
+          'phoneNumber': null,
+          'followerCount': 0,
+          'followingCount': 0,
+          'rating': 0.0,
+          'reviewCount': 0,
+          'addressText': null,
+          'addressLat': null,
+          'addressLng': null,
+          'setupCompleted': false,
+          'dateOfBirth': null,
+          'city': null,
+          'examScore': null,
+          'examTakenAt': null,
+          'examRetryCount': 0,
+          'examPassed': false,
+          'examNextRetryAt': null,
+          'gender': gender,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        try {
+          await _authService.logout();
+        } catch (_) {}
+        rethrow;
+      }
+
+      await CacheService.saveUserId(userId);
+      await CacheService.saveUserRole(role);
+      await CacheService.saveUserName(name);
+      await _saveFCMTokenWithRetry();
+    });
+  }
+
   Future<void> logout() async {
     state = const AsyncValue.loading();
 
@@ -301,6 +431,19 @@ class AuthService {
 
   Future<void> sendPasswordResetEmail(String email) =>
       _auth.sendPasswordResetEmail(email: email);
+
+  Future<UserCredential> signInWithGoogle() async {
+    final googleUser = await GoogleSignIn().signIn();
+    if (googleUser == null) throw Exception('تم إلغاء تسجيل الدخول');
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    return _auth.signInWithCredential(credential);
+  }
 }
 
 final isAuthenticatedProvider = Provider<bool>((ref) {

@@ -31,6 +31,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
+  Future<void> _signUpWithGoogle() async {
+    final notifier = ref.read(authNotifierProvider.notifier);
+    await notifier.signInWithGoogle();
+
+    if (!mounted) return;
+    final state = ref.read(authNotifierProvider);
+
+    if (state.hasError && state.error is NeedsRoleSelectionException) {
+      // New Google user — use the role and gender already selected on this screen.
+      await notifier.completeGoogleSignIn(
+        role: _selectedRole,
+        gender: _selectedGender,
+      );
+      return;
+    }
+
+    if (state.hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.error.toString()),
+          backgroundColor: AppThemeConstants.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _submit() async {
     setState(() {
       _autoValidate = true;
