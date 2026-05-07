@@ -155,8 +155,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       textDirection: TextDirection.rtl,
       child: Scaffold(
         body: mohaffezAsync.when(
-          data: (teachers) =>
-              _buildMapExperience(context, ref, params, teachers),
+          data: (teachers) => _buildMapExperience(context, teachers),
           loading: _buildLoading,
           error: (_, __) => ErrorDisplay.dataLoad(
             onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
@@ -168,87 +167,197 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
 
   Widget _buildMapExperience(
     BuildContext context,
-    WidgetRef ref,
-    NearbyParams params,
     List<MohaffezModel> teachers,
   ) {
     _ensureMarkerIcons(teachers);
     _fitInitialBounds(teachers);
 
-    return Stack(
-      children: [
-        GoogleMap(
-          initialCameraPosition: _initialCamera(teachers),
-          myLocationEnabled: userLat != null && userLng != null,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          compassEnabled: false,
-          mapToolbarEnabled: false,
-          style: _premiumMapStyle,
-          markers: _buildMarkers(teachers),
-          circles: _buildRadiusCircle(),
-          onMapCreated: (controller) {
-            _mapController = controller;
-            _fitInitialBounds(teachers, force: true);
-          },
-          onTap: (_) => setState(() => _selectedTeacher = null),
-        ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.center,
-                  colors: [
-                    AppThemeConstants.deepTeal.withValues(alpha: 0.5),
-                    AppThemeConstants.transparent,
+    return SafeArea(
+      child: Column(
+        children: [
+          _buildMapHeader(teachers.length),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 720;
+                final mapPane = _buildMapPane(teachers);
+                final resultsPane = _buildResultsPane(context, teachers);
+
+                if (isWide) {
+                  return Row(
+                    children: [
+                      SizedBox(
+                        width: math.min(430, constraints.maxWidth * 0.42),
+                        child: resultsPane,
+                      ),
+                      Expanded(child: mapPane),
+                    ],
+                  );
+                }
+
+                return Column(
+                  children: [
+                    Expanded(flex: 5, child: mapPane),
+                    Expanded(flex: 6, child: resultsPane),
                   ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapPane(List<MohaffezModel> teachers) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            GoogleMap(
+              initialCameraPosition: _initialCamera(teachers),
+              myLocationEnabled: userLat != null && userLng != null,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              compassEnabled: false,
+              mapToolbarEnabled: false,
+              style: _premiumMapStyle,
+              markers: _buildMarkers(teachers),
+              circles: _buildRadiusCircle(),
+              onMapCreated: (controller) {
+                _mapController = controller;
+                _fitInitialBounds(teachers, force: true);
+              },
+              onTap: (_) => setState(() => _selectedTeacher = null),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.center,
+                      colors: [
+                        AppThemeConstants.deepTeal.withValues(alpha: 0.36),
+                        AppThemeConstants.transparent,
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-        SafeArea(
-          child: Column(
-            children: [
-              _buildMapHeader(teachers.length),
-              _buildSearchBar(),
-              _buildFilterRail(),
-              if (isLoadingLocation || locationError != null)
-                _buildLocationBanner(),
-            ],
-          ),
-        ),
-        if (teachers.isEmpty && !isLoadingLocation)
-          const Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: EmptyState(
-                  icon: Icons.travel_explore,
-                  title: 'لا يوجد محفظون',
-                  message: 'لم نتمكن من العثور على محفظين في نطاق البحث',
-                ),
+            Positioned(
+              left: 14,
+              bottom: 14,
+              child: _FloatingMapButton(
+                icon: Icons.my_location,
+                onTap: _getCurrentLocation,
+                tooltip: 'تحديث الموقع',
               ),
             ),
-          ),
-        Positioned(
-          left: 16,
-          bottom: _selectedTeacher == null ? 34 : 238,
-          child: _FloatingMapButton(
-            icon: Icons.my_location,
-            onTap: _getCurrentLocation,
-            tooltip: 'تحديث الموقع',
-          ),
+            Positioned(
+              right: 14,
+              top: 14,
+              child: _MapCounterBadge(
+                count: teachers.length,
+                radiusKm: radiusKm.round(),
+              ),
+            ),
+          ],
         ),
-        Positioned(
-          right: 16,
-          left: 16,
-          bottom: 18,
-          child: _buildSelectedTeacherCard(context),
-        ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildResultsPane(BuildContext context, List<MohaffezModel> teachers) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppThemeConstants.outline),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeConstants.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildSearchBar(),
+          _buildFilterRail(),
+          if (isLoadingLocation || locationError != null)
+            _buildLocationBanner(),
+          if (_selectedTeacher != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: _TeacherPreviewCard(
+                teacher: _selectedTeacher!,
+                distance: _selectedTeacher!.getDistanceFrom(userLat, userLng),
+                pulseValue: _pulseController.value,
+                onClose: () => setState(() => _selectedTeacher = null),
+                onBook: () => _openTeacherProfile(_selectedTeacher!),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.format_list_bulleted_rounded,
+                  size: 18,
+                  color: AppThemeConstants.primary,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'نتائج البحث',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: AppThemeConstants.textPrimary,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${teachers.length}',
+                  style: const TextStyle(
+                    color: AppThemeConstants.textSecondary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: teachers.isEmpty && !isLoadingLocation
+                ? const EmptyState(
+                    icon: Icons.travel_explore,
+                    title: 'لا يوجد محفظون',
+                    message: 'لم نتمكن من العثور على محفظين في نطاق البحث',
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                    itemCount: teachers.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final teacher = teachers[index];
+                      return _TeacherResultTile(
+                        teacher: teacher,
+                        distance: teacher.getDistanceFrom(userLat, userLng),
+                        isSelected: _selectedTeacher?.id == teacher.id,
+                        onTap: () => _selectTeacher(teacher),
+                        onBook: () => _openTeacherProfile(teacher),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -770,32 +879,15 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     );
   }
 
-  Widget _buildSelectedTeacherCard(BuildContext context) {
-    final teacher = _selectedTeacher;
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 280),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      child: teacher == null
-          ? const SizedBox.shrink()
-          : _TeacherPreviewCard(
-              key: ValueKey(teacher.id),
-              teacher: teacher,
-              distance: teacher.getDistanceFrom(userLat, userLng),
-              pulseValue: _pulseController.value,
-              onClose: () => setState(() => _selectedTeacher = null),
-              onBook: () {
-                final uri = Uri(
-                  path: '/mohaffez/${teacher.id}',
-                  queryParameters: {
-                    if (userLat != null) 'lat': userLat!.toString(),
-                    if (userLng != null) 'lng': userLng!.toString(),
-                  },
-                );
-                context.go(uri.toString());
-              },
-            ),
+  void _openTeacherProfile(MohaffezModel teacher) {
+    final uri = Uri(
+      path: '/mohaffez/${teacher.id}',
+      queryParameters: {
+        if (userLat != null) 'lat': userLat!.toString(),
+        if (userLng != null) 'lng': userLng!.toString(),
+      },
     );
+    context.go(uri.toString());
   }
 
   void _updateFilter(SortType newFilter) {
@@ -826,7 +918,6 @@ class _TeacherPreviewCard extends StatelessWidget {
   final VoidCallback onBook;
 
   const _TeacherPreviewCard({
-    super.key,
     required this.teacher,
     required this.distance,
     required this.pulseValue,
@@ -865,13 +956,10 @@ class _TeacherPreviewCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Hero(
-                tag: 'mohaffez-${teacher.id}',
-                child: CachedAvatar(
-                  imageUrl: teacher.photoUrl,
-                  radius: 34,
-                  semanticLabel: teacher.name,
-                ),
+              CachedAvatar(
+                imageUrl: teacher.photoUrl,
+                radius: 34,
+                semanticLabel: teacher.name,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -983,6 +1071,135 @@ class _TeacherPreviewCard extends StatelessWidget {
   }
 }
 
+class _TeacherResultTile extends StatelessWidget {
+  final MohaffezModel teacher;
+  final double? distance;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onBook;
+
+  const _TeacherResultTile({
+    required this.teacher,
+    required this.distance,
+    required this.isSelected,
+    required this.onTap,
+    required this.onBook,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected
+          ? AppThemeConstants.primary.withValues(alpha: 0.08)
+          : AppThemeConstants.grey50,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected
+                  ? AppThemeConstants.primary
+                  : AppThemeConstants.outline,
+              width: isSelected ? 1.6 : 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppThemeConstants.primary.withValues(alpha: 0.14),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              CachedAvatar(
+                imageUrl: teacher.photoUrl,
+                radius: 28,
+                semanticLabel: teacher.name,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      teacher.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: AppThemeConstants.textPrimary,
+                      ),
+                    ),
+                    if (teacher.specialization?.isNotEmpty ?? false) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        teacher.specialization!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _MetricPill(
+                          icon: Icons.star_rounded,
+                          label: teacher.rating.toStringAsFixed(1),
+                          color: AppThemeConstants.secondary,
+                        ),
+                        if (distance != null)
+                          _MetricPill(
+                            icon: Icons.near_me_rounded,
+                            label: distance! < 1
+                                ? '${(distance! * 1000).round()} م'
+                                : '${distance!.toStringAsFixed(1)} كم',
+                            color: AppThemeConstants.info,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                onPressed: onBook,
+                icon: const Icon(Icons.event_available_rounded, size: 18),
+                tooltip: 'احجز الآن',
+                style: IconButton.styleFrom(
+                  backgroundColor: isSelected
+                      ? AppThemeConstants.primary
+                      : AppThemeConstants.primary.withValues(alpha: 0.12),
+                  foregroundColor: isSelected
+                      ? AppThemeConstants.white
+                      : AppThemeConstants.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MetricPill extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1013,6 +1230,56 @@ class _MetricPill extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w800,
               color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapCounterBadge extends StatelessWidget {
+  final int count;
+  final int radiusKm;
+
+  const _MapCounterBadge({
+    required this.count,
+    required this.radiusKm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFF062B3F).withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: AppThemeConstants.primaryVariant.withValues(alpha: 0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeConstants.black.withValues(alpha: 0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.groups_rounded,
+            color: AppThemeConstants.primaryVariant,
+            size: 17,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$count / $radiusKm كم',
+            style: const TextStyle(
+              color: AppThemeConstants.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
