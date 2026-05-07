@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../theme/app_theme_constants.dart';
+import '../utils/time_formatter.dart';
 
 class SessionCard extends StatelessWidget {
   final String title;
@@ -29,9 +31,8 @@ class SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = dateTime != null
-        ? '${dateTime!.day}/${dateTime!.month}/${dateTime!.year} - ${dateTime!.hour.toString().padLeft(2, '0')}:${dateTime!.minute.toString().padLeft(2, '0')}'
-        : '';
+    final dateStr =
+        dateTime != null ? formatDateTimeToArabicAmPm(dateTime!) : '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -77,7 +78,8 @@ class SessionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 14, color: AppThemeConstants.textMuted),
+                    const Icon(Icons.location_on,
+                        size: 14, color: AppThemeConstants.textMuted),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -96,7 +98,8 @@ class SessionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.access_time, size: 14, color: AppThemeConstants.textMuted),
+                    const Icon(Icons.access_time,
+                        size: 14, color: AppThemeConstants.textMuted),
                     const SizedBox(width: 4),
                     Text(
                       dateStr,
@@ -124,7 +127,9 @@ class SessionCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppThemeConstants.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppThemeConstants.success.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color:
+                              AppThemeConstants.success.withValues(alpha: 0.3)),
                     ),
                     child: Text(hifz, style: const TextStyle(fontSize: 13)),
                   ),
@@ -142,7 +147,8 @@ class SessionCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppThemeConstants.info.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppThemeConstants.info.withValues(alpha: 0.3)),
                     ),
                     child: Text(muraja, style: const TextStyle(fontSize: 13)),
                   ),
@@ -156,7 +162,8 @@ class SessionCard extends StatelessWidget {
                   children: [
                     const Text(
                       'التقييم: ',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const SizedBox(width: 8),
                     ...List.generate(
@@ -191,7 +198,9 @@ class SessionCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppThemeConstants.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppThemeConstants.warning.withValues(alpha: 0.3)),
+                    border: Border.all(
+                        color:
+                            AppThemeConstants.warning.withValues(alpha: 0.3)),
                   ),
                   child: Text(notes, style: const TextStyle(fontSize: 13)),
                 ),

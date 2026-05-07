@@ -1,4 +1,4 @@
-﻿// lib/screens/student_requests_screen.dart
+// lib/screens/student_requests_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
+import '../../shared/utils/time_formatter.dart';
 import 'direct_payment_screen.dart';
 
 // ============================================================================
@@ -53,7 +54,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   /// FIX: Subscription-credit requests NEVER require student payment action
   bool _requiresPayment(Map<String, dynamic> request) {
     final status = (request['status'] as String? ?? '').toLowerCase();
-    final selectedPaymentMethod = request['selectedPaymentMethod'] as String? ?? '';
+    final selectedPaymentMethod =
+        request['selectedPaymentMethod'] as String? ?? '';
 
     // Subscription-credit requests NEVER require student payment action
     if (selectedPaymentMethod == 'subscriptioncredit') return false;
@@ -167,10 +169,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         'slotEnd': toDate(lockedRequest['slotEnd']),
         'imamAddressText': lockedRequest['imamAddressText'] as String? ??
             lockedRequest['location'] as String?,
-        'imamAddressLat':
-            (lockedRequest['imamAddressLat'] as num?)?.toDouble(),
-        'imamAddressLng':
-            (lockedRequest['imamAddressLng'] as num?)?.toDouble(),
+        'imamAddressLat': (lockedRequest['imamAddressLat'] as num?)?.toDouble(),
+        'imamAddressLng': (lockedRequest['imamAddressLng'] as num?)?.toDouble(),
         'mohaffezPhone': lockedRequest['mohaffezPhone'] as String?,
         'planType': lockedRequest['planType'] as String?,
         'planId': lockedRequest['planId'] as String?,
@@ -303,7 +303,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                             Text(
                               'إدارة طلبات الحجز',
                               style: TextStyle(
-                                  fontSize: 13, color: AppThemeConstants.white70),
+                                  fontSize: 13,
+                                  color: AppThemeConstants.white70),
                             ),
                           ],
                         ),
@@ -343,8 +344,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                     },
                   )
                 : null,
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
             fillColor: AppThemeConstants.grey100,
           ),
@@ -380,16 +380,19 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             return ChoiceChip(
               avatar: Icon(icon,
                   size: 18,
-                  color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700),
+                  color: isSelected
+                      ? AppThemeConstants.white
+                      : AppThemeConstants.grey700),
               label: Text(label),
               selected: isSelected,
               onSelected: (_) =>
                   ref.read(requestFilterProvider.notifier).state = filter,
               selectedColor: AppThemeConstants.primary,
               labelStyle: TextStyle(
-                color: isSelected ? AppThemeConstants.white : AppThemeConstants.grey700,
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? AppThemeConstants.white
+                    : AppThemeConstants.grey700,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             );
           },
@@ -453,9 +456,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           ),
         );
       },
-      loading: () =>
-          const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator())),
+      loading: () => const SliverFillRemaining(
+          child: Center(child: CircularProgressIndicator())),
       error: (e, _) => SliverFillRemaining(
         child: ErrorDisplay.dataLoad(
           onRetry: () =>
@@ -559,8 +561,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              style:
-                  ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.error),
               child: const Text('إلغاء الطلب',
                   style: TextStyle(color: AppThemeConstants.white)),
             ),
@@ -681,8 +683,8 @@ class _RequestCard extends StatelessWidget {
             // ── Header: Status badge + Cancel ────────────────────────────
             Row(children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -708,8 +710,8 @@ class _RequestCard extends StatelessWidget {
               const Spacer(),
               if (canCancel && !isAwaitingDirectConfirmation)
                 IconButton(
-                  icon:
-                      const Icon(Icons.cancel_outlined, color: AppThemeConstants.error),
+                  icon: const Icon(Icons.cancel_outlined,
+                      color: AppThemeConstants.error),
                   onPressed: onCancel,
                   tooltip: 'إلغاء الطلب',
                 ),
@@ -719,8 +721,7 @@ class _RequestCard extends StatelessWidget {
             // ── Mohaffez Name ───────────────────────────────────────────
             Text(
               mohaffezName,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
@@ -729,9 +730,10 @@ class _RequestCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _buildDetailChip(Icons.schedule, preferredTimeSlot),
-                _buildDetailChip(Icons.location_on,
-                    _getSessionTypeLabel(sessionType)),
+                _buildDetailChip(
+                    Icons.schedule, formatTimeToArabicAmPm(preferredTimeSlot)),
+                _buildDetailChip(
+                    Icons.location_on, _getSessionTypeLabel(sessionType)),
               ],
             ),
             const SizedBox(height: 12),
@@ -796,8 +798,7 @@ class _RequestCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppThemeConstants.accentBlueLight,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: AppThemeConstants.accentBlue),
+                  border: Border.all(color: AppThemeConstants.accentBlue),
                 ),
                 child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -872,15 +873,16 @@ class _RequestCard extends StatelessWidget {
         return ('قيد الانتظار', AppThemeConstants.warning, Icons.pending);
       case 'awaitingpayment':
       case 'awaiting_payment':
-        return ('في انتظار الدفع', AppThemeConstants.primary,
-            Icons.payment);
+        return ('في انتظار الدفع', AppThemeConstants.primary, Icons.payment);
       case 'awaitingdirectpayment':
-        return ('في انتظار الدفع', AppThemeConstants.primary,
-            Icons.payment);
+        return ('في انتظار الدفع', AppThemeConstants.primary, Icons.payment);
       case 'awaitingdirectpaymentconfirmation':
       case 'awaiting_direct_payment_confirmation':
-        return ('في انتظار تأكيد المعلم', AppThemeConstants.accentBlue,
-            Icons.hourglass_top);
+        return (
+          'في انتظار تأكيد المعلم',
+          AppThemeConstants.accentBlue,
+          Icons.hourglass_top
+        );
       case 'accepted':
       case 'confirmed':
         return ('مقبول', AppThemeConstants.success, Icons.check_circle);
@@ -954,8 +956,8 @@ class _RejectedRequestCard extends StatelessWidget {
           children: [
             Row(children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppThemeConstants.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -963,7 +965,8 @@ class _RejectedRequestCard extends StatelessWidget {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.cancel, size: 16, color: AppThemeConstants.error),
+                    Icon(Icons.cancel,
+                        size: 16, color: AppThemeConstants.error),
                     SizedBox(width: 6),
                     Text('مرفوض',
                         style: TextStyle(
@@ -982,16 +985,17 @@ class _RejectedRequestCard extends StatelessWidget {
             ]),
             const SizedBox(height: 12),
             Text(mohaffezName,
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                _buildDetailChip(Icons.schedule, preferredTimeSlot),
-                _buildDetailChip(Icons.location_on,
-                    _getSessionTypeLabel(sessionType)),
+                _buildDetailChip(
+                    Icons.schedule, formatTimeToArabicAmPm(preferredTimeSlot)),
+                _buildDetailChip(
+                    Icons.location_on, _getSessionTypeLabel(sessionType)),
               ],
             ),
             const SizedBox(height: 12),
@@ -1022,18 +1026,15 @@ class _RejectedRequestCard extends StatelessWidget {
                 ),
               ),
             ]),
-            if (rejectionReason != null &&
-                rejectionReason!.isNotEmpty) ...[
+            if (rejectionReason != null && rejectionReason!.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primary
-                      .withValues(alpha: 0.08),
+                  color: AppThemeConstants.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: AppThemeConstants.primary
-                          .withValues(alpha: 0.4)),
+                      color: AppThemeConstants.primary.withValues(alpha: 0.4)),
                 ),
                 child: Row(children: [
                   const Icon(Icons.info_outline,
@@ -1043,8 +1044,7 @@ class _RejectedRequestCard extends StatelessWidget {
                     child: Text(
                       'السبب: $rejectionReason',
                       style: const TextStyle(
-                          fontSize: 13,
-                          color: AppThemeConstants.primary),
+                          fontSize: 13, color: AppThemeConstants.primary),
                     ),
                   ),
                 ]),
@@ -1058,8 +1058,7 @@ class _RejectedRequestCard extends StatelessWidget {
 
   Widget _buildDetailChip(IconData icon, String label) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppThemeConstants.grey100,
         borderRadius: BorderRadius.circular(8),

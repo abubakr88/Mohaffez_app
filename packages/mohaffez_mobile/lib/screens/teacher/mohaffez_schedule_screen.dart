@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/time_formatter.dart';
 
 class MohaffezScheduleScreen extends ConsumerStatefulWidget {
   const MohaffezScheduleScreen({super.key});
@@ -335,7 +336,7 @@ class _SessionCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 13),
               ),
             if (timeSlot.isNotEmpty)
-              Text(timeSlot, style: const TextStyle(fontSize: 12)),
+              Text(formatTimeToArabicAmPm(timeSlot), style: const TextStyle(fontSize: 12)),
             if (location.isNotEmpty)
               Text(location, style: const TextStyle(fontSize: 12)),
             if (date != null)

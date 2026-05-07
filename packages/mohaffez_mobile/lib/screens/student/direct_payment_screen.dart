@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/widgets/payment_deadline_timer.dart';
+import '../../shared/utils/time_formatter.dart';
 
 class DirectPaymentScreen extends ConsumerStatefulWidget {
   final String? requestId;
@@ -652,7 +654,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   Expanded(
                     child: Directionality(
                       textDirection: TextDirection.ltr,
-                      child: Text(resolvedTimeSlot!,
+                      child: Text(formatTimeToArabicAmPm(resolvedTimeSlot!),
                           style: const TextStyle(fontSize: 13)),
                     ),
                   ),

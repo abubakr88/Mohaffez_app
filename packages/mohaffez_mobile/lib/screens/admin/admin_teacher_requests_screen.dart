@@ -1,4 +1,4 @@
-﻿// lib/screens/admin_teacher_requests_screen.dart
+// lib/screens/admin_teacher_requests_screen.dart
 //
 // Admin screen: lists all teachers with status == 'pending_approval'.
 // Admin can expand each card to review profile data + certificates,
@@ -10,9 +10,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../services/notification_service.dart';
+import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 
 // ─── Provider ────────────────────────────────────────────────────────────────
@@ -43,10 +43,8 @@ class AdminTeacherRequestsScreen extends ConsumerWidget {
         backgroundColor: AppThemeConstants.background,
         appBar: const AdminAppBar(title: 'طلبات الانضمام — المحافظون'),
         body: requestsAsync.when(
-          loading: () =>
-              const Center(child: CircularProgressIndicator()),
-          error: (e, _) =>
-              Center(child: Text('خطأ في التحميل: $e')),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('خطأ في التحميل: $e')),
           data: (requests) {
             if (requests.isEmpty) {
               return const Center(
@@ -63,8 +61,8 @@ class AdminTeacherRequestsScreen extends ConsumerWidget {
                             color: Color(0xFF4B5563))),
                     SizedBox(height: 8),
                     Text('جميع طلبات الانضمام تمت مراجعتها.',
-                        style: TextStyle(
-                            fontSize: 14, color: Color(0xFF9CA3AF))),
+                        style:
+                            TextStyle(fontSize: 14, color: Color(0xFF9CA3AF))),
                   ],
                 ),
               );
@@ -73,8 +71,7 @@ class AdminTeacherRequestsScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               itemCount: requests.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, i) =>
-                  _RequestCard(data: requests[i]),
+              itemBuilder: (_, i) => _RequestCard(data: requests[i]),
             );
           },
         ),
@@ -107,13 +104,11 @@ class _RequestCardState extends State<_RequestCard> {
   String get _name => widget.data['name'] as String? ?? '—';
   String get _email => widget.data['email'] as String? ?? '—';
   String? get _bio => widget.data['bio'] as String?;
-  String? get _specialization =>
-      widget.data['specialization'] as String?;
+  String? get _specialization => widget.data['specialization'] as String?;
   String? get _phone => widget.data['phoneNumber'] as String?;
   String? get _city => widget.data['city'] as String?;
   String? get _videoUrl => widget.data['youtubeVideoUrl'] as String?;
-  double? get _examScore =>
-      (widget.data['examScore'] as num?)?.toDouble();
+  double? get _examScore => (widget.data['examScore'] as num?)?.toDouble();
   DateTime? get _submittedAt {
     final raw = widget.data['approvalSubmittedAt'];
     if (raw is Timestamp) return raw.toDate();
@@ -123,10 +118,7 @@ class _RequestCardState extends State<_RequestCard> {
   Future<void> _approve() async {
     setState(() => _loading = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_uid)
-          .update({
+      await FirebaseFirestore.instance.collection('users').doc(_uid).update({
         'status': 'active',
         'approvedAt': FieldValue.serverTimestamp(),
         'rejectionNote': FieldValue.delete(),
@@ -146,7 +138,8 @@ class _RequestCardState extends State<_RequestCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e'),
+          SnackBar(
+              content: Text('خطأ: $e'),
               backgroundColor: AppThemeConstants.error),
         );
       }
@@ -168,10 +161,7 @@ class _RequestCardState extends State<_RequestCard> {
     }
     setState(() => _loading = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_uid)
-          .update({
+      await FirebaseFirestore.instance.collection('users').doc(_uid).update({
         'status': 'rejected',
         'rejectionNote': note,
         'rejectedAt': FieldValue.serverTimestamp(),
@@ -192,7 +182,8 @@ class _RequestCardState extends State<_RequestCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e'),
+          SnackBar(
+              content: Text('خطأ: $e'),
               backgroundColor: AppThemeConstants.error),
         );
       }
@@ -229,7 +220,8 @@ class _RequestCardState extends State<_RequestCard> {
                 children: [
                   // Avatar
                   Container(
-                    width: 48, height: 48,
+                    width: 48,
+                    height: 48,
                     decoration: const BoxDecoration(
                       color: AppThemeConstants.accentBackground,
                       shape: BoxShape.circle,
@@ -258,15 +250,13 @@ class _RequestCardState extends State<_RequestCard> {
                         const SizedBox(height: 2),
                         Text(_email,
                             style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF4B5563))),
+                                fontSize: 12, color: Color(0xFF4B5563))),
                         if (_submittedAt != null) ...[
                           const SizedBox(height: 2),
                           Text(
-                            'قُدِّم: ${DateFormat('dd/MM/yyyy – HH:mm', 'ar').format(_submittedAt!)}',
+                            'قُدِّم: ${formatDateTimeToArabicAmPm(_submittedAt!, separator: ' – ')}',
                             style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF9CA3AF)),
+                                fontSize: 11, color: Color(0xFF9CA3AF)),
                           ),
                         ],
                       ],
@@ -321,12 +311,10 @@ class _RequestCardState extends State<_RequestCard> {
                     runSpacing: 8,
                     children: [
                       if (_phone != null)
-                        _InfoChip(
-                            icon: Icons.phone_rounded, label: _phone!),
+                        _InfoChip(icon: Icons.phone_rounded, label: _phone!),
                       if (_city != null)
                         _InfoChip(
-                            icon: Icons.location_on_rounded,
-                            label: _city!),
+                            icon: Icons.location_on_rounded, label: _city!),
                       if (_specialization != null)
                         _InfoChip(
                             icon: Icons.auto_stories_rounded,
@@ -410,13 +398,12 @@ class _RequestCardState extends State<_RequestCard> {
                     decoration: const InputDecoration(
                       hintText: 'سبب الرفض (مطلوب عند الرفض فقط)...',
                       border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(10)),
+                        borderRadius: BorderRadius.all(Radius.circular(10)),
                       ),
                       filled: true,
                       fillColor: Color(0xFFF4F7F6),
-                      contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -429,18 +416,17 @@ class _RequestCardState extends State<_RequestCard> {
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: _reject,
-                                icon: const Icon(Icons.close_rounded,
-                                    size: 18),
+                                icon: const Icon(Icons.close_rounded, size: 18),
                                 label: const Text('رفض'),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppThemeConstants.error,
                                   side: const BorderSide(
                                       color: AppThemeConstants.error),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.all(
-                                        Radius.circular(10)),
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(10)),
                                   ),
                                 ),
                               ),
@@ -450,19 +436,16 @@ class _RequestCardState extends State<_RequestCard> {
                               flex: 2,
                               child: ElevatedButton.icon(
                                 onPressed: _approve,
-                                icon: const Icon(
-                                    Icons.check_rounded,
-                                    size: 18),
+                                icon: const Icon(Icons.check_rounded, size: 18),
                                 label: const Text('قبول وتفعيل'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      AppThemeConstants.primary,
+                                  backgroundColor: AppThemeConstants.primary,
                                   foregroundColor: AppThemeConstants.white,
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.all(
-                                        Radius.circular(10)),
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(10)),
                                   ),
                                   elevation: 0,
                                 ),
@@ -505,22 +488,20 @@ class _CertificatesList extends StatelessWidget {
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
           return const Text('لا توجد شهادات مرفوعة.',
-              style: TextStyle(
-                  fontSize: 13, color: Color(0xFF9CA3AF)));
+              style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)));
         }
         return Column(
           children: docs.map((doc) {
             final d = doc.data() as Map<String, dynamic>;
             final title = d['title'] as String? ?? '—';
-            final org   = d['organization'] as String? ?? '—';
-            final imgs  = (d['imageUrls'] as List?)?.cast<String>() ?? [];
+            final org = d['organization'] as String? ?? '—';
+            final imgs = (d['imageUrls'] as List?)?.cast<String>() ?? [];
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
                 color: Color(0xFFEAF6F3),
-                borderRadius:
-                    BorderRadius.all(Radius.circular(10)),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
               ),
               child: Row(
                 children: [
@@ -538,8 +519,7 @@ class _CertificatesList extends StatelessWidget {
                                 color: Color(0xFF111827))),
                         Text(org,
                             style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF4B5563))),
+                                fontSize: 12, color: Color(0xFF4B5563))),
                       ],
                     ),
                   ),
@@ -548,8 +528,7 @@ class _CertificatesList extends StatelessWidget {
                       onPressed: () => _showImages(context, imgs),
                       child: Text('${imgs.length} صور',
                           style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF0C6F6A))),
+                              fontSize: 12, color: Color(0xFF0C6F6A))),
                     ),
                 ],
               ),
@@ -572,17 +551,16 @@ class _CertificatesList extends StatelessWidget {
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: urls.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: 8),
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (_, i) => ClipRRect(
-                borderRadius:
-                    const BorderRadius.all(Radius.circular(8)),
+                borderRadius: const BorderRadius.all(Radius.circular(8)),
                 child: CachedNetworkImage(
                     imageUrl: urls[i],
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) =>
-                        const Icon(Icons.broken_image_rounded,
-                            size: 40, color: AppThemeConstants.grey500)),
+                    errorWidget: (_, __, ___) => const Icon(
+                        Icons.broken_image_rounded,
+                        size: 40,
+                        color: AppThemeConstants.grey500)),
               ),
             ),
           ),
@@ -607,8 +585,7 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: const Color(0xFFF4F7F6),
         borderRadius: const BorderRadius.all(Radius.circular(8)),
@@ -620,8 +597,7 @@ class _InfoChip extends StatelessWidget {
           Icon(icon, size: 14, color: AppThemeConstants.primary),
           const SizedBox(width: 6),
           Text(label,
-              style: const TextStyle(
-                  fontSize: 12, color: Color(0xFF374151))),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF374151))),
         ],
       ),
     );

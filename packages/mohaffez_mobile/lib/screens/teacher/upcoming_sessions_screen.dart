@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -794,7 +795,7 @@ class SessionCard extends ConsumerWidget {
                       size: 14, color: AppThemeConstants.grey600),
                   const SizedBox(width: 6),
                   Text(
-                    timeSlot,
+                    formatTimeToArabicAmPm(timeSlot),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppThemeConstants.grey700,

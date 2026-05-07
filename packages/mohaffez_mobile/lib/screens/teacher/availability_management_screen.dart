@@ -1,8 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../shared/utils/time_formatter.dart';
 
 // ─── Data classes ─────────────────────────────────────────────────────────────
 
@@ -149,8 +151,7 @@ class _AvailabilityManagementScreenState
         _breakMinutes = s['breakMinutes'] as int? ?? 0;
       }
 
-      final snapshot =
-          await userRef.collection('availability').get();
+      final snapshot = await userRef.collection('availability').get();
 
       final newDays = List.generate(7, (_) => _DayAvailability());
 
@@ -162,8 +163,7 @@ class _AvailabilityManagementScreenState
 
         final timeSlots =
             List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
-        final enabled =
-            timeSlots.where((s) => s['enabled'] == true).toList();
+        final enabled = timeSlots.where((s) => s['enabled'] == true).toList();
         if (enabled.isEmpty) continue;
 
         enabled.sort((a, b) =>
@@ -173,12 +173,11 @@ class _AvailabilityManagementScreenState
         // otherwise derive from slots for backward compatibility.
         final start = data['startTime'] as String? ??
             enabled.first['startTime'] as String;
-        final end = data['endTime'] as String? ??
-            enabled.last['endTime'] as String;
+        final end =
+            data['endTime'] as String? ?? enabled.last['endTime'] as String;
 
-        final types = enabled
-            .map((s) => s['sessionType'] as String? ?? 'home')
-            .toSet();
+        final types =
+            enabled.map((s) => s['sessionType'] as String? ?? 'home').toSet();
 
         final exclusions = (data['exclusionRanges'] as List<dynamic>? ?? [])
             .map((e) => _TimeRange(
@@ -263,8 +262,7 @@ class _AvailabilityManagementScreenState
 
       for (int i = 0; i < 7; i++) {
         final dayOfWeek = i + 1;
-        final docRef =
-            userRef.collection('availability').doc('day_$dayOfWeek');
+        final docRef = userRef.collection('availability').doc('day_$dayOfWeek');
         final day = _days[i];
 
         if (!day.isActive) {
@@ -333,8 +331,7 @@ class _AvailabilityManagementScreenState
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(msg), backgroundColor: AppThemeConstants.error),
+      SnackBar(content: Text(msg), backgroundColor: AppThemeConstants.error),
     );
   }
 
@@ -352,13 +349,12 @@ class _AvailabilityManagementScreenState
   }
 
   Future<void> _pickTime(int dayIdx, bool isStart) async {
-    final current =
-        isStart ? _days[dayIdx].startTime : _days[dayIdx].endTime;
+    final current = isStart ? _days[dayIdx].startTime : _days[dayIdx].endTime;
     final parts = current.split(':');
     final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(
-          hour: int.parse(parts[0]), minute: int.parse(parts[1])),
+      initialTime:
+          TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1])),
     );
     if (picked == null || !mounted) return;
     final fmt =
@@ -397,8 +393,7 @@ class _AvailabilityManagementScreenState
         textDirection: TextDirection.rtl,
         child: StatefulBuilder(
           builder: (ctx, setDS) => AlertDialog(
-            title: Text(
-                'استثناء ليوم ${ScheduleConstants.arabicDays[dayIdx]}'),
+            title: Text('استثناء ليوم ${ScheduleConstants.arabicDays[dayIdx]}'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -410,8 +405,7 @@ class _AvailabilityManagementScreenState
                     final t = await showTimePicker(
                       context: ctx,
                       initialTime: TimeOfDay(
-                          hour: int.parse(p[0]),
-                          minute: int.parse(p[1])),
+                          hour: int.parse(p[0]), minute: int.parse(p[1])),
                     );
                     if (t != null) {
                       setDS(() => start =
@@ -428,8 +422,7 @@ class _AvailabilityManagementScreenState
                     final t = await showTimePicker(
                       context: ctx,
                       initialTime: TimeOfDay(
-                          hour: int.parse(p[0]),
-                          minute: int.parse(p[1])),
+                          hour: int.parse(p[0]), minute: int.parse(p[1])),
                     );
                     if (t != null) {
                       setDS(() => end =
@@ -459,8 +452,7 @@ class _AvailabilityManagementScreenState
                       List<_TimeRange>.from(_days[dayIdx].exclusions)
                         ..add(_TimeRange(start: start, end: end));
                   setState(() {
-                    _days[dayIdx] =
-                        _days[dayIdx].copyWith(exclusions: updated);
+                    _days[dayIdx] = _days[dayIdx].copyWith(exclusions: updated);
                   });
                   Navigator.pop(ctx);
                 },
@@ -568,7 +560,8 @@ class _AvailabilityManagementScreenState
                 label: Text(
                   _saving ? 'جارٍ الحفظ…' : 'حفظ الجدول',
                   style: const TextStyle(
-                      color: AppThemeConstants.white, fontWeight: FontWeight.bold),
+                      color: AppThemeConstants.white,
+                      fontWeight: FontWeight.bold),
                 ),
               )
             : null,
@@ -625,7 +618,8 @@ class _AvailabilityManagementScreenState
                             Text(
                               'حدد أيامك وأوقاتك بسهولة',
                               style: TextStyle(
-                                  fontSize: 13, color: AppThemeConstants.white70),
+                                  fontSize: 13,
+                                  color: AppThemeConstants.white70),
                             ),
                           ],
                         ),
@@ -633,7 +627,8 @@ class _AvailabilityManagementScreenState
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: IconButton(
-                          icon: const Icon(Icons.settings_outlined, color: AppThemeConstants.white),
+                          icon: const Icon(Icons.settings_outlined,
+                              color: AppThemeConstants.white),
                           tooltip: 'إعدادات الجدول',
                           onPressed: _showScheduleSettings,
                         ),
@@ -716,13 +711,14 @@ class _AvailabilityManagementScreenState
       ),
       child: const Row(
         children: [
-          Icon(Icons.info_outline, color: AppThemeConstants.accentBlueDark, size: 18),
+          Icon(Icons.info_outline,
+              color: AppThemeConstants.accentBlueDark, size: 18),
           SizedBox(width: 10),
           Expanded(
             child: Text(
               'فعّل الأيام التي تعمل فيها، حدد الوقت ونوع الجلسة، ثم اضغط حفظ.',
-              style:
-                  TextStyle(fontSize: 12, color: AppThemeConstants.accentBlueDark),
+              style: TextStyle(
+                  fontSize: 12, color: AppThemeConstants.accentBlueDark),
             ),
           ),
         ],
@@ -746,8 +742,7 @@ class _AvailabilityManagementScreenState
         child: StatefulBuilder(
           builder: (ctx, setDS) => AlertDialog(
             title: const Text('إعدادات الجدول'),
-            contentPadding:
-                const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -755,8 +750,8 @@ class _AvailabilityManagementScreenState
                 children: [
                   // ── Session duration ────────────────────────────────────
                   const Text('مدة الجلسة',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15)),
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -809,13 +804,11 @@ class _AvailabilityManagementScreenState
                       const Expanded(
                         child: Text('استثناء أوقات الصلاة',
                             style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15)),
+                                fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
                       Switch.adaptive(
                         value: tempExcludePrayers,
-                        onChanged: (v) =>
-                            setDS(() => tempExcludePrayers = v),
+                        onChanged: (v) => setDS(() => tempExcludePrayers = v),
                         activeTrackColor: AppThemeConstants.success,
                       ),
                     ],
@@ -868,8 +861,7 @@ class _AvailabilityManagementScreenState
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _prayerWindowDescription(
-                                  tempBefore, tempAfter),
+                              _prayerWindowDescription(tempBefore, tempAfter),
                               style: const TextStyle(
                                   fontSize: 12,
                                   color: AppThemeConstants.successDark),
@@ -1062,7 +1054,8 @@ class _DayCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          const Icon(Icons.access_time, size: 18, color: AppThemeConstants.grey500),
+          const Icon(Icons.access_time,
+              size: 18, color: AppThemeConstants.grey500),
           const SizedBox(width: 8),
           const Text('من',
               style: TextStyle(fontSize: 13, color: AppThemeConstants.grey500)),
@@ -1114,8 +1107,7 @@ class _DayCard extends StatelessWidget {
               SizedBox(width: 6),
               Text(
                 'أوقات مستثناة',
-                style:
-                    TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -1127,8 +1119,8 @@ class _DayCard extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppThemeConstants.errorLight,
                     borderRadius: BorderRadius.circular(8),
@@ -1140,7 +1132,7 @@ class _DayCard extends StatelessWidget {
                           size: 16, color: AppThemeConstants.accentRed),
                       const SizedBox(width: 8),
                       Text(
-                        '${excl.start}  –  ${excl.end}',
+                        '${formatTimeToArabicAmPm(excl.start)}  –  ${formatTimeToArabicAmPm(excl.end)}',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1163,8 +1155,8 @@ class _DayCard extends StatelessWidget {
           TextButton.icon(
             onPressed: onAddExclusion,
             icon: const Icon(Icons.add, size: 16),
-            label: const Text('إضافة وقت مستثنى',
-                style: TextStyle(fontSize: 12)),
+            label:
+                const Text('إضافة وقت مستثنى', style: TextStyle(fontSize: 12)),
             style: TextButton.styleFrom(
               foregroundColor: AppThemeConstants.error,
               padding: EdgeInsets.zero,
@@ -1195,14 +1187,22 @@ class _DayCard extends StatelessWidget {
 
   String get _shortDay {
     switch (dayName) {
-      case 'الاثنين': return 'إثن';
-      case 'الثلاثاء': return 'ثلا';
-      case 'الأربعاء': return 'أرب';
-      case 'الخميس': return 'خمي';
-      case 'الجمعة': return 'جمع';
-      case 'السبت': return 'سبت';
-      case 'الأحد': return 'أحد';
-      default: return dayName.substring(0, 3);
+      case 'الاثنين':
+        return 'إثن';
+      case 'الثلاثاء':
+        return 'ثلا';
+      case 'الأربعاء':
+        return 'أرب';
+      case 'الخميس':
+        return 'خمي';
+      case 'الجمعة':
+        return 'جمع';
+      case 'السبت':
+        return 'سبت';
+      case 'الأحد':
+        return 'أحد';
+      default:
+        return dayName.substring(0, 3);
     }
   }
 }
@@ -1220,8 +1220,7 @@ class _TimeButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: AppThemeConstants.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
@@ -1229,7 +1228,7 @@ class _TimeButton extends StatelessWidget {
               color: AppThemeConstants.primary.withValues(alpha: 0.3)),
         ),
         child: Text(
-          time,
+          formatTimeToArabicAmPm(time),
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
@@ -1276,15 +1275,13 @@ class _TypeChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon,
-                size: 18,
-                color: selected ? color : AppThemeConstants.grey400),
+                size: 18, color: selected ? color : AppThemeConstants.grey400),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight:
-                    selected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                 color: selected ? color : AppThemeConstants.grey500,
               ),
               textAlign: TextAlign.center,
@@ -1325,9 +1322,7 @@ class _StatPill extends StatelessWidget {
           children: [
             Text(value,
                 style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: color)),
+                    fontSize: 18, fontWeight: FontWeight.bold, color: color)),
             Text(label,
                 style: const TextStyle(
                     fontSize: 11, color: AppThemeConstants.grey500)),
@@ -1385,8 +1380,7 @@ class _OffsetRow extends StatelessWidget {
           alignment: Alignment.center,
           child: Text(
             value >= 0 ? '+$value' : '$value',
-            style: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
         _StepButton(
@@ -1449,8 +1443,8 @@ class _TimePickerRow extends StatelessWidget {
         SizedBox(
           width: 32,
           child: Text(label,
-              style: const TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600)),
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
         ),
         const SizedBox(width: 12),
         _TimeButton(time: time, onTap: onTap),
