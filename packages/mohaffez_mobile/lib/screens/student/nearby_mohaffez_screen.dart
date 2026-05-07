@@ -1,12 +1,14 @@
-﻿import 'dart:async';
-import 'package:mohaffez_core/mohaffez_core.dart';
+import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 
-import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/widgets/cached_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
@@ -19,7 +21,31 @@ class NearbyMohaffezScreen extends ConsumerStatefulWidget {
       _NearbyMohaffezScreenState();
 }
 
-class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
+class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
+    with SingleTickerProviderStateMixin {
+  static const CameraPosition _fallbackCamera = CameraPosition(
+    target: LatLng(30.0444, 31.2357),
+    zoom: 11,
+  );
+
+  static const String _premiumMapStyle = '''
+[
+  {"elementType":"geometry","stylers":[{"color":"#0b2530"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#b7d8d2"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#072027"}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#155e63"}]},
+  {"featureType":"landscape.natural","elementType":"geometry","stylers":[{"color":"#123b39"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0f3a42"}]},
+  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#0f4d43"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#164653"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#08252e"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#1f6c70"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#0d3945"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#062b3f"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#68d8d6"}]}
+]
+''';
+
   SortType selectedFilter = SortType.distance;
   double? userLat;
   double? userLng;
@@ -29,40 +55,54 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
   double _displayRadius = 50.0;
   String searchQuery = '';
   String? selectedSpecialization;
+  MohaffezModel? _selectedTeacher;
+  GoogleMapController? _mapController;
+  bool _hasFitInitialBounds = false;
+
+  final Map<String, BitmapDescriptor> _markerIcons = {};
+  final Map<String, BitmapDescriptor> _selectedMarkerIcons = {};
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _pulseController.addListener(() {
+      if (mounted) setState(() {});
+    });
+    _getCurrentLocation();
+  }
 
   @override
   void dispose() {
+    _mapController?.dispose();
+    _pulseController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _getCurrentLocation();
-  }
-
-  // FIXED: Check mounted before calling setState
   Future<void> _getCurrentLocation() async {
     try {
       if (!mounted) return;
-
       setState(() {
         isLoadingLocation = true;
         locationError = null;
       });
 
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         throw Exception('خدمات الموقع غير مفعلة');
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
@@ -74,7 +114,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         throw Exception('تم رفض إذن الموقع بشكل دائم');
       }
 
-      final Position position = await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           distanceFilter: 0,
@@ -82,38 +122,21 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
         ),
       );
 
-      // FIXED: Check mounted before setState
       if (!mounted) return;
-
       setState(() {
         userLat = position.latitude;
         userLng = position.longitude;
         isLoadingLocation = false;
+        _hasFitInitialBounds = false;
       });
+      await _animateToUser();
     } catch (e) {
-      // FIXED: Check mounted before setState
       if (!mounted) return;
-
       setState(() {
         locationError = e.toString();
         isLoadingLocation = false;
       });
     }
-  }
-
-  void _updateFilter(SortType newFilter) {
-    if (selectedFilter != newFilter) {
-      setState(() {
-        selectedFilter = newFilter;
-      });
-    }
-  }
-
-  void _clearSearch() {
-    _searchController.clear();
-    setState(() {
-      searchQuery = '';
-    });
   }
 
   @override
@@ -126,271 +149,563 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
       searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
       specialization: selectedSpecialization,
     );
-
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(nearbyMohaffezProvider(params));
-            await ref
-                .read(nearbyMohaffezProvider(params).future)
-                .catchError((_) => <MohaffezModel>[]);
-          },
-          child: CustomScrollView(
-            slivers: [
-              _buildAppBar(context, ref, params),
-              if (isLoadingLocation || locationError != null)
-                SliverToBoxAdapter(
-                  child: _buildLocationBanner(),
-                ),
-              SliverToBoxAdapter(
-                child: _buildSearchBar(),
-              ),
-              SliverToBoxAdapter(
-                child: _buildSpecializationChips(),
-              ),
-              SliverToBoxAdapter(
-                child: _buildRadiusSlider(),
-              ),
-              SliverToBoxAdapter(
-                child: _buildFilterChips(),
-              ),
-              mohaffezAsync.when(
-                data: (mohaffezList) {
-                  if (mohaffezList.isEmpty) {
-                    return const SliverFillRemaining(
-                      child: EmptyState(
-                        icon: Icons.search_off,
-                        title: 'لا يوجد محفظون',
-                        message: 'لم نتمكن من العثور على محفظين في منطقتك',
-                      ),
-                    );
-                  }
-
-                  return SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final mohaffez = mohaffezList[index];
-                          final distance =
-                              mohaffez.getDistanceFrom(userLat, userLng);
-
-                          return _MohaffezCard(
-                            mohaffez: mohaffez,
-                            distance: distance,
-                            onTap: () =>
-                                context.go('/mohaffez/${mohaffez.id}', extra: {
-                              'lat': userLat?.toString(),
-                              'lng': userLng?.toString(),
-                            }),
-                          );
-                        },
-                        childCount: mohaffezList.length,
-                      ),
-                    ),
-                  );
-                },
-                loading: () => const SliverToBoxAdapter(
-                  child: Column(
-                    children: [
-                      SkeletonList(itemCount: 6, itemHeight: 90),
-                      Padding(
-                        padding: EdgeInsets.only(top: 8, bottom: 16),
-                        child: Text(
-                          'جاري البحث عن محفظين بالقرب منك...',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppThemeConstants.textMuted,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                error: (error, stack) => SliverFillRemaining(
-                  child: ErrorDisplay.dataLoad(
-                    onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
-                  ),
-                ),
-              ),
-            ],
+        body: mohaffezAsync.when(
+          data: (teachers) =>
+              _buildMapExperience(context, ref, params, teachers),
+          loading: _buildLoading,
+          error: (_, __) => ErrorDisplay.dataLoad(
+            onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildAppBar(
+  Widget _buildMapExperience(
     BuildContext context,
     WidgetRef ref,
     NearbyParams params,
+    List<MohaffezModel> teachers,
   ) {
-    return SliverAppBar(
-      expandedHeight: 100,
-      floating: true,
-      pinned: true,
-      automaticallyImplyLeading: false,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      backgroundColor: AppThemeConstants.deepTeal,
-      surfaceTintColor: AppThemeConstants.transparent,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: AppThemeConstants.tealGradient,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    _ensureMarkerIcons(teachers);
+    _fitInitialBounds(teachers);
+
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: _initialCamera(teachers),
+          myLocationEnabled: userLat != null && userLng != null,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          compassEnabled: false,
+          mapToolbarEnabled: false,
+          style: _premiumMapStyle,
+          markers: _buildMarkers(teachers),
+          circles: _buildRadiusCircle(),
+          onMapCreated: (controller) {
+            _mapController = controller;
+            _fitInitialBounds(teachers, force: true);
+          },
+          onTap: (_) => setState(() => _selectedTeacher = null),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.center,
+                  colors: [
+                    AppThemeConstants.deepTeal.withValues(alpha: 0.5),
+                    AppThemeConstants.transparent,
+                  ],
+                ),
+              ),
             ),
           ),
-          child: SafeArea(
+        ),
+        SafeArea(
+          child: Column(
+            children: [
+              _buildMapHeader(teachers.length),
+              _buildSearchBar(),
+              _buildFilterRail(),
+              if (isLoadingLocation || locationError != null)
+                _buildLocationBanner(),
+            ],
+          ),
+        ),
+        if (teachers.isEmpty && !isLoadingLocation)
+          const Positioned.fill(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Row(
+              padding: EdgeInsets.all(24),
+              child: Center(
+                child: EmptyState(
+                  icon: Icons.travel_explore,
+                  title: 'لا يوجد محفظون',
+                  message: 'لم نتمكن من العثور على محفظين في نطاق البحث',
+                ),
+              ),
+            ),
+          ),
+        Positioned(
+          left: 16,
+          bottom: _selectedTeacher == null ? 34 : 238,
+          child: _FloatingMapButton(
+            icon: Icons.my_location,
+            onTap: _getCurrentLocation,
+            tooltip: 'تحديث الموقع',
+          ),
+        ),
+        Positioned(
+          right: 16,
+          left: 16,
+          bottom: 18,
+          child: _buildSelectedTeacherCard(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoading() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF08252E), Color(0xFF0B7A75)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppThemeConstants.secondary),
+            SizedBox(height: 16),
+            Text(
+              'جاري تجهيز الخريطة...',
+              style: TextStyle(
+                color: AppThemeConstants.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  CameraPosition _initialCamera(List<MohaffezModel> teachers) {
+    if (userLat != null && userLng != null) {
+      return CameraPosition(target: LatLng(userLat!, userLng!), zoom: 12.5);
+    }
+    final first = teachers.where(_hasLocation).firstOrNull;
+    if (first != null) {
+      return CameraPosition(
+        target: LatLng(first.addressLat!, first.addressLng!),
+        zoom: 12,
+      );
+    }
+    return _fallbackCamera;
+  }
+
+  Set<Marker> _buildMarkers(List<MohaffezModel> teachers) {
+    final pulse = 0.82 + (_pulseController.value * 0.18);
+
+    return teachers.where(_hasLocation).map((teacher) {
+      final isSelected = _selectedTeacher?.id == teacher.id;
+      return Marker(
+        markerId: MarkerId(teacher.id),
+        position: LatLng(teacher.addressLat!, teacher.addressLng!),
+        icon: isSelected
+            ? (_selectedMarkerIcons[teacher.id] ??
+                BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueYellow))
+            : (_markerIcons[teacher.id] ??
+                BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueAzure)),
+        alpha: isSelected ? pulse : 0.95,
+        zIndexInt: isSelected ? 20 : 10,
+        anchor: const Offset(0.5, 0.92),
+        onTap: () => _selectTeacher(teacher),
+      );
+    }).toSet();
+  }
+
+  Set<Circle> _buildRadiusCircle() {
+    if (userLat == null || userLng == null) return const {};
+    return {
+      Circle(
+        circleId: const CircleId('student-search-radius'),
+        center: LatLng(userLat!, userLng!),
+        radius: radiusKm * 1000,
+        fillColor: AppThemeConstants.primaryVariant.withValues(alpha: 0.08),
+        strokeColor: AppThemeConstants.primaryVariant.withValues(alpha: 0.28),
+        strokeWidth: 2,
+      ),
+    };
+  }
+
+  void _selectTeacher(MohaffezModel teacher) {
+    setState(() => _selectedTeacher = teacher);
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(teacher.addressLat!, teacher.addressLng!),
+        14.5,
+      ),
+    );
+  }
+
+  Future<void> _animateToUser() async {
+    if (_mapController == null || userLat == null || userLng == null) return;
+    await _mapController!.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(userLat!, userLng!), 13),
+    );
+  }
+
+  void _fitInitialBounds(List<MohaffezModel> teachers, {bool force = false}) {
+    if (_mapController == null || (_hasFitInitialBounds && !force)) return;
+    final points = <LatLng>[
+      if (userLat != null && userLng != null) LatLng(userLat!, userLng!),
+      ...teachers
+          .where(_hasLocation)
+          .map((teacher) => LatLng(teacher.addressLat!, teacher.addressLng!)),
+    ];
+    if (points.length < 2) return;
+
+    _hasFitInitialBounds = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _mapController == null) return;
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngBounds(_boundsFrom(points), 84),
+      );
+    });
+  }
+
+  LatLngBounds _boundsFrom(List<LatLng> points) {
+    var minLat = points.first.latitude;
+    var maxLat = points.first.latitude;
+    var minLng = points.first.longitude;
+    var maxLng = points.first.longitude;
+    for (final point in points.skip(1)) {
+      minLat = math.min(minLat, point.latitude);
+      maxLat = math.max(maxLat, point.latitude);
+      minLng = math.min(minLng, point.longitude);
+      maxLng = math.max(maxLng, point.longitude);
+    }
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+  }
+
+  bool _hasLocation(MohaffezModel teacher) =>
+      teacher.addressLat != null && teacher.addressLng != null;
+
+  Future<void> _ensureMarkerIcons(List<MohaffezModel> teachers) async {
+    final missing = teachers
+        .where(_hasLocation)
+        .where((teacher) => !_markerIcons.containsKey(teacher.id))
+        .toList();
+    if (missing.isEmpty) return;
+
+    for (final teacher in missing) {
+      final initials = teacher.name.trim().isEmpty
+          ? 'م'
+          : teacher.name.trim().characters.take(2).toString();
+      _markerIcons[teacher.id] =
+          await _teacherMarker(initials, selected: false);
+      _selectedMarkerIcons[teacher.id] =
+          await _teacherMarker(initials, selected: true);
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _teacherMarker(
+    String initials, {
+    required bool selected,
+  }) async {
+    final size = selected ? 142.0 : 118.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final center = Offset(size / 2, size / 2);
+    final glowPaint = Paint()
+      ..color = (selected
+              ? AppThemeConstants.secondary
+              : AppThemeConstants.primaryVariant)
+          .withValues(alpha: selected ? 0.26 : 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
+    final shellPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF0B7A75), Color(0xFF14B8A6)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromCircle(center: center, radius: size * 0.34));
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = selected ? 7 : 5
+      ..color = selected
+          ? AppThemeConstants.secondary
+          : AppThemeConstants.white.withValues(alpha: 0.92);
+
+    canvas.drawCircle(center.translate(0, 4), size * 0.34, glowPaint);
+    canvas.drawCircle(center, size * 0.31, shellPaint);
+    canvas.drawCircle(center, size * 0.31, borderPaint);
+    canvas.drawCircle(
+      center.translate(0, 2),
+      size * 0.19,
+      Paint()..color = AppThemeConstants.white.withValues(alpha: 0.16),
+    );
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: initials,
+        style: TextStyle(
+          color: AppThemeConstants.white,
+          fontSize: selected ? 34 : 28,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.rtl,
+      textAlign: TextAlign.center,
+    )..layout(maxWidth: size);
+    textPainter.paint(
+      canvas,
+      Offset(center.dx - textPainter.width / 2,
+          center.dy - textPainter.height / 2),
+    );
+
+    final pinPath = Path()
+      ..moveTo(center.dx - 14, center.dy + size * 0.26)
+      ..quadraticBezierTo(center.dx, center.dy + size * 0.44, center.dx + 14,
+          center.dy + size * 0.26)
+      ..close();
+    canvas.drawPath(pinPath, shellPaint);
+    canvas.drawCircle(
+      center.translate(size * 0.22, -size * 0.22),
+      selected ? 12 : 9,
+      Paint()..color = AppThemeConstants.success,
+    );
+
+    final image =
+        await recorder.endRecording().toImage(size.round(), size.round());
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(data!.buffer.asUint8List());
+  }
+
+  Widget _buildMapHeader(int teacherCount) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF062B3F).withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppThemeConstants.primaryVariant.withValues(alpha: 0.35),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppThemeConstants.black.withValues(alpha: 0.22),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppThemeConstants.primaryVariant.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      AppThemeConstants.primaryVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              child: const Icon(
+                Icons.explore_rounded,
+                color: AppThemeConstants.primaryVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppThemeConstants.surface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.location_searching,
-                      size: 24,
-                      color: AppThemeConstants.surface,
+                  const Text(
+                    'خريطة المحفظين',
+                    style: TextStyle(
+                      color: AppThemeConstants.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'ابحث عن محفظ',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppThemeConstants.surface,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'محفظون معتمدون بالقرب منك',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppThemeConstants.surface.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 2),
+                  Text(
+                    '$teacherCount محفظ ضمن ${radiusKm.round()} كم',
+                    style: TextStyle(
+                      color: AppThemeConstants.white.withValues(alpha: 0.72),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.my_location, color: AppThemeConstants.surface),
-                    onPressed: _getCurrentLocation,
-                    tooltip: 'تحديث الموقع',
                   ),
                 ],
               ),
             ),
-          ),
+            IconButton(
+              onPressed: () => context.pop(),
+              icon: const Icon(Icons.arrow_forward_ios_rounded),
+              color: AppThemeConstants.white,
+              tooltip: 'رجوع',
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: TextField(
-        controller: _searchController,
-        focusNode: _searchFocusNode,
-        textDirection: TextDirection.rtl,
-        decoration: InputDecoration(
-          hintText: 'ابحث باسم المحفظ...',
-          hintTextDirection: TextDirection.rtl,
-          prefixIcon: const Icon(Icons.search, color: AppThemeConstants.textSecondary),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, color: AppThemeConstants.textSecondary),
-                  onPressed: _clearSearch,
-                )
-              : null,
-          filled: true,
-          fillColor: AppThemeConstants.background,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppThemeConstants.outline),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppThemeConstants.outline),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppThemeConstants.secondary, width: 2),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppThemeConstants.white.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: AppThemeConstants.black.withValues(alpha: 0.14),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        onChanged: (value) {
-          _searchDebounce?.cancel();
-          _searchDebounce = Timer(const Duration(milliseconds: 400), () {
-            if (mounted) {
-              setState(() {
-                searchQuery = value.trim();
-              });
-            }
-          });
-        },
+        child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          textDirection: TextDirection.rtl,
+          decoration: InputDecoration(
+            hintText: 'ابحث باسم المحفظ...',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: _clearSearch,
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          onChanged: (value) {
+            _searchDebounce?.cancel();
+            _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+              if (mounted) {
+                setState(() {
+                  searchQuery = value.trim();
+                  _selectedTeacher = null;
+                  _hasFitInitialBounds = false;
+                });
+              }
+            });
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildSpecializationChips() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+  Widget _buildFilterRail() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'التخصص',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppThemeConstants.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _SpecializationChip(
-                  label: 'الكل',
-                  isSelected: selectedSpecialization == null,
-                  onTap: () {
-                    setState(() {
-                      selectedSpecialization = null;
-                    });
-                  },
+                _MapChip(
+                  label: 'الأقرب',
+                  icon: Icons.near_me_rounded,
+                  isSelected: selectedFilter == SortType.distance,
+                  onTap: () => _updateFilter(SortType.distance),
                 ),
-                ...SpecializationConstants.specializations.map((spec) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _SpecializationChip(
-                    label: spec,
-                    isSelected: selectedSpecialization == spec,
-                    onTap: () {
-                      setState(() {
-                        selectedSpecialization = spec;
-                      });
-                    },
+                const SizedBox(width: 8),
+                _MapChip(
+                  label: 'الأعلى تقييماً',
+                  icon: Icons.star_rounded,
+                  isSelected: selectedFilter == SortType.rating,
+                  onTap: () => _updateFilter(SortType.rating),
+                ),
+                const SizedBox(width: 8),
+                _MapChip(
+                  label: 'الأكثر متابعة',
+                  icon: Icons.people_alt_rounded,
+                  isSelected: selectedFilter == SortType.followers,
+                  onTap: () => _updateFilter(SortType.followers),
+                ),
+                const SizedBox(width: 8),
+                ...SpecializationConstants.specializations.map(
+                  (spec) => Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _MapChip(
+                      label: spec,
+                      icon: Icons.auto_awesome_rounded,
+                      isSelected: selectedSpecialization == spec,
+                      onTap: () {
+                        setState(() {
+                          selectedSpecialization =
+                              selectedSpecialization == spec ? null : spec;
+                          _selectedTeacher = null;
+                          _hasFitInitialBounds = false;
+                        });
+                      },
+                    ),
                   ),
-                )),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF062B3F).withValues(alpha: 0.84),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppThemeConstants.primaryVariant.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${_displayRadius.round()} كم',
+                  style: const TextStyle(
+                    color: AppThemeConstants.secondary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppThemeConstants.secondary,
+                      inactiveTrackColor:
+                          AppThemeConstants.white.withValues(alpha: 0.18),
+                      thumbColor: AppThemeConstants.secondary,
+                      overlayColor:
+                          AppThemeConstants.secondary.withValues(alpha: 0.2),
+                    ),
+                    child: Slider(
+                      value: _displayRadius,
+                      min: 5,
+                      max: 100,
+                      divisions: 19,
+                      label: '${_displayRadius.round()} كم',
+                      onChanged: (value) {
+                        setState(() => _displayRadius = value);
+                      },
+                      onChangeEnd: (value) {
+                        setState(() {
+                          _displayRadius = value;
+                          radiusKm = value;
+                          _selectedTeacher = null;
+                          _hasFitInitialBounds = false;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.radar_rounded,
+                  color: AppThemeConstants.primaryVariant,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -400,373 +715,280 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen> {
   }
 
   Widget _buildLocationBanner() {
-    if (isLoadingLocation) {
-      return Container(
+    final isError = locationError != null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Container(
         padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: AppThemeConstants.info.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.3)),
-        ),
-        child: const Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Text(
-              '${ArabicLabels.loading} ${ArabicLabels.location}...',
-              style: TextStyle(fontSize: 14, color: AppThemeConstants.info),
+          color: isError
+              ? AppThemeConstants.warningBackground
+              : AppThemeConstants.infoLight,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: AppThemeConstants.black.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
-        ),
-      );
-    }
-
-    if (locationError != null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppThemeConstants.warningBackground,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppThemeConstants.warning.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.warning_amber, color: AppThemeConstants.warning),
-            const SizedBox(width: 12),
-            const Expanded(
+            if (isLoadingLocation)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(Icons.warning_amber_rounded,
+                  color: AppThemeConstants.warning),
+            const SizedBox(width: 10),
+            Expanded(
               child: Text(
-                'تعذر تحديد موقعك. يرجى التحقق من إعدادات الموقع.',
-                style: TextStyle(fontSize: 13, color: AppThemeConstants.warning),
+                isLoadingLocation
+                    ? 'جاري تحديد موقعك...'
+                    : 'تعذر تحديد موقعك. يمكنك رؤية المحفظين المتاحين أو إعادة المحاولة.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isError
+                      ? AppThemeConstants.warning
+                      : AppThemeConstants.infoDark,
+                ),
               ),
             ),
-            TextButton(
-              onPressed: _getCurrentLocation,
-              child: const Text(ArabicLabels.retry),
-            ),
+            if (isError)
+              TextButton(
+                onPressed: _getCurrentLocation,
+                child: const Text(ArabicLabels.retry),
+              ),
           ],
         ),
-      );
-    }
-    return const SizedBox.shrink();
+      ),
+    );
   }
 
-  Widget _buildRadiusSlider() {
+  Widget _buildSelectedTeacherCard(BuildContext context) {
+    final teacher = _selectedTeacher;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      child: teacher == null
+          ? const SizedBox.shrink()
+          : _TeacherPreviewCard(
+              key: ValueKey(teacher.id),
+              teacher: teacher,
+              distance: teacher.getDistanceFrom(userLat, userLng),
+              pulseValue: _pulseController.value,
+              onClose: () => setState(() => _selectedTeacher = null),
+              onBook: () {
+                final uri = Uri(
+                  path: '/mohaffez/${teacher.id}',
+                  queryParameters: {
+                    if (userLat != null) 'lat': userLat!.toString(),
+                    if (userLng != null) 'lng': userLng!.toString(),
+                  },
+                );
+                context.go(uri.toString());
+              },
+            ),
+    );
+  }
+
+  void _updateFilter(SortType newFilter) {
+    if (selectedFilter != newFilter) {
+      setState(() {
+        selectedFilter = newFilter;
+        _selectedTeacher = null;
+        _hasFitInitialBounds = false;
+      });
+    }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      searchQuery = '';
+      _selectedTeacher = null;
+      _hasFitInitialBounds = false;
+    });
+  }
+}
+
+class _TeacherPreviewCard extends StatelessWidget {
+  final MohaffezModel teacher;
+  final double? distance;
+  final double pulseValue;
+  final VoidCallback onClose;
+  final VoidCallback onBook;
+
+  const _TeacherPreviewCard({
+    super.key,
+    required this.teacher,
+    required this.distance,
+    required this.pulseValue,
+    required this.onClose,
+    required this.onBook,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = 0.10 + (pulseValue * 0.18);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppThemeConstants.primaryVariant.withValues(alpha: 0.24),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeConstants.primaryVariant.withValues(alpha: glow),
+            blurRadius: 28,
+            spreadRadius: 3,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: AppThemeConstants.black.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'نطاق البحث',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppThemeConstants.secondary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+              Hero(
+                tag: 'mohaffez-${teacher.id}',
+                child: CachedAvatar(
+                  imageUrl: teacher.photoUrl,
+                  radius: 34,
+                  semanticLabel: teacher.name,
                 ),
-                child: Text(
-                  '${_displayRadius.round()} كم',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppThemeConstants.secondary,
-                  ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            teacher.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppThemeConstants.textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: onClose,
+                          icon: const Icon(Icons.close_rounded),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'إغلاق',
+                        ),
+                      ],
+                    ),
+                    if (teacher.specialization?.isNotEmpty ?? false)
+                      Text(
+                        teacher.specialization!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppThemeConstants.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _MetricPill(
+                          icon: Icons.star_rounded,
+                          label: teacher.rating.toStringAsFixed(1),
+                          color: AppThemeConstants.secondary,
+                        ),
+                        _MetricPill(
+                          icon: Icons.people_alt_rounded,
+                          label: '${teacher.followerCount} متابع',
+                          color: AppThemeConstants.success,
+                        ),
+                        if (distance != null)
+                          _MetricPill(
+                            icon: Icons.near_me_rounded,
+                            label: distance! < 1
+                                ? '${(distance! * 1000).round()} م'
+                                : '${distance!.toStringAsFixed(1)} كم',
+                            color: AppThemeConstants.info,
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: AppThemeConstants.secondary,
-              inactiveTrackColor: AppThemeConstants.divider,
-              thumbColor: AppThemeConstants.secondary,
-              overlayColor: AppThemeConstants.secondary.withValues(alpha: 0.2),
+          if (teacher.bio?.isNotEmpty ?? false) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                teacher.bio!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: AppThemeConstants.textSecondary,
+                ),
+              ),
             ),
-            child: Slider(
-              value: _displayRadius,
-              min: 5,
-              max: 100,
-              divisions: 19,
-              label: '${_displayRadius.round()} كم',
-              onChanged: (value) {
-                setState(() {
-                  _displayRadius = value;
-                });
-              },
-              onChangeEnd: (value) {
-                setState(() {
-                  _displayRadius = value;
-                  radiusKm = value;
-                });
-              },
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: onBook,
+              icon: const Icon(Icons.event_available_rounded),
+              label: const Text(
+                'احجز الآن',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildFilterChips() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _SortChip(
-              label: 'الأقرب',
-              icon: Icons.location_on,
-              isSelected: selectedFilter == SortType.distance,
-              onTap: () => _updateFilter(SortType.distance),
-            ),
-            const SizedBox(width: 8),
-            _SortChip(
-              label: 'الأعلى تقييماً',
-              icon: Icons.star,
-              isSelected: selectedFilter == SortType.rating,
-              onTap: () => _updateFilter(SortType.rating),
-            ),
-            const SizedBox(width: 8),
-            _SortChip(
-              label: 'الأكثر متابعة',
-              icon: Icons.people,
-              isSelected: selectedFilter == SortType.followers,
-              onTap: () => _updateFilter(SortType.followers),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
-class _SortChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _SortChip({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isSelected ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppThemeConstants.secondary : AppThemeConstants.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppThemeConstants.secondary : AppThemeConstants.outline,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppThemeConstants.secondary.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? AppThemeConstants.surface : AppThemeConstants.textPrimary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppThemeConstants.surface : AppThemeConstants.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SpecializationChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _SpecializationChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isSelected ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppThemeConstants.primary.withValues(alpha: 0.15) : AppThemeConstants.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppThemeConstants.primary : AppThemeConstants.outline,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? AppThemeConstants.primary : AppThemeConstants.textPrimary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MohaffezCard extends ConsumerWidget {
-  final MohaffezModel mohaffez;
-  final double? distance;
-  final VoidCallback onTap;
-
-  const _MohaffezCard({
-    required this.mohaffez,
-    this.distance,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionCountAsync = ref.watch(mohaffezSessionCountProvider(mohaffez.id));
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: AppThemeConstants.elevationSm,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Hero(
-                tag: 'mohaffez-${mohaffez.id}',
-                child: CachedAvatar(
-                  imageUrl: mohaffez.photoUrl,
-                  radius: 36,
-                  semanticLabel: mohaffez.name,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mohaffez.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (mohaffez.specialization?.isNotEmpty ?? false) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        mohaffez.specialization!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppThemeConstants.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
-                      children: [
-                        if (distance != null) ...[
-                          _InfoBadge(
-                            icon: Icons.location_on,
-                            label: distance! < 1
-                                ? '${(distance! * 1000).round()} م'
-                                : '${distance!.toStringAsFixed(1)} كم',
-                            color: AppThemeConstants.info,
-                          ),
-                        ],
-                        _InfoBadge(
-                          icon: Icons.star,
-                          label: mohaffez.rating.toStringAsFixed(1),
-                          color: AppThemeConstants.secondary,
-                        ),
-                        _InfoBadge(
-                          icon: Icons.people,
-                          label: '${mohaffez.followerCount}',
-                          color: AppThemeConstants.success,
-                        ),
-                        sessionCountAsync.when(
-                          data: (count) => _InfoBadge(
-                            icon: Icons.check_circle,
-                            label: '$count جلسة',
-                            color: AppThemeConstants.primary,
-                          ),
-                          loading: () => const SizedBox.shrink(),
-                          error: (_, __) => const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: AppThemeConstants.textMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoBadge extends StatelessWidget {
+class _MetricPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
 
-  const _InfoBadge({
+  const _MetricPill({
     required this.icon,
     required this.label,
     required this.color,
@@ -775,25 +997,125 @@ class _InfoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          Icon(icon, size: 15, color: color),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               color: color,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MapChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _MapChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: isSelected ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppThemeConstants.secondary
+              : const Color(0xFF062B3F).withValues(alpha: 0.86),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: isSelected
+                ? AppThemeConstants.secondary
+                : AppThemeConstants.primaryVariant.withValues(alpha: 0.24),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppThemeConstants.black.withValues(alpha: 0.16),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 17,
+              color: isSelected
+                  ? AppThemeConstants.deepTeal
+                  : AppThemeConstants.primaryVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: isSelected
+                    ? AppThemeConstants.deepTeal
+                    : AppThemeConstants.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FloatingMapButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _FloatingMapButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppThemeConstants.primary,
+        elevation: 8,
+        shadowColor: AppThemeConstants.primary.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: Icon(icon, color: AppThemeConstants.white),
+          ),
+        ),
       ),
     );
   }
