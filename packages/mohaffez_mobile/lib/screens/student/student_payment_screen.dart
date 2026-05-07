@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/time_formatter.dart';
 
 enum _DpMethod { online, direct }
 
@@ -793,7 +794,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 DateFormat('EEEE، dd MMMM yyyy', 'ar')
                     .format(slotDate.toDate())),
           if (timeSlot != null && timeSlot.isNotEmpty)
-            lockedDetailRow(ArabicLabels.time, timeSlot),
+            lockedDetailRow(ArabicLabels.time, formatTimeToArabicAmPm(timeSlot)),
           if (location != null && location.isNotEmpty)
             lockedDetailRow(ArabicLabels.location, location),
           const SizedBox(height: 12),

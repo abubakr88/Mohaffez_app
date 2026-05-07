@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 
 // Provider: all sessions between this teacher and this specific student
@@ -405,7 +406,7 @@ class _SessionHistoryCard extends StatelessWidget {
                       size: 14, color: AppThemeConstants.grey500),
                   const SizedBox(width: 6),
                   Text(
-                    session['preferredTimeSlot'] as String? ?? '',
+                    formatTimeToArabicAmPm(session['preferredTimeSlot'] as String? ?? ''),
                     style: const TextStyle(
                         fontSize: 13, color: AppThemeConstants.black87),
                   ),

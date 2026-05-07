@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/time_formatter.dart';
 
 /// Dedicated screen for calendar/timeline view of all sessions
 class StudentScheduleScreen extends ConsumerStatefulWidget {
@@ -316,7 +317,7 @@ class _SessionCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(_getSessionTypeLabel(sessionType)),
             if (timeSlot.isNotEmpty)
-              Text('الوقت: $timeSlot', style: const TextStyle(fontSize: 12)),
+              Text('الوقت: ${formatTimeToArabicAmPm(timeSlot)}', style: const TextStyle(fontSize: 12)),
             if (location.isNotEmpty)
               Text('الموقع: $location', style: const TextStyle(fontSize: 12)),
           ],

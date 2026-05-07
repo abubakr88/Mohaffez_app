@@ -1,9 +1,10 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 import '../../shared/widgets/admin_empty_state.dart';
 
@@ -57,9 +58,8 @@ class _AdminTeacherCommissionsScreenState
         SnackBar(
           backgroundColor:
               st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
-          content: Text(st.hasError
-              ? st.error.toString()
-              : 'تم تأكيد الدفع بنجاح ✓'),
+          content: Text(
+              st.hasError ? st.error.toString() : 'تم تأكيد الدفع بنجاح ✓'),
         ),
       );
     } catch (e) {
@@ -183,8 +183,7 @@ class _AdminTeacherCommissionsScreenState
                       filled: true,
                       fillColor: AppThemeConstants.background,
                     ),
-                    onChanged: (value) =>
-                        setState(() => _searchQuery = value),
+                    onChanged: (value) => setState(() => _searchQuery = value),
                   ),
                 ),
                 const SizedBox(height: AppThemeConstants.spaceMd),
@@ -248,112 +247,114 @@ class _AdminTeacherCommissionsScreenState
                           ),
                         )
                       : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppThemeConstants.spaceMd,
-                    ),
-                    itemCount: grouped.length,
-                    itemBuilder: (context, index) {
-                      final mohaffezId = grouped.keys.elementAt(index);
-                      final summaries = grouped[mohaffezId]!;
-                      final mohaffezName = summaries.first.mohaffezName;
-                      final totalSessions = summaries.fold<int>(
-                          0, (s, w) => s + w.totalSessions);
-                      final totalRevenue = summaries.fold<double>(
-                          0.0, (s, w) => s + w.totalRevenue);
-                      final pendingAmount = summaries
-                          .where((w) => !w.isPaid)
-                          .fold(0.0, (s, w) => s + w.commissionAmount);
-                      final hasOverdue =
-                          summaries.any((w) => w.isOverdue);
-                      final hasAwaiting =
-                          summaries.any((w) => w.isAwaitingConfirmation);
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppThemeConstants.spaceMd,
+                          ),
+                          itemCount: grouped.length,
+                          itemBuilder: (context, index) {
+                            final mohaffezId = grouped.keys.elementAt(index);
+                            final summaries = grouped[mohaffezId]!;
+                            final mohaffezName = summaries.first.mohaffezName;
+                            final totalSessions = summaries.fold<int>(
+                                0, (s, w) => s + w.totalSessions);
+                            final totalRevenue = summaries.fold<double>(
+                                0.0, (s, w) => s + w.totalRevenue);
+                            final pendingAmount = summaries
+                                .where((w) => !w.isPaid)
+                                .fold(0.0, (s, w) => s + w.commissionAmount);
+                            final hasOverdue =
+                                summaries.any((w) => w.isOverdue);
+                            final hasAwaiting =
+                                summaries.any((w) => w.isAwaitingConfirmation);
 
-                      // Color priority: overdue > awaiting > pending > paid
-                      final chipColor = hasOverdue
-                          ? AppThemeConstants.error
-                          : hasAwaiting
-                              ? AppThemeConstants.accentBlueDark
-                              : pendingAmount > 0
-                                  ? AppThemeConstants.warning
-                                  : AppThemeConstants.success;
+                            // Color priority: overdue > awaiting > pending > paid
+                            final chipColor = hasOverdue
+                                ? AppThemeConstants.error
+                                : hasAwaiting
+                                    ? AppThemeConstants.accentBlueDark
+                                    : pendingAmount > 0
+                                        ? AppThemeConstants.warning
+                                        : AppThemeConstants.success;
 
-                      return Card(
-                        margin: const EdgeInsets.only(
-                            bottom: AppThemeConstants.spaceSm),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: AppThemeConstants.borderRadiusMd,
-                        ),
-                        elevation: 2,
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: AppThemeConstants.primary,
-                            child: Text(
-                              mohaffezName.isNotEmpty
-                                  ? mohaffezName[0]
-                                  : '?',
-                              style: const TextStyle(
-                                color: AppThemeConstants.white,
-                                fontWeight: FontWeight.bold,
+                            return Card(
+                              margin: const EdgeInsets.only(
+                                  bottom: AppThemeConstants.spaceSm),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
                               ),
-                            ),
-                          ),
-                          title: Text(
-                            mohaffezName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'جلسات: $totalSessions | إجمالي: ${totalRevenue.toStringAsFixed(0)} ج.م',
-                          ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: chipColor.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${pendingAmount.toStringAsFixed(0)} ج.م',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: chipColor,
+                              elevation: 2,
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppThemeConstants.primary,
+                                  child: Text(
+                                    mohaffezName.isNotEmpty
+                                        ? mohaffezName[0]
+                                        : '?',
+                                    style: const TextStyle(
+                                      color: AppThemeConstants.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                hasAwaiting ? 'بانتظار التأكيد' : 'مستحق',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppThemeConstants.grey500,
+                                title: Text(
+                                  mohaffezName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => _TeacherCommissionDetailScreen(
-                                  mohaffezId: mohaffezId,
-                                  mohaffezName: mohaffezName,
-                                  summaries: summaries,
-                                  markingPaid: _markingPaid,
-                                  onReview: _openReviewDialog,
+                                subtitle: Text(
+                                  'جلسات: $totalSessions | إجمالي: ${totalRevenue.toStringAsFixed(0)} ج.م',
                                 ),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            chipColor.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '${pendingAmount.toStringAsFixed(0)} ج.م',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: chipColor,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      hasAwaiting ? 'بانتظار التأكيد' : 'مستحق',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppThemeConstants.grey500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          _TeacherCommissionDetailScreen(
+                                        mohaffezId: mohaffezId,
+                                        mohaffezName: mohaffezName,
+                                        summaries: summaries,
+                                        markingPaid: _markingPaid,
+                                        onReview: _openReviewDialog,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             );
                           },
                         ),
-                      );
-                    },
-                  ),
                 ),
               ],
             );
@@ -405,8 +406,14 @@ class _TeacherCommissionDetailScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: totalPending > 0
-                      ? [AppThemeConstants.accentAmberDark, AppThemeConstants.accentAmber]
-                      : [AppThemeConstants.success, AppThemeConstants.accentGreenAlt],
+                      ? [
+                          AppThemeConstants.accentAmberDark,
+                          AppThemeConstants.accentAmber
+                        ]
+                      : [
+                          AppThemeConstants.success,
+                          AppThemeConstants.accentGreenAlt
+                        ],
                 ),
                 borderRadius: AppThemeConstants.borderRadiusMd,
               ),
@@ -529,9 +536,7 @@ class _WeekSummaryCard extends StatelessWidget {
   String get _statusLabel => switch (summary.status) {
         'paid' => '✅ مدفوع',
         'overdue' => '⚠️ متأخر',
-        'pendingVerification' ||
-        'awaiting_confirmation' =>
-          '⏳ بانتظار التأكيد',
+        'pendingVerification' || 'awaiting_confirmation' => '⏳ بانتظار التأكيد',
         _ => '⏳ مستحق',
       };
 
@@ -574,8 +579,7 @@ class _WeekSummaryCard extends StatelessWidget {
                           '${summary.totalSessions} جلسة • '
                           'إجمالي: ${summary.totalRevenue.toStringAsFixed(0)} ج.م',
                           style: const TextStyle(
-                              fontSize: 11,
-                              color: AppThemeConstants.grey500),
+                              fontSize: 11, color: AppThemeConstants.grey500),
                         ),
                         if (due.isNotEmpty && !summary.isPaid)
                           Text('الاستحقاق: $due',
@@ -591,8 +595,7 @@ class _WeekSummaryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                          '${summary.commissionAmount.toStringAsFixed(2)} ج.م',
+                      Text('${summary.commissionAmount.toStringAsFixed(2)} ج.م',
                           style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -615,8 +618,7 @@ class _WeekSummaryCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (summary.paymentMethod != null)
-                        Text(
-                            'الطريقة: ${_methodLabel(summary.paymentMethod!)}',
+                        Text('الطريقة: ${_methodLabel(summary.paymentMethod!)}',
                             style: const TextStyle(fontSize: 12)),
                       if (summary.paymentReference != null &&
                           summary.paymentReference!.isNotEmpty)
@@ -699,10 +701,9 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
   @override
   void initState() {
     super.initState();
-    final initial = widget.summary.reportedAmount ??
-        widget.summary.commissionAmount;
-    _amountController =
-        TextEditingController(text: initial.toStringAsFixed(2));
+    final initial =
+        widget.summary.reportedAmount ?? widget.summary.commissionAmount;
+    _amountController = TextEditingController(text: initial.toStringAsFixed(2));
   }
 
   @override
@@ -766,8 +767,7 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _kv('المحفظ', s.mohaffezName),
-                _kv(
-                    'المبلغ المتوقع',
+                _kv('المبلغ المتوقع',
                     '${s.commissionAmount.toStringAsFixed(2)} ج.م'),
                 if (s.paymentMethod != null)
                   _kv('طريقة التحويل',
@@ -782,8 +782,7 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
                   _kv('ملاحظة المحفظ', s.mohaffezNote!),
                 if (s.mohaffezReportedAt != null)
                   _kv('تم الإرسال في',
-                      DateFormat('dd/MM/yyyy HH:mm', 'ar')
-                          .format(s.mohaffezReportedAt!)),
+                      formatDateTimeToArabicAmPm(s.mohaffezReportedAt!)),
                 const Divider(height: 24),
                 if (!_showRejectForm) ...[
                   const Text('المبلغ المُستلَم فعلياً:',
@@ -791,8 +790,8 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
                   const SizedBox(height: 6),
                   TextField(
                     controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
                       suffixText: 'ج.م',
                       border: OutlineInputBorder(),
@@ -819,8 +818,7 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
                     minLines: 2,
                     maxLines: 4,
                     decoration: const InputDecoration(
-                      hintText:
-                          'مثال: لم نستلم المبلغ، رقم المرجع غير صحيح…',
+                      hintText: 'مثال: لم نستلم المبلغ، رقم المرجع غير صحيح…',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -837,9 +835,8 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
               child: const Text('إلغاء'),
             ),
             TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => setState(() => _showRejectForm = true),
+              onPressed:
+                  _busy ? null : () => setState(() => _showRejectForm = true),
               style: TextButton.styleFrom(
                 foregroundColor: AppThemeConstants.error,
               ),
@@ -852,8 +849,7 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
                       width: 14,
                       height: 14,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppThemeConstants.white),
+                          strokeWidth: 2, color: AppThemeConstants.white),
                     )
                   : const Icon(Icons.check_rounded, size: 18),
               label: const Text('تأكيد الاستلام'),
@@ -879,8 +875,7 @@ class _CommissionReviewDialogState extends State<_CommissionReviewDialog> {
                       width: 14,
                       height: 14,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppThemeConstants.white),
+                          strokeWidth: 2, color: AppThemeConstants.white),
                     )
                   : const Text('تأكيد الرفض'),
             ),

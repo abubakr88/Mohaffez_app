@@ -1,10 +1,12 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
+import '../../shared/utils/time_formatter.dart';
 
 // legacyBookingFlowProvider and BookingPaymentMethod are exported from package:mohaffez_core/mohaffez_core.dart
 
@@ -209,9 +211,12 @@ class _BookingConfirmationScreenState
               ],
             ),
             const SizedBox(height: 12),
-            _policyItem(Icons.check_circle, AppThemeConstants.success, 'إلغاء مجاني قبل 24 ساعة من موعد الجلسة'),
-            _policyItem(Icons.warning_amber, AppThemeConstants.warning, 'خصم 50% من المبلغ للإلغاء قبل 12 ساعة'),
-            _policyItem(Icons.cancel, AppThemeConstants.error, 'خصم 100% (لا يمكن استرداد المبلغ) للإلغاء بعد ذلك'),
+            _policyItem(Icons.check_circle, AppThemeConstants.success,
+                'إلغاء مجاني قبل 24 ساعة من موعد الجلسة'),
+            _policyItem(Icons.warning_amber, AppThemeConstants.warning,
+                'خصم 50% من المبلغ للإلغاء قبل 12 ساعة'),
+            _policyItem(Icons.cancel, AppThemeConstants.error,
+                'خصم 100% (لا يمكن استرداد المبلغ) للإلغاء بعد ذلك'),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
@@ -227,8 +232,8 @@ class _BookingConfirmationScreenState
                   Expanded(
                     child: Text(
                       'في حالة استخدام الباقة، سيتم خصم جلسة واحدة عند الإلغاء المتأخر',
-                      style:
-                          TextStyle(fontSize: 12, color: AppThemeConstants.error),
+                      style: TextStyle(
+                          fontSize: 12, color: AppThemeConstants.error),
                     ),
                   ),
                 ],
@@ -249,7 +254,8 @@ class _BookingConfirmationScreenState
           Icon(icon, size: 18, color: iconColor),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 14, height: 1.5)),
+            child:
+                Text(text, style: const TextStyle(fontSize: 14, height: 1.5)),
           ),
         ],
       ),
@@ -297,7 +303,8 @@ class _BookingConfirmationScreenState
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: AppThemeConstants.accentAmber, size: 18),
+                          const Icon(Icons.star,
+                              color: AppThemeConstants.accentAmber, size: 18),
                           const SizedBox(width: 4),
                           Text(
                             '${details.rating.toStringAsFixed(1)}/10',
@@ -318,7 +325,8 @@ class _BookingConfirmationScreenState
             ),
             const Divider(height: 24),
             _detailRow(Icons.calendar_today, 'التاريخ', formattedDate),
-            _detailRow(Icons.access_time, 'الوقت', details.preferredTimeSlot),
+            _detailRow(Icons.access_time, 'الوقت',
+                formatTimeToArabicAmPm(details.preferredTimeSlot)),
             _detailRow(
               Icons.timer,
               'المدة',
@@ -334,7 +342,8 @@ class _BookingConfirmationScreenState
                 const SizedBox(width: 8),
                 const Text(
                   'التكلفة',
-                  style: TextStyle(fontSize: 16, color: AppThemeConstants.grey700),
+                  style:
+                      TextStyle(fontSize: 16, color: AppThemeConstants.grey700),
                 ),
                 const Spacer(),
                 Column(
@@ -351,7 +360,8 @@ class _BookingConfirmationScreenState
                       ),
                       const Text(
                         'سيتم خصم جلسة واحدة',
-                        style: TextStyle(fontSize: 12, color: AppThemeConstants.grey500),
+                        style: TextStyle(
+                            fontSize: 12, color: AppThemeConstants.grey500),
                       ),
                     ] else
                       Text(
@@ -380,7 +390,8 @@ class _BookingConfirmationScreenState
           Icon(icon, size: 20, color: AppThemeConstants.grey600),
           const SizedBox(width: 8),
           Text(label,
-              style: const TextStyle(fontSize: 14, color: AppThemeConstants.grey700)),
+              style: const TextStyle(
+                  fontSize: 14, color: AppThemeConstants.grey700)),
           const Spacer(),
           Expanded(
             flex: 2,
@@ -425,33 +436,34 @@ class _BookingConfirmationScreenState
 
     setState(() => _isSubmitting = true);
     try {
-      final result =
-          await ref.read(legacyBookingFlowProvider.notifier).createSessionRequest(
-                mohaffezId: d.mohaffezId,
-                studentId: d.studentId,
-                studentName: d.studentName,
-                mohaffezName: d.mohaffezName,
-                sessionType: d.sessionType,
-                preferredTimeSlot: d.preferredTimeSlot,
-                slotStart: d.slotStart,
-                slotEnd: d.slotEnd,
-                slotDate: d.slotDate,
-                imamAddressText: d.location,
-                imamAddressLat: d.locationLat,
-                imamAddressLng: d.locationLng,
-                mohaffezPhone: d.mohaffezPhone,
-                subscriptionId: _isUsingSubscription ? d.subscriptionId : null,
-                isPaid: false,
-                requiresPaymentOnAcceptance:
-                    d.paymentMethod == BookingPaymentMethod.payAfterAcceptance,
-                paymentMethod: d.paymentMethod,
-                slotLockId: d.slotLockId,
-                planId: d.planId,
-                planTitle: d.planTitle,
-                paymentAmount: d.paymentAmount ?? d.cost,
-                sessionsCount: d.sessionsCount,
-                planType: d.planType,
-              );
+      final result = await ref
+          .read(legacyBookingFlowProvider.notifier)
+          .createSessionRequest(
+            mohaffezId: d.mohaffezId,
+            studentId: d.studentId,
+            studentName: d.studentName,
+            mohaffezName: d.mohaffezName,
+            sessionType: d.sessionType,
+            preferredTimeSlot: d.preferredTimeSlot,
+            slotStart: d.slotStart,
+            slotEnd: d.slotEnd,
+            slotDate: d.slotDate,
+            imamAddressText: d.location,
+            imamAddressLat: d.locationLat,
+            imamAddressLng: d.locationLng,
+            mohaffezPhone: d.mohaffezPhone,
+            subscriptionId: _isUsingSubscription ? d.subscriptionId : null,
+            isPaid: false,
+            requiresPaymentOnAcceptance:
+                d.paymentMethod == BookingPaymentMethod.payAfterAcceptance,
+            paymentMethod: d.paymentMethod,
+            slotLockId: d.slotLockId,
+            planId: d.planId,
+            planTitle: d.planTitle,
+            paymentAmount: d.paymentAmount ?? d.cost,
+            sessionsCount: d.sessionsCount,
+            planType: d.planType,
+          );
 
       if (!mounted) return;
       if (result.isSuccess) {

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/time_formatter.dart';
 
 DateTime? _toDateTime(dynamic value) {
   if (value == null) return null;
@@ -728,7 +729,7 @@ class _SessionCard extends StatelessWidget {
                           if (timeSlot.isNotEmpty)
                             _InfoChip(
                               icon: Icons.access_time_rounded,
-                              text: timeSlot,
+                              text: formatTimeToArabicAmPm(timeSlot),
                               color: AppThemeConstants.info,
                             ),
                           if (location.isNotEmpty)

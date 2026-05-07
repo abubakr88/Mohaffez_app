@@ -1,4 +1,4 @@
-﻿// lib/screens/direct_booking_request_screen.dart
+// lib/screens/direct_booking_request_screen.dart
 // WHY THIS SCREEN EXISTS: Path C direct single-session booking previously jumped
 // straight to the payment screen, forcing the student to pay before the teacher
 // agreed to the slot. This screen inserts the missing "request first" step:
@@ -13,6 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
+import '../../shared/utils/time_formatter.dart';
 
 class DirectBookingRequestScreen extends ConsumerStatefulWidget {
   const DirectBookingRequestScreen({super.key});
@@ -78,11 +80,11 @@ class _DirectBookingRequestScreenState
     try {
       final result = await FirebaseFunctions.instance
           .httpsCallable(
-            'createSessionRequest',
-            options: HttpsCallableOptions(
-              timeout: const Duration(seconds: 30),
-            ),
-          )
+        'createSessionRequest',
+        options: HttpsCallableOptions(
+          timeout: const Duration(seconds: 30),
+        ),
+      )
           .call({
         'mohaffezId': slotContext.mohaffezId,
         'mohaffezName': slotContext.mohaffezName,
@@ -175,8 +177,7 @@ class _DirectBookingRequestScreenState
           if (mounted) context.go('/home');
         });
       }
-      return const Scaffold(
-          body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final DateTime? slotDate = DateTime.tryParse(slotContext.slotDate);
@@ -260,7 +261,8 @@ class _DirectBookingRequestScreenState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: (_submitting || !_acknowledged) ? null : sendRequest,
+                  onPressed:
+                      (_submitting || !_acknowledged) ? null : sendRequest,
                   icon: _submitting
                       ? const SizedBox(
                           width: 20,
@@ -268,7 +270,8 @@ class _DirectBookingRequestScreenState
                           child: CircularProgressIndicator(
                               color: AppThemeConstants.white, strokeWidth: 2),
                         )
-                      : const Icon(Icons.send_outlined, color: AppThemeConstants.white),
+                      : const Icon(Icons.send_outlined,
+                          color: AppThemeConstants.white),
                   label: Text(
                     _submitting ? 'جاري الإرسال...' : 'إرسال الطلب',
                     style: const TextStyle(
@@ -294,7 +297,8 @@ class _DirectBookingRequestScreenState
                   onPressed: _submitting ? null : () => context.pop(),
                   child: const Text(
                     'إلغاء',
-                    style: TextStyle(color: AppThemeConstants.grey500, fontSize: 15),
+                    style: TextStyle(
+                        color: AppThemeConstants.grey500, fontSize: 15),
                   ),
                 ),
               ),
@@ -341,8 +345,7 @@ class SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -350,12 +353,10 @@ class SummaryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(children: [
-              Icon(Icons.assignment_outlined,
-                  color: AppThemeConstants.primary),
+              Icon(Icons.assignment_outlined, color: AppThemeConstants.primary),
               SizedBox(width: 8),
               Text('تفاصيل الجلسة',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
             const Divider(height: 20),
             _row(Icons.person_outline, 'المحفظ: ', mohaffezName),
@@ -363,22 +364,20 @@ class SummaryCard extends StatelessWidget {
             _row(Icons.category_outlined, 'نوع الجلسة: ',
                 translateSessionType(sessionType)),
             const SizedBox(height: 8),
-            // LTR wrapper prevents RTL from flipping "08:00-09:00" → "09:00-08:00"
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.access_time, size: 16, color: AppThemeConstants.grey500),
+                const Icon(Icons.access_time,
+                    size: 16, color: AppThemeConstants.grey500),
                 const SizedBox(width: 8),
                 const Text('الوقت: ',
-                    style: TextStyle(color: AppThemeConstants.grey500, fontSize: 13)),
+                    style: TextStyle(
+                        color: AppThemeConstants.grey500, fontSize: 13)),
                 Expanded(
-                  child: Directionality(
-                    textDirection: ui.TextDirection.ltr,
-                    child: Text(
-                      timeSlot,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13),
-                    ),
+                  child: Text(
+                    formatTimeToArabicAmPm(timeSlot),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                 ),
               ],
@@ -400,7 +399,8 @@ class SummaryCard extends StatelessWidget {
         Icon(icon, size: 16, color: AppThemeConstants.grey500),
         const SizedBox(width: 8),
         Text(label,
-            style: const TextStyle(color: AppThemeConstants.grey500, fontSize: 13)),
+            style: const TextStyle(
+                color: AppThemeConstants.grey500, fontSize: 13)),
         Expanded(
             child: Text(value,
                 style: const TextStyle(
@@ -449,9 +449,7 @@ class InfoCard extends StatelessWidget {
                         fontSize: 13,
                         color: color)),
                 const SizedBox(height: 4),
-                Text(body,
-                    style:
-                        const TextStyle(fontSize: 13, height: 1.7)),
+                Text(body, style: const TextStyle(fontSize: 13, height: 1.7)),
               ],
             ),
           ),

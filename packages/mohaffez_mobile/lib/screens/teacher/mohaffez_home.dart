@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../services/app_version_service.dart';
+import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1266,7 +1267,7 @@ class _SessionCard extends StatelessWidget {
                                   ? ArabicLabels.notSpecified
                                   : DateFormat('dd/MM/yyyy', 'ar').format(sessionDate!),
                             ),
-                            _InfoPill(icon: Icons.access_time_rounded, text: timeSlot),
+                            _InfoPill(icon: Icons.access_time_rounded, text: formatTimeToArabicAmPm(timeSlot)),
                           ],
                         ),
                       ],

@@ -1,4 +1,4 @@
-﻿// lib/screens/direct_payment_confirmations_screen.dart
+// lib/screens/direct_payment_confirmations_screen.dart
 // CHANGES vs original:
 // • _confirm(): replaced `rethrow` in `on FirebaseFunctionsException` with
 //   inline error handling + snackbar. In Dart, rethrow inside a catch block
@@ -17,6 +17,8 @@
 
 import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
+import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/time_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -64,8 +66,7 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
 
   // ── Build body ─────────────────────────────────────────────────────────────
   Widget _buildBody(String mohaffezId, WidgetRef ref) {
-    if (directPaymentRequestId != null &&
-        directPaymentRequestId!.isNotEmpty) {
+    if (directPaymentRequestId != null && directPaymentRequestId!.isNotEmpty) {
       return StreamBuilder<DirectPaymentModel?>(
         stream:
             DirectPaymentService.watchDirectPayment(directPaymentRequestId!),
@@ -78,7 +79,8 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
+                  const Icon(Icons.error_outline,
+                      size: 48, color: AppThemeConstants.error),
                   const SizedBox(height: 12),
                   Text(
                     'خطأ في التحميل: ${snapshot.error}',
@@ -100,7 +102,8 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
                   SizedBox(height: 16),
                   Text(
                     'لا توجد مدفوعات بانتظار التأكيد',
-                    style: TextStyle(fontSize: 16, color: AppThemeConstants.textSecondary),
+                    style: TextStyle(
+                        fontSize: 16, color: AppThemeConstants.textSecondary),
                   ),
                 ],
               ),
@@ -129,7 +132,8 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
+                const Icon(Icons.error_outline,
+                    size: 48, color: AppThemeConstants.error),
                 const SizedBox(height: 12),
                 Text(
                   'خطأ في التحميل: ${snapshot.error}',
@@ -151,7 +155,8 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
                 SizedBox(height: 16),
                 Text(
                   'لا توجد مدفوعات بانتظار التأكيد',
-                  style: TextStyle(fontSize: 16, color: AppThemeConstants.textSecondary),
+                  style: TextStyle(
+                      fontSize: 16, color: AppThemeConstants.textSecondary),
                 ),
               ],
             ),
@@ -161,9 +166,9 @@ class DirectPaymentConfirmationsScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(12),
           itemCount: items.length,
           itemBuilder: (_, i) => _PaymentConfirmationCard(
-              payment: items[i],
-              commissionRate: _getCommissionRate(ref),
-            ),
+            payment: items[i],
+            commissionRate: _getCommissionRate(ref),
+          ),
         );
       },
     );
@@ -311,13 +316,12 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       }
 
       final msg = switch (e.code) {
-        'resource-exhausted' =>
-            e.message != null && e.message!.isNotEmpty
-                ? e.message!
-                : 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات',
-        'permission-denied'  => 'ليس لديك صلاحية تأكيد هذه المدفوعة',
-        'not-found'          => 'لم يتم العثور على طلب الدفع',
-        _                    => e.message ?? 'حدث خطأ أثناء التأكيد',
+        'resource-exhausted' => e.message != null && e.message!.isNotEmpty
+            ? e.message!
+            : 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات',
+        'permission-denied' => 'ليس لديك صلاحية تأكيد هذه المدفوعة',
+        'not-found' => 'لم يتم العثور على طلب الدفع',
+        _ => e.message ?? 'حدث خطأ أثناء التأكيد',
       };
       messenger.showSnackBar(
         SnackBar(
@@ -329,7 +333,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_ERROR: '
           'paymentId=${widget.payment.id}, error=$e');
       messenger.showSnackBar(
-        SnackBar(content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error),
+        SnackBar(
+            content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error),
       );
     } catch (e, stack) {
       // FIX: Catches Dart Errors (TypeError, StateError, AssertionError, …)
@@ -385,8 +390,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               ),
               ElevatedButton(
                 onPressed: () => context.pop(ctrl.text.trim()),
-                style:
-                    ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppThemeConstants.error),
                 child: const Text(
                   'رفض',
                   style: TextStyle(color: AppThemeConstants.onPrimary),
@@ -412,8 +417,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         ),
       );
     } on Exception catch (e) {
-      messenger.showSnackBar(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error));
+      messenger.showSnackBar(SnackBar(
+          content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error));
     } catch (e, stack) {
       // Same safety net for the reject path.
       debugPrint('❌ [BUNDLE_FLOW] Reject_UNHANDLED_ERROR: '
@@ -438,7 +443,11 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
     final p = widget.payment;
     final method = DirectPaymentMethod.fromValue(p.paymentMethod);
     final dateStr = p.studentConfirmedAt != null
-        ? DateFormat('dd/MM HH:mm').format(p.studentConfirmedAt!)
+        ? formatDateTimeToArabicAmPm(
+            p.studentConfirmedAt!,
+            datePattern: 'dd/MM',
+            separator: ' ',
+          )
         : '–';
     final sessionDateStr = p.sessionDate != null
         ? DateFormat('EEEE d MMMM', 'ar').format(p.sessionDate!)
@@ -446,8 +455,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -476,13 +484,14 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     Text('أرسل إشعار الدفع: $dateStr',
                         style: const TextStyle(
-                            color: AppThemeConstants.textSecondary, fontSize: 12)),
+                            color: AppThemeConstants.textSecondary,
+                            fontSize: 12)),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppThemeConstants.secondary,
                   borderRadius: BorderRadius.circular(20),
@@ -499,18 +508,15 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
             // ── Bundle badge ──────────────────────────────────────────
             if (p.planType != null &&
-                (p.planType == 'bundle' ||
-                    p.planType == 'subscription')) ...[
+                (p.planType == 'bundle' || p.planType == 'subscription')) ...[
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primary
-                      .withValues(alpha: 0.15),
+                  color: AppThemeConstants.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
-                  border:
-                      Border.all(color: AppThemeConstants.primary),
+                  border: Border.all(color: AppThemeConstants.primary),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   const Icon(Icons.collections_bookmark_outlined,
@@ -534,7 +540,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
 
             // ── Info rows ─────────────────────────────────────────────
             _row(Icons.payment, 'طريقة الدفع', method.label),
-            _row(Icons.schedule, 'الموعد', p.preferredTimeSlot),
+            _row(Icons.schedule, 'الموعد',
+                formatTimeToArabicAmPm(p.preferredTimeSlot)),
             if (sessionDateStr != null)
               _row(Icons.calendar_today, 'تاريخ الجلسة', sessionDateStr),
             if (p.studentNote != null && p.studentNote!.isNotEmpty)
@@ -545,12 +552,10 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
               margin: const EdgeInsets.symmetric(vertical: 10),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppThemeConstants.primary
-                    .withValues(alpha: 0.06),
+                color: AppThemeConstants.primary.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color: AppThemeConstants.primary
-                        .withValues(alpha: 0.3)),
+                    color: AppThemeConstants.primary.withValues(alpha: 0.3)),
               ),
               child: Row(children: [
                 const Icon(Icons.info_outline,
@@ -563,8 +568,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     'يصلك صافي: '
                     '${(p.amount - p.commissionAmount).toStringAsFixed(2)} ج.م',
                     style: const TextStyle(
-                        fontSize: 12,
-                        color: AppThemeConstants.primary),
+                        fontSize: 12, color: AppThemeConstants.primary),
                   ),
                 ),
               ]),
@@ -583,8 +587,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _confirm,
-                    icon:
-                        const Icon(Icons.check, color: AppThemeConstants.onPrimary),
+                    icon: const Icon(Icons.check,
+                        color: AppThemeConstants.onPrimary),
                     label: const Text(
                       'استلمت الدفع',
                       style: TextStyle(
@@ -593,8 +597,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppThemeConstants.secondary,
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -627,12 +630,12 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
           Icon(icon, size: 16, color: AppThemeConstants.textSecondary),
           const SizedBox(width: 6),
           Text('$label: ',
-              style:
-                  const TextStyle(color: AppThemeConstants.textSecondary, fontSize: 13)),
+              style: const TextStyle(
+                  color: AppThemeConstants.textSecondary, fontSize: 13)),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 13)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           ),
         ]),
       );

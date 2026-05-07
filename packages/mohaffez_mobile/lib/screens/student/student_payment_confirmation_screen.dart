@@ -1,4 +1,4 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/empty_state.dart';
 
 class StudentPaymentConfirmationScreen extends ConsumerStatefulWidget {
@@ -141,7 +142,8 @@ class _StudentPaymentConfirmationScreenState
                     child: Text(
                       '${ArabicLabels.payNow} ${selectedPlan!.priceEGP.toStringAsFixed(0)} جنيه',
                       style: const TextStyle(
-                          color: AppThemeConstants.white, fontWeight: FontWeight.bold),
+                          color: AppThemeConstants.white,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -172,7 +174,8 @@ class _StudentPaymentConfirmationScreenState
               Text(
                 'تفاصيل الجلسة المطلوبة',
                 style: TextStyle(
-                    fontWeight: FontWeight.bold, color: AppThemeConstants.accentBlueDark),
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeConstants.accentBlueDark),
               ),
             ],
           ),
@@ -182,7 +185,7 @@ class _StudentPaymentConfirmationScreenState
               '${ArabicLabels.type}: ${ArabicLabels.getSessionTypeLabel(_sessionType)}'),
           Text('${ArabicLabels.date}: $dateLabel'),
           Text(
-              '${ArabicLabels.time}: ${_timeSlot.isEmpty ? ArabicLabels.notSpecified : _timeSlot}'),
+              '${ArabicLabels.time}: ${_timeSlot.isEmpty ? ArabicLabels.notSpecified : formatTimeToArabicAmPm(_timeSlot)}'),
           Text('${ArabicLabels.location}: $_location'),
         ],
       ),
@@ -200,8 +203,9 @@ class _StudentPaymentConfirmationScreenState
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                selected ? AppThemeConstants.secondary : AppThemeConstants.grey300,
+            color: selected
+                ? AppThemeConstants.secondary
+                : AppThemeConstants.grey300,
             width: selected ? 2 : 1,
           ),
         ),

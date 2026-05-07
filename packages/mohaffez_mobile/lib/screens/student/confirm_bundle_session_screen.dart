@@ -1,4 +1,4 @@
-﻿// lib/screens/confirm_bundle_session_screen.dart
+// lib/screens/confirm_bundle_session_screen.dart
 //
 // PURPOSE: Used ONLY when the student already has an active bundle and wants
 // to consume one session from it (subscriptionCredit path).
@@ -17,6 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
+import '../../shared/utils/time_formatter.dart';
 
 class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {
   final String? requestId;
@@ -52,7 +54,11 @@ class _ConfirmBundleSessionScreenState
 
     // 2. If slotContext is already set, cache it locally and move on.
     if (slotCtx != null) {
-      if (mounted) setState(() { _cachedSlotContext = slotCtx; _hydrating = false; });
+      if (mounted)
+        setState(() {
+          _cachedSlotContext = slotCtx;
+          _hydrating = false;
+        });
       if (mounted) await _loadSubscription();
       return;
     }
@@ -187,7 +193,8 @@ class _ConfirmBundleSessionScreenState
     final currentUser = ref.read(currentUserProvider).value;
     final sub = _activeSubscription;
 
-    if (_activeSubscription == null || _activeSubscription!.remainingSessions <= 0) {
+    if (_activeSubscription == null ||
+        _activeSubscription!.remainingSessions <= 0) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -240,9 +247,8 @@ class _ConfirmBundleSessionScreenState
           .where('dayOfWeek', isEqualTo: slotDate.weekday)
           .limit(1)
           .get();
-      final availabilityDocId = availabilitySnap.docs.isEmpty
-          ? null
-          : availabilitySnap.docs.first.id;
+      final availabilityDocId =
+          availabilitySnap.docs.isEmpty ? null : availabilitySnap.docs.first.id;
 
       final lockRef = firestore.collection('slotLocks').doc();
       slotLockId = lockRef.id;
@@ -295,16 +301,18 @@ class _ConfirmBundleSessionScreenState
 
       if (result.success) {
         ref.read(bookingFlowProvider.notifier).reset();
-        
+
         // Show different message for duplicate vs new request
         final message = result.isDuplicate
             ? 'لديك طلب موجود بالفعل لهذا الموعد — تم استخدامه'
             : 'تم إرسال طلب الجلسة بنجاح ✓';
-            
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: result.isDuplicate ? AppThemeConstants.warning : AppThemeConstants.success,
+            backgroundColor: result.isDuplicate
+                ? AppThemeConstants.warning
+                : AppThemeConstants.success,
             duration: Duration(seconds: result.isDuplicate ? 4 : 3),
           ),
         );
@@ -312,8 +320,8 @@ class _ConfirmBundleSessionScreenState
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                result.errorMessage ?? 'فشل إرسال الطلب، حاول مرة أخرى'),
+            content:
+                Text(result.errorMessage ?? 'فشل إرسال الطلب، حاول مرة أخرى'),
             backgroundColor: AppThemeConstants.error,
           ),
         );
@@ -394,7 +402,8 @@ class _ConfirmBundleSessionScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: AppThemeConstants.error),
+            const Icon(Icons.error_outline,
+                size: 64, color: AppThemeConstants.error),
             const SizedBox(height: 16),
             Text(
               _subscriptionError!,
@@ -426,7 +435,8 @@ class _ConfirmBundleSessionScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.warning_amber, size: 64, color: AppThemeConstants.warning),
+            const Icon(Icons.warning_amber,
+                size: 64, color: AppThemeConstants.warning),
             const SizedBox(height: 16),
             const Text('لم يتم تحديد موعد الجلسة'),
             const SizedBox(height: 24),
@@ -505,7 +515,8 @@ class _ConfirmBundleSessionScreenState
                 const SizedBox(height: 4),
                 const Text(
                   'ستُخصم جلسة واحدة عند التأكيد',
-                  style: TextStyle(fontSize: 12, color: AppThemeConstants.textSecondary),
+                  style: TextStyle(
+                      fontSize: 12, color: AppThemeConstants.textSecondary),
                 ),
               ],
             ),
@@ -534,8 +545,7 @@ class _ConfirmBundleSessionScreenState
               children: [
                 const Text(
                   'تفاصيل الجلسة',
-                  style:
-                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const Divider(height: 20),
                 _infoRow(
@@ -548,7 +558,7 @@ class _ConfirmBundleSessionScreenState
                 ),
                 const SizedBox(height: 8),
                 _infoRow(Icons.access_time, 'الوقت',
-                    slotContext.preferredTimeSlot),
+                    formatTimeToArabicAmPm(slotContext.preferredTimeSlot)),
                 if (displayDate != null) ...[
                   const SizedBox(height: 8),
                   _infoRow(
@@ -581,13 +591,15 @@ class _ConfirmBundleSessionScreenState
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.warning_amber, color: AppThemeConstants.warning, size: 18),
+                  Icon(Icons.warning_amber,
+                      color: AppThemeConstants.warning, size: 18),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'هذه آخر جلسة في باقتك الحالية',
                       style: TextStyle(
-                          color: AppThemeConstants.warning, fontWeight: FontWeight.bold),
+                          color: AppThemeConstants.warning,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -619,8 +631,8 @@ class _ConfirmBundleSessionScreenState
                   : const Icon(Icons.check_circle_outline),
               label: Text(
                 _isLoading ? 'جارٍ الإرسال...' : 'تأكيد الحجز',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),

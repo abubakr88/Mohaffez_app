@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'package:go_router/go_router.dart';
@@ -127,7 +128,7 @@ class AcceptedSessionsScreen extends ConsumerWidget {
         : null;
 
     final timeText = session.preferredTimeSlot?.isNotEmpty == true
-        ? session.preferredTimeSlot
+        ? formatTimeToArabicAmPm(session.preferredTimeSlot!)
         : null;
 
     return Card(
@@ -234,7 +235,9 @@ class _TypeChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: isOnline ? AppThemeConstants.accentBlueDark : AppThemeConstants.secondary,
+          color: isOnline
+              ? AppThemeConstants.accentBlueDark
+              : AppThemeConstants.secondary,
         ),
       ),
     );
@@ -246,8 +249,7 @@ class _InfoRow extends StatelessWidget {
   final String text;
   final Color color;
 
-  const _InfoRow(
-      {required this.icon, required this.text, required this.color});
+  const _InfoRow({required this.icon, required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {

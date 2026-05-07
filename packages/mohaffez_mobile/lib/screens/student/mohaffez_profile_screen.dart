@@ -1,4 +1,4 @@
-﻿// lib/screens/mohaffez_profile_screen.dart
+// lib/screens/mohaffez_profile_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../shared/widgets/skeleton_card.dart';
+import '../../shared/utils/time_formatter.dart';
 import '../../providers/mohaffez_profile_providers.dart';
 import '../../providers/student_count_provider.dart';
 
@@ -29,8 +30,7 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
       _MohaffezProfileScreenState();
 }
 
-class _MohaffezProfileScreenState
-    extends ConsumerState<MohaffezProfileScreen> {
+class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   String selectedSessionType = 'home';
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
@@ -92,22 +92,16 @@ class _MohaffezProfileScreenState
   // ─── SlotContext builder ──────────────────────────────────────────────────
 
   SlotContext _buildSlotContext(Map<String, dynamic>? profileValue) {
-    final startRaw =
-        selectedTimeSlot!['startTime'] as String? ?? '0:0';
-    final endRaw =
-        selectedTimeSlot!['endTime'] as String? ?? '0:0';
+    final startRaw = selectedTimeSlot!['startTime'] as String? ?? '0:0';
+    final endRaw = selectedTimeSlot!['endTime'] as String? ?? '0:0';
 
     final startParts = startRaw.split(':');
     final endParts = endRaw.split(':');
 
-    final startHour =
-        int.tryParse(startParts.elementAtOrNull(0) ?? '') ?? 0;
-    final startMin =
-        int.tryParse(startParts.elementAtOrNull(1) ?? '') ?? 0;
-    final endHour =
-        int.tryParse(endParts.elementAtOrNull(0) ?? '') ?? 0;
-    final endMin =
-        int.tryParse(endParts.elementAtOrNull(1) ?? '') ?? 0;
+    final startHour = int.tryParse(startParts.elementAtOrNull(0) ?? '') ?? 0;
+    final startMin = int.tryParse(startParts.elementAtOrNull(1) ?? '') ?? 0;
+    final endHour = int.tryParse(endParts.elementAtOrNull(0) ?? '') ?? 0;
+    final endMin = int.tryParse(endParts.elementAtOrNull(1) ?? '') ?? 0;
 
     final slotStart = DateTime(
       selectedDate!.year,
@@ -141,10 +135,8 @@ class _MohaffezProfileScreenState
       // FIX Bug 2: Firestore stores coordinates as num, not double.
       // Direct cast 'as double?' throws TypeError at runtime.
       // Use (as num?)?.toDouble() which safely handles both int and double.
-      imamAddressLat:
-          (profileValue?['addressLat'] as num?)?.toDouble(),
-      imamAddressLng:
-          (profileValue?['addressLng'] as num?)?.toDouble(),
+      imamAddressLat: (profileValue?['addressLat'] as num?)?.toDouble(),
+      imamAddressLng: (profileValue?['addressLng'] as num?)?.toDouble(),
     );
   }
 
@@ -152,10 +144,8 @@ class _MohaffezProfileScreenState
 
   @override
   Widget build(BuildContext context) {
-    final profileAsync =
-        ref.watch(mohaffezProfileProvider(widget.mohaffezId));
-    final plansAsync =
-        ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    final profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
+    final plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
 
     // Auto-switch to the first session type that has a plan
     ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
@@ -230,8 +220,7 @@ class _MohaffezProfileScreenState
               ],
             ),
           ),
-          loading: () =>
-              const Center(child: CircularProgressIndicator()),
+          loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -259,7 +248,8 @@ class _MohaffezProfileScreenState
                 TextButton.icon(
                   onPressed: () {
                     ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
-                    ref.invalidate(activePricingPlansProvider(widget.mohaffezId));
+                    ref.invalidate(
+                        activePricingPlansProvider(widget.mohaffezId));
                     ref.invalidate(credentialsProvider(widget.mohaffezId));
                     ref.invalidate(availabilityProvider(widget.mohaffezId));
                   },
@@ -288,109 +278,109 @@ class _MohaffezProfileScreenState
                   key: const ValueKey('booking_bar'),
                   child: Container(
                     padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppThemeConstants.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppThemeConstants.black.withValues(alpha: 0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, -2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppThemeConstants.secondary
-                                  .withValues(alpha: 0.1),
-                              borderRadius: AppThemeConstants.borderRadiusSm,
-                              border: Border.all(
-                                color: AppThemeConstants.secondary
-                                    .withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.calendar_today_rounded,
-                                        color: AppThemeConstants.secondary,
-                                        size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'التاريخ: ${DateFormat('EEEE، dd MMMM yyyy', 'ar').format(selectedDate!)}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.access_time_rounded,
-                                        color: AppThemeConstants.secondary,
-                                        size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'الوقت: ${selectedTimeSlot!['startTime']} - ${selectedTimeSlot!['endTime']}',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.close_rounded),
-                                      onPressed: () {
-                                        setState(() {
-                                          selectedTimeSlot = null;
-                                          selectedDate = null;
-                                          selectedDayOfWeek = null;
-                                        });
-                                      },
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton.icon(
-                              onPressed: _navigateToBookingMethod,
-                              icon: const Icon(Icons.send_rounded),
-                              label: const Text(
-                                'إرسال طلب الحجز',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppThemeConstants.primary,
-                                foregroundColor: AppThemeConstants.white,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: AppThemeConstants.borderRadiusMd,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppThemeConstants.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
                     ),
-                  )
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppThemeConstants.secondary
+                                .withValues(alpha: 0.1),
+                            borderRadius: AppThemeConstants.borderRadiusSm,
+                            border: Border.all(
+                              color: AppThemeConstants.secondary
+                                  .withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_today_rounded,
+                                      color: AppThemeConstants.secondary,
+                                      size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'التاريخ: ${DateFormat('EEEE، dd MMMM yyyy', 'ar').format(selectedDate!)}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.access_time_rounded,
+                                      color: AppThemeConstants.secondary,
+                                      size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'الوقت: ${formatTimeToArabicAmPm('${selectedTimeSlot!['startTime']} - ${selectedTimeSlot!['endTime']}')}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () {
+                                      setState(() {
+                                        selectedTimeSlot = null;
+                                        selectedDate = null;
+                                        selectedDayOfWeek = null;
+                                      });
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: _navigateToBookingMethod,
+                            icon: const Icon(Icons.send_rounded),
+                            label: const Text(
+                              'إرسال طلب الحجز',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppThemeConstants.primary,
+                              foregroundColor: AppThemeConstants.white,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : const SizedBox.shrink(key: ValueKey('empty_bar')),
         ),
       ),
@@ -425,7 +415,9 @@ class _MohaffezProfileScreenState
         });
 
         final savings = (bestPlan.sessionsCount > 1 && singlePlan != null)
-            ? ((singlePlan.priceEGP * bestPlan.sessionsCount) - bestPlan.priceEGP).toInt()
+            ? ((singlePlan.priceEGP * bestPlan.sessionsCount) -
+                    bestPlan.priceEGP)
+                .toInt()
             : 0;
 
         return Container(
@@ -433,7 +425,10 @@ class _MohaffezProfileScreenState
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
+              colors: [
+                AppThemeConstants.primary,
+                AppThemeConstants.primaryVariant
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -490,8 +485,8 @@ class _MohaffezProfileScreenState
               if (savings > 0) ...[
                 const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: AppThemeConstants.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
@@ -753,9 +748,12 @@ class _MohaffezProfileScreenState
   Widget _buildReadOnlyPlanCard(PricingPlanModel plan) {
     final isBundle =
         plan.type == PlanType.bundle || plan.type == PlanType.subscription;
-    final badgeColor =
-        isBundle ? AppThemeConstants.accentPurpleDark : AppThemeConstants.accentAmberDark;
-    final badgeBg = isBundle ? AppThemeConstants.accentPurpleLight : AppThemeConstants.accentAmberLight;
+    final badgeColor = isBundle
+        ? AppThemeConstants.accentPurpleDark
+        : AppThemeConstants.accentAmberDark;
+    final badgeBg = isBundle
+        ? AppThemeConstants.accentPurpleLight
+        : AppThemeConstants.accentAmberLight;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -775,11 +773,9 @@ class _MohaffezProfileScreenState
         children: [
           Row(children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(20)),
+                  color: badgeBg, borderRadius: BorderRadius.circular(20)),
               child: Text(isBundle ? 'باقة' : 'جلسة واحدة',
                   style: TextStyle(
                       fontSize: 11,
@@ -799,8 +795,7 @@ class _MohaffezProfileScreenState
           ]),
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 6, children: [
-            _profileChip(
-                '${plan.sessionsCount} جلسة', Icons.event_available),
+            _profileChip('${plan.sessionsCount} جلسة', Icons.event_available),
             if (plan.validityDays != null && plan.validityDays! > 0)
               _profileChip('${plan.validityDays} يوم', Icons.schedule),
             if (isBundle)
@@ -812,8 +807,8 @@ class _MohaffezProfileScreenState
           if (plan.description != null && plan.description!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(plan.description!,
-                style:
-                    const TextStyle(fontSize: 12, color: AppThemeConstants.grey600)),
+                style: const TextStyle(
+                    fontSize: 12, color: AppThemeConstants.grey600)),
           ],
         ],
       ),
@@ -836,14 +831,12 @@ class _MohaffezProfileScreenState
             style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color:
-                    AppThemeConstants.secondary.withValues(alpha: 0.9))),
+                color: AppThemeConstants.secondary.withValues(alpha: 0.9))),
       ]),
     );
   }
 
-  Widget _buildPricingSection(
-      AsyncValue<List<PricingPlanModel>> plansAsync) {
+  Widget _buildPricingSection(AsyncValue<List<PricingPlanModel>> plansAsync) {
     return plansAsync.when(
       data: (plans) {
         if (plans.isEmpty) return const SizedBox.shrink();
@@ -859,8 +852,7 @@ class _MohaffezProfileScreenState
                 color: AppThemeConstants.primary.withValues(alpha: 0.08),
                 borderRadius: AppThemeConstants.borderRadiusMd,
                 border: Border.all(
-                    color: AppThemeConstants.primary
-                        .withValues(alpha: 0.4)),
+                    color: AppThemeConstants.primary.withValues(alpha: 0.4)),
               ),
               child: const Row(
                 children: [
@@ -953,12 +945,14 @@ class _MohaffezProfileScreenState
           ),
           child: const Row(
             children: [
-              Icon(Icons.error_outline, color: AppThemeConstants.error, size: 20),
+              Icon(Icons.error_outline,
+                  color: AppThemeConstants.error, size: 20),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'تعذر تحميل خطط التسعير',
-                  style: TextStyle(fontSize: 14, color: AppThemeConstants.error),
+                  style:
+                      TextStyle(fontSize: 14, color: AppThemeConstants.error),
                 ),
               ),
             ],
@@ -970,13 +964,11 @@ class _MohaffezProfileScreenState
 
   // ─── AppBar ───────────────────────────────────────────────────────────────
 
-  Widget _buildAppBar(
-      BuildContext context, Map<String, dynamic> profile) {
+  Widget _buildAppBar(BuildContext context, Map<String, dynamic> profile) {
     final name = (profile['name'] as String?)?.trim().isNotEmpty == true
         ? profile['name'] as String
         : 'المحفّظ';
-    final specialization = (profile['specialization'] as String?)
-        ?.trim();
+    final specialization = (profile['specialization'] as String?)?.trim();
     final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
     final reviewCount = profile['reviewCount'] as int? ?? 0;
 
@@ -997,7 +989,10 @@ class _MohaffezProfileScreenState
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
+                  colors: [
+                    AppThemeConstants.primary,
+                    AppThemeConstants.primaryVariant
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -1129,12 +1124,14 @@ class _MohaffezProfileScreenState
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppThemeConstants.white.withValues(alpha: 0.42),
+                          color:
+                              AppThemeConstants.white.withValues(alpha: 0.42),
                           width: 2,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppThemeConstants.black.withValues(alpha: 0.20),
+                            color:
+                                AppThemeConstants.black.withValues(alpha: 0.20),
                             blurRadius: 16,
                             offset: const Offset(0, 10),
                           ),
@@ -1178,7 +1175,8 @@ class _MohaffezProfileScreenState
     final reviewCount = profile['reviewCount'] as int? ?? 0;
     final ratingText = reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد';
     final statsAsync = ref.watch(mohaffezStatsProvider(widget.mohaffezId));
-    final studentCountAsync = ref.watch(mohaffezStudentCountProvider(widget.mohaffezId));
+    final studentCountAsync =
+        ref.watch(mohaffezStudentCountProvider(widget.mohaffezId));
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -1300,12 +1298,15 @@ class _MohaffezProfileScreenState
           ),
           const SizedBox(height: 16),
           Row(
-            children: List.generate(stats.length, (i) => Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(left: i < stats.length - 1 ? 8 : 0),
-                child: stats[i],
-              ),
-            )),
+            children: List.generate(
+                stats.length,
+                (i) => Expanded(
+                      child: Padding(
+                        padding:
+                            EdgeInsets.only(left: i < stats.length - 1 ? 8 : 0),
+                        child: stats[i],
+                      ),
+                    )),
           ),
         ],
       ),
@@ -1505,8 +1506,7 @@ class _MohaffezProfileScreenState
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 'الشهادات والمؤهلات',
-                style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 12),
@@ -1533,11 +1533,13 @@ class _MohaffezProfileScreenState
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: AppThemeConstants.accentPurple.withValues(alpha: 0.18),
+                        color: AppThemeConstants.accentPurple
+                            .withValues(alpha: 0.18),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppThemeConstants.accentPurple.withValues(alpha: 0.08),
+                          color: AppThemeConstants.accentPurple
+                              .withValues(alpha: 0.08),
                           blurRadius: 14,
                           offset: const Offset(0, 8),
                         ),
@@ -1552,7 +1554,8 @@ class _MohaffezProfileScreenState
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: AppThemeConstants.accentPurple.withValues(alpha: 0.12),
+                                color: AppThemeConstants.accentPurple
+                                    .withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: const Icon(
@@ -1583,7 +1586,8 @@ class _MohaffezProfileScreenState
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: AppThemeConstants.white.withValues(alpha: 0.9),
+                            color:
+                                AppThemeConstants.white.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Row(
@@ -1617,7 +1621,8 @@ class _MohaffezProfileScreenState
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: AppThemeConstants.success.withValues(alpha: 0.12),
+                            color: AppThemeConstants.success
+                                .withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: const Row(
@@ -1664,12 +1669,14 @@ class _MohaffezProfileScreenState
           ),
           child: const Row(
             children: [
-              Icon(Icons.error_outline, color: AppThemeConstants.error, size: 20),
+              Icon(Icons.error_outline,
+                  color: AppThemeConstants.error, size: 20),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'تعذر تحميل الشهادات والمؤهلات',
-                  style: TextStyle(fontSize: 14, color: AppThemeConstants.error),
+                  style:
+                      TextStyle(fontSize: 14, color: AppThemeConstants.error),
                 ),
               ),
             ],
@@ -1685,7 +1692,8 @@ class _MohaffezProfileScreenState
       decoration: BoxDecoration(
         color: AppThemeConstants.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.10)),
+        border:
+            Border.all(color: AppThemeConstants.white.withValues(alpha: 0.10)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1755,9 +1763,7 @@ class _MohaffezProfileScreenState
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: hasPlan
-                  ? (isSelected
-                      ? activeColor
-                      : AppThemeConstants.outline)
+                  ? (isSelected ? activeColor : AppThemeConstants.outline)
                   : AppThemeConstants.grey300,
               width: isSelected ? 2 : 1.5,
             ),
@@ -1809,8 +1815,7 @@ class _MohaffezProfileScreenState
                   label,
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                     color: hasPlan
                         ? (isSelected
                             ? AppThemeConstants.textPrimary
@@ -1843,8 +1848,7 @@ class _MohaffezProfileScreenState
                 type: 'home',
                 label: 'بيت الطالب',
                 icon: Icons.home_rounded,
-                activeColor:
-                    AppThemeConstants.primary.withValues(alpha: 0.18),
+                activeColor: AppThemeConstants.primary.withValues(alpha: 0.18),
                 hasPlan: homeHasPlan,
               ),
               chip(
@@ -1859,7 +1863,8 @@ class _MohaffezProfileScreenState
                 type: 'online',
                 label: 'أونلاين',
                 icon: Icons.videocam_rounded,
-                activeColor: AppThemeConstants.accentBlue.withValues(alpha: 0.18),
+                activeColor:
+                    AppThemeConstants.accentBlue.withValues(alpha: 0.18),
                 hasPlan: onlineHasPlan,
               ),
             ],
@@ -1888,8 +1893,7 @@ class _MohaffezProfileScreenState
 
   // ─── Availability section ─────────────────────────────────────────────────
 
-  Widget _buildAvailabilitySection(WidgetRef ref,
-      Map<String, dynamic> profile,
+  Widget _buildAvailabilitySection(WidgetRef ref, Map<String, dynamic> profile,
       AsyncValue<List<PricingPlanModel>> plansAsync) {
     final plans = plansAsync.valueOrNull ?? [];
     final currentTypeHasPlan = plansAsync.hasValue
@@ -1914,7 +1918,8 @@ class _MohaffezProfileScreenState
               Expanded(
                 child: Text(
                   'اختر نوع جلسة متاح أولاً لعرض المواعيد',
-                  style: TextStyle(fontSize: 14, color: AppThemeConstants.textSecondary),
+                  style: TextStyle(
+                      fontSize: 14, color: AppThemeConstants.textSecondary),
                 ),
               ),
             ],
@@ -1926,295 +1931,298 @@ class _MohaffezProfileScreenState
     final availability = ref.watch(availabilityProvider(widget.mohaffezId));
     return availability.when(
       data: (slots) {
-            if (slots.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppThemeConstants.grey50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppThemeConstants.grey200),
+        if (slots.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppThemeConstants.grey50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppThemeConstants.grey200),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.calendar_today,
+                      color: AppThemeConstants.grey400, size: 32),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'لا توجد أوقات متاحة',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 15, color: AppThemeConstants.grey600),
+                    ),
                   ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.calendar_today,
-                          color: AppThemeConstants.grey400, size: 32),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'لا توجد أوقات متاحة',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 15, color: AppThemeConstants.grey600),
-                        ),
-                      ),
-                    ],
+                ],
+              ),
+            ),
+          );
+        }
+
+        const arabicDays = [
+          'الإثنين',
+          'الثلاثاء',
+          'الأربعاء',
+          'الخميس',
+          'الجمعة',
+          'السبت',
+          'الأحد',
+        ];
+
+        // Pre-filter all slots to check if any exist for selected session type
+        final hasAnyFilteredSlots = slots.any((slot) {
+          final timeSlots =
+              List<Map<String, dynamic>>.from(slot['timeSlots'] ?? []);
+          return timeSlots.any((ts) =>
+              ts['enabled'] == true &&
+              ts['sessionType'] == selectedSessionType);
+        });
+
+        if (!hasAnyFilteredSlots) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppThemeConstants.warningLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppThemeConstants.accentOrange),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      color: AppThemeConstants.accentOrange, size: 32),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'لا توجد أوقات متاحة لهذا النوع من الجلسات',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 15, color: AppThemeConstants.warning),
+                    ),
                   ),
-                ),
-              );
-            }
+                ],
+              ),
+            ),
+          );
+        }
 
-            const arabicDays = [
-              'الإثنين',
-              'الثلاثاء',
-              'الأربعاء',
-              'الخميس',
-              'الجمعة',
-              'السبت',
-              'الأحد',
-            ];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'الأوقات المتاحة - اختر الوقت المناسب',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...(() {
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final currentDayOfWeek = today.weekday;
+              final sorted = [...slots]..sort((a, b) {
+                  int dA = ((a['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
+                  int dB = ((b['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
+                  return dA.compareTo(dB);
+                });
+              return sorted;
+            }())
+                .expand((slot) {
+              final dayOfWeek = slot['dayOfWeek'] as int;
+              final timeSlots =
+                  List<Map<String, dynamic>>.from(slot['timeSlots'] ?? []);
 
-            // Pre-filter all slots to check if any exist for selected session type
-            final hasAnyFilteredSlots = slots.any((slot) {
-              final timeSlots = List<Map<String, dynamic>>.from(slot['timeSlots'] ?? []);
-              return timeSlots.any((ts) =>
-                  ts['enabled'] == true && ts['sessionType'] == selectedSessionType);
-            });
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final currentDayOfWeek = today.weekday;
 
-            if (!hasAnyFilteredSlots) {
-              return Padding(
-                padding: const EdgeInsets.all(16),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppThemeConstants.warningLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppThemeConstants.accentOrange),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline,
-                          color: AppThemeConstants.accentOrange, size: 32),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'لا توجد أوقات متاحة لهذا النوع من الجلسات',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 15, color: AppThemeConstants.warning),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+              int baseDaysUntil = dayOfWeek - currentDayOfWeek;
+              if (baseDaysUntil < 0) baseDaysUntil += 7;
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'الأوقات المتاحة - اختر الوقت المناسب',
-                    style: TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...(() {
-                  final now = DateTime.now();
-                  final today = DateTime(now.year, now.month, now.day);
-                  final currentDayOfWeek = today.weekday;
-                  final sorted = [...slots]..sort((a, b) {
-                      int dA = ((a['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
-                      int dB = ((b['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
-                      return dA.compareTo(dB);
-                    });
-                  return sorted;
-                }()).expand((slot) {
-                  final dayOfWeek = slot['dayOfWeek'] as int;
-                  final timeSlots =
-                      List<Map<String, dynamic>>.from(
-                          slot['timeSlots'] ?? []);
+              // Show only the next occurrence of this weekday (within 7 days)
+              return List.generate(1, (weekIndex) {
+                final daysUntil = baseDaysUntil + (weekIndex * 7);
+                final targetDate = DateTime(
+                  today.year,
+                  today.month,
+                  today.day + daysUntil,
+                );
+                final isToday = daysUntil == 0;
 
-                  final now = DateTime.now();
-                  final today =
-                      DateTime(now.year, now.month, now.day);
-                  final currentDayOfWeek = today.weekday;
-
-                  int baseDaysUntil = dayOfWeek - currentDayOfWeek;
-                  if (baseDaysUntil < 0) baseDaysUntil += 7;
-
-                  // Show only the next occurrence of this weekday (within 7 days)
-                  return List.generate(1, (weekIndex) {
-                    final daysUntil = baseDaysUntil + (weekIndex * 7);
-                    final targetDate = DateTime(
+                final enabledSlots = timeSlots.where((ts) {
+                  if (ts['enabled'] != true) return false;
+                  if (ts['sessionType'] != selectedSessionType) {
+                    return false;
+                  }
+                  if (isToday) {
+                    final parts =
+                        (ts['startTime'] as String? ?? '0:0').split(':');
+                    final hour =
+                        int.tryParse(parts.elementAtOrNull(0) ?? '') ?? 0;
+                    final minute =
+                        int.tryParse(parts.elementAtOrNull(1) ?? '') ?? 0;
+                    final slotTime = DateTime(
                       today.year,
                       today.month,
-                      today.day + daysUntil,
+                      today.day,
+                      hour,
+                      minute,
                     );
-                    final isToday = daysUntil == 0;
+                    return slotTime.isAfter(now);
+                  }
+                  return true;
+                }).toList();
 
-                    final enabledSlots = timeSlots.where((ts) {
-                      if (ts['enabled'] != true) return false;
-                      if (ts['sessionType'] != selectedSessionType) {
-                        return false;
-                      }
-                      if (isToday) {
-                        final parts =
-                            (ts['startTime'] as String? ?? '0:0').split(':');
-                        final hour =
-                            int.tryParse(parts.elementAtOrNull(0) ?? '') ?? 0;
-                        final minute =
-                            int.tryParse(parts.elementAtOrNull(1) ?? '') ?? 0;
-                        final slotTime = DateTime(
-                          today.year,
-                          today.month,
-                          today.day,
-                          hour,
-                          minute,
-                        );
-                        return slotTime.isAfter(now);
-                      }
-                      return true;
-                    }).toList();
+                if (enabledSlots.isEmpty) {
+                  return const SizedBox.shrink();
+                }
 
-                    if (enabledSlots.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.calendar_today_rounded,
-                                  size: 18,
-                                  color: AppThemeConstants.secondary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '${arabicDays[dayOfWeek - 1]} - ${DateFormat('dd/MM', 'ar').format(targetDate)}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          const Icon(Icons.calendar_today_rounded,
+                              size: 18, color: AppThemeConstants.secondary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${arabicDays[dayOfWeek - 1]} - ${DateFormat('dd/MM', 'ar').format(targetDate)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (isToday)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppThemeConstants.secondary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'اليوم',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppThemeConstants.white,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (isToday)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppThemeConstants.secondary,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Text(
-                                    'اليوم',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppThemeConstants.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: enabledSlots.map((ts) {
-                              final isSelected =
-                                  selectedTimeSlot == ts &&
-                                      selectedDayOfWeek == dayOfWeek &&
-                                      selectedDate == targetDate;
-                              return Semantics(
-                                button: true,
-                                selected: isSelected,
-                                label: 'وقت ${ts['startTime']} إلى ${ts['endTime']}',
-                                hint: isSelected ? 'تم اختيار هذا الوقت' : 'اختر هذا الوقت',
-                                child: InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      selectedTimeSlot = ts;
-                                      selectedDate = targetDate;
-                                      selectedDayOfWeek = dayOfWeek;
-                                    });
-                                  },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    constraints: const BoxConstraints(
-                                      minHeight: 48,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? AppThemeConstants.secondary
-                                          : AppThemeConstants.successLight,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? AppThemeConstants.secondary
-                                            : AppThemeConstants.accentGreenAlt,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.access_time,
-                                          size: 14,
-                                          color: isSelected
-                                              ? AppThemeConstants.white
-                                              : AppThemeConstants.success,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          '${ts['startTime']} - ${ts['endTime']}',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: isSelected
-                                                ? AppThemeConstants.white
-                                                : AppThemeConstants.success,
-                                          ),
-                                        ),
-                                        if (isSelected) ...[
-                                          const SizedBox(width: 4),
-                                          const Icon(Icons.check_circle,
-                                              size: 16, color: AppThemeConstants.white),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 4),
+                            ),
                         ],
                       ),
-                    );
-                  });
-                }),
-              ],
-            );
-          },
-      loading: () => const SizedBox(
-            height: 320,
-            child: SkeletonList(itemCount: 4, itemHeight: 70),
-          ),
-      error: (_, __) => const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'خطأ في تحميل الأوقات المتاحة',
-              style: TextStyle(color: AppThemeConstants.error),
-            ),
-          ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: enabledSlots.map((ts) {
+                          final isSelected = selectedTimeSlot == ts &&
+                              selectedDayOfWeek == dayOfWeek &&
+                              selectedDate == targetDate;
+                          final displayTime = formatTimeToArabicAmPm(
+                              '${ts['startTime']} - ${ts['endTime']}');
+                          return Semantics(
+                            button: true,
+                            selected: isSelected,
+                            label: 'وقت $displayTime',
+                            hint: isSelected
+                                ? 'تم اختيار هذا الوقت'
+                                : 'اختر هذا الوقت',
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  selectedTimeSlot = ts;
+                                  selectedDate = targetDate;
+                                  selectedDayOfWeek = dayOfWeek;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  minHeight: 48,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppThemeConstants.secondary
+                                      : AppThemeConstants.successLight,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppThemeConstants.secondary
+                                        : AppThemeConstants.accentGreenAlt,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.access_time,
+                                      size: 14,
+                                      color: isSelected
+                                          ? AppThemeConstants.white
+                                          : AppThemeConstants.success,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      displayTime,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isSelected
+                                            ? AppThemeConstants.white
+                                            : AppThemeConstants.success,
+                                      ),
+                                    ),
+                                    if (isSelected) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.check_circle,
+                                          size: 16,
+                                          color: AppThemeConstants.white),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
+                );
+              });
+            }),
+          ],
         );
+      },
+      loading: () => const SizedBox(
+        height: 320,
+        child: SkeletonList(itemCount: 4, itemHeight: 70),
+      ),
+      error: (_, __) => const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text(
+          'خطأ في تحميل الأوقات المتاحة',
+          style: TextStyle(color: AppThemeConstants.error),
+        ),
+      ),
+    );
   }
 }

@@ -1,4 +1,4 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
+import '../../shared/utils/time_formatter.dart';
 
 class AdminPaymentEventsScreen extends ConsumerStatefulWidget {
   const AdminPaymentEventsScreen({super.key});
@@ -28,7 +29,10 @@ class _AdminPaymentEventsScreenState
     'paymentfailed': {'label': 'فشل', 'color': AppThemeConstants.error},
     'webhookreceived': {'label': 'Webhook', 'color': AppThemeConstants.info},
     'bookingconfirmed': {'label': 'حجز', 'color': AppThemeConstants.primary},
-    'subscriptioncreated': {'label': 'اشتراك', 'color': AppThemeConstants.accentPurple},
+    'subscriptioncreated': {
+      'label': 'اشتراك',
+      'color': AppThemeConstants.accentPurple
+    },
     'paymentcreated': {'label': 'جديد', 'color': AppThemeConstants.warning},
   };
 
@@ -77,7 +81,7 @@ class _AdminPaymentEventsScreenState
       List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
     return docs.where((doc) {
       final data = doc.data();
-      
+
       // Filter by event type
       if (_selectedEventType != null) {
         final eventType = data['eventType']?.toString();
@@ -88,14 +92,16 @@ class _AdminPaymentEventsScreenState
       final timestamp = data['timestamp'];
       if (timestamp != null) {
         final eventDate = (timestamp as Timestamp).toDate();
-        
+
         if (_fromDate != null) {
-          final fromStart = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
+          final fromStart =
+              DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
           if (eventDate.isBefore(fromStart)) return false;
         }
 
         if (_toDate != null) {
-          final toEnd = DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59);
+          final toEnd =
+              DateTime(_toDate!.year, _toDate!.month, _toDate!.day, 23, 59, 59);
           if (eventDate.isAfter(toEnd)) return false;
         }
       }
@@ -117,7 +123,11 @@ class _AdminPaymentEventsScreenState
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('d MMM yyyy', 'ar');
-    final timeFormat = DateFormat('d MMM • HH:mm', 'ar');
+    String timeFormat(DateTime dateTime) => formatDateTimeToArabicAmPm(
+          dateTime,
+          datePattern: 'd MMM',
+          separator: ' • ',
+        );
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -147,7 +157,9 @@ class _AdminPaymentEventsScreenState
                       label: Text(
                         chip['label'] as String,
                         style: TextStyle(
-                          color: isSelected ? AppThemeConstants.onPrimary : AppThemeConstants.textPrimary,
+                          color: isSelected
+                              ? AppThemeConstants.onPrimary
+                              : AppThemeConstants.textPrimary,
                         ),
                       ),
                       selected: isSelected,
@@ -155,7 +167,8 @@ class _AdminPaymentEventsScreenState
                       checkmarkColor: AppThemeConstants.onPrimary,
                       onSelected: (selected) {
                         setState(() {
-                          _selectedEventType = selected ? chip['value'] as String? : null;
+                          _selectedEventType =
+                              selected ? chip['value'] as String? : null;
                         });
                       },
                     ),
@@ -221,7 +234,8 @@ class _AdminPaymentEventsScreenState
                           padding: const EdgeInsets.all(16),
                           child: Text(
                             'خطأ في تحميل الأحداث: ${snapshot.error}',
-                            style: const TextStyle(color: AppThemeConstants.error),
+                            style:
+                                const TextStyle(color: AppThemeConstants.error),
                           ),
                         ),
                       ),
@@ -244,7 +258,8 @@ class _AdminPaymentEventsScreenState
                       final doc = filteredDocs[index];
                       final data = doc.data();
 
-                      final eventType = data['eventType']?.toString() ?? 'unknown';
+                      final eventType =
+                          data['eventType']?.toString() ?? 'unknown';
                       final timestamp = data['timestamp'] as Timestamp?;
                       final paymentId = data['paymentId']?.toString();
                       final userId = data['userId']?.toString();
@@ -254,10 +269,12 @@ class _AdminPaymentEventsScreenState
                       // Get event type config
                       final config = _eventTypeConfig[eventType];
                       final label = config?['label'] as String? ?? eventType;
-                      final color = config?['color'] as Color? ?? AppThemeConstants.grey500;
+                      final color = config?['color'] as Color? ??
+                          AppThemeConstants.grey500;
 
                       return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
@@ -265,7 +282,8 @@ class _AdminPaymentEventsScreenState
                             children: [
                               // Top Row
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Chip(
                                     label: Text(
@@ -276,14 +294,16 @@ class _AdminPaymentEventsScreenState
                                         fontSize: 12,
                                       ),
                                     ),
-                                    backgroundColor: color.withValues(alpha: 0.15),
+                                    backgroundColor:
+                                        color.withValues(alpha: 0.15),
                                     side: BorderSide(color: color, width: 0.8),
                                     padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   if (timestamp != null)
                                     Text(
-                                      timeFormat.format(timestamp.toDate()),
+                                      timeFormat(timestamp.toDate()),
                                       style: const TextStyle(
                                         color: AppThemeConstants.grey600,
                                         fontSize: 12,
@@ -296,11 +316,14 @@ class _AdminPaymentEventsScreenState
 
                               // Middle rows
                               if (paymentId != null && paymentId.isNotEmpty)
-                                _buildIdRow('paymentId', paymentId, 'معرف الدفع'),
+                                _buildIdRow(
+                                    'paymentId', paymentId, 'معرف الدفع'),
                               if (userId != null && userId.isNotEmpty)
                                 _buildIdRow('userId', userId, 'معرف المستخدم'),
-                              if (transactionId != null && transactionId.isNotEmpty)
-                                _buildIdRow('transactionId', transactionId, 'معرف المعاملة'),
+                              if (transactionId != null &&
+                                  transactionId.isNotEmpty)
+                                _buildIdRow('transactionId', transactionId,
+                                    'معرف المعاملة'),
 
                               // Bottom: ExpansionTile
                               if (extraData != null && extraData.isNotEmpty)
@@ -317,13 +340,15 @@ class _AdminPaymentEventsScreenState
                                   children: extraData.entries
                                       .where((e) => e.value != null)
                                       .map((e) => Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 4),
                                             child: Row(
                                               children: [
                                                 Text(
                                                   e.key,
                                                   style: const TextStyle(
-                                                    color: AppThemeConstants.accentAmber,
+                                                    color: AppThemeConstants
+                                                        .accentAmber,
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 12,
                                                   ),
@@ -332,7 +357,8 @@ class _AdminPaymentEventsScreenState
                                                 Text(
                                                   e.value.toString(),
                                                   style: const TextStyle(
-                                                    color: AppThemeConstants.grey700,
+                                                    color: AppThemeConstants
+                                                        .grey700,
                                                     fontSize: 12,
                                                   ),
                                                 ),
@@ -357,9 +383,8 @@ class _AdminPaymentEventsScreenState
   }
 
   Widget _buildIdRow(String field, String value, String label) {
-    final displayValue = value.length > 14
-        ? '${value.substring(0, 14)}...'
-        : value;
+    final displayValue =
+        value.length > 14 ? '${value.substring(0, 14)}...' : value;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -391,6 +416,3 @@ class _AdminPaymentEventsScreenState
     );
   }
 }
-
-
-
