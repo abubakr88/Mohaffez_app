@@ -19,12 +19,13 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
     }
 
+    // Admin authority is granted exclusively via custom claims minted server-side
+    // (Cloud Functions / Admin SDK). The previous Firestore-doc fallback is removed
+    // so a self-set `role: 'admin'` field on /users/{uid} cannot grant admin powers.
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.admin == true ||
-        request.auth.token.role == 'admin' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        request.auth.token.role == 'admin'
       );
     }
 
@@ -40,9 +41,15 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
 
+      // Self-create on first sign-in. Role and status are constrained to a
+      // closed set so a user cannot self-assign 'admin' or pre-approve as
+      // 'mohaffez' with status 'active'. Admin role is server-only via
+      // custom claims (see isAdmin()).
       allow create: if isAuthenticated() &&
                     request.auth.uid == userId &&
-                    request.resource.data.uid == userId;
+                    request.resource.data.uid == userId &&
+                    request.resource.data.role in ['student', 'mohaffez'] &&
+                    request.resource.data.status in ['active', 'pending_approval'];
 
       // User self-update: profile fields + setup account fields
       allow update: if isOwner(userId) &&

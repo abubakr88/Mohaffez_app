@@ -79,8 +79,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _signInWithGoogle() async {
-    if (kIsWeb) return;
-
     final notifier = ref.read(authNotifierProvider.notifier);
     await notifier.signInWithGoogle();
 
@@ -475,36 +473,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ],
             ),
             
-            const SizedBox(height: 24),
-
-            // ── Google Sign-In Button ─────────────────────
-            SizedBox(
-              height: 54,
-              child: OutlinedButton.icon(
-                onPressed: isLoading ? null : _signInWithGoogle,
-                icon: const Icon(Icons.login, size: 20),
-                label: const Text(
-                  'تسجيل الدخول بحساب Google',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    fontFamily: 'Cairo',
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _LoginTheme.textPrimary,
-                  side: BorderSide(
-                    color: Colors.grey.shade300,
-                    width: 1.5,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  backgroundColor: AppThemeConstants.surface,
-                ),
-              ),
-            ),
-
             const SizedBox(height: 24),
 
             // ── Secondary Button ──────────────────────────
