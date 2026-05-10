@@ -60,7 +60,7 @@ service cloud.firestore {
             'fcmTokenUpdatedAt', 'photoUrl', 'bio',
             'phoneNumber', 'addressText', 'addressLat',
             'addressLng', 'specialization', 'name',
-            'youtubeVideoUrl',
+            'youtubeVideoUrl', 'meetingLink',
             'walletNumbers',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
@@ -310,10 +310,17 @@ service cloud.firestore {
         );
 
       allow update: if isAuthenticated() && (
-        (request.auth.uid == resource.data.mohaffezId)
+        // Mohaffez starting their online session — can write meeting URL + start timestamps
+        (request.auth.uid == resource.data.mohaffezId &&
+         onlyUpdating(['meeting', 'meetingStartedAt', 'meetingTeacherJoinedAt', 'updatedAt']))
+        ||
+        // Mohaffez can update session fields but never the meeting map (written by Cloud Function only)
+        (request.auth.uid == resource.data.mohaffezId &&
+         !request.resource.data.diff(resource.data).affectedKeys()
+           .hasAny(['meeting', 'meetingReminderSent', 'meetingReminderSentAt']))
         ||
         (request.auth.uid == resource.data.studentId &&
-         onlyUpdating(['studentFeedback', 'teacherRating', 'reviewNotes', 'updatedAt']))
+         onlyUpdating(['studentFeedback', 'teacherRating', 'reviewNotes', 'meetingStudentJoinedAt', 'updatedAt']))
         ||
         (isAuthenticated() &&
          onlyUpdating([
