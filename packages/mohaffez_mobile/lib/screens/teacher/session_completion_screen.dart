@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/quiz_access_provider.dart';
+import '../../services/meeting_launcher_service.dart';
 import '../../shared/widgets/interactive_quran_page.dart';
 
 class SessionCompletionScreen extends ConsumerStatefulWidget {
@@ -14,6 +15,7 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String? previousHifz;
   final String? previousMuraja;
   final bool isLateCompletion;
+  final String? sessionType;
 
   const SessionCompletionScreen({
     super.key,
@@ -22,6 +24,7 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
     this.previousHifz,
     this.previousMuraja,
     this.isLateCompletion = false,
+    this.sessionType,
   });
 
   @override
@@ -222,6 +225,12 @@ class _SessionCompletionScreenState
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // Online session control panel
+              if (widget.sessionType == 'online') ...[
+                _OnlineSessionPanel(sessionId: widget.sessionId),
+                const SizedBox(height: 16),
+              ],
+
               // Late Warning Banner
               if (widget.isLateCompletion)
                 Container(
@@ -1032,5 +1041,133 @@ class _QuizToggleCard extends ConsumerWidget {
   }
 }
 
+class _OnlineSessionPanel extends ConsumerWidget {
+  final String sessionId;
+  const _OnlineSessionPanel({required this.sessionId});
 
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final infoAsync = ref.watch(meetingInfoProvider(sessionId));
+    final info = infoAsync.valueOrNull;
+    final url = info?.url ?? '';
+    final studentJoined = info?.studentJoinedAt != null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: AppThemeConstants.tealGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.videocam_rounded,
+                    color: AppThemeConstants.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'الجلسة مفتوحة',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.white,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'افتح تطبيق الاجتماع في نافذة منفصلة وعد إلى هذه الشاشة لتسجيل النتائج',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppThemeConstants.white,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      studentJoined
+                          ? Icons.check_circle
+                          : Icons.hourglass_top_rounded,
+                      color: AppThemeConstants.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      studentJoined ? 'الطالب انضم' : 'بانتظار الطالب',
+                      style: const TextStyle(
+                        color: AppThemeConstants.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: url.isEmpty
+                  ? null
+                  : () => MeetingLauncherService.launch(
+                        context: context,
+                        ref: ref,
+                        info: info!,
+                        sessionId: sessionId,
+                        role: 'mohaffez',
+                      ),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: const Text(
+                'افتح الاجتماع',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.white,
+                foregroundColor: AppThemeConstants.primary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 

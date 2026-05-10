@@ -648,6 +648,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 studentName: extra?['studentName'] ?? '',
                 previousHifz: extra?['previousHifz'],
                 previousMuraja: extra?['previousMuraja'],
+                isLateCompletion: extra?['isLateCompletion'] == true,
+                sessionType: extra?['sessionType'] as String?,
               );
             },
           ),

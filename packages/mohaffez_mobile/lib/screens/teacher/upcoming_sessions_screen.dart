@@ -10,6 +10,7 @@ import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../services/meeting_launcher_service.dart';
 
 class UpcomingSessionsScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -328,6 +329,42 @@ class SessionCard extends ConsumerWidget {
     required this.session,
     required this.mohaffezId,
   });
+
+  Future<void> _showMissingMeetingLinkDialog(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('أضف رابط الاجتماع أولاً',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          content: const Text(
+            'لم تقم بإضافة رابط Zoom أو Google Meet في ملفك الشخصي. أضفه مرة واحدة وسيُستخدم لجميع جلساتك أونلاين.',
+            style: TextStyle(height: 1.6),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('لاحقاً'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.push('/profile');
+              },
+              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+              label: const Text('فتح الملف الشخصي'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ✅ Check if session can be completed (30 min before → 24 hours after)
   bool _canCompleteSession(DateTime sessionDate, String timeSlot, int earlyMinutes) {
@@ -892,8 +929,59 @@ class SessionCard extends ConsumerWidget {
                 ),
               ),
 
-              // ✅ ACTION BUTTONS - Based on Session Time
-              if (canComplete) ...[
+              // ✅ ACTION BUTTONS - Online sessions get a dedicated start button
+              // (always enabled — supports early/late start). Other types stay gated.
+              if (sessionType == 'online') ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final url = await MeetingLauncherService.markMeetingStarted(
+                        sessionId: session['id'] as String,
+                        teacherId: mohaffezId,
+                      );
+                      if (!context.mounted) return;
+                      if (url == null) {
+                        await _showMissingMeetingLinkDialog(context);
+                        return;
+                      }
+                      final previousAssignment =
+                          await _getPreviousAssignment(studentId);
+                      if (!context.mounted) return;
+                      final result = await context.push<bool>(
+                        '/complete-session/${session['id'] as String}',
+                        extra: {
+                          'studentName': studentName,
+                          'previousHifz': previousAssignment['hifz'],
+                          'previousMuraja': previousAssignment['muraja'],
+                          'isLateCompletion': isLate,
+                          'sessionType': sessionType,
+                        },
+                      );
+                      if (result == true && context.mounted) {
+                        ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                        ref.invalidate(completedSessionsProvider(mohaffezId));
+                      }
+                    },
+                    icon: const Icon(Icons.videocam_rounded, size: 20),
+                    label: const Text(
+                      'ابدأ الجلسة',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppThemeConstants.primary,
+                      foregroundColor: AppThemeConstants.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else if (canComplete) ...[
                 // Session is ACTIVE - Can complete
                 Row(
                   children: [
