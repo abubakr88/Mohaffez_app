@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/online_meeting_button.dart';
 import '../../shared/utils/time_formatter.dart';
 
 DateTime? _toDateTime(dynamic value) {
@@ -772,6 +773,22 @@ class _SessionCard extends StatelessWidget {
                               label: 'مراجعة',
                               text: muraja,
                               color: AppThemeConstants.info),
+                      ],
+
+                      // Online meeting join button (visible only when sessionType
+                      // is online + a meeting exists; widget hides itself otherwise)
+                      if (sessionType == 'online') ...[
+                        const SizedBox(height: 12),
+                        Builder(builder: (ctx) {
+                          final sid =
+                              (session['sessionId'] as String?) ?? '';
+                          if (sid.isEmpty) return const SizedBox.shrink();
+                          return OnlineMeetingButton(
+                            sessionId: sid,
+                            sessionType: sessionType,
+                            role: 'student',
+                          );
+                        }),
                       ],
                     ],
                   ),

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/interactive_quran_page.dart';
+import '../../shared/widgets/online_meeting_button.dart';
 import '../student/rate_session_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -538,6 +539,17 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                     ),
 
                     const SizedBox(height: 16),
+
+                    // Online meeting join button (visible only for online + accepted sessions)
+                    if (session.status == 'accepted' && session.id != null)
+                      OnlineMeetingButton(
+                        sessionId: session.id!,
+                        sessionType: session.sessionType,
+                        role: isMohaffez ? 'mohaffez' : 'student',
+                      ),
+
+                    if (session.status == 'accepted' && session.id != null)
+                      const SizedBox(height: 16),
 
                     // Assignments
                     if ((session.hifzAssignment?.isNotEmpty ?? false) ||
