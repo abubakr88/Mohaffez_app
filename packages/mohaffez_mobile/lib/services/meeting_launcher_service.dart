@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -30,8 +29,9 @@ class MeetingLauncherService {
     await prefs.setBool(_infoCardKey, true);
   }
 
-  /// Main entry point called by the join button.
-  /// Handles: checklist (first time), permissions, URL launch, join timestamp.
+  /// Main entry point called by the join button. The meeting opens in an
+  /// external app (Zoom / Meet / Teams), which handles its own camera and
+  /// microphone permissions — Mohaffez never touches them.
   static Future<void> launch({
     required BuildContext context,
     required WidgetRef ref,
@@ -45,22 +45,6 @@ class MeetingLauncherService {
       if (!proceed) return;
     }
 
-    if (!context.mounted) return;
-
-    final cameraGranted = await _requestPermission(
-      context: context,
-      permission: Permission.camera,
-      label: 'الكاميرا',
-    );
-    if (!cameraGranted || !context.mounted) return;
-
-    final micGranted = await _requestPermission(
-      context: context,
-      permission: Permission.microphone,
-      label: 'الميكروفون',
-    );
-    if (!micGranted || !context.mounted) return;
-
     await _launchUrl(info.url);
     await _writeJoinTimestamp(sessionId, role);
   }
@@ -73,24 +57,6 @@ class MeetingLauncherService {
       builder: (_) => const _ChecklistSheet(),
     );
     return result ?? false;
-  }
-
-  static Future<bool> _requestPermission({
-    required BuildContext context,
-    required Permission permission,
-    required String label,
-  }) async {
-    final status = await permission.request();
-    if (status.isGranted) return true;
-
-    if (context.mounted) {
-      await showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (_) => _PermissionDeniedSheet(label: label),
-      );
-    }
-    return false;
   }
 
   static Future<void> _launchUrl(String url) async {
@@ -298,73 +264,3 @@ class _ChecklistSheetState extends State<_ChecklistSheet> {
   }
 }
 
-// ─── Permission denied sheet ─────────────────────────────────────────────────
-
-class _PermissionDeniedSheet extends StatelessWidget {
-  final String label;
-  const _PermissionDeniedSheet({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.no_photography_outlined,
-                size: 48, color: AppThemeConstants.error),
-            const SizedBox(height: 16),
-            Text(
-              'الإذن مطلوب: $label',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: AppThemeConstants.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'لبدء جلسة الفيديو يجب السماح لتطبيق محفظي باستخدام $label.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppThemeConstants.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('إلغاء'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      openAppSettings();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.primary,
-                      foregroundColor: AppThemeConstants.white,
-                    ),
-                    child: const Text('افتح الإعدادات'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
