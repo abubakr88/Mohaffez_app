@@ -15,6 +15,7 @@ class UserModel with _$UserModel {
     String? photoUrl,
     String? bio,
     String? youtubeVideoUrl,
+    String? meetingLink,
     String? specialization,
     String? phoneNumber,
     @Default(0) int followerCount,
