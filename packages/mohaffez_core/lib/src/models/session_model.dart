@@ -55,6 +55,7 @@ class SessionModel with _$SessionModel {
     double? sessionPrice,
 
     // ONLINE SESSION FIELDS
+    String? preferredProvider, // 'zoom' | 'googleMeet' | 'teams' (chosen by student)
     String? meetingLink,
     String? meetingId,
     String? meetingPassword,
