@@ -98,17 +98,55 @@ class MeetingLauncherService {
 
     final firestore = FirebaseFirestore.instance;
 
-    final teacherSnap = await firestore.collection('users').doc(teacherId).get();
-    final link = (teacherSnap.data()?['meetingLink'] as String?)?.trim() ?? '';
-    if (link.isEmpty) return null;
+    final sessionSnap =
+        await firestore.collection('hafizSessions').doc(sessionId).get();
+    final preferredProvider =
+        (sessionSnap.data()?['preferredProvider'] as String?)?.trim() ?? '';
 
-    final provider = link.contains('zoom.us')
-        ? 'zoom'
-        : link.contains('meet.google.com')
-            ? 'google-meet'
-            : (link.contains('teams.microsoft.com') || link.contains('teams.live.com'))
-                ? 'teams'
-                : 'custom';
+    final teacherSnap = await firestore.collection('users').doc(teacherId).get();
+    final teacherData = teacherSnap.data() ?? const <String, dynamic>{};
+    final linksRaw = teacherData['meetingLinks'];
+    final Map<String, String> links = linksRaw is Map
+        ? linksRaw.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''))
+        : <String, String>{};
+
+    String link = '';
+    String provider = '';
+
+    // 1. Honor the student's pick.
+    if (preferredProvider.isNotEmpty &&
+        (links[preferredProvider]?.trim().isNotEmpty ?? false)) {
+      link = links[preferredProvider]!.trim();
+      provider = preferredProvider;
+    }
+
+    // 2. Any configured provider.
+    if (link.isEmpty) {
+      for (final entry in links.entries) {
+        if (entry.value.trim().isNotEmpty) {
+          link = entry.value.trim();
+          provider = entry.key;
+          break;
+        }
+      }
+    }
+
+    // 3. Legacy fallback.
+    if (link.isEmpty) {
+      link = (teacherData['meetingLink'] as String?)?.trim() ?? '';
+      if (link.isNotEmpty) {
+        provider = link.contains('zoom.us')
+            ? 'zoom'
+            : link.contains('meet.google.com')
+                ? 'googleMeet'
+                : (link.contains('teams.microsoft.com') ||
+                        link.contains('teams.live.com'))
+                    ? 'teams'
+                    : 'custom';
+      }
+    }
+
+    if (link.isEmpty) return null;
 
     try {
       await firestore.collection('hafizSessions').doc(sessionId).update({

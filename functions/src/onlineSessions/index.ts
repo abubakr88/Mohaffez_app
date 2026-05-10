@@ -56,13 +56,41 @@ export const onSessionAcceptedCreateMeeting = functions.firestore
       sessionDateMs + 30 * 60 * 1000
     );
 
+    const preferredProvider = asString(after.preferredProvider);
+
     let teacherLink = '';
+    let resolvedProvider = '';
     if (mohaffezId) {
       try {
         const teacherSnap = await db.collection('users').doc(mohaffezId).get();
-        teacherLink = asString(teacherSnap.data()?.meetingLink);
+        const data = teacherSnap.data() ?? {};
+        const links = (data.meetingLinks ?? {}) as Record<string, unknown>;
+
+        // 1. Prefer the provider the student picked at booking time.
+        if (preferredProvider) {
+          teacherLink = asString(links[preferredProvider]);
+          if (teacherLink) resolvedProvider = preferredProvider;
+        }
+
+        // 2. Fallback to any non-empty entry in the map.
+        if (!teacherLink) {
+          for (const [key, value] of Object.entries(links)) {
+            const v = asString(value);
+            if (v) {
+              teacherLink = v;
+              resolvedProvider = key;
+              break;
+            }
+          }
+        }
+
+        // 3. Legacy fallback to the single meetingLink field.
+        if (!teacherLink) {
+          teacherLink = asString(data.meetingLink);
+          if (teacherLink) resolvedProvider = detectProvider(teacherLink);
+        }
       } catch (err) {
-        functions.logger.error('Failed to read teacher meetingLink', { mohaffezId, err });
+        functions.logger.error('Failed to read teacher meetingLinks', { mohaffezId, err });
       }
     }
 
@@ -85,7 +113,7 @@ export const onSessionAcceptedCreateMeeting = functions.firestore
       return;
     }
 
-    const provider = detectProvider(teacherLink);
+    const provider = resolvedProvider || detectProvider(teacherLink);
     const url = teacherLink;
     const roomId = teacherLink;
 
