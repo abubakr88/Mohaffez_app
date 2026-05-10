@@ -16,6 +16,7 @@ class UserModel with _$UserModel {
     String? bio,
     String? youtubeVideoUrl,
     String? meetingLink,
+    @Default({}) Map<String, String> meetingLinks,
     String? specialization,
     String? phoneNumber,
     @Default(0) int followerCount,
