@@ -2,6 +2,8 @@
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'meeting_links_sheet.dart';
+
 class AddPricingPlanSheet extends ConsumerStatefulWidget {
   final String mohaffezId;
   final PricingPlanModel? existingPlan;
@@ -314,8 +316,75 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
     }
   }
 
+  /// Returns `true` if the teacher already has at least one meeting link
+  /// configured, OR after they add one via the bottom sheet. Returns `false`
+  /// if the user dismisses the prompt without adding any link — in which case
+  /// the caller must abort plan creation.
+  Future<bool> _ensureTeacherHasMeetingLink() async {
+    final teacher = await ref.read(getUserOnceProvider(widget.mohaffezId).future);
+    final hasMap = teacher != null &&
+        teacher.meetingLinks.values.any((v) => v.trim().isNotEmpty);
+    final hasLegacy = teacher != null &&
+        (teacher.meetingLink?.trim().isNotEmpty ?? false);
+    if (hasMap || hasLegacy) return true;
+
+    if (!mounted) return false;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('أضف رابط اجتماع أولاً'),
+          content: const Text(
+            'لتفعيل الجلسات أونلاين، أضف رابط Zoom أو Google Meet أو Teams من ملفك الشخصي. الطالب سيختار المنصة عند الحجز.',
+            style: TextStyle(height: 1.6),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.add_link_rounded, size: 18),
+              label: const Text('أضف الآن'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (proceed != true || !mounted) return false;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MeetingLinksSheet(user: teacher!),
+    );
+    if (saved == true) {
+      ref.invalidate(getUserOnceProvider(widget.mohaffezId));
+      // Re-check: even if saved=true, user might have left all fields empty.
+      final fresh =
+          await ref.read(getUserOnceProvider(widget.mohaffezId).future);
+      return fresh != null &&
+          (fresh.meetingLinks.values.any((v) => v.trim().isNotEmpty) ||
+              (fresh.meetingLink?.trim().isNotEmpty ?? false));
+    }
+    return false;
+  }
+
   Future<void> _savePlan() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedMode == SessionMode.online) {
+      final allowed = await _ensureTeacherHasMeetingLink();
+      if (!allowed) return;
+    }
 
     final plan = PricingPlanModel(
       id: widget.existingPlan?.id,
