@@ -243,6 +243,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
       }
 
       // ── 15. Build sessionDetails for hafizSessions document ───────────────
+      const reqPreferredProvider = requestData.preferredProvider as string | undefined;
       const sessionDetails = {
         requestId,
         mohaffezId,
@@ -250,6 +251,10 @@ export const confirmSubscriptionSession = functions.https.onCall(
         mohaffezName,
         studentName,
         sessionType,
+        preferredProvider:
+          sessionType === 'online' && reqPreferredProvider
+            ? reqPreferredProvider
+            : null,
         preferredTimeSlot,
         timeSlot:         preferredTimeSlot,
         sessionDate:      sessionDateTs,
