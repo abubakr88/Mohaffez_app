@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/widgets/cached_avatar.dart';
+import '../../shared/widgets/meeting_links_sheet.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (consistent with home screens)
@@ -64,13 +65,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isUploadingPhoto = false;
   final _bioController = TextEditingController();
   final _youtubeController = TextEditingController();
-  final _meetingLinkController = TextEditingController();
 
   @override
   void dispose() {
     _bioController.dispose();
     _youtubeController.dispose();
-    _meetingLinkController.dispose();
     super.dispose();
   }
 
@@ -106,88 +105,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  bool _isValidMeetingLink(String value) {
-    final uri = Uri.tryParse(value.trim());
-    if (uri == null || !uri.hasScheme || !uri.hasAuthority) return false;
-    final host = uri.host.toLowerCase();
-    return host.contains('zoom.us') ||
-        host.contains('meet.google.com') ||
-        host.contains('teams.microsoft.com') ||
-        host.contains('teams.live.com');
+  String _meetingLinksSubtitle(UserModel user) {
+    final count = user.meetingLinks.values.where((v) => v.trim().isNotEmpty).length +
+        ((user.meetingLink?.trim().isNotEmpty ?? false) && user.meetingLinks.isEmpty ? 1 : 0);
+    if (count == 0) return 'أضف رابط Zoom أو Google Meet أو Teams';
+    if (count == 1) return 'تم إضافة رابط واحد';
+    return 'تم إضافة $count روابط';
   }
 
-  Future<void> _saveMeetingLink(String userId) async {
-    try {
-      final trimmed = _meetingLinkController.text.trim();
-      if (trimmed.isNotEmpty && !_isValidMeetingLink(trimmed)) {
-        throw Exception('يرجى إدخال رابط Zoom أو Google Meet أو Teams صحيح');
-      }
-      final repository = ref.read(userRepositoryProvider);
-      await repository.updateUser(userId, {
-        'meetingLink': trimmed.isEmpty ? null : trimmed,
-      });
-      ref.invalidate(currentUserProvider);
-      if (mounted) _showSnackBar('تم حفظ رابط الاجتماع بنجاح', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
-    }
-  }
-
-  Future<void> _showMeetingLinkDialog(String userId) async {
-    await showDialog(
+  Future<void> _showMeetingLinksSheet(UserModel user) async {
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
-          title: const Text('رابط الاجتماعات أونلاين',
-              style: TextStyle(fontWeight: FontWeight.w700, color: _DS.text1)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _meetingLinkController,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  hintText: 'https://meet.google.com/... أو https://zoom.us/j/...',
-                  border: OutlineInputBorder(borderRadius: _DS.r12),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'الصق رابط غرفة الاجتماع الشخصية الخاصة بك في Zoom أو Google Meet أو Microsoft Teams. سيُستخدم لجميع جلساتك أونلاين تلقائياً.',
-                style: TextStyle(fontSize: 12, color: _DS.text2, height: 1.6),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '💡 ملاحظة: على Zoom و Meet المجاني، الجلسات الفردية بلا حد زمني.',
-                style: TextStyle(fontSize: 11, color: _DS.text3, height: 1.5),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(ArabicLabels.cancel),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _saveMeetingLink(userId);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _DS.teal500,
-                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
-              ),
-              child: const Text(ArabicLabels.save),
-            ),
-          ],
-        ),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MeetingLinksSheet(user: user),
     );
+    if (saved == true && mounted) {
+      ref.invalidate(currentUserProvider);
+      _showSnackBar('تم حفظ روابط الاجتماعات', isSuccess: true);
+    }
   }
 
   bool _isValidYoutubeUrl(String value) {
@@ -637,16 +573,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   ),
                                   _ActionTile(
                                     icon: Icons.videocam_rounded,
-                                    title: 'رابط الاجتماعات أونلاين',
-                                    subtitle: (user.meetingLink?.isNotEmpty ?? false)
-                                        ? 'تم إضافة رابط (Zoom / Meet / Teams)'
-                                        : 'أضف رابط Zoom أو Google Meet للجلسات أونلاين',
+                                    title: 'روابط الاجتماعات أونلاين',
+                                    subtitle: _meetingLinksSubtitle(user),
                                     color: _DS.teal500,
                                     isLast: true,
-                                    onTap: () {
-                                      _meetingLinkController.text = user.meetingLink ?? '';
-                                      _showMeetingLinkDialog(user.uid);
-                                    },
+                                    onTap: () => _showMeetingLinksSheet(user),
                                   ),
                                 ],
                               ),
