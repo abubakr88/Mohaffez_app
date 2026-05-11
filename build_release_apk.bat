@@ -40,8 +40,8 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo [2/3] Building release APK...
-call flutter build apk --dart-define-from-file="%REPO_ROOT%.env" --release
+echo [2/3] Building release APK (prod flavor)...
+call flutter build apk --flavor prod -t lib/main.dart --dart-define-from-file="%REPO_ROOT%.env" --release
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Build failed. Check the output above.
     pause
@@ -52,7 +52,7 @@ echo.
 echo [3/3] Done!
 echo.
 echo ============================================================
-echo   Output: packages\mohaffez_mobile\build\app\outputs\flutter-apk\app-release.apk
+echo   Output: packages\mohaffez_mobile\build\app\outputs\flutter-apk\app-prod-release.apk
 echo   Install directly on a device for testing.
 echo ============================================================
 echo.

@@ -136,17 +136,10 @@ class MohaffezHomeContent extends ConsumerWidget {
 
     final nextSessionDate = upcomingSessions.when(
       data: (sessions) {
-        debugPrint('🏠 Upcoming sessions count: ${sessions.length}');
-        for (final s in sessions) {
-          final d = s['sessionDate'] as DateTime?;
-          final slot = s['preferredTimeSlot'] ?? s['timeSlot'] ?? 'N/A';
-          debugPrint('📅 Session: $d | timeSlot: $slot | isAfter(now): ${d?.isAfter(now)} | now: $now');
-        }
         final future = sessions.where((s) {
           final d = s['sessionDate'] as DateTime?;
           return d != null && d.isAfter(now);
         }).toList();
-        debugPrint('⏰ Future sessions count: ${future.length}');
         if (future.isEmpty) return null;
         // Sort by actual datetime (sessionDate + slotStart) to get the earliest session
         future.sort((a, b) {

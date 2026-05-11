@@ -85,23 +85,89 @@ class MeetingLauncherService {
     } catch (_) {}
   }
 
+  /// Result of attempting to start an online meeting. Exactly one of
+  /// `url` or `error` is non-null on a non-success result; on success
+  /// `url` is set and `error` is null.
+  ///
+  /// Errors are returned (not thrown) so the caller can render an
+  /// appropriate snackbar/dialog without try/catch noise.
+  ///
+  /// `error` codes:
+  /// - `noLink`     — teacher has not configured any meeting link
+  /// - `tooEarly`   — `now < sessionDate − leadTime`
+  /// - `concurrent` — teacher already has another in-progress online session
+  /// - `notFound`   — session document does not exist
+  /// - `unknown`    — write failed
+  ///
   /// Called by the teacher when starting an online session. Refreshes the
   /// session's `meeting.url` from the teacher's current `users/{uid}.meetingLink`
   /// (so a link added after acceptance is honored), then stamps `meetingStartedAt`
-  /// so the student's UI immediately shows the join banner. Returns the meeting
-  /// URL on success, or `null` if the teacher has not configured a meeting link.
-  static Future<String?> markMeetingStarted({
+  /// so the student's UI immediately shows the join banner.
+  static Future<({String? url, String? error, int? minutesUntilEarliestStart})>
+      markMeetingStarted({
     required String sessionId,
     required String teacherId,
+    required int leadTimeMinutes,
   }) async {
-    if (sessionId.isEmpty || teacherId.isEmpty) return null;
+    if (sessionId.isEmpty || teacherId.isEmpty) {
+      return (url: null, error: 'notFound', minutesUntilEarliestStart: null);
+    }
 
     final firestore = FirebaseFirestore.instance;
 
     final sessionSnap =
         await firestore.collection('hafizSessions').doc(sessionId).get();
+    if (!sessionSnap.exists) {
+      return (url: null, error: 'notFound', minutesUntilEarliestStart: null);
+    }
+    final sessionData = sessionSnap.data() ?? const <String, dynamic>{};
     final preferredProvider =
-        (sessionSnap.data()?['preferredProvider'] as String?)?.trim() ?? '';
+        (sessionData['preferredProvider'] as String?)?.trim() ?? '';
+
+    // Guard 1 — too early. Teacher can only start within `leadTimeMinutes`
+    // before sessionDate.
+    final sessionDateRaw = sessionData['sessionDate'];
+    final DateTime? sessionDate = sessionDateRaw is Timestamp
+        ? sessionDateRaw.toDate()
+        : (sessionDateRaw is DateTime ? sessionDateRaw : null);
+    if (sessionDate != null) {
+      final earliestStart =
+          sessionDate.subtract(Duration(minutes: leadTimeMinutes));
+      final now = DateTime.now();
+      if (now.isBefore(earliestStart)) {
+        return (
+          url: null,
+          error: 'tooEarly',
+          minutesUntilEarliestStart:
+              earliestStart.difference(now).inMinutes + 1,
+        );
+      }
+    }
+
+    // Guard 2 — no concurrent in-progress sessions for this teacher.
+    // Equality-only query (no range filter) so we don't need a composite
+    // index. The `meetingStartedAt`/`meetingEndedAt` predicate is applied
+    // client-side; result set is small (one teacher's accepted online
+    // sessions) so this is cheap.
+    final concurrent = await firestore
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: teacherId)
+        .where('sessionType', isEqualTo: 'online')
+        .where('status', isEqualTo: 'accepted')
+        .get();
+    final hasOther = concurrent.docs.any((d) {
+      if (d.id == sessionId) return false;
+      final data = d.data();
+      return data['meetingStartedAt'] != null &&
+          data['meetingEndedAt'] == null;
+    });
+    if (hasOther) {
+      return (
+        url: null,
+        error: 'concurrent',
+        minutesUntilEarliestStart: null,
+      );
+    }
 
     final teacherSnap = await firestore.collection('users').doc(teacherId).get();
     final teacherData = teacherSnap.data() ?? const <String, dynamic>{};
@@ -146,7 +212,9 @@ class MeetingLauncherService {
       }
     }
 
-    if (link.isEmpty) return null;
+    if (link.isEmpty) {
+      return (url: null, error: 'noLink', minutesUntilEarliestStart: null);
+    }
 
     try {
       await firestore.collection('hafizSessions').doc(sessionId).update({
@@ -157,8 +225,10 @@ class MeetingLauncherService {
         'meetingTeacherJoinedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-    } catch (_) {}
-    return link;
+    } catch (_) {
+      return (url: null, error: 'unknown', minutesUntilEarliestStart: null);
+    }
+    return (url: link, error: null, minutesUntilEarliestStart: null);
   }
 }
 

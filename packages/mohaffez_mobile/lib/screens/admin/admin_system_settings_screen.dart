@@ -139,9 +139,9 @@ class _AdminSystemSettingsScreenState
       _numberField('slotLockDurationMinutes',
           ArabicLabels.slotLockDurationMinutes, c.slotLockDurationMinutes),
       _numberField(
-        'earlyCompletionMinutes',
-        'مدة الإتمام المبكر للجلسة (دقائق)',
-        c.earlyCompletionMinutes,
+        'meetingStartLeadTimeMinutes',
+        'مهلة بدء الجلسة الأونلاين قبل موعدها (دقائق)',
+        c.meetingStartLeadTimeMinutes,
       ),
       _numberField('maxPendingRequestsPerStudent', 'أقصى طلبات معلقة للطالب',
           c.maxPendingRequestsPerStudent),

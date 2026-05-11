@@ -1236,6 +1236,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       final updates = <String, dynamic>{
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
+        // Stamp `meetingEndedAt` so the online-meeting button on the student
+        // side flips to MeetingButtonState.ended (renders "انتهت الجلسة")
+        // immediately, instead of staying on the active "انضم" button.
+        'meetingEndedAt': FieldValue.serverTimestamp(),
         'sessionRating': sessionRating,
         'isLateCompletion': isLateCompletion,
         'quizUnlocked': false,

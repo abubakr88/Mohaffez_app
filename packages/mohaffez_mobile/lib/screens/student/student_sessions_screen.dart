@@ -638,7 +638,7 @@ class _SessionCard extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        final sessionId = session['sessionId'] as String?;
+        final sessionId = (session['id'] as String?) ?? (session['sessionId'] as String?);
         if (sessionId != null && sessionId.isNotEmpty) {
           context.go('/session/$sessionId');
         }
@@ -781,7 +781,9 @@ class _SessionCard extends StatelessWidget {
                         const SizedBox(height: 12),
                         Builder(builder: (ctx) {
                           final sid =
-                              (session['sessionId'] as String?) ?? '';
+                              (session['id'] as String?) ??
+                              (session['sessionId'] as String?) ??
+                              '';
                           if (sid.isEmpty) return const SizedBox.shrink();
                           return OnlineMeetingButton(
                             sessionId: sid,

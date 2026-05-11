@@ -36,9 +36,13 @@ export const onSessionAcceptedCreateMeeting = functions.firestore
     const mohaffezId = asString(after.mohaffezId);
     const mohaffezName = asString(after.mohaffezName, 'المحفظ');
 
-    const sessionDateRaw = after.sessionDate ?? after.slotStart;
+    // Prefer `slotStart` (full datetime) over `sessionDate` (day-only at
+    // midnight). Using `sessionDate` collapses every session on the same day
+    // to the same `joinWindowOpensAt`, so all sessions on that day show an
+    // identical countdown.
+    const sessionDateRaw = after.slotStart ?? after.sessionDate;
     if (!sessionDateRaw) {
-      functions.logger.warn('onSessionAcceptedCreateMeeting: no sessionDate', { sessionId });
+      functions.logger.warn('onSessionAcceptedCreateMeeting: no slotStart/sessionDate', { sessionId });
       return;
     }
 

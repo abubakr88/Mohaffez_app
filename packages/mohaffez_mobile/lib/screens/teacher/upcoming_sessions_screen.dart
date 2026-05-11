@@ -675,7 +675,7 @@ class SessionCard extends ConsumerWidget {
     final earlyMinutes = ref
         .watch(systemConfigProvider)
         .valueOrNull
-        ?.earlyCompletionMinutes ?? 30;
+        ?.meetingStartLeadTimeMinutes ?? 60;
     final studentName = session['studentName'] as String? ?? 'غير معروف';
     final sessionDate = session['sessionDate'] as DateTime?;
     final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
@@ -930,56 +930,32 @@ class SessionCard extends ConsumerWidget {
               ),
 
               // ✅ ACTION BUTTONS - Online sessions get a dedicated start button
-              // (always enabled — supports early/late start). Other types stay gated.
+              // gated by lead-time guard + concurrent-session guard inside
+              // markMeetingStarted. Other session types stay gated by canComplete.
               if (sessionType == 'online') ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final url = await MeetingLauncherService.markMeetingStarted(
-                        sessionId: session['id'] as String,
-                        teacherId: mohaffezId,
-                      );
-                      if (!context.mounted) return;
-                      if (url == null) {
-                        await _showMissingMeetingLinkDialog(context);
-                        return;
-                      }
-                      final previousAssignment =
-                          await _getPreviousAssignment(studentId);
-                      if (!context.mounted) return;
-                      final result = await context.push<bool>(
-                        '/complete-session/${session['id'] as String}',
-                        extra: {
-                          'studentName': studentName,
-                          'previousHifz': previousAssignment['hifz'],
-                          'previousMuraja': previousAssignment['muraja'],
-                          'isLateCompletion': isLate,
-                          'sessionType': sessionType,
-                        },
-                      );
-                      if (result == true && context.mounted) {
-                        ref.invalidate(upcomingSessionsProvider(mohaffezId));
-                        ref.invalidate(completedSessionsProvider(mohaffezId));
-                      }
-                    },
-                    icon: const Icon(Icons.videocam_rounded, size: 20),
-                    label: const Text(
-                      'ابدأ الجلسة',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppThemeConstants.primary,
-                      foregroundColor: AppThemeConstants.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
+                _TeacherStartSessionButton(
+                  sessionId: session['id'] as String,
+                  mohaffezId: mohaffezId,
+                  onAfterStart: () async {
+                    final previousAssignment =
+                        await _getPreviousAssignment(studentId);
+                    if (!context.mounted) return;
+                    final result = await context.push<bool>(
+                      '/complete-session/${session['id'] as String}',
+                      extra: {
+                        'studentName': studentName,
+                        'previousHifz': previousAssignment['hifz'],
+                        'previousMuraja': previousAssignment['muraja'],
+                        'isLateCompletion': isLate,
+                        'sessionType': sessionType,
+                      },
+                    );
+                    if (result == true && context.mounted) {
+                      ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                      ref.invalidate(completedSessionsProvider(mohaffezId));
+                    }
+                  },
+                  onMissingLink: () => _showMissingMeetingLinkDialog(context),
                 ),
               ] else if (canComplete) ...[
                 // Session is ACTIVE - Can complete
@@ -1132,5 +1108,153 @@ class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
         ],
       ),
     );
+  }
+}
+
+/// Teacher's "ابدأ الجلسة" button. Reads `meetingButtonStateProvider` so it
+/// disables itself before `sessionDate − leadTime` and changes label after
+/// the teacher has clicked start. All the actual work of writing
+/// `meetingStartedAt` (with lead-time + concurrent-session guards) lives in
+/// `MeetingLauncherService.markMeetingStarted`.
+class _TeacherStartSessionButton extends ConsumerWidget {
+  final String sessionId;
+  final String mohaffezId;
+  final Future<void> Function() onAfterStart;
+  final Future<void> Function() onMissingLink;
+
+  const _TeacherStartSessionButton({
+    required this.sessionId,
+    required this.mohaffezId,
+    required this.onAfterStart,
+    required this.onMissingLink,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(meetingButtonStateProvider(
+        (sessionId: sessionId, role: 'mohaffez')));
+    final infoAsync = ref.watch(meetingInfoProvider(sessionId));
+    final info = infoAsync.valueOrNull;
+    final leadTimeMinutes = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.meetingStartLeadTimeMinutes ??
+        60;
+
+    String label;
+    IconData icon;
+    bool enabled;
+
+    switch (state) {
+      case MeetingButtonState.tooEarly:
+        final sd = info?.slotStart ?? info?.sessionDate;
+        String countdown = '';
+        if (sd != null) {
+          final earliestStart =
+              sd.subtract(Duration(minutes: leadTimeMinutes));
+          final diff = earliestStart.difference(DateTime.now());
+          if (diff.inHours > 0) {
+            countdown =
+                ' (يمكنك البدء بعد ${diff.inHours}س ${diff.inMinutes.remainder(60)}د)';
+          } else if (diff.inMinutes > 0) {
+            countdown = ' (يمكنك البدء بعد ${diff.inMinutes}د)';
+          }
+        }
+        label = 'لم يحن وقت الجلسة بعد$countdown';
+        icon = Icons.lock_clock_rounded;
+        enabled = false;
+        break;
+      case MeetingButtonState.inProgress:
+        label = 'تم بدء الجلسة — متابعة';
+        icon = Icons.open_in_new_rounded;
+        enabled = true;
+        break;
+      case MeetingButtonState.ended:
+      case MeetingButtonState.teacherLate:
+        label = 'انتهت الجلسة';
+        icon = Icons.videocam_off_rounded;
+        enabled = false;
+        break;
+      case MeetingButtonState.pendingMeetingLink:
+      case MeetingButtonState.hidden:
+      case MeetingButtonState.waitingForTeacher:
+      case MeetingButtonState.ready:
+        label = 'ابدأ الجلسة';
+        icon = Icons.videocam_rounded;
+        enabled = state != MeetingButtonState.pendingMeetingLink;
+        break;
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: enabled ? () => _onTap(context, ref) : null,
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: state == MeetingButtonState.inProgress
+              ? AppThemeConstants.success
+              : AppThemeConstants.primary,
+          foregroundColor: AppThemeConstants.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onTap(BuildContext context, WidgetRef ref) async {
+    final leadTimeMinutes = ref
+            .read(systemConfigProvider)
+            .valueOrNull
+            ?.meetingStartLeadTimeMinutes ??
+        60;
+    final result = await MeetingLauncherService.markMeetingStarted(
+      sessionId: sessionId,
+      teacherId: mohaffezId,
+      leadTimeMinutes: leadTimeMinutes,
+    );
+    if (!context.mounted) return;
+    if (result.error != null) {
+      switch (result.error) {
+        case 'noLink':
+          await onMissingLink();
+          return;
+        case 'tooEarly':
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppThemeConstants.warning,
+              content: Text(
+                'لا يمكن بدء الجلسة قبل موعدها بأكثر من $leadTimeMinutes دقيقة',
+              ),
+            ),
+          );
+          return;
+        case 'concurrent':
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppThemeConstants.error,
+              content: Text(
+                'لديك جلسة أخرى مفتوحة بالفعل — أنهِها قبل بدء جلسة جديدة',
+              ),
+            ),
+          );
+          return;
+        default:
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppThemeConstants.error,
+              content: Text('تعذّر بدء الجلسة، حاول مرة أخرى'),
+            ),
+          );
+          return;
+      }
+    }
+    await onAfterStart();
   }
 }

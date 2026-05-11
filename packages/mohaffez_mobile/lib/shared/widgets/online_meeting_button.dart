@@ -70,7 +70,8 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
     final isEnabled = ref.watch(onlineSessionsEnabledProvider);
     if (!isEnabled) return const SizedBox.shrink();
 
-    final state = ref.watch(meetingButtonStateProvider(widget.sessionId));
+    final state = ref.watch(meetingButtonStateProvider(
+        (sessionId: widget.sessionId, role: widget.role)));
     if (state == MeetingButtonState.hidden) return const SizedBox.shrink();
 
     return Column(
@@ -91,6 +92,7 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
   // ── State → button ─────────────────────────────────────────────────────────
 
   Widget _buildButton(BuildContext context, MeetingButtonState state) {
+    final isTeacher = widget.role == 'mohaffez';
     switch (state) {
       case MeetingButtonState.pendingMeetingLink:
         return const _DisabledButton(
@@ -103,11 +105,23 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
       case MeetingButtonState.tooEarly:
         return _CountdownButton(
           sessionId: widget.sessionId,
+          role: widget.role,
         );
+
+      case MeetingButtonState.waitingForTeacher:
+        return const _DisabledButton(
+          icon: Icons.hourglass_bottom_rounded,
+          label: 'حان وقت الجلسة — في انتظار المعلم',
+          subtext: 'سيظهر زر الانضمام بمجرد أن يبدأ معلمك الجلسة',
+          color: AppThemeConstants.info,
+        );
+
+      case MeetingButtonState.teacherLate:
+        return const _TeacherLateCard();
 
       case MeetingButtonState.ready:
         return _JoinButton(
-          label: 'ابدأ الجلسة',
+          label: isTeacher ? 'ابدأ الجلسة' : 'ابدأ الجلسة',
           icon: Icons.videocam_rounded,
           gradient: const LinearGradient(
             colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
@@ -117,16 +131,35 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
         );
 
       case MeetingButtonState.inProgress:
+        if (isTeacher) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _SessionInProgressBanner(),
+              const SizedBox(height: 10),
+              _JoinButton(
+                label: 'تم بدء الجلسة — افتح الاجتماع',
+                icon: Icons.open_in_new_rounded,
+                gradient: const LinearGradient(
+                  colors: [
+                    AppThemeConstants.secondary,
+                    AppThemeConstants.primary
+                  ],
+                ),
+                loading: _launching,
+                onTap: _handleJoin,
+              ),
+            ],
+          );
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (widget.role == 'student') const _SessionStartedBanner(),
-            if (widget.role == 'student') const SizedBox(height: 10),
+            const _SessionStartedBanner(),
+            const SizedBox(height: 10),
             _PulseJoinButton(
               pulse: _pulse,
-              label: widget.role == 'student'
-                  ? 'انضم إلى معلمك الآن'
-                  : 'الجلسة مفتوحة — افتح الاجتماع',
+              label: 'انضم إلى معلمك الآن',
               loading: _launching,
               onTap: _handleJoin,
             ),
@@ -279,37 +312,128 @@ class _DisabledButton extends StatelessWidget {
   }
 }
 
-// Shows a disabled button with live countdown until joinWindowOpensAt.
+// Shows a disabled button with live countdown until the user can act.
+// Both teacher and student use slotStart − leadTimeMinutes as the gate.
 class _CountdownButton extends ConsumerWidget {
   final String sessionId;
-  const _CountdownButton({required this.sessionId});
+  final String role;
+  const _CountdownButton({required this.sessionId, required this.role});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final infoAsync = ref.watch(meetingInfoProvider(sessionId));
     final info = infoAsync.valueOrNull;
-    final opensAt = info?.joinWindowOpensAt;
+    final isTeacher = role == 'mohaffez';
+    final leadTimeMinutes = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.meetingStartLeadTimeMinutes ??
+        60;
+
+    final sd = info?.slotStart ?? info?.sessionDate;
+    final DateTime? target = sd?.subtract(Duration(minutes: leadTimeMinutes));
 
     String label = 'الجلسة لم تبدأ بعد';
-    if (opensAt != null) {
-      final diff = opensAt.difference(DateTime.now());
+    if (target != null) {
+      final diff = target.difference(DateTime.now());
       final h = diff.inHours;
       final m = diff.inMinutes.remainder(60);
       final s = diff.inSeconds.remainder(60);
       if (h > 0) {
-        label = 'ستبدأ خلال $hس $mد';
+        label = isTeacher
+            ? 'يمكنك البدء بعد $hس $mد'
+            : 'ستبدأ خلال $hس $mد';
       } else if (m > 0) {
-        label = 'ستبدأ خلال $mد $sث';
+        label = isTeacher
+            ? 'يمكنك البدء بعد $mد $sث'
+            : 'ستبدأ خلال $mد $sث';
       } else {
-        label = 'ستبدأ خلال $sث';
+        label = isTeacher
+            ? 'يمكنك البدء بعد $sث'
+            : 'ستبدأ خلال $sث';
       }
     }
 
     return _DisabledButton(
       icon: Icons.access_time_rounded,
       label: label,
-      subtext: 'يمكنك الانضمام قبل الموعد بـ 10 دقائق',
+      subtext: 'يمكنك الانضمام قبل الموعد بـ $leadTimeMinutes دقيقة',
       color: AppThemeConstants.primary,
+    );
+  }
+}
+
+class _TeacherLateCard extends StatelessWidget {
+  const _TeacherLateCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: AppThemeConstants.warning.withValues(alpha: 0.4),
+            width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.warning.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.access_time_filled_rounded,
+                    color: AppThemeConstants.warning, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'نأسف على التأخير — هل تم التواصل مع المعلم؟',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: AppThemeConstants.warning,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            decoration: BoxDecoration(
+              color: AppThemeConstants.warning.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: AppThemeConstants.warning.withValues(alpha: 0.25)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 16, color: AppThemeConstants.warning),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'يمكنك إلغاء الحلقة وطلب التعويض من معلمك',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppThemeConstants.warning,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -368,6 +492,49 @@ class _JoinButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SessionInProgressBanner extends StatelessWidget {
+  const _SessionInProgressBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.success.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppThemeConstants.success.withValues(alpha: 0.4),
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppThemeConstants.success.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle,
+                color: AppThemeConstants.success, size: 16),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'تم بدء الجلسة — الطالب يستطيع الانضمام الآن',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppThemeConstants.success,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

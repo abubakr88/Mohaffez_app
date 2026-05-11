@@ -121,16 +121,10 @@ class StudentHomeContent extends ConsumerWidget {
 
     final nextSessionDate = studentUpcomingAsync.when(
       data: (sessions) {
-        debugPrint('👨‍🎓 Student upcoming sessions: ${sessions.length}');
-        for (final s in sessions) {
-          final d = s['sessionDate'] as DateTime?;
-          debugPrint('📅 Student session: $d | isAfter(now): ${d?.isAfter(now)}');
-        }
         final future = sessions.where((s) {
           final d = s['sessionDate'] as DateTime?;
           return d != null && d.isAfter(now);
         }).toList();
-        debugPrint('⏰ Student future sessions: ${future.length}');
         if (future.isEmpty) return null;
         // Sort by actual datetime (sessionDate + slotStart) to get the earliest session
         future.sort((a, b) {
