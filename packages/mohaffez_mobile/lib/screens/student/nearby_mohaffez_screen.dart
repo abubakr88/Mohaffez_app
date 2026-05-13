@@ -1,14 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../../shared/widgets/cached_avatar.dart';
@@ -25,31 +22,9 @@ class NearbyMohaffezScreen extends ConsumerStatefulWidget {
 
 class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     with SingleTickerProviderStateMixin {
-  static const CameraPosition _fallbackCamera = CameraPosition(
-    target: LatLng(30.0444, 31.2357),
-    zoom: 11,
-  );
-
-  static const String _mapsApiKey =
-      String.fromEnvironment('GOOGLE_MAPS_API_KEY');
-
-  static const String _premiumMapStyle = '''
-[
-  {"elementType":"geometry","stylers":[{"color":"#0b2530"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#b7d8d2"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#072027"}]},
-  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#155e63"}]},
-  {"featureType":"landscape.natural","elementType":"geometry","stylers":[{"color":"#123b39"}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0f3a42"}]},
-  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#0f4d43"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#164653"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#08252e"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#1f6c70"}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#0d3945"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#062b3f"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#68d8d6"}]}
-]
-''';
+  static const LatLng _fallbackCenter = LatLng(30.0444, 31.2357);
+  static const String _osmTileUrl =
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   SortType selectedFilter = SortType.distance;
   double? userLat;
@@ -61,18 +36,10 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   String searchQuery = '';
   String? selectedSpecialization;
   MohaffezModel? _selectedTeacher;
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   bool _hasFitInitialBounds = false;
   bool _showMapView = false;
 
-  // driving distance cache: teacher.id → km
-  final Map<String, double> _drivingDistances = {};
-  bool _fetchingDrivingDistances = false;
-
-  BitmapDescriptor? _userLocationMarker;
-
-  final Map<String, BitmapDescriptor> _markerIcons = {};
-  final Map<String, BitmapDescriptor> _selectedMarkerIcons = {};
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
@@ -93,7 +60,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
 
   @override
   void dispose() {
-    _mapController?.dispose();
     _pulseController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -135,17 +101,13 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       );
 
       if (!mounted) return;
-      _userLocationMarker ??= await _buildUserLocationIcon();
-      if (!mounted) return;
       setState(() {
         userLat = position.latitude;
         userLng = position.longitude;
         isLoadingLocation = false;
         _hasFitInitialBounds = false;
-        _drivingDistances.clear();
-        _fetchingDrivingDistances = false;
       });
-      await _animateToUser();
+      _animateToUser();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -155,77 +117,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     }
   }
 
-  Future<void> _fetchDrivingDistances(List<MohaffezModel> teachers) async {
-    if (_fetchingDrivingDistances || userLat == null || userLng == null) return;
-    if (_mapsApiKey.isEmpty) return;
-
-    final missing = teachers
-        .where(_hasLocation)
-        .where((t) => !_drivingDistances.containsKey(t.id))
-        .toList();
-    if (missing.isEmpty) return;
-
-    _fetchingDrivingDistances = true;
-
-    // Distance Matrix allows 25 destinations per request
-    for (var i = 0; i < missing.length; i += 25) {
-      final batch = missing.skip(i).take(25).toList();
-      final destinations =
-          batch.map((t) => '${t.addressLat},${t.addressLng}').join('|');
-
-      try {
-        final uri = Uri.parse(
-          'https://maps.googleapis.com/maps/api/distancematrix/json'
-          '?origins=$userLat,$userLng'
-          '&destinations=$destinations'
-          '&mode=driving'
-          '&key=$_mapsApiKey',
-        );
-        final response = await http.get(uri);
-        if (!mounted) return;
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final rows = data['rows'] as List?;
-          if (rows != null && rows.isNotEmpty) {
-            final elements = rows[0]['elements'] as List;
-            for (var j = 0; j < elements.length && j < batch.length; j++) {
-              final element = elements[j] as Map<String, dynamic>;
-              if (element['status'] == 'OK') {
-                final meters =
-                    (element['distance']['value'] as num).toDouble();
-                _drivingDistances[batch[j].id] = meters / 1000.0;
-              }
-            }
-          }
-        }
-      } catch (_) {
-        // fall back to haversine silently
-      }
-    }
-
-    if (!mounted) return;
-    setState(() => _fetchingDrivingDistances = false);
-  }
-
-  void _scheduleDrivingDistanceFetch(List<MohaffezModel> teachers) {
-    if (_fetchingDrivingDistances || userLat == null || userLng == null) return;
-    final missing = teachers
-        .where(_hasLocation)
-        .where((t) => !_drivingDistances.containsKey(t.id))
-        .toList();
-    if (missing.isEmpty) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fetchDrivingDistances(missing);
-    });
-  }
-
-  double? _distanceFor(MohaffezModel teacher) {
-    return _drivingDistances[teacher.id] ??
-        teacher.getDistanceFrom(userLat, userLng);
-  }
-
-  bool _isDrivingDistance(MohaffezModel teacher) =>
-      _drivingDistances.containsKey(teacher.id);
+  double? _distanceFor(MohaffezModel teacher) =>
+      teacher.getDistanceFrom(userLat, userLng);
 
   @override
   Widget build(BuildContext context) {
@@ -257,46 +150,43 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     BuildContext context,
     List<MohaffezModel> teachers,
   ) {
-    _ensureMarkerIcons(teachers);
-    _scheduleDrivingDistanceFetch(teachers);
-
     return SafeArea(
       child: Column(
         children: [
           _buildHeader(teachers.length),
           Expanded(
             child: Stack(
-            children: [
-              IndexedStack(
-                index: _showMapView ? 0 : 1,
-                children: [
-                  _buildMapPane(teachers),
-                  _buildResultsPane(context, teachers),
-                ],
-              ),
-              Positioned(
-                bottom: 20,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: _showMapView
-                      ? _ViewToggleButton(
-                          label: 'عرض القائمة',
-                          icon: Icons.format_list_bulleted_rounded,
-                          onTap: () => setState(() => _showMapView = false),
-                        )
-                      : _ViewToggleButton(
-                          label: 'عرض على الخريطة',
-                          icon: Icons.map_rounded,
-                          onTap: () {
-                            setState(() => _showMapView = true);
-                            _fitInitialBounds(teachers, force: true);
-                          },
-                        ),
+              children: [
+                IndexedStack(
+                  index: _showMapView ? 0 : 1,
+                  children: [
+                    _buildMapPane(teachers),
+                    _buildResultsPane(context, teachers),
+                  ],
                 ),
-              ),
-            ],
-          ),
+                Positioned(
+                  bottom: 20,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: _showMapView
+                        ? _ViewToggleButton(
+                            label: 'عرض القائمة',
+                            icon: Icons.format_list_bulleted_rounded,
+                            onTap: () => setState(() => _showMapView = false),
+                          )
+                        : _ViewToggleButton(
+                            label: 'عرض على الخريطة',
+                            icon: Icons.map_rounded,
+                            onTap: () {
+                              setState(() => _showMapView = true);
+                              _fitInitialBounds(teachers, force: true);
+                            },
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -310,21 +200,42 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
         borderRadius: BorderRadius.circular(18),
         child: Stack(
           children: [
-            GoogleMap(
-              initialCameraPosition: _initialCamera(teachers),
-              myLocationEnabled: userLat != null && userLng != null,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              compassEnabled: false,
-              mapToolbarEnabled: false,
-              style: _premiumMapStyle,
-              markers: _buildMarkers(teachers),
-              circles: _buildRadiusCircle(),
-              onMapCreated: (controller) {
-                _mapController = controller;
-                _fitInitialBounds(teachers, force: true);
-              },
-              onTap: (_) => setState(() => _selectedTeacher = null),
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _initialCenter(teachers),
+                initialZoom: 12.5,
+                onTap: (_, __) => setState(() => _selectedTeacher = null),
+                onMapReady: () => _fitInitialBounds(teachers, force: true),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: _osmTileUrl,
+                  userAgentPackageName: 'app.mohafezy',
+                  maxNativeZoom: 19,
+                ),
+                if (userLat != null && userLng != null)
+                  CircleLayer(
+                    circles: [
+                      CircleMarker(
+                        point: LatLng(userLat!, userLng!),
+                        radius: radiusKm * 1000,
+                        useRadiusInMeter: true,
+                        color: AppThemeConstants.primaryVariant
+                            .withValues(alpha: 0.08),
+                        borderColor: AppThemeConstants.primaryVariant
+                            .withValues(alpha: 0.28),
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
+                MarkerLayer(markers: _buildMarkers(teachers)),
+                const RichAttributionWidget(
+                  attributions: [
+                    TextSourceAttribution('© OpenStreetMap contributors'),
+                  ],
+                ),
+              ],
             ),
             Positioned.fill(
               child: IgnorePointer(
@@ -334,7 +245,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                       begin: Alignment.topCenter,
                       end: Alignment.center,
                       colors: [
-                        AppThemeConstants.deepTeal.withValues(alpha: 0.36),
+                        AppThemeConstants.deepTeal.withValues(alpha: 0.24),
                         AppThemeConstants.transparent,
                       ],
                     ),
@@ -392,7 +303,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
               child: _TeacherPreviewCard(
                 teacher: _selectedTeacher!,
                 distance: _distanceFor(_selectedTeacher!),
-                isDrivingDistance: _isDrivingDistance(_selectedTeacher!),
                 pulseValue: _pulseController.value,
                 onClose: () => setState(() => _selectedTeacher = null),
                 onBook: () => _openTeacherProfile(_selectedTeacher!),
@@ -418,16 +328,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                     ),
                   ),
                 ),
-                if (_fetchingDrivingDistances)
-                  const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppThemeConstants.primary,
-                    ),
-                  ),
-                const SizedBox(width: 6),
                 Text(
                   '${teachers.length}',
                   style: const TextStyle(
@@ -446,7 +346,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                     message: 'لم نتمكن من العثور على محفظين في نطاق البحث',
                   )
                 : ListView.separated(
-                    // extra bottom padding so FAB doesn't cover last item
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 72),
                     itemCount: teachers.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -455,7 +354,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                       return _TeacherResultTile(
                         teacher: teacher,
                         distance: _distanceFor(teacher),
-                        isDrivingDistance: _isDrivingDistance(teacher),
                         isSelected: _selectedTeacher?.id == teacher.id,
                         onTap: () => _selectTeacher(teacher),
                         onBook: () => _openTeacherProfile(teacher),
@@ -496,151 +394,69 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     );
   }
 
-  CameraPosition _initialCamera(List<MohaffezModel> teachers) {
+  LatLng _initialCenter(List<MohaffezModel> teachers) {
     if (userLat != null && userLng != null) {
-      return CameraPosition(target: LatLng(userLat!, userLng!), zoom: 12.5);
+      return LatLng(userLat!, userLng!);
     }
     final first = teachers.where(_hasLocation).firstOrNull;
     if (first != null) {
-      return CameraPosition(
-        target: LatLng(first.addressLat!, first.addressLng!),
-        zoom: 12,
-      );
+      return LatLng(first.addressLat!, first.addressLng!);
     }
-    return _fallbackCamera;
+    return _fallbackCenter;
   }
 
-  Set<Marker> _buildMarkers(List<MohaffezModel> teachers) {
+  List<Marker> _buildMarkers(List<MohaffezModel> teachers) {
     final pulse = 0.82 + (_pulseController.value * 0.18);
 
     final markers = teachers.where(_hasLocation).map((teacher) {
       final isSelected = _selectedTeacher?.id == teacher.id;
+      final initials = teacher.name.trim().isEmpty
+          ? 'م'
+          : teacher.name.trim().characters.take(2).toString();
       return Marker(
-        markerId: MarkerId(teacher.id),
-        position: LatLng(teacher.addressLat!, teacher.addressLng!),
-        icon: isSelected
-            ? (_selectedMarkerIcons[teacher.id] ??
-                BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueYellow))
-            : (_markerIcons[teacher.id] ??
-                BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueAzure)),
-        alpha: isSelected ? pulse : 0.95,
-        zIndexInt: isSelected ? 20 : 10,
-        anchor: const Offset(0.5, 0.92),
-        onTap: () => _selectTeacher(teacher),
+        point: LatLng(teacher.addressLat!, teacher.addressLng!),
+        width: isSelected ? 64 : 52,
+        height: isSelected ? 64 : 52,
+        alignment: Alignment.topCenter,
+        child: GestureDetector(
+          onTap: () => _selectTeacher(teacher),
+          child: Opacity(
+            opacity: isSelected ? pulse : 0.96,
+            child: _TeacherPin(initials: initials, selected: isSelected),
+          ),
+        ),
       );
-    }).toSet();
+    }).toList();
 
-    if (userLat != null && userLng != null && _userLocationMarker != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('_user_location'),
-        position: LatLng(userLat!, userLng!),
-        icon: _userLocationMarker!,
-        anchor: const Offset(0.5, 0.5),
-        zIndexInt: 30,
-        consumeTapEvents: true,
-      ));
+    if (userLat != null && userLng != null) {
+      markers.add(
+        Marker(
+          point: LatLng(userLat!, userLng!),
+          width: 56,
+          height: 56,
+          child: const _UserLocationPin(),
+        ),
+      );
     }
 
     return markers;
   }
 
-  Future<BitmapDescriptor> _buildUserLocationIcon() async {
-    const size = 120.0;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    const center = Offset(size / 2, size / 2);
-    const radius = size * 0.30;
-
-    // outer glow
-    canvas.drawCircle(
-      center,
-      radius + 10,
-      Paint()
-        ..color = AppThemeConstants.secondary.withValues(alpha: 0.22)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-    );
-
-    // filled circle
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFFD4A44A), Color(0xFFF5C842)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(Rect.fromCircle(center: center, radius: radius)),
-    );
-
-    // white border
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..color = AppThemeConstants.white,
-    );
-
-    // label
-    final tp = TextPainter(
-      text: const TextSpan(
-        text: 'أنت',
-        style: TextStyle(
-          color: Color(0xFF062B3F),
-          fontSize: 24,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      textDirection: TextDirection.rtl,
-      textAlign: TextAlign.center,
-    )..layout(maxWidth: size);
-    tp.paint(
-      canvas,
-      Offset(center.dx - tp.width / 2, center.dy - tp.height / 2),
-    );
-
-    final image =
-        await recorder.endRecording().toImage(size.round(), size.round());
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.bytes(data!.buffer.asUint8List());
-  }
-
-  Set<Circle> _buildRadiusCircle() {
-    if (userLat == null || userLng == null) return const {};
-    return {
-      Circle(
-        circleId: const CircleId('student-search-radius'),
-        center: LatLng(userLat!, userLng!),
-        radius: radiusKm * 1000,
-        fillColor: AppThemeConstants.primaryVariant.withValues(alpha: 0.08),
-        strokeColor: AppThemeConstants.primaryVariant.withValues(alpha: 0.28),
-        strokeWidth: 2,
-      ),
-    };
-  }
-
   void _selectTeacher(MohaffezModel teacher) {
     setState(() => _selectedTeacher = teacher);
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        LatLng(teacher.addressLat!, teacher.addressLng!),
-        14.5,
-      ),
+    _mapController.move(
+      LatLng(teacher.addressLat!, teacher.addressLng!),
+      14.5,
     );
   }
 
-  Future<void> _animateToUser() async {
-    if (_mapController == null || userLat == null || userLng == null) return;
-    await _mapController!.animateCamera(
-      CameraUpdate.newLatLngZoom(LatLng(userLat!, userLng!), 13),
-    );
+  void _animateToUser() {
+    if (userLat == null || userLng == null) return;
+    _mapController.move(LatLng(userLat!, userLng!), 13);
   }
 
   void _fitInitialBounds(List<MohaffezModel> teachers, {bool force = false}) {
-    if (_mapController == null || (_hasFitInitialBounds && !force)) return;
+    if (_hasFitInitialBounds && !force) return;
     final points = <LatLng>[
       if (userLat != null && userLng != null) LatLng(userLat!, userLng!),
       ...teachers
@@ -648,126 +464,20 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
           .map((teacher) => LatLng(teacher.addressLat!, teacher.addressLng!)),
     ];
     if (points.length < 2) return;
-
     _hasFitInitialBounds = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _mapController == null) return;
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLngBounds(_boundsFrom(points), 84),
+      if (!mounted) return;
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(points),
+          padding: const EdgeInsets.all(48),
+        ),
       );
     });
   }
 
-  LatLngBounds _boundsFrom(List<LatLng> points) {
-    var minLat = points.first.latitude;
-    var maxLat = points.first.latitude;
-    var minLng = points.first.longitude;
-    var maxLng = points.first.longitude;
-    for (final point in points.skip(1)) {
-      minLat = math.min(minLat, point.latitude);
-      maxLat = math.max(maxLat, point.latitude);
-      minLng = math.min(minLng, point.longitude);
-      maxLng = math.max(maxLng, point.longitude);
-    }
-    return LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
-  }
-
   bool _hasLocation(MohaffezModel teacher) =>
       teacher.addressLat != null && teacher.addressLng != null;
-
-  Future<void> _ensureMarkerIcons(List<MohaffezModel> teachers) async {
-    final missing = teachers
-        .where(_hasLocation)
-        .where((teacher) => !_markerIcons.containsKey(teacher.id))
-        .toList();
-    if (missing.isEmpty) return;
-
-    for (final teacher in missing) {
-      final initials = teacher.name.trim().isEmpty
-          ? 'م'
-          : teacher.name.trim().characters.take(2).toString();
-      _markerIcons[teacher.id] =
-          await _teacherMarker(initials, selected: false);
-      _selectedMarkerIcons[teacher.id] =
-          await _teacherMarker(initials, selected: true);
-    }
-    if (mounted) setState(() {});
-  }
-
-  Future<BitmapDescriptor> _teacherMarker(
-    String initials, {
-    required bool selected,
-  }) async {
-    final size = selected ? 142.0 : 118.0;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final center = Offset(size / 2, size / 2);
-    final glowPaint = Paint()
-      ..color = (selected
-              ? AppThemeConstants.secondary
-              : AppThemeConstants.primaryVariant)
-          .withValues(alpha: selected ? 0.26 : 0.18)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
-    final shellPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFF0B7A75), Color(0xFF14B8A6)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(Rect.fromCircle(center: center, radius: size * 0.34));
-    final borderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = selected ? 7 : 5
-      ..color = selected
-          ? AppThemeConstants.secondary
-          : AppThemeConstants.white.withValues(alpha: 0.92);
-
-    canvas.drawCircle(center.translate(0, 4), size * 0.34, glowPaint);
-    canvas.drawCircle(center, size * 0.31, shellPaint);
-    canvas.drawCircle(center, size * 0.31, borderPaint);
-    canvas.drawCircle(
-      center.translate(0, 2),
-      size * 0.19,
-      Paint()..color = AppThemeConstants.white.withValues(alpha: 0.16),
-    );
-
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: initials,
-        style: TextStyle(
-          color: AppThemeConstants.white,
-          fontSize: selected ? 34 : 28,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      textDirection: TextDirection.rtl,
-      textAlign: TextAlign.center,
-    )..layout(maxWidth: size);
-    textPainter.paint(
-      canvas,
-      Offset(center.dx - textPainter.width / 2,
-          center.dy - textPainter.height / 2),
-    );
-
-    final pinPath = Path()
-      ..moveTo(center.dx - 14, center.dy + size * 0.26)
-      ..quadraticBezierTo(center.dx, center.dy + size * 0.44, center.dx + 14,
-          center.dy + size * 0.26)
-      ..close();
-    canvas.drawPath(pinPath, shellPaint);
-    canvas.drawCircle(
-      center.translate(size * 0.22, -size * 0.22),
-      selected ? 12 : 9,
-      Paint()..color = AppThemeConstants.success,
-    );
-
-    final image =
-        await recorder.endRecording().toImage(size.round(), size.round());
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.bytes(data!.buffer.asUint8List());
-  }
 
   Widget _buildHeader(int teacherCount) {
     return Padding(
@@ -981,8 +691,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                           radiusKm = value;
                           _selectedTeacher = null;
                           _hasFitInitialBounds = false;
-                          _drivingDistances.clear();
-                          _fetchingDrivingDistances = false;
                         });
                       },
                     ),
@@ -1088,6 +796,94 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   }
 }
 
+// ─── Map pins ───────────────────────────────────────────────────────────────
+
+class _TeacherPin extends StatelessWidget {
+  final String initials;
+  final bool selected;
+
+  const _TeacherPin({required this.initials, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = selected ? 56.0 : 44.0;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0B7A75), Color(0xFF14B8A6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: selected
+              ? AppThemeConstants.secondary
+              : AppThemeConstants.white.withValues(alpha: 0.92),
+          width: selected ? 3 : 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (selected
+                    ? AppThemeConstants.secondary
+                    : AppThemeConstants.primaryVariant)
+                .withValues(alpha: 0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: AppThemeConstants.white,
+            fontSize: selected ? 16 : 13,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UserLocationPin extends StatelessWidget {
+  const _UserLocationPin();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFD4A44A), Color(0xFFF5C842)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: AppThemeConstants.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeConstants.secondary.withValues(alpha: 0.4),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Text(
+          'أنت',
+          style: TextStyle(
+            color: Color(0xFF062B3F),
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── View toggle button ─────────────────────────────────────────────────────
 
 class _ViewToggleButton extends StatelessWidget {
@@ -1139,7 +935,6 @@ class _ViewToggleButton extends StatelessWidget {
 class _TeacherPreviewCard extends StatelessWidget {
   final MohaffezModel teacher;
   final double? distance;
-  final bool isDrivingDistance;
   final double pulseValue;
   final VoidCallback onClose;
   final VoidCallback onBook;
@@ -1147,7 +942,6 @@ class _TeacherPreviewCard extends StatelessWidget {
   const _TeacherPreviewCard({
     required this.teacher,
     required this.distance,
-    required this.isDrivingDistance,
     required this.pulseValue,
     required this.onClose,
     required this.onBook,
@@ -1244,9 +1038,7 @@ class _TeacherPreviewCard extends StatelessWidget {
                         ),
                         if (distance != null)
                           _MetricPill(
-                            icon: isDrivingDistance
-                                ? Icons.directions_car_rounded
-                                : Icons.near_me_rounded,
+                            icon: Icons.near_me_rounded,
                             label: distance! < 1
                                 ? '${(distance! * 1000).round()} م'
                                 : '${distance!.toStringAsFixed(1)} كم',
@@ -1306,7 +1098,6 @@ class _TeacherPreviewCard extends StatelessWidget {
 class _TeacherResultTile extends StatelessWidget {
   final MohaffezModel teacher;
   final double? distance;
-  final bool isDrivingDistance;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onBook;
@@ -1314,7 +1105,6 @@ class _TeacherResultTile extends StatelessWidget {
   const _TeacherResultTile({
     required this.teacher,
     required this.distance,
-    required this.isDrivingDistance,
     required this.isSelected,
     required this.onTap,
     required this.onBook,
@@ -1398,9 +1188,7 @@ class _TeacherResultTile extends StatelessWidget {
                         ),
                         if (distance != null)
                           _MetricPill(
-                            icon: isDrivingDistance
-                                ? Icons.directions_car_rounded
-                                : Icons.near_me_rounded,
+                            icon: Icons.near_me_rounded,
                             label: distance! < 1
                                 ? '${(distance! * 1000).round()} م'
                                 : '${distance!.toStringAsFixed(1)} كم',
