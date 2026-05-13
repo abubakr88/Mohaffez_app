@@ -34,7 +34,12 @@ class MeetingInfo {
   });
 
   factory MeetingInfo.fromDoc(Map<String, dynamic> doc) {
-    DateTime? ts(dynamic v) => v is Timestamp ? v.toDate() : null;
+    // Accept both Timestamp (normal) and DateTime (Firestore auto-conversion).
+    DateTime? ts(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      if (v is DateTime) return v;
+      return null;
+    }
     final meeting = doc['meeting'] as Map<String, dynamic>? ?? const {};
     return MeetingInfo(
       provider: meeting['provider'] as String? ?? 'custom',
@@ -98,11 +103,12 @@ final meetingButtonStateProvider =
 
   final infoAsync = ref.watch(meetingInfoProvider(key.sessionId));
   ref.watch(_meetingClockProvider);
-  final leadTimeMinutes = ref
-          .watch(systemConfigProvider)
-          .valueOrNull
-          ?.meetingStartLeadTimeMinutes ??
-      60;
+  final systemConfig = ref.watch(systemConfigProvider).valueOrNull;
+  final leadTimeMinutes = systemConfig?.meetingStartLeadTimeMinutes ?? 60;
+  print('DEBUG CONFIG: systemConfig: $systemConfig, leadTimeMinutes: $leadTimeMinutes');
+  // NTP correction disabled — the `ntp` package returns unreliable offsets
+  // on some devices. Device clock is used directly.
+  // final offset = ref.watch(serverClockProvider).offset ?? Duration.zero;
 
   return infoAsync.when(
     data: (info) => _computeState(

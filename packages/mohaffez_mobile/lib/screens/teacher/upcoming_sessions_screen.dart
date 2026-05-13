@@ -367,9 +367,9 @@ class SessionCard extends ConsumerWidget {
   }
 
   // ✅ Check if session can be completed (30 min before → 24 hours after)
-  bool _canCompleteSession(DateTime sessionDate, String timeSlot, int earlyMinutes) {
+  bool _canCompleteSession(DateTime sessionDate, String timeSlot, int earlyMinutes, WidgetRef ref) {
     try {
-      final now = DateTime.now();
+      final now = serverNow(ref);
 
       // Parse time slot (e.g., "08:00" or "08:00-09:00")
       final timeParts = timeSlot.split('-')[0].split(':');
@@ -387,7 +387,7 @@ class SessionCard extends ConsumerWidget {
 
       // Window: 30 min before → 24 hours after
       final canStartFrom = sessionTime.subtract(Duration(minutes: earlyMinutes));
-      final canCompleteUntil = sessionTime.add(const Duration(hours: 24));
+      final canCompleteUntil = sessionTime.add(const  Duration(hours: 24));
 
       return now.isAfter(canStartFrom) && now.isBefore(canCompleteUntil);
     } catch (e) {
@@ -396,9 +396,9 @@ class SessionCard extends ConsumerWidget {
   }
 
   // ✅ Check if session is late (more than 15 min after scheduled time)
-  bool _isSessionLate(DateTime sessionDate, String timeSlot) {
+  bool _isSessionLate(DateTime sessionDate, String timeSlot, WidgetRef ref) {
     try {
-      final now = DateTime.now();
+      final now = serverNow(ref);
       final timeParts = timeSlot.split('-')[0].split(':');
       final hour = int.parse(timeParts[0]);
       final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
@@ -688,18 +688,18 @@ class SessionCard extends ConsumerWidget {
         session['imamAddressText'] as String? ?? session['location'] as String?;
 
     final bool canComplete =
-        sessionDate != null && _canCompleteSession(sessionDate, timeSlot, earlyMinutes);
+        sessionDate != null && _canCompleteSession(sessionDate, timeSlot, earlyMinutes, ref);
     final bool isLate =
-        sessionDate != null && _isSessionLate(sessionDate, timeSlot);
+        sessionDate != null && _isSessionLate(sessionDate, timeSlot, ref);
     final hoursUntilSession =
-        sessionDate?.difference(DateTime.now()).inHours ?? 999;
+        sessionDate?.difference(serverNow(ref)).inHours ?? 999;
     final showCommunication =
         hoursUntilSession <= 24 && hoursUntilSession >= -2;
 
     // Calculate days until session
     String getTimeUntil() {
       if (sessionDate == null) return '';
-      final now = DateTime.now();
+      final now = serverNow(ref);
       final dateOnly =
           DateTime(sessionDate.year, sessionDate.month, sessionDate.day);
       final today = DateTime(now.year, now.month, now.day);
@@ -1171,7 +1171,7 @@ class _TeacherStartSessionButton extends ConsumerWidget {
         break;
       case MeetingButtonState.ended:
       case MeetingButtonState.teacherLate:
-        label = 'انتهت الجلسة';
+        label = 'انتهت';
         icon = Icons.videocam_off_rounded;
         enabled = false;
         break;

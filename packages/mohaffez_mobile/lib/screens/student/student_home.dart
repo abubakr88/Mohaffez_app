@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -117,7 +117,7 @@ class StudentHomeContent extends ConsumerWidget {
     final requestsAsync     = ref.watch(studentRequestsFirstPageProvider(studentId));
     final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
     final studentUpcomingAsync = ref.watch(studentUpcomingSessionsProvider(studentId));
-    final now               = DateTime.now();
+    final now               = serverNow(ref);
 
     final nextSessionDate = studentUpcomingAsync.when(
       data: (sessions) {
@@ -138,7 +138,8 @@ class StudentHomeContent extends ConsumerWidget {
           }
           return da.compareTo(db);
         });
-        return future.first['sessionDate'] as DateTime?;
+        final next = future.first;
+        return next['slotStart'] as DateTime? ?? next['sessionDate'] as DateTime?;
       },
       loading: () => null,
       error: (_, __) => null,
@@ -1053,7 +1054,7 @@ class _AssignmentsSection extends ConsumerWidget {
   }
 }
 
-class _AssignmentCard extends StatelessWidget {
+class _AssignmentCard extends ConsumerWidget {
   final String mohaffezName;
   final String hifz;
   final String muraja;
@@ -1070,9 +1071,8 @@ class _AssignmentCard extends StatelessWidget {
     required this.onTap,
   });
 
-  static String _relativeDate(DateTime? date) {
+  static String _relativeDate(DateTime? date, DateTime now) {
     if (date == null) return '';
-    final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final target = DateTime(date.year, date.month, date.day);
     final diff = today.difference(target).inDays;
@@ -1085,13 +1085,13 @@ class _AssignmentCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     const colors = [_DS.teal500, _DS.green, _DS.purple];
     const bgs    = [_DS.teal50,  _DS.greenBg, _DS.purpleBg];
     final color  = colors[colorIndex % colors.length];
     final bg     = bgs[colorIndex % bgs.length];
 
-    final relDate = _relativeDate(sessionDate);
+    final relDate = _relativeDate(sessionDate, serverNow(ref));
 
     return Material(
       color: AppThemeConstants.transparent,
@@ -1241,15 +1241,15 @@ class _AssignmentRow extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEXT SESSION COUNTDOWN (IMPROVED)
 // ═══════════════════════════════════════════════════════════════════════════════
-class _NextSessionCountdown extends StatefulWidget {
+class _NextSessionCountdown extends ConsumerStatefulWidget {
   final DateTime? nextSessionDate;
   const _NextSessionCountdown({required this.nextSessionDate});
 
   @override
-  State<_NextSessionCountdown> createState() => _NextSessionCountdownState();
+  ConsumerState<_NextSessionCountdown> createState() => _NextSessionCountdownState();
 }
 
-class _NextSessionCountdownState extends State<_NextSessionCountdown> {
+class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
   Timer? _timer;
   Duration _remaining = Duration.zero;
 
@@ -1277,7 +1277,7 @@ class _NextSessionCountdownState extends State<_NextSessionCountdown> {
   void _recalculate() {
     final d = widget.nextSessionDate;
     if (d == null) { _remaining = Duration.zero; return; }
-    final diff = d.difference(DateTime.now());
+    final diff = d.difference(serverNow(ref));
     _remaining = diff.isNegative ? Duration.zero : diff;
   }
 

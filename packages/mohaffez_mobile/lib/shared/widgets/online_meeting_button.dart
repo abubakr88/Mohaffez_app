@@ -120,8 +120,17 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
         return const _TeacherLateCard();
 
       case MeetingButtonState.ready:
+        String readyLabel = 'ابدأ الجلسة';
+        if (isTeacher) {
+          final info =
+              ref.watch(meetingInfoProvider(widget.sessionId)).valueOrNull;
+          final sessionTime = info?.slotStart ?? info?.sessionDate;
+          if (sessionTime != null && DateTime.now().isBefore(sessionTime)) {
+            readyLabel = 'يمكنك بدأ الجلسة الآن في حالة موافقة الطالب';
+          }
+        }
         return _JoinButton(
-          label: isTeacher ? 'ابدأ الجلسة' : 'ابدأ الجلسة',
+          label: readyLabel,
           icon: Icons.videocam_rounded,
           gradient: const LinearGradient(
             colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
@@ -169,7 +178,7 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
       case MeetingButtonState.ended:
         return const _DisabledButton(
           icon: Icons.videocam_off_rounded,
-          label: 'انتهت الجلسة',
+          label: 'انتهت',
           color: AppThemeConstants.grey400,
         );
 
@@ -231,11 +240,11 @@ class _InfoCard extends StatelessWidget {
                 color: AppThemeConstants.primary, size: 20),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'جلسة عبر الإنترنت',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -243,8 +252,8 @@ class _InfoCard extends StatelessWidget {
                     color: AppThemeConstants.primary,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
+                SizedBox(height: 4),
+                Text(
                   'سيظهر زر الانضمام بمجرد أن يبدأ معلمك الجلسة. تأكد من تطبيق المحادثة (Zoom أو Google Meet) مثبّت على هاتفك.',
                   style: TextStyle(
                     fontSize: 12,
@@ -312,18 +321,39 @@ class _DisabledButton extends StatelessWidget {
   }
 }
 
-// Shows a disabled button with live countdown until the user can act.
-// Both teacher and student use slotStart − leadTimeMinutes as the gate.
-class _CountdownButton extends ConsumerWidget {
+// Shows a disabled button with live countdown until the session start time,
+// with a subtext noting when the user can actually join/start early.
+class _CountdownButton extends ConsumerStatefulWidget {
   final String sessionId;
   final String role;
   const _CountdownButton({required this.sessionId, required this.role});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final infoAsync = ref.watch(meetingInfoProvider(sessionId));
+  ConsumerState<_CountdownButton> createState() => _CountdownButtonState();
+}
+
+class _CountdownButtonState extends ConsumerState<_CountdownButton> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final infoAsync = ref.watch(meetingInfoProvider(widget.sessionId));
     final info = infoAsync.valueOrNull;
-    final isTeacher = role == 'mohaffez';
+    final isTeacher = widget.role == 'mohaffez';
     final leadTimeMinutes = ref
             .watch(systemConfigProvider)
             .valueOrNull
@@ -331,36 +361,45 @@ class _CountdownButton extends ConsumerWidget {
         60;
 
     final sd = info?.slotStart ?? info?.sessionDate;
-    final DateTime? target = sd?.subtract(Duration(minutes: leadTimeMinutes));
+    // Count down to actual session start (not the join window).
+    final DateTime? target = sd;
+    final DateTime? openAt = sd?.subtract(Duration(minutes: leadTimeMinutes));
 
-    String label = 'الجلسة لم تبدأ بعد';
+    String label = 'الجلسة لم تحن بعد';
+    String subtext = openAt != null
+        ? 'يمكنك ${isTeacher ? 'البدء' : 'الانضمام'} من ${_fmtTime(openAt)} · قبل $leadTimeMinutes دقيقة من الموعد'
+        : 'يمكنك ${isTeacher ? 'البدء' : 'الانضمام'} قبل الموعد بـ $leadTimeMinutes دقيقة';
+
     if (target != null) {
       final diff = target.difference(DateTime.now());
-      final h = diff.inHours;
-      final m = diff.inMinutes.remainder(60);
-      final s = diff.inSeconds.remainder(60);
-      if (h > 0) {
-        label = isTeacher
-            ? 'يمكنك البدء بعد $hس $mد'
-            : 'ستبدأ خلال $hس $mد';
-      } else if (m > 0) {
-        label = isTeacher
-            ? 'يمكنك البدء بعد $mد $sث'
-            : 'ستبدأ خلال $mد $sث';
-      } else {
-        label = isTeacher
-            ? 'يمكنك البدء بعد $sث'
-            : 'ستبدأ خلال $sث';
+      if (!diff.isNegative) {
+        final h = diff.inHours;
+        final m = diff.inMinutes.remainder(60);
+        final s = diff.inSeconds.remainder(60);
+        if (h > 0) {
+          label = 'الجلسة تبدأ بعد $hس $mد';
+        } else if (m > 0) {
+          label = 'الجلسة تبدأ بعد $mد $sث';
+        } else {
+          label = 'الجلسة تبدأ بعد $sث';
+        }
       }
     }
 
     return _DisabledButton(
       icon: Icons.access_time_rounded,
       label: label,
-      subtext: 'يمكنك الانضمام قبل الموعد بـ $leadTimeMinutes دقيقة',
+      subtext: subtext,
       color: AppThemeConstants.primary,
     );
   }
+}
+
+String _fmtTime(DateTime dt) {
+  final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final m = dt.minute.toString().padLeft(2, '0');
+  final ampm = dt.hour >= 12 ? 'م' : 'ص';
+  return '$h:$m $ampm';
 }
 
 class _TeacherLateCard extends StatelessWidget {

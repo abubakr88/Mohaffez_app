@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../providers/navigation_provider.dart';
+import '../../shared/widgets/clock_skew_banner.dart';
 import '../../shared/widgets/offline_banner.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -130,6 +131,7 @@ class HomeShell extends ConsumerWidget {
           body: Column(
             children: [
               const OfflineBanner(),
+              const ClockSkewBanner(),
               Expanded(child: child),
             ],
           ),
