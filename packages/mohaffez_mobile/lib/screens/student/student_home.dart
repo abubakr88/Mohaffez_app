@@ -253,6 +253,11 @@ class StudentHomeContent extends ConsumerWidget {
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 20),
                       _QuizAccessCard(studentId: studentId),
+                      const SizedBox(height: 20),
+                      _LevelStripCard(
+                        studentId: studentId,
+                        dateOfBirth: user?.dateOfBirth,
+                      ),
                       const SizedBox(height: 28),
                       _AssignmentsSection(studentId: studentId),
                       const SizedBox(height: 16),
@@ -1537,6 +1542,131 @@ class _EmptyCard extends StatelessWidget {
               textAlign: TextAlign.center),
         ],
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEVEL STRIP CARD
+// ═══════════════════════════════════════════════════════════════════════════════
+class _LevelStripCard extends ConsumerWidget {
+  final String studentId;
+  final DateTime? dateOfBirth;
+  const _LevelStripCard({required this.studentId, required this.dateOfBirth});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(studentCompletedSessionsProvider(studentId));
+
+    return sessionsAsync.when(
+      loading: () => Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: _DS.goldBg,
+          borderRadius: _DS.r16,
+          border: Border.all(color: _DS.gold.withValues(alpha: 0.3)),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (sessions) {
+        final age = calculateAge(dateOfBirth);
+        final level = resolveLevel(sessions, age);
+        final progress = level.progressTo(sessions);
+        final toNext = level.sessionsToNext(sessions);
+        final isMax = level.nextMin == -1;
+        final subtitle =
+            isMax ? 'أعلى مستوى 🎉' : 'بقي $toNext جلسة للمستوى التالي';
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              context.push('/student-rewards');
+            },
+            borderRadius: _DS.r16,
+            child: Ink(
+              decoration: BoxDecoration(
+                color: _DS.goldBg,
+                borderRadius: _DS.r16,
+                border:
+                    Border.all(color: _DS.gold.withValues(alpha: 0.4), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _DS.gold.withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _DS.gold.withValues(alpha: 0.15),
+                            borderRadius: _DS.r12,
+                          ),
+                          child: Center(
+                            child: Text(level.emoji,
+                                style: const TextStyle(fontSize: 22)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                level.name,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: _DS.text1,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style:
+                                    const TextStyle(fontSize: 12, color: _DS.text2),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 14,
+                          color: _DS.gold,
+                        ),
+                      ],
+                    ),
+                    if (!isMax) ...[
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: const BorderRadius.all(Radius.circular(4)),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 5,
+                          backgroundColor: _DS.gold.withValues(alpha: 0.15),
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(_DS.gold),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
