@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
@@ -213,6 +215,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                   urlTemplate: _osmTileUrl,
                   userAgentPackageName: 'app.mohafezy',
                   maxNativeZoom: 19,
+                  tileProvider: kIsWeb
+                      ? CancellableNetworkTileProvider()
+                      : NetworkTileProvider(),
                 ),
                 if (userLat != null && userLng != null)
                   CircleLayer(

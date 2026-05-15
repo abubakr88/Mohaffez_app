@@ -3,6 +3,7 @@
 class MohaffezStudentSummary {
   final String studentId;
   final String studentName;
+  final String? photoUrl;
   final DateTime? lastSessionDate;
   final String lastSessionStatus;
   final String hifzAssignment;
@@ -22,6 +23,7 @@ class MohaffezStudentSummary {
   const MohaffezStudentSummary({
     required this.studentId,
     required this.studentName,
+    this.photoUrl,
     this.lastSessionDate,
     this.lastSessionStatus = 'accepted',
     this.hifzAssignment = '',
@@ -39,10 +41,11 @@ class MohaffezStudentSummary {
     this.performanceNotes,
   });
 
-  MohaffezStudentSummary copyWith({int? sessionCount}) {
+  MohaffezStudentSummary copyWith({int? sessionCount, String? photoUrl}) {
     return MohaffezStudentSummary(
       studentId: studentId,
       studentName: studentName,
+      photoUrl: photoUrl ?? this.photoUrl,
       lastSessionDate: lastSessionDate,
       lastSessionStatus: lastSessionStatus,
       hifzAssignment: hifzAssignment,
@@ -65,6 +68,7 @@ class MohaffezStudentSummary {
     return MohaffezStudentSummary(
       studentId: json['studentId'] as String,
       studentName: json['studentName'] as String,
+      photoUrl: json['photoUrl'] as String?,
       lastSessionDate: json['lastSessionDate'] != null
           ? DateTime.parse(json['lastSessionDate'] as String)
           : null,
@@ -89,6 +93,7 @@ class MohaffezStudentSummary {
     return {
       'studentId': studentId,
       'studentName': studentName,
+      'photoUrl': photoUrl,
       'lastSessionDate': lastSessionDate?.toIso8601String(),
       'lastSessionStatus': lastSessionStatus,
       'hifzAssignment': hifzAssignment,

@@ -1397,8 +1397,28 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
     }
   }
 
+  // Batch-fetch photoUrl from users collection (chunked to respect Firestore whereIn limit of 30)
+  final studentIds = students.keys.toList();
+  final Map<String, String?> photoUrls = {};
+  for (int i = 0; i < studentIds.length; i += 30) {
+    final chunk = studentIds.sublist(i, i + 30 > studentIds.length ? studentIds.length : i + 30);
+    final userDocs = await FirebaseFirestore.instance
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: chunk)
+        .get();
+    for (final doc in userDocs.docs) {
+      final url = doc.data()['photoUrl'] as String?;
+      if (url != null && url.isNotEmpty) {
+        photoUrls[doc.id] = url;
+      }
+    }
+  }
+
   return students.values
-      .map((s) => s.copyWith(sessionCount: counts[s.studentId] ?? 1))
+      .map((s) => s.copyWith(
+            sessionCount: counts[s.studentId] ?? 1,
+            photoUrl: photoUrls[s.studentId],
+          ))
       .toList();
 });
 

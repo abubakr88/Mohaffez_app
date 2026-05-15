@@ -67,7 +67,8 @@ service cloud.firestore {
             'setupCompleted', 'dateOfBirth', 'city',
             'examScore', 'examTakenAt',
             'examQuestionCount', 'examCorrectCount',
-            'examPassed', 'examRetryCount', 'examNextRetryAt'
+            'examPassed', 'examRetryCount', 'examNextRetryAt',
+            'setupWizardSeen'
           ]);
 
       // Mohaffez submitting for admin approval (registration step 3)
