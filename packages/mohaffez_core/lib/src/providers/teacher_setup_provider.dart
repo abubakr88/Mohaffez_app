@@ -79,7 +79,7 @@ final teacherSetupProvider = FutureProvider<TeacherSetupProgress>((ref) async {
 /// Writes the seen-flag to SharedPreferences so subsequent calls return false.
 Future<bool> shouldAutoShowSetupWizard(String uid) async {
   final prefs = await SharedPreferences.getInstance();
-  final key = 'teacher_setup_wizard_shown_v1_$uid';
+  final key = 'persistent_teacher_setup_wizard_shown_v1_$uid';
   if (prefs.getBool(key) ?? false) return false;
   await prefs.setBool(key, true);
   return true;

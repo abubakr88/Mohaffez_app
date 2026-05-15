@@ -14,6 +14,10 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String studentName;
   final String? previousHifz;
   final String? previousMuraja;
+  final String? previousHifzFromAyah;
+  final String? previousHifzToAyah;
+  final String? previousMurajaFromAyah;
+  final String? previousMurajaToAyah;
   final bool isLateCompletion;
   final String? sessionType;
 
@@ -23,6 +27,10 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
     required this.studentName,
     this.previousHifz,
     this.previousMuraja,
+    this.previousHifzFromAyah,
+    this.previousHifzToAyah,
+    this.previousMurajaFromAyah,
+    this.previousMurajaToAyah,
     this.isLateCompletion = false,
     this.sessionType,
   });
@@ -52,6 +60,10 @@ class _SessionCompletionScreenState
   // Ayah range for new muraja
   final newMurajaFromAyahController = TextEditingController();
   final newMurajaToAyahController = TextEditingController();
+
+  // "All surah" toggles (hides specific ayah range when checked)
+  bool newHifzAllSurah = false;
+  bool newMurajaAllSurah = false;
 
   // General session rating
   int sessionRating = 7;
@@ -104,18 +116,18 @@ class _SessionCompletionScreenState
             newMurajaAssignment: newMurajaController.text.trim().isEmpty
                 ? null
                 : newMurajaController.text.trim(),
-            // Ayah range for new hifz
-            newHifzFromAyah: newHifzFromAyahController.text.trim().isEmpty
+            // Ayah range for new hifz (null when "all surah" is selected)
+            newHifzFromAyah: newHifzAllSurah || newHifzFromAyahController.text.trim().isEmpty
                 ? null
                 : newHifzFromAyahController.text.trim(),
-            newHifzToAyah: newHifzToAyahController.text.trim().isEmpty
+            newHifzToAyah: newHifzAllSurah || newHifzToAyahController.text.trim().isEmpty
                 ? null
                 : newHifzToAyahController.text.trim(),
-            // Ayah range for new muraja
-            newMurajaFromAyah: newMurajaFromAyahController.text.trim().isEmpty
+            // Ayah range for new muraja (null when "all surah" is selected)
+            newMurajaFromAyah: newMurajaAllSurah || newMurajaFromAyahController.text.trim().isEmpty
                 ? null
                 : newMurajaFromAyahController.text.trim(),
-            newMurajaToAyah: newMurajaToAyahController.text.trim().isEmpty
+            newMurajaToAyah: newMurajaAllSurah || newMurajaToAyahController.text.trim().isEmpty
                 ? null
                 : newMurajaToAyahController.text.trim(),
             // General rating
@@ -357,6 +369,25 @@ class _SessionCompletionScreenState
                                   widget.previousHifz!,
                                   style: const TextStyle(fontSize: 14),
                                 ),
+                                if (widget.previousHifzFromAyah != null &&
+                                    widget.previousHifzToAyah != null) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.format_list_numbered,
+                                          size: 14, color: AppThemeConstants.success),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'من آية ${widget.previousHifzFromAyah} إلى آية ${widget.previousHifzToAyah}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppThemeConstants.success,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -421,6 +452,25 @@ class _SessionCompletionScreenState
                                   widget.previousMuraja!,
                                   style: const TextStyle(fontSize: 14),
                                 ),
+                                if (widget.previousMurajaFromAyah != null &&
+                                    widget.previousMurajaToAyah != null) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.format_list_numbered,
+                                          size: 14, color: AppThemeConstants.accentBlue),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'من آية ${widget.previousMurajaFromAyah} إلى آية ${widget.previousMurajaToAyah}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppThemeConstants.accentBlue,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -614,49 +664,66 @@ class _SessionCompletionScreenState
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      // Hifz ayah range
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: newHifzFromAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'من آية رقم',
-                                hintText: 'مثال: 1',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.success,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: newHifzToAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'إلى آية رقم',
-                                hintText: 'مثال: 10',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.success,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 4),
+                      // "All surah" toggle for hifz
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: newHifzAllSurah,
+                        onChanged: (val) =>
+                            setState(() => newHifzAllSurah = val!),
+                        activeColor: AppThemeConstants.success,
+                        title: const Text(
+                          'كل السورة (بدون تحديد آيات)',
+                          style: TextStyle(fontSize: 13, color: AppThemeConstants.success),
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
                       ),
+                      // Hifz ayah range (hidden when "all surah" is checked)
+                      if (!newHifzAllSurah) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: newHifzFromAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'من آية رقم',
+                                  hintText: 'مثال: 1',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.success,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: newHifzToAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'إلى آية رقم',
+                                  hintText: 'مثال: 10',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.success,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       // New muraja
                       TextFormField(
@@ -674,49 +741,66 @@ class _SessionCompletionScreenState
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      // Muraja ayah range
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: newMurajaFromAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'من آية رقم',
-                                hintText: 'مثال: 1',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.accentBlue,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: newMurajaToAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'إلى آية رقم',
-                                hintText: 'مثال: 50',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.accentBlue,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 4),
+                      // "All surah" toggle for muraja
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: newMurajaAllSurah,
+                        onChanged: (val) =>
+                            setState(() => newMurajaAllSurah = val!),
+                        activeColor: AppThemeConstants.accentBlue,
+                        title: const Text(
+                          'كل السورة (بدون تحديد آيات)',
+                          style: TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
                       ),
+                      // Muraja ayah range (hidden when "all surah" is checked)
+                      if (!newMurajaAllSurah) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: newMurajaFromAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'من آية رقم',
+                                  hintText: 'مثال: 1',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.accentBlue,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: newMurajaToAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'إلى آية رقم',
+                                  hintText: 'مثال: 50',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.accentBlue,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

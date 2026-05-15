@@ -38,6 +38,7 @@ class MeetingInfo {
     DateTime? ts(dynamic v) {
       if (v is Timestamp) return v.toDate();
       if (v is DateTime) return v;
+      if (v is String) return DateTime.tryParse(v);
       return null;
     }
     final meeting = doc['meeting'] as Map<String, dynamic>? ?? const {};

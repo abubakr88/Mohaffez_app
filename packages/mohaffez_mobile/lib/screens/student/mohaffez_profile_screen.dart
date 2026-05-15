@@ -1465,7 +1465,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                                         .format(day.date),
                                     style: TextStyle(
                                       fontSize: 11,
-                                      color: isSelected
+                                       color: isSelected
                                           ? Colors.white
                                               .withValues(alpha: 0.75)
                                           : Colors.grey,
