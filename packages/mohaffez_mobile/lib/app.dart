@@ -46,7 +46,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     final router = ref.watch(goRouterProvider);
 
     return MaterialApp.router(
-      title: 'المحفظ',
+      title: 'محفظي',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.light,
       theme: AppThemeData.lightTheme,

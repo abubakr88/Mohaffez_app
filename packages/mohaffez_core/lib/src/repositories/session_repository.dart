@@ -491,6 +491,7 @@ class SessionRepository {
     final imamAddressLat = requestData['imamAddressLat'];
     final imamAddressLng = requestData['imamAddressLng'];
     final mohaffezPhone = requestData['mohaffezPhone'] as String?;
+    final preferredProvider = requestData['preferredProvider'] as String?;
     final requiresPaymentOnAcceptance =
         requestData['requiresPaymentOnAcceptance'] as bool? ?? false;
 
@@ -576,6 +577,7 @@ class SessionRepository {
         'mohaffezName': mohaffezName,
         'studentName': studentName,
         'sessionType': sessionType,
+        if (preferredProvider != null) 'preferredProvider': preferredProvider,
         'preferredTimeSlot': preferredTimeSlot,
         'timeSlot': preferredTimeSlot,
         'sessionDate': slotDate,

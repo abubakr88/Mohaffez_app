@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -117,20 +117,14 @@ class StudentHomeContent extends ConsumerWidget {
     final requestsAsync     = ref.watch(studentRequestsFirstPageProvider(studentId));
     final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
     final studentUpcomingAsync = ref.watch(studentUpcomingSessionsProvider(studentId));
-    final now               = DateTime.now();
+    final now               = serverNow(ref);
 
     final nextSessionDate = studentUpcomingAsync.when(
       data: (sessions) {
-        debugPrint('👨‍🎓 Student upcoming sessions: ${sessions.length}');
-        for (final s in sessions) {
-          final d = s['sessionDate'] as DateTime?;
-          debugPrint('📅 Student session: $d | isAfter(now): ${d?.isAfter(now)}');
-        }
         final future = sessions.where((s) {
           final d = s['sessionDate'] as DateTime?;
           return d != null && d.isAfter(now);
         }).toList();
-        debugPrint('⏰ Student future sessions: ${future.length}');
         if (future.isEmpty) return null;
         // Sort by actual datetime (sessionDate + slotStart) to get the earliest session
         future.sort((a, b) {
@@ -144,7 +138,8 @@ class StudentHomeContent extends ConsumerWidget {
           }
           return da.compareTo(db);
         });
-        return future.first['sessionDate'] as DateTime?;
+        final next = future.first;
+        return next['slotStart'] as DateTime? ?? next['sessionDate'] as DateTime?;
       },
       loading: () => null,
       error: (_, __) => null,
@@ -258,6 +253,11 @@ class StudentHomeContent extends ConsumerWidget {
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 20),
                       _QuizAccessCard(studentId: studentId),
+                      const SizedBox(height: 20),
+                      _LevelStripCard(
+                        studentId: studentId,
+                        dateOfBirth: user?.dateOfBirth,
+                      ),
                       const SizedBox(height: 28),
                       _AssignmentsSection(studentId: studentId),
                       const SizedBox(height: 16),
@@ -1059,7 +1059,7 @@ class _AssignmentsSection extends ConsumerWidget {
   }
 }
 
-class _AssignmentCard extends StatelessWidget {
+class _AssignmentCard extends ConsumerWidget {
   final String mohaffezName;
   final String hifz;
   final String muraja;
@@ -1076,9 +1076,8 @@ class _AssignmentCard extends StatelessWidget {
     required this.onTap,
   });
 
-  static String _relativeDate(DateTime? date) {
+  static String _relativeDate(DateTime? date, DateTime now) {
     if (date == null) return '';
-    final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final target = DateTime(date.year, date.month, date.day);
     final diff = today.difference(target).inDays;
@@ -1091,13 +1090,13 @@ class _AssignmentCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     const colors = [_DS.teal500, _DS.green, _DS.purple];
     const bgs    = [_DS.teal50,  _DS.greenBg, _DS.purpleBg];
     final color  = colors[colorIndex % colors.length];
     final bg     = bgs[colorIndex % bgs.length];
 
-    final relDate = _relativeDate(sessionDate);
+    final relDate = _relativeDate(sessionDate, serverNow(ref));
 
     return Material(
       color: AppThemeConstants.transparent,
@@ -1247,15 +1246,15 @@ class _AssignmentRow extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEXT SESSION COUNTDOWN (IMPROVED)
 // ═══════════════════════════════════════════════════════════════════════════════
-class _NextSessionCountdown extends StatefulWidget {
+class _NextSessionCountdown extends ConsumerStatefulWidget {
   final DateTime? nextSessionDate;
   const _NextSessionCountdown({required this.nextSessionDate});
 
   @override
-  State<_NextSessionCountdown> createState() => _NextSessionCountdownState();
+  ConsumerState<_NextSessionCountdown> createState() => _NextSessionCountdownState();
 }
 
-class _NextSessionCountdownState extends State<_NextSessionCountdown> {
+class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
   Timer? _timer;
   Duration _remaining = Duration.zero;
 
@@ -1283,7 +1282,7 @@ class _NextSessionCountdownState extends State<_NextSessionCountdown> {
   void _recalculate() {
     final d = widget.nextSessionDate;
     if (d == null) { _remaining = Duration.zero; return; }
-    final diff = d.difference(DateTime.now());
+    final diff = d.difference(serverNow(ref));
     _remaining = diff.isNegative ? Duration.zero : diff;
   }
 
@@ -1543,6 +1542,131 @@ class _EmptyCard extends StatelessWidget {
               textAlign: TextAlign.center),
         ],
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEVEL STRIP CARD
+// ═══════════════════════════════════════════════════════════════════════════════
+class _LevelStripCard extends ConsumerWidget {
+  final String studentId;
+  final DateTime? dateOfBirth;
+  const _LevelStripCard({required this.studentId, required this.dateOfBirth});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(studentCompletedSessionsProvider(studentId));
+
+    return sessionsAsync.when(
+      loading: () => Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: _DS.goldBg,
+          borderRadius: _DS.r16,
+          border: Border.all(color: _DS.gold.withValues(alpha: 0.3)),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (sessions) {
+        final age = calculateAge(dateOfBirth);
+        final level = resolveLevel(sessions, age);
+        final progress = level.progressTo(sessions);
+        final toNext = level.sessionsToNext(sessions);
+        final isMax = level.nextMin == -1;
+        final subtitle =
+            isMax ? 'أعلى مستوى 🎉' : 'بقي $toNext جلسة للمستوى التالي';
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              context.push('/student-rewards');
+            },
+            borderRadius: _DS.r16,
+            child: Ink(
+              decoration: BoxDecoration(
+                color: _DS.goldBg,
+                borderRadius: _DS.r16,
+                border:
+                    Border.all(color: _DS.gold.withValues(alpha: 0.4), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: _DS.gold.withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _DS.gold.withValues(alpha: 0.15),
+                            borderRadius: _DS.r12,
+                          ),
+                          child: Center(
+                            child: Text(level.emoji,
+                                style: const TextStyle(fontSize: 22)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                level.name,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: _DS.text1,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style:
+                                    const TextStyle(fontSize: 12, color: _DS.text2),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 14,
+                          color: _DS.gold,
+                        ),
+                      ],
+                    ),
+                    if (!isMax) ...[
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: const BorderRadius.all(Radius.circular(4)),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 5,
+                          backgroundColor: _DS.gold.withValues(alpha: 0.15),
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(_DS.gold),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

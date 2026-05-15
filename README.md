@@ -1,4 +1,4 @@
-# Al-Mohaffez (المحفظ)
+# Mohafezy (محفظي)
 
 A Flutter platform connecting students with Quran teachers (mohaffezeen) for in-person, mosque, or online memorization sessions. The UI is Arabic-only (RTL).
 

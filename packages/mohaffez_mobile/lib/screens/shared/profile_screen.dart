@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/widgets/cached_avatar.dart';
+import '../../shared/widgets/meeting_links_sheet.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (consistent with home screens)
@@ -101,6 +102,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    }
+  }
+
+  String _meetingLinksSubtitle(UserModel user) {
+    final count = user.meetingLinks.values.where((v) => v.trim().isNotEmpty).length +
+        ((user.meetingLink?.trim().isNotEmpty ?? false) && user.meetingLinks.isEmpty ? 1 : 0);
+    if (count == 0) return 'أضف رابط Zoom أو Google Meet أو Teams';
+    if (count == 1) return 'تم إضافة رابط واحد';
+    return 'تم إضافة $count روابط';
+  }
+
+  Future<void> _showMeetingLinksSheet(UserModel user) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MeetingLinksSheet(user: user),
+    );
+    if (saved == true && mounted) {
+      ref.invalidate(currentUserProvider);
+      _showSnackBar('تم حفظ روابط الاجتماعات', isSuccess: true);
     }
   }
 
@@ -544,11 +566,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         ? 'تمت إضافة رابط YouTube'
                                         : 'أضف رابط YouTube لتلاوة مسجلة',
                                     color: _DS.red,
-                                    isLast: true,
                                     onTap: () {
                                       _youtubeController.text = user.youtubeVideoUrl ?? '';
                                       _showYoutubeLinkDialog(user.uid);
                                     },
+                                  ),
+                                  _ActionTile(
+                                    icon: Icons.videocam_rounded,
+                                    title: 'روابط الاجتماعات أونلاين',
+                                    subtitle: _meetingLinksSubtitle(user),
+                                    color: _DS.teal500,
+                                    isLast: true,
+                                    onTap: () => _showMeetingLinksSheet(user),
                                   ),
                                 ],
                               ),

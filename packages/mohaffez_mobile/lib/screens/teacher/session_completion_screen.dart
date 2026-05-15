@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../providers/quiz_access_provider.dart';
+import '../../services/meeting_launcher_service.dart';
 import '../../shared/widgets/interactive_quran_page.dart';
 
 class SessionCompletionScreen extends ConsumerStatefulWidget {
@@ -13,7 +14,12 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
   final String studentName;
   final String? previousHifz;
   final String? previousMuraja;
+  final String? previousHifzFromAyah;
+  final String? previousHifzToAyah;
+  final String? previousMurajaFromAyah;
+  final String? previousMurajaToAyah;
   final bool isLateCompletion;
+  final String? sessionType;
 
   const SessionCompletionScreen({
     super.key,
@@ -21,7 +27,12 @@ class SessionCompletionScreen extends ConsumerStatefulWidget {
     required this.studentName,
     this.previousHifz,
     this.previousMuraja,
+    this.previousHifzFromAyah,
+    this.previousHifzToAyah,
+    this.previousMurajaFromAyah,
+    this.previousMurajaToAyah,
     this.isLateCompletion = false,
+    this.sessionType,
   });
 
   @override
@@ -49,6 +60,10 @@ class _SessionCompletionScreenState
   // Ayah range for new muraja
   final newMurajaFromAyahController = TextEditingController();
   final newMurajaToAyahController = TextEditingController();
+
+  // "All surah" toggles (hides specific ayah range when checked)
+  bool newHifzAllSurah = false;
+  bool newMurajaAllSurah = false;
 
   // General session rating
   int sessionRating = 7;
@@ -101,18 +116,18 @@ class _SessionCompletionScreenState
             newMurajaAssignment: newMurajaController.text.trim().isEmpty
                 ? null
                 : newMurajaController.text.trim(),
-            // Ayah range for new hifz
-            newHifzFromAyah: newHifzFromAyahController.text.trim().isEmpty
+            // Ayah range for new hifz (null when "all surah" is selected)
+            newHifzFromAyah: newHifzAllSurah || newHifzFromAyahController.text.trim().isEmpty
                 ? null
                 : newHifzFromAyahController.text.trim(),
-            newHifzToAyah: newHifzToAyahController.text.trim().isEmpty
+            newHifzToAyah: newHifzAllSurah || newHifzToAyahController.text.trim().isEmpty
                 ? null
                 : newHifzToAyahController.text.trim(),
-            // Ayah range for new muraja
-            newMurajaFromAyah: newMurajaFromAyahController.text.trim().isEmpty
+            // Ayah range for new muraja (null when "all surah" is selected)
+            newMurajaFromAyah: newMurajaAllSurah || newMurajaFromAyahController.text.trim().isEmpty
                 ? null
                 : newMurajaFromAyahController.text.trim(),
-            newMurajaToAyah: newMurajaToAyahController.text.trim().isEmpty
+            newMurajaToAyah: newMurajaAllSurah || newMurajaToAyahController.text.trim().isEmpty
                 ? null
                 : newMurajaToAyahController.text.trim(),
             // General rating
@@ -222,6 +237,12 @@ class _SessionCompletionScreenState
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // Online session control panel
+              if (widget.sessionType == 'online') ...[
+                _OnlineSessionPanel(sessionId: widget.sessionId),
+                const SizedBox(height: 16),
+              ],
+
               // Late Warning Banner
               if (widget.isLateCompletion)
                 Container(
@@ -348,6 +369,25 @@ class _SessionCompletionScreenState
                                   widget.previousHifz!,
                                   style: const TextStyle(fontSize: 14),
                                 ),
+                                if (widget.previousHifzFromAyah != null &&
+                                    widget.previousHifzToAyah != null) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.format_list_numbered,
+                                          size: 14, color: AppThemeConstants.success),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'من آية ${widget.previousHifzFromAyah} إلى آية ${widget.previousHifzToAyah}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppThemeConstants.success,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -412,6 +452,25 @@ class _SessionCompletionScreenState
                                   widget.previousMuraja!,
                                   style: const TextStyle(fontSize: 14),
                                 ),
+                                if (widget.previousMurajaFromAyah != null &&
+                                    widget.previousMurajaToAyah != null) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.format_list_numbered,
+                                          size: 14, color: AppThemeConstants.accentBlue),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'من آية ${widget.previousMurajaFromAyah} إلى آية ${widget.previousMurajaToAyah}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppThemeConstants.accentBlue,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -605,49 +664,66 @@ class _SessionCompletionScreenState
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      // Hifz ayah range
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: newHifzFromAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'من آية رقم',
-                                hintText: 'مثال: 1',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.success,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: newHifzToAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'إلى آية رقم',
-                                hintText: 'مثال: 10',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.success,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 4),
+                      // "All surah" toggle for hifz
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: newHifzAllSurah,
+                        onChanged: (val) =>
+                            setState(() => newHifzAllSurah = val!),
+                        activeColor: AppThemeConstants.success,
+                        title: const Text(
+                          'كل السورة (بدون تحديد آيات)',
+                          style: TextStyle(fontSize: 13, color: AppThemeConstants.success),
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
                       ),
+                      // Hifz ayah range (hidden when "all surah" is checked)
+                      if (!newHifzAllSurah) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: newHifzFromAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'من آية رقم',
+                                  hintText: 'مثال: 1',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.success,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: newHifzToAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'إلى آية رقم',
+                                  hintText: 'مثال: 10',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.success,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       // New muraja
                       TextFormField(
@@ -665,49 +741,66 @@ class _SessionCompletionScreenState
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      // Muraja ayah range
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: newMurajaFromAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'من آية رقم',
-                                hintText: 'مثال: 1',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.accentBlue,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: newMurajaToAyahController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'إلى آية رقم',
-                                hintText: 'مثال: 50',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.format_list_numbered,
-                                  color: AppThemeConstants.accentBlue,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 4),
+                      // "All surah" toggle for muraja
+                      CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: newMurajaAllSurah,
+                        onChanged: (val) =>
+                            setState(() => newMurajaAllSurah = val!),
+                        activeColor: AppThemeConstants.accentBlue,
+                        title: const Text(
+                          'كل السورة (بدون تحديد آيات)',
+                          style: TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
+                        ),
+                        controlAffinity: ListTileControlAffinity.leading,
                       ),
+                      // Muraja ayah range (hidden when "all surah" is checked)
+                      if (!newMurajaAllSurah) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: newMurajaFromAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'من آية رقم',
+                                  hintText: 'مثال: 1',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.accentBlue,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: newMurajaToAyahController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'إلى آية رقم',
+                                  hintText: 'مثال: 50',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.format_list_numbered,
+                                    color: AppThemeConstants.accentBlue,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1032,5 +1125,133 @@ class _QuizToggleCard extends ConsumerWidget {
   }
 }
 
+class _OnlineSessionPanel extends ConsumerWidget {
+  final String sessionId;
+  const _OnlineSessionPanel({required this.sessionId});
 
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final infoAsync = ref.watch(meetingInfoProvider(sessionId));
+    final info = infoAsync.valueOrNull;
+    final url = info?.url ?? '';
+    final studentJoined = info?.studentJoinedAt != null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: AppThemeConstants.tealGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.videocam_rounded,
+                    color: AppThemeConstants.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'الجلسة مفتوحة',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.white,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'افتح تطبيق الاجتماع في نافذة منفصلة وعد إلى هذه الشاشة لتسجيل النتائج',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppThemeConstants.white,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      studentJoined
+                          ? Icons.check_circle
+                          : Icons.hourglass_top_rounded,
+                      color: AppThemeConstants.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      studentJoined ? 'الطالب انضم' : 'بانتظار الطالب',
+                      style: const TextStyle(
+                        color: AppThemeConstants.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: url.isEmpty
+                  ? null
+                  : () => MeetingLauncherService.launch(
+                        context: context,
+                        ref: ref,
+                        info: info!,
+                        sessionId: sessionId,
+                        role: 'mohaffez',
+                      ),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: const Text(
+                'افتح الاجتماع',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.white,
+                foregroundColor: AppThemeConstants.primary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 

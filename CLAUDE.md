@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This App Is
 
-**Al-Mohaffez** (المحفظ) — a Flutter app connecting students with Quran teachers (mohaffezeen) for in-person, mosque, or online memorization sessions. The app has three roles: **student**, **mohaffez** (teacher), and **admin**. The UI is Arabic-only, RTL throughout.
+**Mohafezy** (محفظي) — a Flutter app connecting students with Quran teachers (mohaffezeen) for in-person, mosque, or online memorization sessions. The app has three roles: **student**, **mohaffez** (teacher), and **admin**. The UI is Arabic-only, RTL throughout.
 
 ---
 

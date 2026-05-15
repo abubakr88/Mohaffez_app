@@ -17,11 +17,6 @@ val dotenv = Properties().apply {
     }
 }
 
-val mapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY")?.takeIf { it.isNotBlank() }
-    ?: (project.findProperty("GOOGLE_MAPS_API_KEY") as String?)?.takeIf { it.isNotBlank() }
-    ?: dotenv.getProperty("GOOGLE_MAPS_API_KEY")?.takeIf { it.isNotBlank() }
-    ?: ""
-
 // Load release signing config from android/key.properties (never commit this file)
 val keystoreProperties = Properties().apply {
     val keystorePropertiesFile = rootProject.file("key.properties")
@@ -50,7 +45,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
-        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     flavorDimensions += "environment"

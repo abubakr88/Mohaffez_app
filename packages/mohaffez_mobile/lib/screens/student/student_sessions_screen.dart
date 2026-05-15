@@ -1,4 +1,4 @@
-﻿// FILE: lib/screens/student_sessions_screen.dart
+// FILE: lib/screens/student_sessions_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/widgets/online_meeting_button.dart';
 import '../../shared/utils/time_formatter.dart';
 
 DateTime? _toDateTime(dynamic value) {
@@ -141,7 +142,7 @@ class _StudentSessionsScreenState
   // ─────────────────────────────────────────────────
 
   Map<String, dynamic> _computeFilteredData(List<Map<String, dynamic>> sessions) {
-    final now = DateTime.now();
+    final now = serverNow(ref);
     final todayStart = DateTime(now.year, now.month, now.day);
     final all = sessions.where((s) {
       final st = (s['status'] as String?)?.toLowerCase();
@@ -151,7 +152,15 @@ class _StudentSessionsScreenState
     final upcoming = all.where((s) {
       final d = _toDateTime(s['sessionDate']);
       return d != null && !d.isBefore(todayStart);
-    }).toList();
+    }).toList()
+      ..sort((a, b) {
+        final aDate = _toDateTime(a['slotStart']) ?? _toDateTime(a['sessionDate']);
+        final bDate = _toDateTime(b['slotStart']) ?? _toDateTime(b['sessionDate']);
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return aDate.compareTo(bDate);
+      });
 
     final completed = all.where((s) {
       final d = _toDateTime(s['sessionDate']);
@@ -601,13 +610,13 @@ class _StatDivider extends StatelessWidget {
 // SESSION CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerWidget {
   final Map<String, dynamic> session;
 
   const _SessionCard({required this.session});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final mohaffezName = (session['mohaffezName'] as String?) ?? 'محفظ';
     final sessionType = (session['sessionType'] as String?) ?? 'home';
     final location = (session['imamAddressText'] as String?) ?? '';
@@ -616,7 +625,7 @@ class _SessionCard extends StatelessWidget {
     final hifz = (session['hifzAssignment'] as String?) ?? '';
     final muraja = (session['murajaAssignment'] as String?) ?? '';
 
-    final now = DateTime.now();
+    final now = serverNow(ref);
     final todayStart = DateTime(now.year, now.month, now.day);
     final isUpcoming =
         sessionDate != null && !sessionDate.isBefore(todayStart);
@@ -637,9 +646,23 @@ class _SessionCard extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        final sessionId = session['sessionId'] as String?;
+        final sessionId = (session['id'] as String?) ?? (session['sessionId'] as String?);
         if (sessionId != null && sessionId.isNotEmpty) {
-          context.go('/session/$sessionId');
+          try {
+            final sessionModel = SessionModel.fromJson(session);
+            context.pushNamed(
+              'session-details',
+              pathParameters: {'id': sessionId},
+              extra: sessionModel,
+            );
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('تعذّر فتح الجلسة، يرجى المحاولة مرة أخرى'),
+                backgroundColor: AppThemeConstants.error,
+              ),
+            );
+          }
         }
       },
       borderRadius: AppThemeConstants.borderRadiusLg,
@@ -772,6 +795,24 @@ class _SessionCard extends StatelessWidget {
                               label: 'مراجعة',
                               text: muraja,
                               color: AppThemeConstants.info),
+                      ],
+
+                      // Online meeting join button (visible only when sessionType
+                      // is online + a meeting exists; widget hides itself otherwise)
+                      if (sessionType == 'online') ...[
+                        const SizedBox(height: 12),
+                        Builder(builder: (ctx) {
+                          final sid =
+                              (session['id'] as String?) ??
+                              (session['sessionId'] as String?) ??
+                              '';
+                          if (sid.isEmpty) return const SizedBox.shrink();
+                          return OnlineMeetingButton(
+                            sessionId: sid,
+                            sessionType: sessionType,
+                            role: 'student',
+                          );
+                        }),
                       ],
                     ],
                   ),

@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../shared/utils/time_formatter.dart';
+import '../../shared/widgets/meeting_provider_picker.dart';
 
 class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {
   final String? requestId;
@@ -33,6 +34,7 @@ class ConfirmBundleSessionScreen extends ConsumerStatefulWidget {
 class _ConfirmBundleSessionScreenState
     extends ConsumerState<ConfirmBundleSessionScreen> {
   bool _isLoading = false;
+  String? _selectedProvider;
   ActiveBundleInfo? _activeSubscription;
   bool _loadingSubscription = true;
   String? _subscriptionError;
@@ -104,9 +106,9 @@ class _ConfirmBundleSessionScreenState
         mohaffezPhone: r.mohaffezPhone,
         sessionType: r.sessionType,
         preferredTimeSlot: r.preferredTimeSlot,
-        slotDate: parseTs(r.slotDate).toIso8601String(),
-        slotStart: parseTs(r.slotStart).toIso8601String(),
-        slotEnd: parseTs(r.slotEnd).toIso8601String(),
+        slotDate: parseTs(r.slotDate).toUtc().toIso8601String(),
+        slotStart: parseTs(r.slotStart).toUtc().toIso8601String(),
+        slotEnd: parseTs(r.slotEnd).toUtc().toIso8601String(),
         imamAddressText: r.imamAddressText,
         imamAddressLat: r.imamAddressLat,
         imamAddressLng: r.imamAddressLng,
@@ -295,6 +297,8 @@ class _ConfirmBundleSessionScreenState
         planType: 'bundle',
         sessionsCount: sub.totalSessions,
         paymentAmount: 0,
+        preferredProvider:
+            slotContext.sessionType == 'online' ? _selectedProvider : null,
       );
 
       if (!mounted) return;
@@ -607,13 +611,26 @@ class _ConfirmBundleSessionScreenState
             ),
           ],
 
+          if (slotContext.sessionType == 'online') ...[
+            const SizedBox(height: 16),
+            MeetingProviderPicker(
+              teacherId: slotContext.mohaffezId,
+              selected: _selectedProvider,
+              onChanged: (id) => setState(() => _selectedProvider = id),
+            ),
+          ],
+
           const SizedBox(height: 24),
 
           // ── Confirm button ────────────────────────────────────────────
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _confirmSession,
+              onPressed: (_isLoading ||
+                      (slotContext.sessionType == 'online' &&
+                          _selectedProvider == null))
+                  ? null
+                  : _confirmSession,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppThemeConstants.secondary,
                 foregroundColor: AppThemeConstants.surface,

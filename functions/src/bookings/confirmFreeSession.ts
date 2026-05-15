@@ -43,6 +43,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     mohaffezName,
     studentName,
     sessionType,
+    preferredProvider,
     preferredTimeSlot,
     slotDate,
     slotStart,
@@ -386,6 +387,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         studentName,
         mohaffezName,
         sessionType,
+        preferredProvider:
+          sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
+            ? preferredProvider
+            : null,
         preferredTimeSlot,
         slotDate: slotDateTimestamp,
         slotStart: slotStartTimestamp,
@@ -412,6 +417,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       mohaffezName,
       studentName,
       sessionType,
+      preferredProvider:
+        sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
+          ? preferredProvider
+          : null,
       location: imamAddressText || "",
       mohaffezPhone: mohaffezPhone || null,
       imamAddressLat: imamAddressLat || null,

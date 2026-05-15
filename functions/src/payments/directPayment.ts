@@ -38,6 +38,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       studentName,
       amount,
       sessionType,
+      preferredProvider,
       preferredTimeSlot,
       slotDate,
       slotStart,
@@ -153,6 +154,10 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           mohaffezId,
           mohaffezName,
           sessionType,
+          preferredProvider:
+            sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
+              ? preferredProvider
+              : null,
           preferredTimeSlot,
           slotDate:  admin.firestore.Timestamp.fromDate(parsedSlotDate),
           slotStart: admin.firestore.Timestamp.fromDate(parsedSlotStart),
@@ -199,6 +204,10 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         commissionAmount: (amount as number) * commissionRate,
         commissionRate,
         sessionType,
+        preferredProvider:
+          sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
+            ? preferredProvider
+            : null,
         preferredTimeSlot,
         sessionDate: admin.firestore.Timestamp.fromDate(parsedSlotDate),
         slotStart:   admin.firestore.Timestamp.fromDate(parsedSlotStart),
@@ -392,6 +401,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           mohaffezName:        dp.mohaffezName,
           studentName:         dp.studentName,
           sessionType:         dp.sessionType,
+          preferredProvider:   (reqData.preferredProvider as string | undefined) ?? null,
           preferredTimeSlot:   dp.preferredTimeSlot,
           sessionDate,
           slotStart,

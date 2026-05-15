@@ -10,6 +10,7 @@ import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../services/meeting_launcher_service.dart';
 
 class UpcomingSessionsScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -329,10 +330,46 @@ class SessionCard extends ConsumerWidget {
     required this.mohaffezId,
   });
 
+  Future<void> _showMissingMeetingLinkDialog(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('أضف رابط الاجتماع أولاً',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          content: const Text(
+            'لم تقم بإضافة رابط Zoom أو Google Meet في ملفك الشخصي. أضفه مرة واحدة وسيُستخدم لجميع جلساتك أونلاين.',
+            style: TextStyle(height: 1.6),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('لاحقاً'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.push('/profile');
+              },
+              icon: const Icon(Icons.open_in_new_rounded, size: 16),
+              label: const Text('فتح الملف الشخصي'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ✅ Check if session can be completed (30 min before → 24 hours after)
-  bool _canCompleteSession(DateTime sessionDate, String timeSlot, int earlyMinutes) {
+  bool _canCompleteSession(DateTime sessionDate, String timeSlot, int earlyMinutes, WidgetRef ref) {
     try {
-      final now = DateTime.now();
+      final now = serverNow(ref);
 
       // Parse time slot (e.g., "08:00" or "08:00-09:00")
       final timeParts = timeSlot.split('-')[0].split(':');
@@ -350,7 +387,7 @@ class SessionCard extends ConsumerWidget {
 
       // Window: 30 min before → 24 hours after
       final canStartFrom = sessionTime.subtract(Duration(minutes: earlyMinutes));
-      final canCompleteUntil = sessionTime.add(const Duration(hours: 24));
+      final canCompleteUntil = sessionTime.add(const  Duration(hours: 24));
 
       return now.isAfter(canStartFrom) && now.isBefore(canCompleteUntil);
     } catch (e) {
@@ -359,9 +396,9 @@ class SessionCard extends ConsumerWidget {
   }
 
   // ✅ Check if session is late (more than 15 min after scheduled time)
-  bool _isSessionLate(DateTime sessionDate, String timeSlot) {
+  bool _isSessionLate(DateTime sessionDate, String timeSlot, WidgetRef ref) {
     try {
-      final now = DateTime.now();
+      final now = serverNow(ref);
       final timeParts = timeSlot.split('-')[0].split(':');
       final hour = int.parse(timeParts[0]);
       final minute = timeParts.length > 1 ? int.parse(timeParts[1]) : 0;
@@ -638,7 +675,7 @@ class SessionCard extends ConsumerWidget {
     final earlyMinutes = ref
         .watch(systemConfigProvider)
         .valueOrNull
-        ?.earlyCompletionMinutes ?? 30;
+        ?.meetingStartLeadTimeMinutes ?? 60;
     final studentName = session['studentName'] as String? ?? 'غير معروف';
     final sessionDate = session['sessionDate'] as DateTime?;
     final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
@@ -651,18 +688,18 @@ class SessionCard extends ConsumerWidget {
         session['imamAddressText'] as String? ?? session['location'] as String?;
 
     final bool canComplete =
-        sessionDate != null && _canCompleteSession(sessionDate, timeSlot, earlyMinutes);
+        sessionDate != null && _canCompleteSession(sessionDate, timeSlot, earlyMinutes, ref);
     final bool isLate =
-        sessionDate != null && _isSessionLate(sessionDate, timeSlot);
+        sessionDate != null && _isSessionLate(sessionDate, timeSlot, ref);
     final hoursUntilSession =
-        sessionDate?.difference(DateTime.now()).inHours ?? 999;
+        sessionDate?.difference(serverNow(ref)).inHours ?? 999;
     final showCommunication =
         hoursUntilSession <= 24 && hoursUntilSession >= -2;
 
     // Calculate days until session
     String getTimeUntil() {
       if (sessionDate == null) return '';
-      final now = DateTime.now();
+      final now = serverNow(ref);
       final dateOnly =
           DateTime(sessionDate.year, sessionDate.month, sessionDate.day);
       final today = DateTime(now.year, now.month, now.day);
@@ -892,8 +929,39 @@ class SessionCard extends ConsumerWidget {
                 ),
               ),
 
-              // ✅ ACTION BUTTONS - Based on Session Time
-              if (canComplete) ...[
+              // ✅ ACTION BUTTONS - Online sessions get a dedicated start button
+              // gated by lead-time guard + concurrent-session guard inside
+              // markMeetingStarted. Other session types stay gated by canComplete.
+              if (sessionType == 'online') ...[
+                _TeacherStartSessionButton(
+                  sessionId: session['id'] as String,
+                  mohaffezId: mohaffezId,
+                  onAfterStart: () async {
+                    final previousAssignment =
+                        await _getPreviousAssignment(studentId);
+                    if (!context.mounted) return;
+                    final result = await context.push<bool>(
+                      '/complete-session/${session['id'] as String}',
+                      extra: {
+                        'studentName': studentName,
+                        'previousHifz': previousAssignment['hifz'],
+                        'previousMuraja': previousAssignment['muraja'],
+                        'previousHifzFromAyah': previousAssignment['hifzFromAyah'],
+                        'previousHifzToAyah': previousAssignment['hifzToAyah'],
+                        'previousMurajaFromAyah': previousAssignment['murajaFromAyah'],
+                        'previousMurajaToAyah': previousAssignment['murajaToAyah'],
+                        'isLateCompletion': isLate,
+                        'sessionType': sessionType,
+                      },
+                    );
+                    if (result == true && context.mounted) {
+                      ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                      ref.invalidate(completedSessionsProvider(mohaffezId));
+                    }
+                  },
+                  onMissingLink: () => _showMissingMeetingLinkDialog(context),
+                ),
+              ] else if (canComplete) ...[
                 // Session is ACTIVE - Can complete
                 Row(
                   children: [
@@ -929,6 +997,10 @@ class SessionCard extends ConsumerWidget {
                               'studentName': studentName,
                               'previousHifz': previousAssignment['hifz'],
                               'previousMuraja': previousAssignment['muraja'],
+                              'previousHifzFromAyah': previousAssignment['hifzFromAyah'],
+                              'previousHifzToAyah': previousAssignment['hifzToAyah'],
+                              'previousMurajaFromAyah': previousAssignment['murajaFromAyah'],
+                              'previousMurajaToAyah': previousAssignment['murajaToAyah'],
                               'isLateCompletion': isLate,
                             },
                           );
@@ -1044,5 +1116,153 @@ class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
         ],
       ),
     );
+  }
+}
+
+/// Teacher's "ابدأ الجلسة" button. Reads `meetingButtonStateProvider` so it
+/// disables itself before `sessionDate − leadTime` and changes label after
+/// the teacher has clicked start. All the actual work of writing
+/// `meetingStartedAt` (with lead-time + concurrent-session guards) lives in
+/// `MeetingLauncherService.markMeetingStarted`.
+class _TeacherStartSessionButton extends ConsumerWidget {
+  final String sessionId;
+  final String mohaffezId;
+  final Future<void> Function() onAfterStart;
+  final Future<void> Function() onMissingLink;
+
+  const _TeacherStartSessionButton({
+    required this.sessionId,
+    required this.mohaffezId,
+    required this.onAfterStart,
+    required this.onMissingLink,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(meetingButtonStateProvider(
+        (sessionId: sessionId, role: 'mohaffez')));
+    final infoAsync = ref.watch(meetingInfoProvider(sessionId));
+    final info = infoAsync.valueOrNull;
+    final leadTimeMinutes = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.meetingStartLeadTimeMinutes ??
+        60;
+
+    String label;
+    IconData icon;
+    bool enabled;
+
+    switch (state) {
+      case MeetingButtonState.tooEarly:
+        final sd = info?.slotStart ?? info?.sessionDate;
+        String countdown = '';
+        if (sd != null) {
+          final earliestStart =
+              sd.subtract(Duration(minutes: leadTimeMinutes));
+          final diff = earliestStart.difference(DateTime.now());
+          if (diff.inHours > 0) {
+            countdown =
+                ' (يمكنك البدء بعد ${diff.inHours}س ${diff.inMinutes.remainder(60)}د)';
+          } else if (diff.inMinutes > 0) {
+            countdown = ' (يمكنك البدء بعد ${diff.inMinutes}د)';
+          }
+        }
+        label = 'لم يحن وقت الجلسة بعد$countdown';
+        icon = Icons.lock_clock_rounded;
+        enabled = false;
+        break;
+      case MeetingButtonState.inProgress:
+        label = 'تم بدء الجلسة — متابعة';
+        icon = Icons.open_in_new_rounded;
+        enabled = true;
+        break;
+      case MeetingButtonState.ended:
+      case MeetingButtonState.teacherLate:
+        label = 'انتهت';
+        icon = Icons.videocam_off_rounded;
+        enabled = false;
+        break;
+      case MeetingButtonState.pendingMeetingLink:
+      case MeetingButtonState.hidden:
+      case MeetingButtonState.waitingForTeacher:
+      case MeetingButtonState.ready:
+        label = 'ابدأ الجلسة';
+        icon = Icons.videocam_rounded;
+        enabled = state != MeetingButtonState.pendingMeetingLink;
+        break;
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: enabled ? () => _onTap(context, ref) : null,
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: state == MeetingButtonState.inProgress
+              ? AppThemeConstants.success
+              : AppThemeConstants.primary,
+          foregroundColor: AppThemeConstants.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onTap(BuildContext context, WidgetRef ref) async {
+    final leadTimeMinutes = ref
+            .read(systemConfigProvider)
+            .valueOrNull
+            ?.meetingStartLeadTimeMinutes ??
+        60;
+    final result = await MeetingLauncherService.markMeetingStarted(
+      sessionId: sessionId,
+      teacherId: mohaffezId,
+      leadTimeMinutes: leadTimeMinutes,
+    );
+    if (!context.mounted) return;
+    if (result.error != null) {
+      switch (result.error) {
+        case 'noLink':
+          await onMissingLink();
+          return;
+        case 'tooEarly':
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppThemeConstants.warning,
+              content: Text(
+                'لا يمكن بدء الجلسة قبل موعدها بأكثر من $leadTimeMinutes دقيقة',
+              ),
+            ),
+          );
+          return;
+        case 'concurrent':
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppThemeConstants.error,
+              content: Text(
+                'لديك جلسة أخرى مفتوحة بالفعل — أنهِها قبل بدء جلسة جديدة',
+              ),
+            ),
+          );
+          return;
+        default:
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppThemeConstants.error,
+              content: Text('تعذّر بدء الجلسة، حاول مرة أخرى'),
+            ),
+          );
+          return;
+      }
+    }
+    await onAfterStart();
   }
 }

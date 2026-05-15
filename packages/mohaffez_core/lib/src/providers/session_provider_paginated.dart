@@ -168,9 +168,9 @@ final upcomingSessionsProvider =
         .limit(100)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
+      final list = snapshot.docs.map((doc) {
         final data = doc.data();
-        return {
+        return <String, dynamic>{
           'id': doc.id,
           'studentName': data['studentName'] as String? ?? '',
           'mohaffezName': data['mohaffezName'] as String? ?? '',
@@ -195,6 +195,16 @@ final upcomingSessionsProvider =
           'subscriptionId': data['subscriptionId'] as String?,
         };
       }).toList();
+      // Secondary sort by time-of-day since Firestore only orders by date (day-level).
+      list.sort((a, b) {
+        final aDate = a['sessionDate'] as DateTime?;
+        final bDate = b['sessionDate'] as DateTime?;
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return aDate.compareTo(bDate);
+      });
+      return list;
     });
   },
 );
@@ -1236,6 +1246,10 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
       final updates = <String, dynamic>{
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
+        // Stamp `meetingEndedAt` so the online-meeting button on the student
+        // side flips to MeetingButtonState.ended (renders "انتهت الجلسة")
+        // immediately, instead of staying on the active "انضم" button.
+        'meetingEndedAt': FieldValue.serverTimestamp(),
         'sessionRating': sessionRating,
         'isLateCompletion': isLateCompletion,
         'quizUnlocked': false,
@@ -1383,8 +1397,28 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
     }
   }
 
+  // Batch-fetch photoUrl from users collection (chunked to respect Firestore whereIn limit of 30)
+  final studentIds = students.keys.toList();
+  final Map<String, String?> photoUrls = {};
+  for (int i = 0; i < studentIds.length; i += 30) {
+    final chunk = studentIds.sublist(i, i + 30 > studentIds.length ? studentIds.length : i + 30);
+    final userDocs = await FirebaseFirestore.instance
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: chunk)
+        .get();
+    for (final doc in userDocs.docs) {
+      final url = doc.data()['photoUrl'] as String?;
+      if (url != null && url.isNotEmpty) {
+        photoUrls[doc.id] = url;
+      }
+    }
+  }
+
   return students.values
-      .map((s) => s.copyWith(sessionCount: counts[s.studentId] ?? 1))
+      .map((s) => s.copyWith(
+            sessionCount: counts[s.studentId] ?? 1,
+            photoUrl: photoUrls[s.studentId],
+          ))
       .toList();
 });
 

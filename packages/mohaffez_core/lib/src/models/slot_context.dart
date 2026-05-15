@@ -5,6 +5,7 @@ class SlotContext {
   final String mohaffezName;
   final String? mohaffezPhone;
   final String sessionType; // 'online', 'home', 'mosque'
+  final String? preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (only for online)
   final String preferredTimeSlot; // e.g. "10:00-11:00"
   final String slotDate; // ISO8601 string
   final String slotStart; // ISO8601 string
@@ -19,6 +20,7 @@ class SlotContext {
     required this.mohaffezName,
     this.mohaffezPhone,
     required this.sessionType,
+    this.preferredProvider,
     required this.preferredTimeSlot,
     required this.slotDate,
     required this.slotStart,
@@ -34,6 +36,7 @@ class SlotContext {
     String? mohaffezName,
     String? mohaffezPhone,
     String? sessionType,
+    String? preferredProvider,
     String? preferredTimeSlot,
     String? slotDate,
     String? slotStart,
@@ -48,6 +51,7 @@ class SlotContext {
       mohaffezName: mohaffezName ?? this.mohaffezName,
       mohaffezPhone: mohaffezPhone ?? this.mohaffezPhone,
       sessionType: sessionType ?? this.sessionType,
+      preferredProvider: preferredProvider ?? this.preferredProvider,
       preferredTimeSlot: preferredTimeSlot ?? this.preferredTimeSlot,
       slotDate: slotDate ?? this.slotDate,
       slotStart: slotStart ?? this.slotStart,
@@ -65,6 +69,7 @@ class SlotContext {
       'mohaffezName': mohaffezName,
       'mohaffezPhone': mohaffezPhone,
       'sessionType': sessionType,
+      if (preferredProvider != null) 'preferredProvider': preferredProvider,
       'preferredTimeSlot': preferredTimeSlot,
       'slotDate': slotDate,
       'slotStart': slotStart,

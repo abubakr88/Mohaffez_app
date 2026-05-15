@@ -1,32 +1,23 @@
 @echo off
-title Mohaffez - Build Release APK (Direct Install)
+title Mohaffez - Build Release Web
 color 0B
 
 echo.
 echo ============================================================
-echo   Mohaffez App - Release APK (Direct Install / Testing)
+echo   Mohaffez App - Release Web Build (Browser / Hosting)
 echo ============================================================
 echo.
 
 REM Store repo root for .env reference
 set REPO_ROOT=%~dp0
 
-REM Switch to the mobile package
+REM Switch to the mobile package (web target)
 cd /d "%REPO_ROOT%packages\mohaffez_mobile"
 
 REM Check .env exists (in repo root)
 if not exist "%REPO_ROOT%.env" (
     echo [ERROR] .env file not found in project root.
-    echo         Create it and add your API keys.
-    pause
-    exit /b 1
-)
-
-REM Check key.properties exists
-if not exist "android\key.properties" (
-    echo [ERROR] android\key.properties not found.
-    echo         Create packages\mohaffez_mobile\android\key.properties
-    echo         and fill in your keystore details.
+    echo         Create it and add your API keys / dart-define values.
     pause
     exit /b 1
 )
@@ -40,8 +31,8 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo [2/3] Building release APK (prod flavor)...
-call flutter build apk --flavor prod -t lib/main.dart --dart-define-from-file="%REPO_ROOT%.env" --release
+echo [2/3] Building release web app...
+call flutter build web --release --pwa-strategy offline-first --source-maps --dart-define-from-file="%REPO_ROOT%.env"
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Build failed. Check the output above.
     pause
@@ -52,8 +43,14 @@ echo.
 echo [3/3] Done!
 echo.
 echo ============================================================
-echo   Output: packages\mohaffez_mobile\build\app\outputs\flutter-apk\app-prod-release.apk
-echo   Install directly on a device for testing.
+echo   Output: packages\mohaffez_mobile\build\web
+echo.
+echo   To deploy to Hostinger:
+echo     1. Open hPanel ^> File Manager (or connect via FTP)
+echo     2. Upload ALL contents of build\web\ to public_html\
+echo        (replace existing files)
+echo     3. Make sure .htaccess is uploaded (hidden file) ^-^-
+echo        required for SPA deep-link routing.
 echo ============================================================
 echo.
 pause

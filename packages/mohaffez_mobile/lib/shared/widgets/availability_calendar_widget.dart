@@ -18,7 +18,7 @@ class AvailabilityCalendarWidget extends StatelessWidget {
     final now = DateTime.now();
     final days = List.generate(
       daysToShow,
-      (index) => now.add(Duration(days: index)),
+      (index) => now.add(Duration(days: daysToShow - 1 - index)),
     );
 
     return SizedBox(

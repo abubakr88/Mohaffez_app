@@ -58,6 +58,8 @@ export 'src/providers/session_provider_paginated.dart';
 export 'src/providers/student_rewards_provider.dart';
 export 'src/providers/subscription_provider.dart';
 export 'src/providers/suspension_provider.dart';
+export 'src/providers/online_meeting_provider.dart';
+export 'src/providers/server_clock_provider.dart';
 export 'src/providers/system_config_provider.dart';
 export 'src/providers/teacher_setup_provider.dart';
 export 'src/providers/user_provider.dart';

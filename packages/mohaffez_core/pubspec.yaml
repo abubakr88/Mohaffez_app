@@ -42,6 +42,9 @@ dependencies:
   # Network
   connectivity_plus: ^6.0.5
 
+  # Server-time sync (avoid trusting device clock)
+  ntp: ^2.0.0
+
   # Auth providers
   google_sign_in: ^6.2.1
 

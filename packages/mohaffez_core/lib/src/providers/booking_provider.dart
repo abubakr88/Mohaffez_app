@@ -199,6 +199,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     double? paymentAmount,
     int? sessionsCount,
     String? planType,
+    String? preferredProvider,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -237,6 +238,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         paymentAmount: paymentAmount,
         sessionsCount: sessionsCount,
         planType: planType,
+        preferredProvider: preferredProvider,
       );
 
       if (result.isSuccess) {
@@ -504,6 +506,7 @@ class BookingService {
     double? paymentAmount,
     int? sessionsCount,
     String? planType,
+    String? preferredProvider,
   }) async {
     final SlotLockResult? lockResult = slotLockId != null
         ? SlotLockResult(success: true, lockId: slotLockId)
@@ -550,6 +553,8 @@ class BookingService {
         'studentName': studentName,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
+        if (sessionType == 'online' && preferredProvider != null)
+          'preferredProvider': preferredProvider,
         'preferredTimeSlot': preferredTimeSlot,
         'slotDate': actualSlotDate.toUtc().toIso8601String(),
         'slotStart': slotStart.toUtc().toIso8601String(),

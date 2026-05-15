@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -132,21 +132,14 @@ class MohaffezHomeContent extends ConsumerWidget {
     final user             = ref.watch(currentUserProvider).value;
     final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
     final pendingCount     = ref.watch(pendingRequestsCountProvider(mohaffezId));
-    final now              = DateTime.now();
+    final now              = serverNow(ref);
 
     final nextSessionDate = upcomingSessions.when(
       data: (sessions) {
-        debugPrint('🏠 Upcoming sessions count: ${sessions.length}');
-        for (final s in sessions) {
-          final d = s['sessionDate'] as DateTime?;
-          final slot = s['preferredTimeSlot'] ?? s['timeSlot'] ?? 'N/A';
-          debugPrint('📅 Session: $d | timeSlot: $slot | isAfter(now): ${d?.isAfter(now)} | now: $now');
-        }
         final future = sessions.where((s) {
           final d = s['sessionDate'] as DateTime?;
           return d != null && d.isAfter(now);
         }).toList();
-        debugPrint('⏰ Future sessions count: ${future.length}');
         if (future.isEmpty) return null;
         // Sort by actual datetime (sessionDate + slotStart) to get the earliest session
         future.sort((a, b) {
@@ -837,15 +830,15 @@ class _ActionCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEXT SESSION COUNTDOWN (IMPROVED)
 // ═══════════════════════════════════════════════════════════════════════════════
-class _NextSessionCountdown extends StatefulWidget {
+class _NextSessionCountdown extends ConsumerStatefulWidget {
   final DateTime? nextSessionDate;
   const _NextSessionCountdown({required this.nextSessionDate});
 
   @override
-  State<_NextSessionCountdown> createState() => _NextSessionCountdownState();
+  ConsumerState<_NextSessionCountdown> createState() => _NextSessionCountdownState();
 }
 
-class _NextSessionCountdownState extends State<_NextSessionCountdown> {
+class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
   Timer? _timer;
   Duration _remaining = Duration.zero;
 
@@ -873,7 +866,7 @@ class _NextSessionCountdownState extends State<_NextSessionCountdown> {
   void _recalculate() {
     final d = widget.nextSessionDate;
     if (d == null) { _remaining = Duration.zero; return; }
-    final diff = d.difference(DateTime.now());
+    final diff = d.difference(serverNow(ref));
     _remaining = diff.isNegative ? Duration.zero : diff;
   }
 
@@ -1135,7 +1128,7 @@ class _UpcomingSection extends ConsumerWidget {
   }
 }
 
-class _SessionCard extends StatelessWidget {
+class _SessionCard extends ConsumerWidget {
   final String studentName;
   final DateTime? sessionDate;
   final String timeSlot;
@@ -1150,9 +1143,8 @@ class _SessionCard extends StatelessWidget {
     this.onTap,
   });
 
-  static String _relativeDate(DateTime? date) {
+  static String _relativeDate(DateTime? date, DateTime now) {
     if (date == null) return '';
-    final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final target = DateTime(date.year, date.month, date.day);
     final diff = target.difference(today).inDays;
@@ -1165,19 +1157,19 @@ class _SessionCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     const colors = [_DS.teal500, _DS.green, _DS.purple];
     const bgs    = [_DS.teal50,  _DS.greenBg, _DS.purpleBg];
     final color  = colors[colorIndex % colors.length];
     final bg     = bgs[colorIndex % bgs.length];
 
-    final now = DateTime.now();
+    final now = serverNow(ref);
     final isToday = sessionDate != null &&
         sessionDate!.year == now.year &&
         sessionDate!.month == now.month &&
         sessionDate!.day == now.day;
 
-    final relDate = _relativeDate(sessionDate);
+    final relDate = _relativeDate(sessionDate, now);
 
     return Material(
       color: AppThemeConstants.transparent,

@@ -10,6 +10,36 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Design tokens — single source for radii / spacing in this screen
+// ─────────────────────────────────────────────────────────────────────────────
+class _R {
+  static const card = 24.0;
+  static const input = 18.0;
+  static const pill = 16.0;
+  static const badge = 10.0;
+}
+
+const _kScreenBg = Color(0xFFF7FAF9);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Segmented filter (single-select)
+// ─────────────────────────────────────────────────────────────────────────────
+enum _Segment { all, hifz, muraja }
+
+extension _SegmentX on _Segment {
+  String get label => switch (this) {
+        _Segment.all => 'الكل',
+        _Segment.hifz => 'حفظ',
+        _Segment.muraja => 'مراجعة',
+      };
+  IconData get icon => switch (this) {
+        _Segment.all => Icons.apps_rounded,
+        _Segment.hifz => Icons.menu_book_rounded,
+        _Segment.muraja => Icons.history_edu_rounded,
+      };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Sort options
 // ─────────────────────────────────────────────────────────────────────────────
 enum _SortBy { lastSession, sessionCount, rating, name }
@@ -86,8 +116,18 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
     super.dispose();
   }
 
-  int get _activeFilterCount =>
-      (_filterHifz ? 1 : 0) + (_filterMuraja ? 1 : 0);
+  _Segment _segmentFromFilters() {
+    if (_filterHifz && !_filterMuraja) return _Segment.hifz;
+    if (_filterMuraja && !_filterHifz) return _Segment.muraja;
+    return _Segment.all;
+  }
+
+  void _applySegment(_Segment s) {
+    setState(() {
+      _filterHifz = s == _Segment.hifz;
+      _filterMuraja = s == _Segment.muraja;
+    });
+  }
 
   List<MohaffezStudentSummary> _applyFilters(
       List<MohaffezStudentSummary> all) {
@@ -216,6 +256,7 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: _kScreenBg,
         body: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(mohaffezStudentsProvider(widget.mohaffezId));
@@ -225,140 +266,83 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
           },
           child: CustomScrollView(
             slivers: [
-              // ── AppBar with embedded search ──────────────────────────────
+              // ── Compact gradient header ─────────────────────────────────
               SliverAppBar(
-                expandedHeight: 140,
-                floating: true,
                 pinned: true,
                 automaticallyImplyLeading: false,
                 elevation: 0,
                 scrolledUnderElevation: 0,
-                backgroundColor: AppThemeConstants.deepTeal,
+                toolbarHeight: 64,
+                backgroundColor: AppThemeConstants.primary,
                 surfaceTintColor: AppThemeConstants.transparent,
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(52),
-                  child: Container(
-                    color: AppThemeConstants.deepTeal,
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppThemeConstants.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppThemeConstants.white.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _searchCtrl,
-                        onChanged: (v) =>
-                            setState(() => _searchQuery = v),
-                        style: const TextStyle(
-                            color: AppThemeConstants.white, fontSize: 14),
-                        cursorColor: AppThemeConstants.white,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          hintText: 'ابحث باسم الطالب...',
-                          hintStyle: TextStyle(
-                            color: AppThemeConstants.white.withValues(alpha: 0.65),
-                            fontSize: 14,
-                          ),
-                          prefixIcon: const Icon(Icons.search,
-                              color: AppThemeConstants.white70, size: 18),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  padding: EdgeInsets.zero,
-                                  icon: const Icon(Icons.clear,
-                                      color: AppThemeConstants.white70, size: 18),
-                                  onPressed: () {
-                                    _searchCtrl.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                )
-                              : null,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
+                flexibleSpace: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: AppThemeConstants.tealGradient,
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
                     ),
                   ),
                 ),
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: AppThemeConstants.tealGradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppThemeConstants.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(_R.pill),
+                      ),
+                      child: const Icon(Icons.groups_rounded,
+                          size: 20, color: AppThemeConstants.onPrimary),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'طلابي',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
+                        color: AppThemeConstants.onPrimary,
                       ),
                     ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 62),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppThemeConstants.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.groups,
-                                  size: 24,
-                                  color: AppThemeConstants.onPrimary),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'طلابي',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppThemeConstants.onPrimary,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                if (totalCount != null)
-                                  Text(
-                                    '$totalCount طالب',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: AppThemeConstants.white
-                                          .withValues(alpha: 0.75),
-                                      height: 1.2,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
+                    if (totalCount != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppThemeConstants.secondary,
+                          borderRadius: BorderRadius.circular(_R.pill),
+                        ),
+                        child: Text(
+                          '$totalCount',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppThemeConstants.onSecondary,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    ],
+                  ],
                 ),
               ),
 
-              // ── Filter / Sort bar (pinned, scrolls with header) ──────────
+              // ── Search + segmented filter (pinned) ──────────────────────
               SliverPersistentHeader(
                 pinned: true,
-                delegate: _FilterBarDelegate(
-                  sortBy: _sortBy,
+                delegate: _SearchFilterDelegate(
+                  searchCtrl: _searchCtrl,
+                  searchQuery: _searchQuery,
+                  segment: _segmentFromFilters(),
+                  sortLabel: _SortByX(_sortBy).label,
                   sortAsc: _sortAsc,
-                  filterHifz: _filterHifz,
-                  filterMuraja: _filterMuraja,
-                  activeFilterCount: _activeFilterCount,
+                  onSearchChanged: (v) => setState(() => _searchQuery = v),
+                  onSearchClear: () {
+                    _searchCtrl.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  onSegmentChanged: _applySegment,
                   onSortTap: _showSortSheet,
-                  onHifzToggle: (v) => setState(() => _filterHifz = v),
-                  onMurajaToggle: (v) =>
-                      setState(() => _filterMuraja = v),
-                  onClearAll: () => setState(() {
-                    _filterHifz = false;
-                    _filterMuraja = false;
-                  }),
                 ),
               ),
 
@@ -367,13 +351,18 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                 skipLoadingOnRefresh: true,
                 data: (students) {
                   if (students.isEmpty) {
-                    return const SliverFillRemaining(
-                      child: EmptyState(
-                        icon: Icons.people_outline,
-                        title: 'لا يوجد طلاب بعد',
-                        message:
-                            'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
-                        animated: true,
+                    return SliverToBoxAdapter(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height * 0.5,
+                        ),
+                        child: const EmptyState(
+                          icon: Icons.people_outline,
+                          title: 'لا يوجد طلاب بعد',
+                          message:
+                              'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
+                          animated: true,
+                        ),
                       ),
                     );
                   }
@@ -381,13 +370,18 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                   final filtered = _applyFilters(students);
 
                   if (filtered.isEmpty) {
-                    return SliverFillRemaining(
-                      child: EmptyState(
-                        icon: Icons.search_off,
-                        title: 'لا توجد نتائج',
-                        message: _searchQuery.isNotEmpty
-                            ? 'لا يوجد طالب باسم "$_searchQuery"'
-                            : 'جرّب تغيير معايير الفلتر',
+                    return SliverToBoxAdapter(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height * 0.5,
+                        ),
+                        child: EmptyState(
+                          icon: Icons.search_off,
+                          title: 'لا توجد نتائج',
+                          message: _searchQuery.isNotEmpty
+                              ? 'لا يوجد طالب باسم "$_searchQuery"'
+                              : 'جرّب تغيير معايير الفلتر',
+                        ),
                       ),
                     );
                   }
@@ -430,13 +424,14 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                     ),
                   );
                 },
-                loading: () => const SliverFillRemaining(
-                  child: _SkeletonList(),
-                ),
-                error: (e, _) => SliverFillRemaining(
-                  child: ErrorDisplay.dataLoad(
-                    onRetry: () => ref.invalidate(
-                        mohaffezStudentsProvider(widget.mohaffezId)),
+                loading: () => const SliverToBoxAdapter(child: _SkeletonList()),
+                error: (e, _) => SliverToBoxAdapter(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 300),
+                    child: ErrorDisplay.dataLoad(
+                      onRetry: () => ref.invalidate(
+                          mohaffezStudentsProvider(widget.mohaffezId)),
+                    ),
                   ),
                 ),
               ),
@@ -449,179 +444,228 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pinned filter + sort bar
+// Pinned search + segmented filter delegate
 // ─────────────────────────────────────────────────────────────────────────────
-class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
-  final _SortBy sortBy;
+class _SearchFilterDelegate extends SliverPersistentHeaderDelegate {
+  final TextEditingController searchCtrl;
+  final String searchQuery;
+  final _Segment segment;
+  final String sortLabel;
   final bool sortAsc;
-  final bool filterHifz;
-  final bool filterMuraja;
-  final int activeFilterCount;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchClear;
+  final ValueChanged<_Segment> onSegmentChanged;
   final VoidCallback onSortTap;
-  final ValueChanged<bool> onHifzToggle;
-  final ValueChanged<bool> onMurajaToggle;
-  final VoidCallback onClearAll;
 
-  _FilterBarDelegate({
-    required this.sortBy,
+  _SearchFilterDelegate({
+    required this.searchCtrl,
+    required this.searchQuery,
+    required this.segment,
+    required this.sortLabel,
     required this.sortAsc,
-    required this.filterHifz,
-    required this.filterMuraja,
-    required this.activeFilterCount,
+    required this.onSearchChanged,
+    required this.onSearchClear,
+    required this.onSegmentChanged,
     required this.onSortTap,
-    required this.onHifzToggle,
-    required this.onMurajaToggle,
-    required this.onClearAll,
   });
 
   @override
-  double get minExtent => 52;
+  double get minExtent => 116;
   @override
-  double get maxExtent => 52;
+  double get maxExtent => 116;
 
   @override
-  bool shouldRebuild(_FilterBarDelegate old) =>
-      sortBy != old.sortBy ||
-      sortAsc != old.sortAsc ||
-      filterHifz != old.filterHifz ||
-      filterMuraja != old.filterMuraja ||
-      activeFilterCount != old.activeFilterCount;
+  bool shouldRebuild(_SearchFilterDelegate old) =>
+      searchQuery != old.searchQuery ||
+      segment != old.segment ||
+      sortLabel != old.sortLabel ||
+      sortAsc != old.sortAsc;
 
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final elevated = shrinkOffset > 0 || overlapsContent;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: const Border(
-          bottom: BorderSide(color: AppThemeConstants.grey200),
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            // Sort button
-            _SortButton(
-              label: _SortByX(sortBy).label,
-              ascending: sortAsc,
-              onTap: onSortTap,
-            ),
-            const SizedBox(width: 8),
-            // Hifz filter chip
-            FilterChip(
-              label: const Text('لديهم حفظ'),
-              selected: filterHifz,
-              onSelected: onHifzToggle,
-              avatar: Icon(Icons.menu_book,
-                  size: 14,
-                  color: filterHifz ? AppThemeConstants.success : AppThemeConstants.grey500),
-              selectedColor: AppThemeConstants.success.withValues(alpha: 0.12),
-              checkmarkColor: AppThemeConstants.success,
-              showCheckmark: false,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                fontWeight: filterHifz ? FontWeight.w700 : FontWeight.normal,
-                color: filterHifz ? AppThemeConstants.success : null,
-              ),
-              side: filterHifz
-                  ? const BorderSide(color: AppThemeConstants.accentGreenAlt)
-                  : null,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            ),
-            const SizedBox(width: 8),
-            // Muraja filter chip
-            FilterChip(
-              label: const Text('لديهم مراجعة'),
-              selected: filterMuraja,
-              onSelected: onMurajaToggle,
-              avatar: Icon(Icons.refresh,
-                  size: 14,
-                  color: filterMuraja ? AppThemeConstants.accentBlue : AppThemeConstants.grey500),
-              selectedColor: AppThemeConstants.accentBlue.withValues(alpha: 0.12),
-              checkmarkColor: AppThemeConstants.accentBlue,
-              showCheckmark: false,
-              labelStyle: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    filterMuraja ? FontWeight.w700 : FontWeight.normal,
-                color: filterMuraja ? AppThemeConstants.accentBlueDark : null,
-              ),
-              side: filterMuraja
-                  ? const BorderSide(color: AppThemeConstants.accentBlue)
-                  : null,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-            ),
-            // Clear all — only when filters active
-            if (activeFilterCount > 0) ...[
-              const SizedBox(width: 8),
-              ActionChip(
-                label: Text('مسح ($activeFilterCount)'),
-                onPressed: onClearAll,
-                avatar: const Icon(Icons.close, size: 14, color: AppThemeConstants.error),
-                backgroundColor: AppThemeConstants.error.withValues(alpha: 0.08),
-                side: const BorderSide(color: AppThemeConstants.accentRed),
-                labelStyle: const TextStyle(
-                  fontSize: 12,
-                  color: AppThemeConstants.error,
-                  fontWeight: FontWeight.w600,
+        color: _kScreenBg,
+        boxShadow: elevated
+            ? [
+                BoxShadow(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+              ]
+            : null,
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Column(
+        children: [
+          // Modern search field
+          Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppThemeConstants.white,
+              borderRadius: BorderRadius.circular(_R.input),
+              boxShadow: [
+                BoxShadow(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: searchCtrl,
+              onChanged: onSearchChanged,
+              style: const TextStyle(fontSize: 14),
+              cursorColor: AppThemeConstants.primary,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: 'ابحث عن طالب...',
+                hintStyle: const TextStyle(
+                  color: AppThemeConstants.textMuted,
+                  fontSize: 14,
+                ),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: AppThemeConstants.primary, size: 20),
+                suffixIcon: searchQuery.isNotEmpty
+                    ? IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.close_rounded,
+                            color: AppThemeConstants.textMuted, size: 18),
+                        onPressed: onSearchClear,
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Segmented pill filter + sort button
+          Row(
+            children: [
+              Expanded(
+                child: _SegmentedFilter(
+                  selected: segment,
+                  onChanged: onSegmentChanged,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _SortIconButton(
+                ascending: sortAsc,
+                onTap: onSortTap,
               ),
             ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SortButton extends StatelessWidget {
-  final String label;
+class _SegmentedFilter extends StatelessWidget {
+  final _Segment selected;
+  final ValueChanged<_Segment> onChanged;
+
+  const _SegmentedFilter({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: AppThemeConstants.white,
+        borderRadius: BorderRadius.circular(_R.pill + 4),
+        border: Border.all(
+          color: AppThemeConstants.primary.withValues(alpha: 0.15),
+        ),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: _Segment.values.map((s) {
+          final isSelected = s == selected;
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onChanged(s),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppThemeConstants.primary
+                      : AppThemeConstants.transparent,
+                  borderRadius: BorderRadius.circular(_R.pill),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppThemeConstants.primary
+                                .withValues(alpha: 0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      s.icon,
+                      size: 14,
+                      color: isSelected
+                          ? AppThemeConstants.white
+                          : AppThemeConstants.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      s.label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? AppThemeConstants.white
+                            : AppThemeConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _SortIconButton extends StatelessWidget {
   final bool ascending;
   final VoidCallback onTap;
 
-  const _SortButton({
-    required this.label,
-    required this.ascending,
-    required this.onTap,
-  });
+  const _SortIconButton({required this.ascending, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        height: 38,
+        width: 38,
         decoration: BoxDecoration(
-          color: AppThemeConstants.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
+          color: AppThemeConstants.white,
+          borderRadius: BorderRadius.circular(_R.pill),
           border: Border.all(
-            color: AppThemeConstants.primary.withValues(alpha: 0.35),
+            color: AppThemeConstants.primary.withValues(alpha: 0.15),
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              ascending ? Icons.arrow_upward : Icons.arrow_downward,
-              size: 13,
-              color: AppThemeConstants.primary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppThemeConstants.primary,
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(Icons.expand_more,
-                size: 14, color: AppThemeConstants.primary),
-          ],
+        child: Icon(
+          ascending ? Icons.swap_vert_rounded : Icons.swap_vert_rounded,
+          color: AppThemeConstants.primary,
+          size: 20,
         ),
       ),
     );
@@ -689,185 +733,268 @@ class StudentCard extends StatelessWidget {
     required this.onTap,
   });
 
+  String _initials() {
+    final parts = student.studentName.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '؟';
+    if (parts.length == 1) return parts[0].isEmpty ? '؟' : parts[0][0];
+    return '${parts[0][0]}${parts[1][0]}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasAssignment = student.hifzAssignment.isNotEmpty ||
+        student.murajaAssignment.isNotEmpty;
+    final hasPrevEval = student.previousHifzCompleted != null ||
+        student.previousMurajaCompleted != null;
     final formattedDate = student.lastSessionDate != null
-        ? DateFormat('dd/MM/yyyy', 'ar').format(student.lastSessionDate!)
-        : '—';
+        ? DateFormat('dd MMM yyyy', 'ar').format(student.lastSessionDate!)
+        : null;
+    final hasPhoto =
+        student.photoUrl != null && student.photoUrl!.isNotEmpty;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header ──────────────────────────────────────────────────
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor:
-                        AppThemeConstants.secondary.withValues(alpha: 0.2),
-                    child: const Icon(Icons.person,
-                        color: AppThemeConstants.secondary, size: 28),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          student.studentName,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppThemeConstants.white,
+            AppThemeConstants.primary.withValues(alpha: 0.025),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(_R.card),
+        border: Border.all(
+          color: AppThemeConstants.primary.withValues(alpha: 0.06),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeConstants.primary.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: AppThemeConstants.transparent,
+        borderRadius: BorderRadius.circular(_R.card),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(_R.card),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── TOP: Avatar + Name + Last session ───────────────────
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Gold-ringed avatar (52x52)
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppThemeConstants.secondary.withValues(alpha: 0.85),
+                            AppThemeConstants.primary.withValues(alpha: 0.6),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today,
-                                size: 12, color: AppThemeConstants.grey500),
-                            const SizedBox(width: 4),
-                            Text(
-                              formattedDate,
-                              style: const TextStyle(
-                                  fontSize: 12, color: AppThemeConstants.grey500),
+                      ),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppThemeConstants.primary
+                            .withValues(alpha: 0.85),
+                        backgroundImage:
+                            hasPhoto ? NetworkImage(student.photoUrl!) : null,
+                        onBackgroundImageError:
+                            hasPhoto ? (_, __) {} : null,
+                        child: hasPhoto
+                            ? null
+                            : Text(
+                                _initials(),
+                                style: const TextStyle(
+                                  color: AppThemeConstants.white,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            student.studentName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppThemeConstants.textPrimary,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (formattedDate != null) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.event_rounded,
+                                    size: 13,
+                                    color: AppThemeConstants.textMuted),
+                                const SizedBox(width: 4),
+                                Text(
+                                  formattedDate,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppThemeConstants.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_left_rounded,
+                        size: 22, color: AppThemeConstants.grey300),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // ── Stats row: sessions + rating ────────────────────────
+                Row(
+                  children: [
+                    _MiniPill(
+                      icon: Icons.school_rounded,
+                      label: '${student.sessionCount} جلسة',
+                      color: AppThemeConstants.primary,
+                    ),
+                    if (student.sessionRating > 0) ...[
+                      const SizedBox(width: 6),
+                      _RatingPill(rating: student.sessionRating),
+                    ],
+                  ],
+                ),
+
+                // ── MIDDLE: Assignments (emerald + gold only) ───────────
+                if (hasAssignment) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppThemeConstants.transparent,
+                          AppThemeConstants.secondary.withValues(alpha: 0.4),
+                          AppThemeConstants.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (student.hifzAssignment.isNotEmpty)
+                        _AssignmentChip(
+                          icon: Icons.menu_book_rounded,
+                          typeLabel: 'حفظ',
+                          value: student.hifzAssignment,
+                          color: AppThemeConstants.success,
+                        ),
+                      if (student.murajaAssignment.isNotEmpty)
+                        _AssignmentChip(
+                          icon: Icons.history_edu_rounded,
+                          typeLabel: 'مراجعة',
+                          value: student.murajaAssignment,
+                          color: AppThemeConstants.secondary,
+                        ),
+                    ],
+                  ),
+                ],
+
+                // ── BOTTOM: Previous evaluation ─────────────────────────
+                if (hasPrevEval) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text(
+                        'السابقة',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (student.previousHifzCompleted != null)
+                        _EvalBadge(
+                          label: 'حفظ ${student.previousHifzRating}/10',
+                          completed: student.previousHifzCompleted!,
+                        ),
+                      if (student.previousMurajaCompleted != null)
+                        _EvalBadge(
+                          label: 'مراجعة ${student.previousMurajaRating}/10',
+                          completed: student.previousMurajaCompleted!,
+                        ),
+                    ],
+                  ),
+                ],
+
+                // ── Performance notes ───────────────────────────────────
+                if (student.performanceNotes != null &&
+                    student.performanceNotes!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.secondaryContainer
+                          .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(_R.pill),
+                      border: Border(
+                        right: BorderSide(
+                          color: AppThemeConstants.secondary
+                              .withValues(alpha: 0.6),
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.format_quote_rounded,
+                            size: 14,
+                            color: AppThemeConstants.secondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            student.performanceNotes!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppThemeConstants.textSecondary,
+                              fontStyle: FontStyle.italic,
+                              height: 1.4,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  _StatChip(
-                    icon: Icons.school,
-                    label: '${student.sessionCount}',
-                    color: AppThemeConstants.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios,
-                      size: 14, color: AppThemeConstants.grey500),
                 ],
-              ),
-
-              const Divider(height: 24),
-
-              // ── Assignments ─────────────────────────────────────────────
-              if (student.hifzAssignment.isNotEmpty) ...[
-                _AssignmentRow(
-                  icon: Icons.menu_book,
-                  label: 'حفظ',
-                  value: student.hifzAssignment,
-                  color: AppThemeConstants.success,
-                ),
-                const SizedBox(height: 6),
               ],
-              if (student.murajaAssignment.isNotEmpty)
-                _AssignmentRow(
-                  icon: Icons.refresh,
-                  label: 'مراجعة',
-                  value: student.murajaAssignment,
-                  color: AppThemeConstants.accentBlue,
-                ),
-
-              // ── Rating ──────────────────────────────────────────────────
-              if (student.sessionRating > 0) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 16, color: AppThemeConstants.accentAmber),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${student.sessionRating} / 10',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppThemeConstants.accentAmber),
-                    ),
-                  ],
-                ),
-              ],
-
-              // ── Previous evaluation ─────────────────────────────────────
-              if (student.previousHifzCompleted != null ||
-                  student.previousMurajaCompleted != null) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'الجلسة السابقة:',
-                  style: TextStyle(fontSize: 12, color: AppThemeConstants.grey500),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (student.previousHifzCompleted != null) ...[
-                      Icon(
-                        student.previousHifzCompleted!
-                            ? Icons.check_circle
-                            : Icons.cancel,
-                        size: 14,
-                        color: student.previousHifzCompleted!
-                            ? AppThemeConstants.success
-                            : AppThemeConstants.error,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'حفظ (${student.previousHifzRating})',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(width: 16),
-                    ],
-                    if (student.previousMurajaCompleted != null) ...[
-                      Icon(
-                        student.previousMurajaCompleted!
-                            ? Icons.check_circle
-                            : Icons.cancel,
-                        size: 14,
-                        color: student.previousMurajaCompleted!
-                            ? AppThemeConstants.success
-                            : AppThemeConstants.error,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'مراجعة (${student.previousMurajaRating})',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-
-              // ── Performance notes ───────────────────────────────────────
-              if (student.performanceNotes != null &&
-                  student.performanceNotes!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppThemeConstants.grey100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.notes, size: 14, color: AppThemeConstants.grey500),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          student.performanceNotes!,
-                          style: const TextStyle(
-                              fontSize: 12, color: AppThemeConstants.black87),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
@@ -876,33 +1003,33 @@ class StudentCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared small widgets
+// Card sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
-class _StatChip extends StatelessWidget {
+
+class _MiniPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-
-  const _StatChip(
+  const _MiniPill(
       {required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(_R.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
+          Icon(icon, size: 13, color: color),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.bold, color: color),
+                fontSize: 12, fontWeight: FontWeight.w700, color: color),
           ),
         ],
       ),
@@ -910,38 +1037,119 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _AssignmentRow extends StatelessWidget {
+class _RatingPill extends StatelessWidget {
+  final int rating;
+  const _RatingPill({required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = rating >= 8
+        ? AppThemeConstants.success
+        : rating >= 5
+            ? AppThemeConstants.secondary
+            : AppThemeConstants.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(_R.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.star_rounded, size: 13, color: color),
+          const SizedBox(width: 3),
+          Text(
+            '$rating',
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssignmentChip extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String typeLabel;
   final String value;
   final Color color;
-
-  const _AssignmentRow(
+  const _AssignmentChip(
       {required this.icon,
-      required this.label,
+      required this.typeLabel,
       required this.value,
       required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 8),
-        Text(
-          '$label: ',
-          style: TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w600, color: color),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 13),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(_R.pill),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            '$typeLabel: ',
+            style: TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700, color: color),
           ),
-        ),
-      ],
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(
+              value,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.w500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EvalBadge extends StatelessWidget {
+  final String label;
+  final bool completed;
+  const _EvalBadge({required this.label, required this.completed});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        completed ? AppThemeConstants.success : AppThemeConstants.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(_R.badge),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            completed ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -954,11 +1162,11 @@ class _SkeletonList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return Padding(
       padding: const EdgeInsets.all(16),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 5,
-      itemBuilder: (_, __) => _SkeletonCard(),
+      child: Column(
+        children: List.generate(5, (_) => _SkeletonCard()),
+      ),
     );
   }
 }

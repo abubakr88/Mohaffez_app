@@ -14,6 +14,7 @@ class SessionRequestModel {
   final String mohaffezId;
   final String mohaffezName;
   final String sessionType;
+  final String? preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (online only)
   final String preferredTimeSlot;
   final Timestamp? slotDate;
   final Timestamp? slotStart;
@@ -71,6 +72,7 @@ class SessionRequestModel {
     required this.mohaffezId,
     required this.mohaffezName,
     required this.sessionType,
+    this.preferredProvider,
     required this.preferredTimeSlot,
     this.slotDate,
     this.slotStart,
@@ -129,6 +131,7 @@ class SessionRequestModel {
       mohaffezId: map['mohaffezId'] as String? ?? '',
       mohaffezName: map['mohaffezName'] as String? ?? '',
       sessionType: map['sessionType'] as String? ?? 'online',
+      preferredProvider: map['preferredProvider'] as String?,
       preferredTimeSlot: map['preferredTimeSlot'] as String? ?? '',
       slotDate: map['slotDate'] as Timestamp?,
       slotStart: map['slotStart'] as Timestamp?,
@@ -170,6 +173,7 @@ class SessionRequestModel {
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
+        if (preferredProvider != null) 'preferredProvider': preferredProvider,
         'preferredTimeSlot': preferredTimeSlot,
         if (slotDate != null) 'slotDate': slotDate,
         if (slotStart != null) 'slotStart': slotStart,
@@ -224,6 +228,7 @@ class SessionRequestModel {
         mohaffezId: mohaffezId,
         mohaffezName: mohaffezName,
         sessionType: sessionType,
+        preferredProvider: preferredProvider,
         preferredTimeSlot: preferredTimeSlot,
         slotDate: slotDate,
         slotStart: slotStart,

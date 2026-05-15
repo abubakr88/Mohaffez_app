@@ -15,6 +15,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../shared/utils/time_formatter.dart';
+import '../../shared/widgets/meeting_provider_picker.dart';
 
 class DirectBookingRequestScreen extends ConsumerStatefulWidget {
   const DirectBookingRequestScreen({super.key});
@@ -28,6 +29,7 @@ class _DirectBookingRequestScreenState
     extends ConsumerState<DirectBookingRequestScreen> {
   bool _submitting = false;
   bool _acknowledged = false;
+  String? _selectedProvider;
 
   // True only after a successful request is sent.
   // Prevents dispose from resetting the provider too early during navigation.
@@ -90,6 +92,8 @@ class _DirectBookingRequestScreenState
         'mohaffezName': slotContext.mohaffezName,
         'studentName': currentUser.name,
         'sessionType': slotContext.sessionType,
+        if (slotContext.sessionType == 'online' && _selectedProvider != null)
+          'preferredProvider': _selectedProvider,
         'preferredTimeSlot': slotContext.preferredTimeSlot,
         'slotDate': slotContext.slotDate,
         'slotStart': slotContext.slotStart,
@@ -228,6 +232,14 @@ class _DirectBookingRequestScreenState
                 body:
                     '١. ترسل الطلب.\n٢. يقبل المحفظ.\n٣. تستلم إشعار بالقبول.\n٤. تحوّل المبلغ مباشرة.\n٥. يؤكد المحفظ الاستلام.',
               ),
+              if (slotContext.sessionType == 'online') ...[
+                const SizedBox(height: 16),
+                MeetingProviderPicker(
+                  teacherId: slotContext.mohaffezId,
+                  selected: _selectedProvider,
+                  onChanged: (id) => setState(() => _selectedProvider = id),
+                ),
+              ],
               const SizedBox(height: 16),
               // Acknowledgment checkbox
               Container(
@@ -262,7 +274,12 @@ class _DirectBookingRequestScreenState
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed:
-                      (_submitting || !_acknowledged) ? null : sendRequest,
+                      (_submitting ||
+                              !_acknowledged ||
+                              (slotContext.sessionType == 'online' &&
+                                  _selectedProvider == null))
+                          ? null
+                          : sendRequest,
                   icon: _submitting
                       ? const SizedBox(
                           width: 20,

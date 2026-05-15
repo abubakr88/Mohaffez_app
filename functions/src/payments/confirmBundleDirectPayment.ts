@@ -371,6 +371,10 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             mohaffezId,
             mohaffezName: dp.mohaffezName,
             sessionType: resolvedSessionType,
+            preferredProvider:
+              resolvedSessionType === 'online' && typeof dp.preferredProvider === 'string' && dp.preferredProvider.length > 0
+                ? dp.preferredProvider
+                : null,
             preferredTimeSlot,
             sessionDate: slotDateTs,
             slotStart: slotStartTs,

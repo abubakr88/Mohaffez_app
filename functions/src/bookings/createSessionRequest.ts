@@ -80,6 +80,7 @@ export const createSessionRequest = functions.https.onCall(
       studentName,
       mohaffezName,
       sessionType,
+      preferredProvider,
       preferredTimeSlot,
       slotDate,
       slotStart,
@@ -412,6 +413,10 @@ export const createSessionRequest = functions.https.onCall(
         studentName,
         mohaffezName,
         sessionType,
+        preferredProvider:
+          sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
+            ? preferredProvider
+            : null,
         preferredTimeSlot,
         slotDate: admin.firestore.Timestamp.fromDate(slotDateObj),
         slotStart: admin.firestore.Timestamp.fromDate(slotStartObj),

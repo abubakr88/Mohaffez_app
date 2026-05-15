@@ -47,9 +47,21 @@ class CacheService {
     return null;
   }
 
-  // Clear all cache (on logout)
+  // Clear session-scoped cache on logout. Permanent flags (e.g. wizard-seen)
+  // use a 'persistent_' prefix and are intentionally kept across logouts.
   static Future<void> clearAll() async {
+    final saved = <String, Object>{};
+    for (final key in _prefs.getKeys().where((k) => k.startsWith('persistent_'))) {
+      final v = _prefs.get(key);
+      if (v != null) saved[key] = v;
+    }
     await _prefs.clear();
+    for (final entry in saved.entries) {
+      if (entry.value is bool)   await _prefs.setBool(entry.key, entry.value as bool);
+      if (entry.value is int)    await _prefs.setInt(entry.key, entry.value as int);
+      if (entry.value is double) await _prefs.setDouble(entry.key, entry.value as double);
+      if (entry.value is String) await _prefs.setString(entry.key, entry.value as String);
+    }
   }
 
   // Check if user was logged in (for quick startup)

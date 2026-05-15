@@ -1,12 +1,14 @@
-﻿import 'dart:async';
-import 'package:mohaffez_core/mohaffez_core.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_google_maps_webservices/places.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../config/env_config.dart';
+import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
+
+import '../../services/geocoding_service.dart';
 
 class PickLocationScreen extends StatefulWidget {
   final double? initialLat;
@@ -25,21 +27,18 @@ class PickLocationScreen extends StatefulWidget {
 }
 
 class _PickLocationScreenState extends State<PickLocationScreen> {
-  GoogleMapController? _mapController;
+  static const String _osmTileUrl =
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
-  GoogleMapsPlaces? _places;
   late LatLng _currentCenter;
-  bool _mapReady = false;
-  List<Prediction> _predictions = [];
+  List<GeocodeResult> _predictions = [];
   bool _isSearching = false;
   bool _isLoadingPlace = false;
   Timer? _debounce;
-  String? _errorMessage;
   bool _hasInteractedWithMap = false;
   bool _isProgrammaticCameraMove = false;
-
-  // FIXED: Load API key from environment variable
-  late final String _googleApiKey;
 
   String? _selectedPlaceId;
   String? _locationName;
@@ -49,18 +48,6 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
   @override
   void initState() {
     super.initState();
-
-    _googleApiKey = EnvConfig.googleMapsApiKey;
-
-    if (_googleApiKey.isEmpty) {
-      setState(() {
-        _errorMessage = 'لم يتم إعداد مفتاح Google Maps. يرجى الاتصال بالدعم.';
-      });
-      return;
-    }
-
-    _places = GoogleMapsPlaces(apiKey: _googleApiKey);
-    _isProgrammaticCameraMove = true;
     _currentCenter = LatLng(
       widget.initialLat ?? 30.0444,
       widget.initialLng ?? 31.2357,
@@ -77,15 +64,12 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
   void dispose() {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
-    _mapController?.dispose();
     _debounce?.cancel();
-    _places?.dispose();
     super.dispose();
   }
 
   void _onSearchChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-
     if (_searchController.text.isEmpty) {
       setState(() {
         _predictions = [];
@@ -93,162 +77,79 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
       });
       return;
     }
-
-    _debounce = Timer(const Duration(milliseconds: 300), () {
+    _debounce = Timer(const Duration(milliseconds: 400), () {
       _performSearch(_searchController.text);
     });
   }
 
   Future<void> _performSearch(String query) async {
     if (query.length < 3) return;
-    if (_places == null) return;
-
     setState(() => _isSearching = true);
-
     try {
-      final result = await _places!.autocomplete(
-        query,
-        language: 'ar',
-      );
-
-      if (result.isOkay) {
-        setState(() {
-          _predictions = result.predictions;
-          _isSearching = false;
-        });
-      } else {
-        setState(() => _isSearching = false);
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حدث خطأ في البحث')),
-        );
-      }
-    } catch (e) {
-      setState(() => _isSearching = false);
-
+      final results = await GeocodingService.search(query);
       if (!mounted) return;
-
+      setState(() {
+        _predictions = results;
+        _isSearching = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSearching = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('حدث خطأ في البحث')),
       );
     }
   }
 
-  Future<void> _onPlaceSelected(Prediction prediction) async {
-    if (prediction.placeId == null) return;
-    if (_places == null) return;
-    
+  Future<void> _onPlaceSelected(GeocodeResult prediction) async {
     setState(() => _isLoadingPlace = true);
-    
-    try {
-      final details = await _places!.getDetailsByPlaceId(
-        prediction.placeId!,
-        language: 'ar',
-      );
 
-      if (details.isOkay) {
-        final result = details.result;
-        final location = result.geometry?.location;
-
-        if (location != null) {
-          final newPosition = LatLng(location.lat, location.lng);
-          final placeName = result.name;
-
-          String? city;
-          String? country;
-
-          for (final comp in result.addressComponents) {
-            if (comp.types.contains('locality')) {
-              city = comp.longName;
-            }
-
-            if (comp.types.contains('administrative_area_level_1') &&
-                (city == null || city.isEmpty)) {
-              city = comp.longName;
-            }
-
-            if (comp.types.contains('country')) {
-              country = comp.longName;
-            }
-          }
-
-          setState(() {
-            _currentCenter = newPosition;
-            _predictions = [];
-            _searchController.clear();
-            _selectedPlaceId = result.placeId;
-            _locationName = placeName;
-            _city = city;
-            _country = country;
-            _hasInteractedWithMap = true;
-            _isLoadingPlace = false;
-          });
-
-          _isProgrammaticCameraMove = true;
-          await _mapController?.animateCamera(
-            CameraUpdate.newLatLngZoom(newPosition, 16),
-          );
-
-          if (!mounted) return;
-          FocusScope.of(context).unfocus();
-        }
-      } else {
-        if (!mounted) return;
-        setState(() => _isLoadingPlace = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('حدث خطأ في جلب تفاصيل المكان')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoadingPlace = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حدث خطأ في تحديد الموقع')),
-      );
-    }
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-    setState(() => _mapReady = true);
-  }
-
-  void _onCameraMove(CameraPosition position) {
-    _currentCenter = position.target;
-  }
-
-  Future<void> _onCameraIdle() async {
-    // Skip geocoding if this was a programmatic camera move (e.g., from place selection or my location)
-    if (_isProgrammaticCameraMove) {
-      _isProgrammaticCameraMove = false;
-      return;
-    }
-    
+    final newPosition = LatLng(prediction.lat, prediction.lng);
     setState(() {
+      _currentCenter = newPosition;
+      _predictions = [];
+      _searchController.clear();
+      _selectedPlaceId = prediction.placeId;
+      _locationName = prediction.name ?? prediction.displayName;
+      _city = prediction.city;
+      _country = prediction.country;
       _hasInteractedWithMap = true;
+      _isLoadingPlace = false;
     });
-    
-    // Perform reverse geocoding for manual drags
+
+    _isProgrammaticCameraMove = true;
+    _mapController.move(newPosition, 16);
+
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+  }
+
+  void _onMapEvent(MapEvent event) {
+    _currentCenter = event.camera.center;
+    if (event is MapEventMoveEnd) {
+      if (_isProgrammaticCameraMove) {
+        _isProgrammaticCameraMove = false;
+        return;
+      }
+      setState(() => _hasInteractedWithMap = true);
+      _reverseGeocode(_currentCenter);
+    }
+  }
+
+  Future<void> _reverseGeocode(LatLng position) async {
     try {
-      final placemarks = await placemarkFromCoordinates(
-        _currentCenter.latitude,
-        _currentCenter.longitude,
-      );
-      
-      if (placemarks.isNotEmpty && mounted) {
-        final place = placemarks.first;
+      final result =
+          await GeocodingService.reverse(position.latitude, position.longitude);
+      if (result != null && mounted) {
         setState(() {
-          _locationName = place.name ?? place.street;
-          _city = place.locality ?? place.subAdministrativeArea;
-          _country = place.country;
-          _selectedPlaceId = null; // Clear place ID since this is manual selection
+          _locationName = result.name ?? result.displayName;
+          _city = result.city;
+          _country = result.country;
+          _selectedPlaceId = null;
         });
       }
-    } catch (e) {
-      // Silently fail reverse geocoding - location coordinates still valid
+    } catch (_) {
+      // silent fail — coordinates still valid
     }
   }
 
@@ -261,7 +162,6 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
       );
       return;
     }
-    
     context.pop({
       'lat': _currentCenter.latitude,
       'lng': _currentCenter.longitude,
@@ -274,7 +174,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
 
   Future<void> _goToMyLocation() async {
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -283,7 +183,7 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
@@ -294,7 +194,6 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
           return;
         }
       }
-
       if (permission == LocationPermission.deniedForever) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -310,20 +209,16 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
           timeLimit: Duration(seconds: 10),
         ),
       );
-      
       if (!mounted) return;
-      
       final newPosition = LatLng(position.latitude, position.longitude);
       _isProgrammaticCameraMove = true;
       setState(() {
         _currentCenter = newPosition;
         _hasInteractedWithMap = true;
       });
-      
-      await _mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(newPosition, 16),
-      );
-    } catch (e) {
+      _mapController.move(newPosition, 16);
+      _reverseGeocode(newPosition);
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تعذر الحصول على موقعك الحالي')),
@@ -333,41 +228,6 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_errorMessage != null) {
-      return Directionality(
-        textDirection: TextDirection.rtl,
-        child: Scaffold(
-          appBar: AppBar(
-            leading: context.canPop()
-                ? IconButton(
-                    icon: const Icon(Icons.arrow_back_ios),
-                    onPressed: () => context.pop(),
-                    tooltip: 'رجوع',
-                  )
-                : null,
-            title: const Text('اختيار الموقع'),
-          ),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 64, color: AppThemeConstants.error),
-                  const SizedBox(height: 16),
-                  Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -383,19 +243,29 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
         ),
         body: Stack(
           children: [
-            GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _currentCenter,
-                zoom: 15,
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _currentCenter,
+                initialZoom: 15,
+                onMapEvent: _onMapEvent,
               ),
-              onMapCreated: _onMapCreated,
-              onCameraMove: _onCameraMove,
-              onCameraIdle: _onCameraIdle,
-              myLocationEnabled: false,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: true,
+              children: [
+                TileLayer(
+                  urlTemplate: _osmTileUrl,
+                  userAgentPackageName: 'app.mohafezy',
+                  maxNativeZoom: 19,
+                  tileProvider: kIsWeb
+                      ? CancellableNetworkTileProvider()
+                      : NetworkTileProvider(),
+                ),
+                const RichAttributionWidget(
+                  attributions: [
+                    TextSourceAttribution('© OpenStreetMap contributors'),
+                  ],
+                ),
+              ],
             ),
-            if (!_mapReady) const Center(child: CircularProgressIndicator()),
             // Static center pin overlay
             Center(
               child: Transform.translate(
@@ -415,7 +285,8 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
                 heroTag: 'my_location',
                 onPressed: _goToMyLocation,
                 backgroundColor: AppThemeConstants.primary,
-                child: const Icon(Icons.my_location, color: AppThemeConstants.onPrimary),
+                child: const Icon(Icons.my_location,
+                    color: AppThemeConstants.onPrimary),
               ),
             ),
             Positioned(
@@ -487,29 +358,31 @@ class _PickLocationScreenState extends State<PickLocationScreen> {
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: _predictions.length,
-                        separatorBuilder: (context, index) =>
-                            const Divider(height: 1),
+                        separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (context, index) {
-                          final prediction = _predictions[index];
-
+                          final p = _predictions[index];
+                          final primary = p.name ?? p.displayName;
+                          final secondary = [
+                            if (p.city != null) p.city,
+                            if (p.country != null) p.country,
+                          ].whereType<String>().join('، ');
                           return ListTile(
                             leading: const Icon(Icons.location_on, size: 20),
                             title: Text(
-                              prediction.structuredFormatting?.mainText ??
-                                  prediction.description ??
-                                  '',
+                              primary,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 14),
                             ),
-                            subtitle: prediction
-                                        .structuredFormatting?.secondaryText !=
-                                    null
-                                ? Text(
-                                    prediction
-                                        .structuredFormatting!.secondaryText!,
+                            subtitle: secondary.isEmpty
+                                ? null
+                                : Text(
+                                    secondary,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontSize: 12),
-                                  )
-                                : null,
-                            onTap: () => _onPlaceSelected(prediction),
+                                  ),
+                            onTap: () => _onPlaceSelected(p),
                           );
                         },
                       ),

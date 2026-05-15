@@ -12,6 +12,10 @@ final systemConfigRepositoryProvider = Provider<SystemConfigRepository>((ref) {
   return SystemConfigRepository(FirebaseFirestore.instance);
 });
 
+final onlineSessionsEnabledProvider = Provider<bool>((ref) {
+  return ref.watch(systemConfigProvider).valueOrNull?.enableOnlineSessions ?? false;
+});
+
 final systemConfigProvider = StreamProvider<SystemConfigModel>((ref) {
   final stream = ref.watch(systemConfigRepositoryProvider).watchGlobalConfig();
   return (() async* {

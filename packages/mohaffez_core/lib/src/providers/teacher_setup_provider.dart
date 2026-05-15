@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'user_provider.dart';
 
 class TeacherSetupProgress {
@@ -76,11 +75,18 @@ final teacherSetupProvider = FutureProvider<TeacherSetupProgress>((ref) async {
 });
 
 /// Returns true the very first time this teacher opens the app after approval.
-/// Writes the seen-flag to SharedPreferences so subsequent calls return false.
+/// Uses Firestore so the flag survives logout, cache clears, and reinstalls.
 Future<bool> shouldAutoShowSetupWizard(String uid) async {
-  final prefs = await SharedPreferences.getInstance();
-  final key = 'teacher_setup_wizard_shown_v1_$uid';
-  if (prefs.getBool(key) ?? false) return false;
-  await prefs.setBool(key, true);
+  final doc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(uid)
+      .get();
+  if (doc.data()?['setupWizardSeen'] == true) return false;
+  // Fire-and-forget: mark seen before the wizard opens so re-entry is safe.
+  FirebaseFirestore.instance
+      .collection('users')
+      .doc(uid)
+      .update({'setupWizardSeen': true})
+      .ignore();
   return true;
 }
