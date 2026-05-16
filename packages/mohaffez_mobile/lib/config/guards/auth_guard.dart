@@ -10,6 +10,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../tour/tour_mode_state.dart';
 import '../route_guard.dart';
 
 class AuthGuard implements RouteGuard {
@@ -28,6 +29,9 @@ class AuthGuard implements RouteGuard {
 
   @override
   String? check(Ref ref, GoRouterState state) {
+    // Tour mode bypasses auth — synthetic user provided via overrides.
+    if (ref.read(tourModeProvider).active) return null;
+
     final authState = ref.read(authStateProvider);
     final currentPath = state.uri.path;
     final isPublicRoute = publicRoutes.contains(currentPath);

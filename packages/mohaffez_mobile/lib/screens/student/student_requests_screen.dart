@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 import '../../shared/utils/time_formatter.dart';
+import '../../tour/tour_mode_state.dart';
 import 'direct_payment_screen.dart';
 
 // ============================================================================
@@ -86,17 +87,20 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
 
       // Fetch fresh Firestore data to get selectedPaymentMethod and latest
       // slot details written by the teacher on acceptance.
+      // Skip in tour mode — synthetic IDs have no real Firestore documents.
       Map<String, dynamic> lockedRequest = Map<String, dynamic>.from(request);
-      try {
-        final snap = await FirebaseFirestore.instance
-            .collection('sessionRequests')
-            .doc(requestId)
-            .get();
-        if (snap.exists && snap.data() != null) {
-          lockedRequest = Map<String, dynamic>.from(snap.data()!);
+      if (!ref.read(tourModeProvider).active) {
+        try {
+          final snap = await FirebaseFirestore.instance
+              .collection('sessionRequests')
+              .doc(requestId)
+              .get();
+          if (snap.exists && snap.data() != null) {
+            lockedRequest = Map<String, dynamic>.from(snap.data()!);
+          }
+        } catch (_) {
+          // Fall back to in-memory map
         }
-      } catch (_) {
-        // Fall back to in-memory map
       }
 
       if (!context.mounted) return;
