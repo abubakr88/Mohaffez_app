@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/offline_banner.dart';
+import '../../tour/widgets/tour_role_chooser_sheet.dart';
 
 // ============================================================
 // PREMIUM LOGIN THEME
@@ -495,6 +496,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
+                    fontFamily: 'Cairo',
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Try-the-app (tour mode) ───────────────────
+            SizedBox(
+              height: 48,
+              child: TextButton.icon(
+                onPressed: () => showTourRoleChooser(context),
+                icon: const Icon(Icons.visibility_outlined,
+                    color: _LoginTheme.primaryTeal, size: 18),
+                label: const Text(
+                  'جرّب التطبيق بدون تسجيل',
+                  style: TextStyle(
+                    color: _LoginTheme.primaryTeal,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
                     fontFamily: 'Cairo',
                   ),
                 ),

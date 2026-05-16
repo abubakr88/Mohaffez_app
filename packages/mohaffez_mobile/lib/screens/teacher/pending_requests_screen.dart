@@ -13,6 +13,7 @@ import '../../shared/widgets/error_widgets.dart';
 import '../../shared/utils/time_formatter.dart';
 
 import '../../shared/widgets/request_payment_type_badge.dart';
+import '../../tour/tour_guard_helper.dart';
 
 // FIX Bug 1: import BookingPaymentMethod so we can reference
 // BookingPaymentMethod.subscriptionCredit.value ('subscription_credit')
@@ -307,6 +308,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
 
   Future<void> _handleAccept(
       String requestId, Map<String, dynamic> data) async {
+    if (guardWriteInTour(ref, context)) return;
     // Loading guard - prevents double-tap per request
     if (_isLoadingAccept[requestId] == true) return;
     setState(() => _isLoadingAccept[requestId] = true);
@@ -440,6 +442,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
   // ─── Reject Handler ───────────────────────────────────────────────────────
 
   Future<void> _handleReject(String requestId) async {
+    if (guardWriteInTour(ref, context)) return;
     final reasonController = TextEditingController();
 
     try {

@@ -32,12 +32,15 @@ final devModeProvider = StreamProvider<DevModeModel>((ref) {
   })();
 });
 
-final isDevModeActiveProvider = Provider<bool>((ref) {
-  final user = ref.watch(currentUserProvider).valueOrNull;
-  final devMode = ref.watch(devModeProvider).valueOrNull;
-  if (user == null || devMode == null) return false;
-  return devMode.devModeEnabled && devMode.devModeUsers.contains(user.uid);
-});
+final isDevModeActiveProvider = Provider<bool>(
+  (ref) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final devMode = ref.watch(devModeProvider).valueOrNull;
+    if (user == null || devMode == null) return false;
+    return devMode.devModeEnabled && devMode.devModeUsers.contains(user.uid);
+  },
+  dependencies: [currentUserProvider, devModeProvider],
+);
 
 class SystemConfigNotifier extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;

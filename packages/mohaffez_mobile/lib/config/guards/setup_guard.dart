@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../tour/tour_mode_state.dart';
 import '../route_guard.dart';
 
 /// Redirects users who haven't completed account setup to /setup.
@@ -31,6 +32,9 @@ class SetupGuard implements RouteGuard {
 
   @override
   String? check(Ref ref, GoRouterState state) {
+    // Tour mode: synthetic user already has setupCompleted: true.
+    if (ref.read(tourModeProvider).active) return null;
+
     final authState = ref.read(authStateProvider);
     if (authState.value == null) return null; // not authenticated
 

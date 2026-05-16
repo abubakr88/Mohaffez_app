@@ -206,18 +206,25 @@ final paginatedNotificationsProvider = StateNotifierProvider.family<
 // ===== CONVENIENCE PROVIDERS =====
 
 /// Current user's notifications (based on auth state)
-final currentUserNotificationsProvider = Provider<PaginationState<NotificationModel>>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  if (user == null) return const PaginationState();
-  return ref.watch(paginatedNotificationsProvider(user.uid));
-});
+final currentUserNotificationsProvider =
+    Provider<PaginationState<NotificationModel>>(
+  (ref) {
+    final user = ref.watch(currentUserProvider).value;
+    if (user == null) return const PaginationState();
+    return ref.watch(paginatedNotificationsProvider(user.uid));
+  },
+  dependencies: [currentUserProvider],
+);
 
 /// Current user's unread count
-final currentUserUnreadCountProvider = Provider<int>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  if (user == null) return 0;
-  return ref.watch(unreadNotificationsCountProvider(user.uid)).value ?? 0;
-});
+final currentUserUnreadCountProvider = Provider<int>(
+  (ref) {
+    final user = ref.watch(currentUserProvider).value;
+    if (user == null) return 0;
+    return ref.watch(unreadNotificationsCountProvider(user.uid)).value ?? 0;
+  },
+  dependencies: [currentUserProvider],
+);
 
 // ===== NOTIFICATION ACTIONS PROVIDER =====
 

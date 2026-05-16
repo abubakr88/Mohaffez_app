@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/widgets/cached_avatar.dart';
 import '../../shared/widgets/meeting_links_sheet.dart';
+import '../../tour/tour_guard_helper.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS (consistent with home screens)
@@ -134,6 +135,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(String userId) async {
+    if (guardWriteInTour(ref, context)) return;
     if (_isUploadingPhoto) return;
     setState(() => _isUploadingPhoto = true);
     try {
@@ -203,6 +205,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _saveBio(String userId) async {
+    if (guardWriteInTour(ref, context)) return;
     try {
       final repository = ref.read(userRepositoryProvider);
       await repository.updateUser(userId, {'bio': _bioController.text.trim()});
@@ -215,6 +218,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _saveYoutubeLink(String userId) async {
+    if (guardWriteInTour(ref, context)) return;
     try {
       final trimmed = _youtubeController.text.trim();
       if (trimmed.isNotEmpty && !_isValidYoutubeUrl(trimmed)) {

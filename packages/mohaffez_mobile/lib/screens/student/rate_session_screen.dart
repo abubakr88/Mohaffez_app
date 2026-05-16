@@ -3,6 +3,8 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../tour/tour_guard_helper.dart';
+
 class RateSessionScreen extends ConsumerStatefulWidget {
   final String sessionId;
   final String mohaffezName;
@@ -29,6 +31,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
   }
 
   Future<void> _submitRating() async {
+    if (guardWriteInTour(ref, context)) return;
     if (_isSubmitting) return;
     if (rating == 0) {
       ScaffoldMessenger.of(context).showSnackBar(

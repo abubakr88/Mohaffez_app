@@ -11,6 +11,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../services/app_version_service.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
+import '../../tour/tour_mode_state.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS
@@ -94,6 +95,7 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
   Future<void> _maybeShowWizard() async {
     final user = ref.read(currentUserProvider).value;
     if (user == null || user.role != 'mohaffez') return;
+    if (ref.read(tourModeProvider).active) return;
     final shouldShow = await shouldAutoShowSetupWizard(user.uid);
     if (!mounted || !shouldShow) return;
     ref.read(wizardModeProvider.notifier).state = true;

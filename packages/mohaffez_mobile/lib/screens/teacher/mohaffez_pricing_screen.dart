@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/widgets/add_pricing_plan_sheet.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
+import '../../tour/tour_guard_helper.dart';
 
 class MohaffezPricingScreen extends ConsumerWidget {
   const MohaffezPricingScreen({super.key});
@@ -52,7 +53,10 @@ class MohaffezPricingScreen extends ConsumerWidget {
               ),
             ),
             floatingActionButton: FloatingActionButton.extended(
-              onPressed: () => _showAddPlanDialog(context, ref, mohaffezId),
+              onPressed: () {
+                if (guardWriteInTour(ref, context)) return;
+                _showAddPlanDialog(context, ref, mohaffezId);
+              },
               icon: const Icon(Icons.add),
               label: const Text('إضافة خطة تسعير'),
             ),
@@ -273,11 +277,17 @@ class PricingPlanCard extends ConsumerWidget {
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _editPlan(context, ref),
+                  onPressed: () {
+                    if (guardWriteInTour(ref, context)) return;
+                    _editPlan(context, ref);
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete, size: 20, color: AppThemeConstants.error),
-                  onPressed: () => _deletePlan(context, ref),
+                  onPressed: () {
+                    if (guardWriteInTour(ref, context)) return;
+                    _deletePlan(context, ref);
+                  },
                 ),
               ],
             ),

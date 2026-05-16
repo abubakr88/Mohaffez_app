@@ -99,13 +99,14 @@ final _meetingClockProvider = StreamProvider<DateTime>((ref) {
 typedef MeetingButtonKey = ({String sessionId, String role});
 
 final meetingButtonStateProvider =
-    Provider.family<MeetingButtonState, MeetingButtonKey>((ref, key) {
-  if (key.sessionId.isEmpty) return MeetingButtonState.hidden;
+    Provider.family<MeetingButtonState, MeetingButtonKey>(
+  (ref, key) {
+    if (key.sessionId.isEmpty) return MeetingButtonState.hidden;
 
-  final infoAsync = ref.watch(meetingInfoProvider(key.sessionId));
-  ref.watch(_meetingClockProvider);
-  final systemConfig = ref.watch(systemConfigProvider).valueOrNull;
-  final leadTimeMinutes = systemConfig?.meetingStartLeadTimeMinutes ?? 60;
+    final infoAsync = ref.watch(meetingInfoProvider(key.sessionId));
+    ref.watch(_meetingClockProvider);
+    final systemConfig = ref.watch(systemConfigProvider).valueOrNull;
+    final leadTimeMinutes = systemConfig?.meetingStartLeadTimeMinutes ?? 60;
   print('DEBUG CONFIG: systemConfig: $systemConfig, leadTimeMinutes: $leadTimeMinutes');
   // NTP correction disabled — the `ntp` package returns unreliable offsets
   // on some devices. Device clock is used directly.
@@ -121,7 +122,9 @@ final meetingButtonStateProvider =
     loading: () => MeetingButtonState.pendingMeetingLink,
     error: (_, __) => MeetingButtonState.hidden,
   );
-});
+  },
+  dependencies: [meetingInfoProvider],
+);
 
 MeetingButtonState _computeState({
   required MeetingInfo? info,

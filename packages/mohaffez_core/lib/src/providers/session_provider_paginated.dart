@@ -256,9 +256,6 @@ final filteredUpcomingSessionsProvider =
         switch (filter) {
           case UpcomingFilter.all:
             return sessions;
-          // BUG FIX #4: Use start-of-next-period as exclusive upper bound.
-          // The original used DateTime(..., 23, 59, 59) which silently drops
-          // sessions scheduled in the last millisecond of the period.
           case UpcomingFilter.today:
             final startOfTomorrow =
                 DateTime(now.year, now.month, now.day + 1);
@@ -273,7 +270,6 @@ final filteredUpcomingSessionsProvider =
               return date != null && date.isBefore(endOfWeek);
             }).toList();
           case UpcomingFilter.thisMonth:
-            // BUG FIX #4: Use start of next month as exclusive bound.
             final startOfNextMonth =
                 DateTime(now.year, now.month + 1, 1);
             return sessions.where((session) {
@@ -286,6 +282,7 @@ final filteredUpcomingSessionsProvider =
       error: (_, __) => [],
     );
   },
+  dependencies: [upcomingSessionsProvider],
 );
 
 // ============================================================================
