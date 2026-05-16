@@ -6,6 +6,8 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'config/app_router.dart';
 import 'services/notification_service.dart';
+import 'tour/tour_scope.dart';
+import 'tour/widgets/tour_mode_banner.dart';
 
 class _AppLifecycleObserver extends WidgetsBindingObserver {
   @override
@@ -75,7 +77,16 @@ class _MyAppState extends ConsumerState<MyApp> {
         data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
         child: Directionality(
           textDirection: TextDirection.rtl,
-          child: child ?? const SizedBox.shrink(),
+          child: Column(
+            children: [
+              const TourModeBanner(),
+              Expanded(
+                child: TourScope(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

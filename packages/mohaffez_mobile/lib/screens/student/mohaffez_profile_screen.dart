@@ -12,6 +12,7 @@ import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../providers/mohaffez_profile_providers.dart';
 import '../../providers/student_count_provider.dart';
+import '../../tour/tour_guard_helper.dart';
 
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -73,6 +74,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // ─── Navigation helper ────────────────────────────────────────────────────
 
   void _navigateToBookingMethod() {
+    if (guardWriteInTour(ref, context)) return;
     if (selectedTimeSlot == null || selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

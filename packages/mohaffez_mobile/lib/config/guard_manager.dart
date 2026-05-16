@@ -9,6 +9,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../tour/tour_mode_state.dart';
 import 'route_guard.dart';
 import 'guards/timeout_guard.dart';
 import 'guards/auth_guard.dart';
@@ -28,9 +29,13 @@ class GuardManager {
   static String? checkGuards(Ref ref, GoRouterState state) {
     final current = state.uri;
 
-    final isSuspended = ref.read(isUserSuspendedProvider).value ?? false;
+    // Tour mode: skip suspension preamble (synthetic user is never suspended).
+    final inTour = ref.read(tourModeProvider).active;
+
+    final isSuspended =
+        !inTour && (ref.read(isUserSuspendedProvider).value ?? false);
     final currentUser = ref.read(currentUserProvider).value;
-    final isStatusSuspended = currentUser?.status == 'suspended';
+    final isStatusSuspended = !inTour && currentUser?.status == 'suspended';
 
     // WHY: Lock out if either the suspension doc OR users.status says suspended.
     if (isSuspended || isStatusSuspended) {

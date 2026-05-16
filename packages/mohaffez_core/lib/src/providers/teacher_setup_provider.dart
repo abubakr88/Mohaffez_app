@@ -37,9 +37,10 @@ class TeacherSetupProgress {
 /// True while the teacher is navigating the sequential setup wizard flow.
 final wizardModeProvider = StateProvider<bool>((ref) => false);
 
-final teacherSetupProvider = FutureProvider<TeacherSetupProgress>((ref) async {
-  final user = ref.watch(currentUserProvider).value;
-  if (user == null) return const TeacherSetupProgress();
+final teacherSetupProvider = FutureProvider<TeacherSetupProgress>(
+  (ref) async {
+    final user = ref.watch(currentUserProvider).value;
+    if (user == null) return const TeacherSetupProgress();
 
   final uid = user.uid;
   final db = FirebaseFirestore.instance;
@@ -65,14 +66,16 @@ final teacherSetupProvider = FutureProvider<TeacherSetupProgress>((ref) async {
   final walletDone =
       walletMap?.values.any((v) => v is String && v.isNotEmpty) ?? false;
 
-  return TeacherSetupProgress(
-    profileDone: profileDone,
-    credentialsDone: credDone,
-    availabilityDone: availDone,
-    walletDone: walletDone,
-    pricingDone: pricingDone,
-  );
-});
+    return TeacherSetupProgress(
+      profileDone: profileDone,
+      credentialsDone: credDone,
+      availabilityDone: availDone,
+      walletDone: walletDone,
+      pricingDone: pricingDone,
+    );
+  },
+  dependencies: [currentUserProvider],
+);
 
 /// Returns true the very first time this teacher opens the app after approval.
 /// Uses Firestore so the flag survives logout, cache clears, and reinstalls.

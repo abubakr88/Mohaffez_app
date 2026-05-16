@@ -10,6 +10,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../tour/tour_mode_state.dart';
 import '../route_guard.dart';
 
 /// Redirects authenticated users from splash/login and enforces role-based access.
@@ -67,9 +68,11 @@ class RoleGuard implements RouteGuard {
     final AsyncValue<UserModel?> userState = ref.read(currentUserProvider);
     final config = ref.read(systemConfigProvider).valueOrNull;
     final currentPath = state.uri.path;
+    final inTour = ref.read(tourModeProvider).active;
 
     // Only process if authenticated (AuthGuard handles unauth).
-    if (authState.value == null) return null;
+    // Tour mode supplies a synthetic user via overrides — treat as authenticated.
+    if (authState.value == null && !inTour) return null;
 
     // WHY: teacher-pending must be checked before sharedRoutePrefixes so that
     // status changes (pending_approval → active/rejected) trigger a redirect
@@ -114,14 +117,23 @@ class RoleGuard implements RouteGuard {
     if (userState.hasError) return null;
 
     final user = userState.value;
-    if (user == null) return null;
 
-    final role = user.role.trim();
+    // In tour mode the nested ProviderScope overrides are invisible to the
+    // outer ref used by GoRouter. Derive the role directly from tourModeProvider
+    // so role-based redirects still apply to demo users.
+    String role;
+    if (user == null) {
+      if (!inTour) return null;
+      final tourRole = ref.read(tourModeProvider).role;
+      role = tourRole == TourRole.mohaffez ? 'mohaffez' : 'student';
+    } else {
+      role = user.role.trim();
+    }
     if (role.isEmpty) return loginPath;
 
     if (config != null &&
         config.maintenanceMode == true &&
-        !config.maintenanceAllowedUids.contains(user.uid) &&
+        !config.maintenanceAllowedUids.contains(user?.uid) &&
         currentPath != '/maintenance') {
       return '/maintenance';
     }

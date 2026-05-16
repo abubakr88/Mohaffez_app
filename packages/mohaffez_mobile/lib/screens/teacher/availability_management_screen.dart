@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../shared/utils/time_formatter.dart';
+import '../../tour/tour_guard_helper.dart';
 
 // ─── Data classes ─────────────────────────────────────────────────────────────
 
@@ -210,6 +211,7 @@ class _AvailabilityManagementScreenState
   // ── Firestore save ──────────────────────────────────────────────────────────
 
   Future<void> _saveAll() async {
+    if (guardWriteInTourCtx(context)) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 

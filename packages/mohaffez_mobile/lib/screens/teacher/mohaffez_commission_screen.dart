@@ -7,6 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+final weeklyCommissionsProvider = StreamProvider.autoDispose
+    .family<List<WeeklyCommissionSummary>, String>((ref, mohaffezId) {
+  return DirectPaymentService.watchCommissions(mohaffezId);
+});
 
 class MohaffezCommissionScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
@@ -47,13 +51,10 @@ class _MohaffezCommissionScreenState
           backgroundColor: AppThemeConstants.primary,
           foregroundColor: AppThemeConstants.onPrimary,
         ),
-        body: StreamBuilder<List<WeeklyCommissionSummary>>(
-          stream: DirectPaymentService.watchCommissions(widget.mohaffezId),
-          builder: (context, snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final list = snap.data!;
+        body: ref.watch(weeklyCommissionsProvider(widget.mohaffezId)).when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => const Center(child: Text('تعذر تحميل البيانات')),
+          data: (list) {
             if (list.isEmpty) {
               return const Center(
                 child: Text('لا توجد عمولات بعد'),

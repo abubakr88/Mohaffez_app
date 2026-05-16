@@ -144,22 +144,27 @@ class UserUpdateNotifier extends StateNotifier<AsyncValue<void>> {
   }
 }
 
-final isMohaffezProvider = Provider<bool>((ref) {
-  return ref.watch(currentUserProvider).value?.role == 'mohaffez';
-});
+final isMohaffezProvider = Provider<bool>(
+  (ref) => ref.watch(currentUserProvider).value?.role == 'mohaffez',
+  dependencies: [currentUserProvider],
+);
 
-final isStudentProvider = Provider<bool>((ref) {
-  return ref.watch(currentUserProvider).value?.role == 'student';
-});
+final isStudentProvider = Provider<bool>(
+  (ref) => ref.watch(currentUserProvider).value?.role == 'student',
+  dependencies: [currentUserProvider],
+);
 
-final currentUserIdProvider = Provider<String?>((ref) {
-  return ref.watch(currentUserProvider).value?.uid;
-});
+final currentUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(currentUserProvider).value?.uid,
+  dependencies: [currentUserProvider],
+);
 
-final currentUserNameProvider = Provider<String?>((ref) {
-  return ref.watch(currentUserProvider).value?.name;
-});
+final currentUserNameProvider = Provider<String?>(
+  (ref) => ref.watch(currentUserProvider).value?.name,
+  dependencies: [currentUserProvider],
+);
 
-final currentUserRoleProvider = Provider<String?>((ref) {
-  return ref.watch(currentUserProvider).value?.role;
-});
+final currentUserRoleProvider = Provider<String?>(
+  (ref) => ref.watch(currentUserProvider).value?.role,
+  dependencies: [currentUserProvider],
+);

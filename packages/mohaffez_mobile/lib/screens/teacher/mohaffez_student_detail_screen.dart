@@ -12,7 +12,7 @@ import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 
 // Provider: all sessions between this teacher and this specific student
-final _studentDetailSessionsProvider = FutureProvider.autoDispose
+final studentDetailSessionsProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>,
         ({String mohaffezId, String studentId})>((ref, p) async {
   final snapshot = await FirebaseFirestore.instance
@@ -54,17 +54,22 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final params = (mohaffezId: mohaffezId, studentId: student.studentId);
-    final sessionsAsync = ref.watch(_studentDetailSessionsProvider(params));
+    // mohaffezId may be empty when the route builder ran in the outer
+    // ProviderScope (e.g. tour mode). Fall back to the in-scope current user.
+    final effectiveMohaffezId = mohaffezId.isNotEmpty
+        ? mohaffezId
+        : (ref.watch(currentUserProvider).value?.uid ?? '');
+    final params = (mohaffezId: effectiveMohaffezId, studentId: student.studentId);
+    final sessionsAsync = ref.watch(studentDetailSessionsProvider(params));
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         body: RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(_studentDetailSessionsProvider(params));
+            ref.invalidate(studentDetailSessionsProvider(params));
             await ref
-                .read(_studentDetailSessionsProvider(params).future)
+                .read(studentDetailSessionsProvider(params).future)
                 .catchError((_) => <Map<String, dynamic>>[]);
           },
           child: CustomScrollView(
@@ -206,7 +211,7 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                 error: (e, _) => SliverFillRemaining(
                   child: ErrorDisplay.dataLoad(
                     onRetry: () =>
-                        ref.invalidate(_studentDetailSessionsProvider(params)),
+                        ref.invalidate(studentDetailSessionsProvider(params)),
                   ),
                 ),
               ),
