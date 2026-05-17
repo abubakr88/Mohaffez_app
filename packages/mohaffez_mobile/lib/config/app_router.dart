@@ -50,6 +50,8 @@ import '../screens/teacher/mohaffez_schedule_screen.dart';
 import '../screens/teacher/mohaffez_students_screen.dart';
 import '../screens/teacher/mohaffez_student_detail_screen.dart';
 import '../screens/teacher/mohaffez_wallet_settings_screen.dart';
+import '../screens/teacher/mohaffez_wallet_screen.dart';
+import '../screens/teacher/request_payout_screen.dart';
 import '../screens/teacher/mohaffez_commission_screen.dart';
 import '../screens/teacher/availability_management_screen.dart';
 import '../screens/teacher/pending_requests_screen.dart';
@@ -470,6 +472,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/wallet-settings',
             name: 'wallet-settings',
             builder: (context, state) => const MohaffezWalletSettingsScreen(),
+          ),
+          GoRoute(
+            path: '/mohaffez-wallet',
+            name: 'mohaffez-wallet',
+            builder: (context, state) => const MohaffezWalletScreen(),
+          ),
+          GoRoute(
+            path: '/request-payout',
+            name: 'request-payout',
+            builder: (context, state) => const RequestPayoutScreen(),
           ),
           GoRoute(
             path: '/mohaffez-commissions',

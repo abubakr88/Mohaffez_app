@@ -720,6 +720,9 @@ class _ActionsSection extends StatelessWidget {
       _ActionData(icon: Icons.receipt_long_rounded, label: 'المستحقات',
           color: _DS.gold, bg: _DS.goldBg,
           onTap: () => context.push('/mohaffez-commissions')),
+      _ActionData(icon: Icons.account_balance_wallet_rounded, label: 'محفظتي',
+          color: _DS.teal600, bg: _DS.teal100,
+          onTap: () => context.push('/mohaffez-wallet')),
       // ── Row 3: Settings / rare ──
       _ActionData(icon: Icons.sell_rounded, label: 'الأسعار',
           color: _DS.purple, bg: _DS.purpleBg,
