@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/payment_deadline_timer.dart';
+import '../../shared/widgets/pay_from_wallet_card.dart';
 import '../../shared/utils/time_formatter.dart';
 
 class DirectPaymentScreen extends ConsumerStatefulWidget {
@@ -509,6 +510,14 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             children: [
               _buildSessionSummaryCard(),
               const SizedBox(height: AppThemeConstants.spaceLg),
+
+              if (widget.requestId != null && resolvedAmount != null) ...[
+                PayFromWalletCard(
+                  sessionRequestId: widget.requestId!,
+                  amountEgp: resolvedAmount!,
+                ),
+                const SizedBox(height: AppThemeConstants.spaceLg),
+              ],
 
               _buildAmountCard(),
               const SizedBox(height: AppThemeConstants.spaceLg),
