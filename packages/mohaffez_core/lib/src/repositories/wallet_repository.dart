@@ -61,6 +61,33 @@ class WalletRepository {
             .toList());
   }
 
+  // ──────────────── admin queues ────────────────
+
+  /// Pending top-up requests awaiting admin verification, oldest first
+  /// (FIFO — fairer to users who've been waiting longest).
+  Stream<List<Map<String, dynamic>>> watchPendingTopUps() {
+    return _firestore
+        .collection('topUpRequests')
+        .where('status', isEqualTo: 'pending')
+        .orderBy('createdAt')
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => {...d.data(), 'id': d.id})
+            .toList());
+  }
+
+  /// Active payout requests (requested OR processing) for the admin queue.
+  Stream<List<PayoutRequestModel>> watchActivePayouts() {
+    return _firestore
+        .collection('payoutRequests')
+        .where('status', whereIn: ['requested', 'processing'])
+        .orderBy('createdAt')
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => PayoutRequestModel.fromFirestore(d))
+            .toList());
+  }
+
   // ──────────────── mutations (callables) ────────────────
 
   /// Student creates a pending top-up request after sending money via
@@ -120,6 +147,16 @@ class WalletRepository {
       'topUpRequestId': topUpRequestId,
       if (paidAmountEgp != null) 'paidAmountEgp': paidAmountEgp,
       if (adminNote != null) 'adminNote': adminNote,
+    });
+  }
+
+  Future<void> rejectWalletTopUp({
+    required String topUpRequestId,
+    required String reason,
+  }) async {
+    await _functions.httpsCallable('rejectWalletTopUp').call({
+      'topUpRequestId': topUpRequestId,
+      'reason': reason,
     });
   }
 

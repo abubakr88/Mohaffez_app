@@ -30,3 +30,18 @@ final payoutRequestsProvider =
   (ref, mohaffezId) =>
       ref.read(walletRepositoryProvider).watchPayoutRequests(mohaffezId),
 );
+
+// ──────────────── admin queues ────────────────
+
+/// Pending top-up requests for the admin verification queue.
+/// Each entry is the raw doc as a Map (no model — fields are admin-facing
+/// metadata: userId, amountEgp, method, referenceNumber, proofUrl, etc).
+final pendingTopUpsProvider =
+    StreamProvider<List<Map<String, dynamic>>>(
+  (ref) => ref.read(walletRepositoryProvider).watchPendingTopUps(),
+);
+
+/// Active payouts (requested + processing) for the admin queue.
+final activePayoutsProvider = StreamProvider<List<PayoutRequestModel>>(
+  (ref) => ref.read(walletRepositoryProvider).watchActivePayouts(),
+);

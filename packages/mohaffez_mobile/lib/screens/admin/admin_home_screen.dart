@@ -364,6 +364,22 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                   ),
                   const SizedBox(height: AppThemeConstants.spaceSm),
                   const _NavCard(
+                    title: 'التحقق من شحنات المحفظة',
+                    subtitle: 'طلبات شحن المحفظة المعلقة',
+                    icon: Icons.verified_rounded,
+                    iconColor: Color(0xFF0891B2),
+                    routeName: 'admin-wallet-topups',
+                  ),
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                  const _NavCard(
+                    title: 'معالجة طلبات السحب',
+                    subtitle: 'طلبات السحب الجارية',
+                    icon: Icons.payments_rounded,
+                    iconColor: Color(0xFFB45309),
+                    routeName: 'admin-process-payouts',
+                  ),
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                  const _NavCard(
                     title: ArabicLabels.promoCodes,
                     subtitle: 'إنشاء وإدارة أكواد الخصم',
                     icon: Icons.discount_rounded,

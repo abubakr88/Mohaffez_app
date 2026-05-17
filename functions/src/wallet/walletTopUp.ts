@@ -88,6 +88,66 @@ export const verifyWalletTopUp = functions.https.onCall(async (data, context) =>
 });
 
 /**
+ * Admin rejects a pending top-up request (e.g. couldn't find the transfer,
+ * suspicious activity). No ledger movement — request is marked 'rejected'
+ * with a reason so the user can see why.
+ */
+export const rejectWalletTopUp = functions.https.onCall(async (data, context) => {
+  const adminUid = await requireAdmin(context);
+  const { topUpRequestId, reason } = data as {
+    topUpRequestId: string;
+    reason: string;
+  };
+  if (!topUpRequestId || !reason || reason.trim().length < 3) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'topUpRequestId + reason required',
+    );
+  }
+
+  return db.runTransaction(async (tx) => {
+    const reqRef = db.collection('topUpRequests').doc(topUpRequestId);
+    const reqSnap = await tx.get(reqRef);
+    if (!reqSnap.exists) {
+      throw new functions.https.HttpsError('not-found', 'top-up request not found');
+    }
+    const req = reqSnap.data()!;
+    if (req.status === 'verified') {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'cannot reject a verified top-up',
+      );
+    }
+    if (req.status === 'rejected') {
+      return { success: true, message: 'already rejected' };
+    }
+
+    tx.update(reqRef, {
+      status: 'rejected',
+      rejectedBy: adminUid,
+      rejectedAt: new Date(),
+      rejectionReason: reason.trim(),
+    });
+
+    // Notify user.
+    const notifRef = db.collection('notifications').doc();
+    tx.set(notifRef, {
+      userId: req.userId,
+      recipientId: req.userId,
+      senderId: adminUid,
+      title: 'تم رفض طلب الشحن',
+      body: `لم يتم تأكيد تحويلك بقيمة ${req.amountEgp} ج.م. السبب: ${reason.trim()}`,
+      type: 'topup_rejected',
+      isRead: false,
+      data: { topUpRequestId, reason: reason.trim() },
+      createdAt: new Date(),
+    });
+
+    return { success: true };
+  });
+});
+
+/**
  * Admin can also credit a wallet directly without a pending request doc
  * (e.g. promo, refund of an out-of-band issue). Always requires a reason.
  */

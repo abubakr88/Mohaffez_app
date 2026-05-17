@@ -69,7 +69,11 @@ export {
 } from './onlineSessions';
 
 // Wallet system (double-entry ledger)
-export { verifyWalletTopUp, adminCreditWallet } from './wallet/walletTopUp';
+export {
+  verifyWalletTopUp,
+  rejectWalletTopUp,
+  adminCreditWallet,
+} from './wallet/walletTopUp';
 export { payFromWallet, refundSessionPayment } from './wallet/walletPaySession';
 export {
   requestPayout,
