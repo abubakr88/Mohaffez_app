@@ -10,14 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
-// Account details shown to the user. In a real deploy these come from
-// systemConfig — hardcoded here as a placeholder until that's wired.
-const _kPlatformAccounts = {
-  'instapay': '01012345678',
-  'vodafone_cash': '01012345678',
-  'bank_transfer': 'IBAN: EG00 0000 0000 0000 0000 0000',
-};
-
+// Account values come from systemConfig/global.adminWallets, keyed by
+// method id. Labels and order are defined here.
 const _kMethodLabels = {
   'instapay': 'إنستاباي',
   'vodafone_cash': 'فودافون كاش',
@@ -279,13 +273,39 @@ class _Step extends StatelessWidget {
   }
 }
 
-class _AccountBox extends StatelessWidget {
+class _AccountBox extends ConsumerWidget {
   final String method;
   const _AccountBox({required this.method});
 
   @override
-  Widget build(BuildContext context) {
-    final value = _kPlatformAccounts[method] ?? '';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(systemConfigProvider).valueOrNull;
+    final value = config?.adminWallets[method] ?? '';
+    if (value.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.warning.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: AppThemeConstants.warning.withValues(alpha: 0.3),
+          ),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline,
+                color: AppThemeConstants.warning, size: 18),
+            SizedBox(width: AppThemeConstants.spaceSm),
+            Expanded(
+              child: Text(
+                'لم يتم إعداد حساب الاستلام بعد. تواصل مع الإدارة.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
       decoration: BoxDecoration(
