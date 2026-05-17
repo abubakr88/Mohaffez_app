@@ -40,6 +40,8 @@ import '../screens/student/confirm_bundle_session_screen.dart';
 import '../screens/student/direct_booking_request_screen.dart';
 import '../screens/student/direct_payment_screen.dart';
 import '../screens/student/active_subscriptions_screen.dart';
+import '../screens/student/student_wallet_screen.dart';
+import '../screens/student/wallet_topup_screen.dart';
 // Teacher screens
 import '../screens/teacher/mohaffez_home.dart';
 import '../screens/teacher/mohaffez_credentials_screen.dart';
@@ -288,6 +290,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/assignments',
             name: 'assignments',
             builder: (context, state) => const StudentAssignmentsScreen(),
+          ),
+          GoRoute(
+            path: '/student-wallet',
+            name: 'student-wallet',
+            builder: (context, state) => const StudentWalletScreen(),
+          ),
+          GoRoute(
+            path: '/wallet-topup',
+            name: 'wallet-topup',
+            builder: (context, state) => const WalletTopupScreen(),
           ),
           GoRoute(
             path: '/rate-session/:sessionId',
