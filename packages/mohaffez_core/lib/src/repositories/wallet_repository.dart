@@ -115,10 +115,16 @@ class WalletRepository {
   }
 
   /// Student pays a session from their wallet. Returns the new session id.
-  Future<String> payFromWallet({required String sessionRequestId}) async {
-    final res = await _functions
-        .httpsCallable('payFromWallet')
-        .call({'sessionRequestId': sessionRequestId});
+  /// [amountEgp] is always sent — server prefers paymentAmount on the doc
+  /// when present and falls back to this otherwise.
+  Future<String> payFromWallet({
+    required String sessionRequestId,
+    required double amountEgp,
+  }) async {
+    final res = await _functions.httpsCallable('payFromWallet').call({
+      'sessionRequestId': sessionRequestId,
+      'amountEgp': amountEgp,
+    });
     return (res.data as Map)['sessionId'] as String;
   }
 

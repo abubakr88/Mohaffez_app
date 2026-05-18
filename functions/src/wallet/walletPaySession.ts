@@ -25,6 +25,9 @@ import {
 
 interface PayFromWalletRequest {
   sessionRequestId: string;
+  /** Required when the sessionRequest doc has no paymentAmount yet
+   *  (early bookings only get the price computed client-side). */
+  amountEgp?: number;
 }
 
 export const payFromWallet = functions.https.onCall(async (data, context) => {
@@ -33,7 +36,8 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
   }
   const studentId = context.auth.uid;
 
-  const { sessionRequestId } = data as PayFromWalletRequest;
+  const { sessionRequestId, amountEgp: clientAmountEgp } =
+    data as PayFromWalletRequest;
   if (!sessionRequestId) {
     throw new functions.https.HttpsError('invalid-argument', 'sessionRequestId required');
   }
@@ -62,9 +66,18 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       );
     }
 
-    const amountEgp = req.paymentAmount as number;
+    // Prefer the price already on the doc when it's a positive number
+    // (set by an earlier flow); otherwise fall back to client-provided
+    // amount. `||` (not `??`) so that an explicit 0 also falls through.
+    const docAmount = req.paymentAmount as number | undefined | null;
+    const amountEgp = ((docAmount && docAmount > 0)
+      ? docAmount
+      : clientAmountEgp) as number;
     if (!amountEgp || amountEgp <= 0) {
-      throw new functions.https.HttpsError('failed-precondition', 'request has no paymentAmount');
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'amount required: pass amountEgp or set paymentAmount on the request',
+      );
     }
     const totalPiastres = egpToPiastres(amountEgp);
 

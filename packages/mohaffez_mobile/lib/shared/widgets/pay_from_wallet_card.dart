@@ -35,9 +35,10 @@ class _PayFromWalletCardState extends ConsumerState<PayFromWalletCard> {
   Future<void> _pay() async {
     setState(() => _submitting = true);
     try {
-      await ref
-          .read(walletRepositoryProvider)
-          .payFromWallet(sessionRequestId: widget.sessionRequestId);
+      await ref.read(walletRepositoryProvider).payFromWallet(
+            sessionRequestId: widget.sessionRequestId,
+            amountEgp: widget.amountEgp,
+          );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -68,6 +69,10 @@ class _PayFromWalletCardState extends ConsumerState<PayFromWalletCard> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider).valueOrNull;
     if (user == null) return const SizedBox.shrink();
+
+    // Defensive: never render an "Pay" CTA when the parent hasn't resolved
+    // a real price yet. Pre-empts a misleading "balance sufficient" state.
+    if (widget.amountEgp <= 0) return const SizedBox.shrink();
 
     final walletAsync = ref.watch(walletProvider((
       userId: user.uid,
