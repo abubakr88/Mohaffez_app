@@ -216,18 +216,21 @@ export async function postLedgerEntry(
   return { groupId: input.groupId, idempotent: false };
 }
 
-/** Guard: callable is admin (custom claim) or throws. */
+/** Guard: callable is admin (custom claim) or throws.
+ *
+ * Custom claim only — Firestore security rules also require the claim
+ * (not a `users/{uid}.role` field). Keeping these two checks aligned
+ * prevents the confusing state where an admin can call a callable but
+ * can't read the data the callable produces. To make a user admin, call
+ * the `setAdminClaim` Cloud Function.
+ */
 export async function requireAdmin(context: functions.https.CallableContext): Promise<string> {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'login required');
   }
   const isAdminClaim =
     context.auth.token.admin === true || context.auth.token.role === 'admin';
-  if (isAdminClaim) return context.auth.uid;
-
-  // Fallback: legacy admins without custom claim (matches existing code style).
-  const userDoc = await db.collection('users').doc(context.auth.uid).get();
-  if (userDoc.data()?.role !== 'admin') {
+  if (!isAdminClaim) {
     throw new functions.https.HttpsError('permission-denied', 'admin only');
   }
   return context.auth.uid;
