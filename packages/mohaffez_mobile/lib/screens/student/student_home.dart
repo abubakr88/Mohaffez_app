@@ -719,6 +719,9 @@ class _ActionsSection extends StatelessWidget {
       _ActionData(icon: Icons.wallet_rounded, label: 'اشتراكاتي',
           color: _DS.gold, bg: _DS.goldBg,
           onTap: () => context.push('/active-subscriptions')),
+      _ActionData(icon: Icons.account_balance_wallet_rounded, label: 'محفظتي',
+          color: _DS.teal600, bg: _DS.teal100,
+          onTap: () => context.push('/student-wallet')),
     ];
 
     return Column(

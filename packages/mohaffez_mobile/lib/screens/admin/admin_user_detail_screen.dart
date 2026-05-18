@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
 import '../../shared/widgets/admin_app_bar.dart';
+import 'admin_credit_wallet_screen.dart';
 
 class AdminUserDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> user;
@@ -175,6 +176,48 @@ class _AdminUserDetailScreenState
                   ),
                 ),
               ],
+            ),
+
+            // ── Wallet credit (admin only — credits the user's wallet
+            //    with a refund/adjustment or promo/reward). Opens the
+            //    standalone AdminCreditWalletScreen prefilled with this user.
+            const SizedBox(height: AppThemeConstants.spaceMd),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  final role = widget.user['role']?.toString();
+                  if (role != 'student' && role != 'mohaffez') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        backgroundColor: AppThemeConstants.warning,
+                        content: Text(
+                            'الإضافة متاحة فقط للطلاب والمحفظين'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => AdminCreditWalletScreen(
+                      prefilledUserId: widget.user['id'].toString(),
+                      prefilledUserName:
+                          widget.user['name']?.toString(),
+                      prefilledRole: role,
+                    ),
+                  ));
+                },
+                icon: const Icon(Icons.add_card_rounded),
+                label: const Text('إضافة رصيد لمحفظة المستخدم'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppThemeConstants.primary,
+                  side: const BorderSide(color: AppThemeConstants.primary),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: AppThemeConstants.spaceMd),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
             ),
 
             // ── Credentials (mohaffez only) ──────────────────────────────────

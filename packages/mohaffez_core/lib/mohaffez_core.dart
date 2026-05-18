@@ -26,6 +26,9 @@ export 'src/models/subscription_model.dart';
 export 'src/models/suspension_model.dart';
 export 'src/models/system_config_model.dart';
 export 'src/models/user_model.dart' hide TimestampConverter;
+export 'src/models/wallet_model.dart';
+export 'src/models/wallet_transaction_model.dart';
+export 'src/models/payout_request_model.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REPOSITORIES
@@ -39,6 +42,7 @@ export 'src/repositories/session_repository.dart';
 export 'src/repositories/subscription_repository.dart';
 export 'src/repositories/system_config_repository.dart';
 export 'src/repositories/user_repository.dart';
+export 'src/repositories/wallet_repository.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROVIDERS
@@ -63,6 +67,7 @@ export 'src/providers/server_clock_provider.dart';
 export 'src/providers/system_config_provider.dart';
 export 'src/providers/teacher_setup_provider.dart';
 export 'src/providers/user_provider.dart';
+export 'src/providers/wallet_provider.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SERVICES

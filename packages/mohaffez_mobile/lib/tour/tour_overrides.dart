@@ -25,11 +25,24 @@ List<Override> buildTourOverrides(TourRole role, Object fixture) {
 }
 
 List<Override> _commonOverrides(UserModel user) {
+  final ownerType = user.role == 'mohaffez'
+      ? WalletOwnerType.mohaffez
+      : WalletOwnerType.student;
   return [
     currentUserProvider.overrideWith((ref) => Stream.value(user)),
     isUserSuspendedProvider.overrideWith((ref) => Stream.value(false)),
     unreadNotificationsCountProvider
         .overrideWith((ref, _) => Stream.value(0)),
+    // Wallet system — synthetic UIDs have no real wallet docs in Firestore.
+    // Provide an empty wallet + empty ledger so tour-mode users can navigate
+    // to the wallet screen without triggering PERMISSION_DENIED.
+    walletProvider.overrideWith(
+      (ref, _) => Stream.value(WalletModel.empty(user.uid, ownerType)),
+    ),
+    walletTransactionsProvider
+        .overrideWith((ref, _) => Stream.value(const [])),
+    payoutRequestsProvider
+        .overrideWith((ref, _) => Stream.value(const [])),
   ];
 }
 

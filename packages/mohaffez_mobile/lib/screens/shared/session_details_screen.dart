@@ -381,6 +381,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     final currentUser = ref.watch(currentUserProvider).value;
     final isMohaffez = currentUser?.role == 'mohaffez';
     final isStudent = currentUser?.role == 'student';
+    final isAdmin = currentUser?.role == 'admin';
     final session = widget.session;
 
     return Directionality(
@@ -488,6 +489,10 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                 padding: const EdgeInsets.all(16),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
+                    if (isAdmin && session.id != null) ...[
+                      _AdminRefundCard(sessionId: session.id!),
+                      const SizedBox(height: 16),
+                    ],
                     // Session Info
                     _SectionCard(
                       title: 'معلومات الجلسة',
@@ -1364,6 +1369,139 @@ class _StatCell extends StatelessWidget {
               const TextStyle(fontSize: 11, color: AppThemeConstants.grey600),
         ),
       ],
+    );
+  }
+}
+
+/// Admin-only card on session details: refund the session via the wallet
+/// ledger. Server enforces eligibility (wallet-paid, not already refunded).
+class _AdminRefundCard extends ConsumerStatefulWidget {
+  final String sessionId;
+  const _AdminRefundCard({required this.sessionId});
+
+  @override
+  ConsumerState<_AdminRefundCard> createState() => _AdminRefundCardState();
+}
+
+class _AdminRefundCardState extends ConsumerState<_AdminRefundCard> {
+  bool _submitting = false;
+
+  Future<void> _confirmRefund() async {
+    final reasonCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('استرداد الجلسة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'سيتم إرجاع مبلغ الجلسة إلى محفظة الطالب وخصم العمولة من رصيد المنصة. تنطبق العملية على الجلسات المدفوعة من المحفظة فقط.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'سبب الاسترداد',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppThemeConstants.error,
+              foregroundColor: AppThemeConstants.white,
+            ),
+            onPressed: () {
+              if (reasonCtrl.text.trim().length < 3) return;
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('تأكيد الاسترداد'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _submitting = true);
+    try {
+      await ref.read(walletRepositoryProvider).refundSessionPayment(
+            sessionId: widget.sessionId,
+            reason: reasonCtrl.text.trim(),
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.success,
+          content: Text('تم الاسترداد بنجاح'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('تعذر الاسترداد: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.error.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: AppThemeConstants.error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.shield_moon_outlined,
+              color: AppThemeConstants.error),
+          const SizedBox(width: AppThemeConstants.spaceSm),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('أدوات الإدارة',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('استرداد المبلغ إلى محفظة الطالب',
+                    style: TextStyle(
+                        color: AppThemeConstants.textSecondary,
+                        fontSize: 12)),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: _submitting ? null : _confirmRefund,
+            icon: _submitting
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.undo, size: 18),
+            label: const Text('استرداد'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppThemeConstants.error,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
