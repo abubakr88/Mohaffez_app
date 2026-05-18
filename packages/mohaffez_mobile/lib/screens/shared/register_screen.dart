@@ -133,6 +133,54 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                     child: Column(
                       children: [
+                        const Text(
+                          'اختر نوع الحساب',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(
+                          height: AppThemeConstants.spaceMd -
+                              AppThemeConstants.spaceXs,
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _RoleCard(
+                                icon: Icons.school,
+                                title: 'محفّظ',
+                                subtitle: 'معلم القرآن',
+                                color: AppThemeConstants.primary,
+                                isSelected: _selectedRole == 'mohaffez',
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRole = 'mohaffez';
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(
+                              width: AppThemeConstants.spaceMd -
+                                  AppThemeConstants.spaceXs,
+                            ),
+                            Expanded(
+                              child: _RoleCard(
+                                icon: Icons.person,
+                                title: 'طالب',
+                                subtitle: 'دارس القرآن',
+                                color: AppThemeConstants.secondary,
+                                isSelected: _selectedRole == 'student',
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRole = 'student';
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceLg),
                         TextFormField(
                           controller: _nameController,
                           decoration: const InputDecoration(
@@ -243,54 +291,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 onTap: () {
                                   setState(() {
                                     _selectedGender = 'female';
-                                  });
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppThemeConstants.spaceLg),
-                        const Text(
-                          'اختر نوع الحساب',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(
-                          height: AppThemeConstants.spaceMd -
-                              AppThemeConstants.spaceXs,
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _RoleCard(
-                                icon: Icons.school,
-                                title: 'محفّظ',
-                                subtitle: 'معلم القرآن',
-                                color: AppThemeConstants.primary,
-                                isSelected: _selectedRole == 'mohaffez',
-                                onTap: () {
-                                  setState(() {
-                                    _selectedRole = 'mohaffez';
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(
-                              width: AppThemeConstants.spaceMd -
-                                  AppThemeConstants.spaceXs,
-                            ),
-                            Expanded(
-                              child: _RoleCard(
-                                icon: Icons.person,
-                                title: 'طالب',
-                                subtitle: 'دارس القرآن',
-                                color: AppThemeConstants.secondary,
-                                isSelected: _selectedRole == 'student',
-                                onTap: () {
-                                  setState(() {
-                                    _selectedRole = 'student';
                                   });
                                 },
                               ),

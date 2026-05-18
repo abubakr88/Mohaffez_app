@@ -101,10 +101,9 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                       value: PlanType.bundle,
                       child: Text('باقة جلسات'),
                     ),
-                    DropdownMenuItem(
-                      value: PlanType.subscription,
-                      child: Text('اشتراك شهري'),
-                    ),
+                    // PlanType.subscription intentionally omitted from the
+                    // picker: same outcome achievable via bundles. The enum
+                    // value stays for backward-compat with existing docs.
                   ],
                   onChanged: (val) {
                     setState(() {
