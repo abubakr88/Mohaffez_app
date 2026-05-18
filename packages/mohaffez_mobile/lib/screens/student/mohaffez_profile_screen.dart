@@ -339,8 +339,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // ─── Pricing section ──────────────────────────────────────────────────────
 
   Widget _buildReadOnlyPlanCard(PricingPlanModel plan) {
-    final isBundle =
-        plan.type == PlanType.bundle || plan.type == PlanType.subscription;
+    final isBundle = plan.type == PlanType.bundle;
     final badgeColor = isBundle
         ? AppThemeConstants.accentPurpleDark
         : AppThemeConstants.accentAmberDark;

@@ -241,7 +241,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             // NEW: Filter for bundle plans only when showBundlePlansOnly is true
             if (widget.showBundlePlansOnly) {
               filteredPlans = filteredPlans
-                  .where((p) => p.type == PlanType.bundle || p.type == PlanType.subscription)
+                  .where((p) => p.type == PlanType.bundle)
                   .toList();
             }
 
@@ -536,8 +536,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     // ── EXISTING: Card / Paymob payment ──────────────────────────────────
     // BUG-A FIX: Allow bundle/subscription plans to proceed without slot
     final planType = selectedPlan?.type;
-    final isBundlePlan = planType == PlanType.bundle ||
-        planType == PlanType.subscription;
+    final isBundlePlan = planType == PlanType.bundle;
     final requiresSlot = !isFreeSession &&
         !isBundlePlan &&    // bundles do not require a slot
         widget.requestId == null;
@@ -594,8 +593,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
     // BUG-A FIX: Handle bundle/subscription direct payment
     final planType = selectedPlan?.type;
-    final isBundlePlan = planType == PlanType.bundle ||
-        planType == PlanType.subscription;
+    final isBundlePlan = planType == PlanType.bundle;
 
     if (isFreeSession && appliedPromoCode != null) {
       await handleFreeSession(context, ref, user);
@@ -619,8 +617,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     // WHY: Bundles are paid first; sessions are booked separately afterward.
     // Only single-session plans require a slot and a requestId at this stage.
     final planType = selectedPlan?.type;
-    final isBundlePlan = planType == PlanType.bundle ||
-        planType == PlanType.subscription;
+    final isBundlePlan = planType == PlanType.bundle;
 
     if (isBundlePlan) {
       // Read slot context from booking flow provider when autoBookFirstSession is true

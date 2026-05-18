@@ -331,8 +331,6 @@ class PricingPlanCard extends ConsumerWidget {
         return ArabicLabels.singleSession;
       case PlanType.bundle:
         return '${ArabicLabels.sessionPackage} ${plan.sessionsCount}';
-      case PlanType.subscription:
-        return 'اشتراك شهري - ${plan.sessionsPerWeek}x أسبوعياً';
     }
   }
 

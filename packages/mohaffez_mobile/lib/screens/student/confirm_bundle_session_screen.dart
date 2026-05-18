@@ -4,7 +4,7 @@
 // to consume one session from it (subscriptionCredit path).
 // requiresPaymentOnAcceptance is intentionally FALSE here — no new payment
 // is needed. The PendingRequestsScreen.handleAccept() routes this request
-// type to confirmSubscriptionSession() (PATH 1), not to the regular accept flow.
+// type to confirmBundleSession() (PATH 1), not to the regular accept flow.
 //
 // For NEW bundle purchases (student buying a bundle for the first time),
 // see select_bundle_plan_screen.dart where requiresPaymentOnAcceptance = true.
@@ -290,9 +290,9 @@ class _ConfirmBundleSessionScreenState
         // INTENTIONALLY false: no new payment needed — student already owns
         // this bundle. PendingRequestsScreen.handleAccept() detects
         // selectedPaymentMethod == 'subscriptionCredit' and routes to
-        // confirmSubscriptionSession() directly, bypassing the payment gate.
+        // confirmBundleSession() directly, bypassing the payment gate.
         requiresPaymentOnAcceptance: false,
-        paymentMethod: BookingPaymentMethod.subscriptionCredit,
+        paymentMethod: BookingPaymentMethod.bundleCredit,
         planTitle: sub.planTitle,
         planType: 'bundle',
         sessionsCount: sub.totalSessions,

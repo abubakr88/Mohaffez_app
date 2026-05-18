@@ -29,18 +29,14 @@ import 'package:intl/intl.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 
 // ── Plan badge colours ──────────────────────────────────────────────────────
+// (planType parameter retained for signature stability; only bundles exist now.)
 
-Color _badgeBg(String planType) => planType == 'subscription'
-    ? AppThemeConstants.primary.withValues(alpha: 0.1)
-    : AppThemeConstants.secondary.withValues(alpha: 0.1);
+Color _badgeBg(String planType) =>
+    AppThemeConstants.secondary.withValues(alpha: 0.1);
 
-Color _badgeBorder(String planType) => planType == 'subscription'
-    ? AppThemeConstants.primary
-    : AppThemeConstants.secondary;
+Color _badgeBorder(String planType) => AppThemeConstants.secondary;
 
-Color _badgeFg(String planType) => planType == 'subscription'
-    ? AppThemeConstants.primary
-    : AppThemeConstants.secondary;
+Color _badgeFg(String planType) => AppThemeConstants.secondary;
 
 // ── Screen ──────────────────────────────────────────────────────────────────
 
@@ -94,7 +90,7 @@ class _SelectBundlePlanScreenState
           .doc(mohaffezId)
           .collection('pricingPlans')
           .where('isActive', isEqualTo: true)
-          .where('type', whereIn: ['bundle', 'subscription'])
+          .where('type', isEqualTo: 'bundle')
           .orderBy('sessionsCount')
           .get();
 
@@ -182,7 +178,7 @@ class _SelectBundlePlanScreenState
           'mohaffezPhone': slotCtx.mohaffezPhone,
         'selectedPaymentMethod': 'directpayment',
         // ── plan fields ───────────────────────────────────────────────
-        'planType': plan.type.name, // 'bundle' | 'subscription'
+        'planType': plan.type.name,
         'planId': plan.id,
         'planTitle': plan.title,
         'sessionsCount': plan.sessionsCount,
@@ -291,7 +287,6 @@ class _SelectBundlePlanScreenState
     final color = _badgeFg(plan.type.name);
     final priceStr = NumberFormat('#,##0', 'ar').format(plan.priceEGP);
     final hasValidity = plan.validityDays != null && plan.validityDays! > 0;
-    final isSubscription = plan.type.name == 'subscription';
     final pricePerSession = plan.sessionsCount > 0
         ? plan.priceEGP / plan.sessionsCount
         : 0.0;
@@ -408,14 +403,6 @@ class _SelectBundlePlanScreenState
                           _InfoChip(
                             icon: Icons.calendar_today_outlined,
                             label: '${plan.validityDays} يوم',
-                            color: AppThemeConstants.textSecondary,
-                          ),
-                        ],
-                        if (isSubscription && plan.sessionsPerWeek != null) ...[
-                          const SizedBox(width: 8),
-                          _InfoChip(
-                            icon: Icons.calendar_view_week_outlined,
-                            label: '${plan.sessionsPerWeek}/أسبوع',
                             color: AppThemeConstants.textSecondary,
                           ),
                         ],
@@ -666,7 +653,7 @@ class _PlanTypeBadge extends StatelessWidget {
           Icon(Icons.card_membership, size: 12, color: _badgeFg(planType)),
           const SizedBox(width: 4),
           Text(
-            planType == 'subscription' ? 'اشتراك' : 'حزمة',
+            'حزمة',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,

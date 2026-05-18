@@ -26,7 +26,7 @@ export { studentMarkedDirectPayment, mohaffezConfirmDirectPayment, mohaffezRejec
 
 // Bundle and subscription payment functions
 export { confirmBundleDirectPayment } from './payments/confirmBundleDirectPayment';
-export { confirmSubscriptionSession } from './payments/confirmSubscriptionSession';
+export { confirmBundleSession } from './payments/confirmBundleSession';
 
 // Admin functions
 export {

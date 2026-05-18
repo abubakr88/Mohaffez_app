@@ -172,10 +172,7 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     ActiveBundleInfo? activeBundle,
     List<PricingPlanModel> plans,
   ) {
-    final hasBundlePlans = plans.any(
-      (plan) =>
-          plan.type == PlanType.bundle || plan.type == PlanType.subscription,
-    );
+    final hasBundlePlans = plans.any((plan) => plan.type == PlanType.bundle);
     final canBuyNewBundle = hasBundlePlans && activeBundle == null;
 
     final singleSessionPrices = plans

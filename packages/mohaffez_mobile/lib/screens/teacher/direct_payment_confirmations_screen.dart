@@ -207,15 +207,14 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
   // ── Confirm ────────────────────────────────────────────────────────────────
   Future<void> _confirm() async {
     final planType = widget.payment.planType ?? 'single';
-    final isBundleOrSubscription =
-        planType == 'bundle' || planType == 'subscription';
+    final isBundle = planType == 'bundle';
 
     final String confirmMessage;
-    if (isBundleOrSubscription) {
+    if (isBundle) {
       confirmMessage =
           'هل تأكد استلام مبلغ ${widget.payment.amount.toStringAsFixed(0)} جنيه'
           ' من ${widget.payment.studentName}'
-          ' مقابل ${planType == 'bundle' ? "حزمة ${widget.payment.sessionsCount ?? 1} جلسات" : "اشتراك شهري"}؟';
+          ' مقابل حزمة ${widget.payment.sessionsCount ?? 1} جلسات؟';
     } else {
       confirmMessage =
           'هل تأكد استلام مبلغ ${widget.payment.amount.toStringAsFixed(0)} جنيه'
@@ -259,9 +258,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
     if (mounted) setState(() => _loading = true);
 
     try {
-      debugPrint('🔵 [BUNDLE_FLOW] Step5_CALLING_CF '
-          'isBundleOrSubscription=$isBundleOrSubscription');
-      if (isBundleOrSubscription) {
+      debugPrint('🔵 [BUNDLE_FLOW] Step5_CALLING_CF isBundle=$isBundle');
+      if (isBundle) {
         await DirectPaymentService.mohaffezConfirmBundlePayment(
           paymentId: widget.payment.id,
         );

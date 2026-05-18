@@ -19,7 +19,7 @@ final legacyBookingFlowProvider =
 });
 
 enum BookingPaymentMethod {
-  subscriptionCredit,
+  bundleCredit,
   payAfterAcceptance,
   buyNewPackage,
   freeSession,
@@ -29,8 +29,8 @@ enum BookingPaymentMethod {
 extension BookingPaymentMethodValue on BookingPaymentMethod {
   String get value {
     switch (this) {
-      case BookingPaymentMethod.subscriptionCredit:
-        return 'subscription_credit';
+      case BookingPaymentMethod.bundleCredit:
+        return 'bundle_credit';
       case BookingPaymentMethod.payAfterAcceptance:
         return 'pay_after_acceptance';
       case BookingPaymentMethod.buyNewPackage:
@@ -209,7 +209,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
       final methodRequiresPayment =
           method == BookingPaymentMethod.payAfterAcceptance;
       final methodSubscriptionId =
-          method == BookingPaymentMethod.subscriptionCredit
+          method == BookingPaymentMethod.bundleCredit
               ? subscriptionId
               : null;
 

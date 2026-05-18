@@ -15,8 +15,6 @@ enum PlanType {
   single,
   @JsonValue('bundle')
   bundle,
-  @JsonValue('subscription')
-  subscription,
 }
 
 enum SessionMode {

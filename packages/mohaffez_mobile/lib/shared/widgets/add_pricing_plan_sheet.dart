@@ -192,40 +192,6 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   const SizedBox(height: 16),
                 ],
                 
-                // Subscription specific fields
-                if (_selectedType == PlanType.subscription) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: _sessionsPerWeek?.toString() ?? '2',
-                          decoration: const InputDecoration(
-                            labelText: 'جلسات في الأسبوع',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today),
-                          ),
-                          keyboardType: TextInputType.number,
-                          onChanged: (val) => _sessionsPerWeek = int.tryParse(val),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: _validityDays?.toString() ?? '30',
-                          decoration: const InputDecoration(
-                            labelText: 'صالح لـ (أيام)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.schedule),
-                          ),
-                          keyboardType: TextInputType.number,
-                          onChanged: (val) => _validityDays = int.tryParse(val),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                
                 // Price
                 TextFormField(
                   controller: _priceController,
@@ -305,12 +271,6 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       case PlanType.bundle:
         _sessionsCount = 5;
         _titleController.text = 'باقة 5 جلسات';
-        break;
-      case PlanType.subscription:
-        _sessionsCount = 8; // 2 sessions/week * 4 weeks
-        _sessionsPerWeek = 2;
-        _validityDays = 30;
-        _titleController.text = 'اشتراك شهري';
         break;
     }
   }

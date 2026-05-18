@@ -88,7 +88,7 @@ class _BookingConfirmationScreenState
 
   bool get _isUsingSubscription =>
       widget.bookingDetails.paymentMethod ==
-      BookingPaymentMethod.subscriptionCredit;
+      BookingPaymentMethod.bundleCredit;
 
   @override
   Widget build(BuildContext context) {

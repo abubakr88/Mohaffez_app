@@ -1,4 +1,4 @@
-// functions/src/payments/confirmSubscriptionSession.ts
+// functions/src/payments/confirmBundleSession.ts
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
@@ -35,9 +35,9 @@ function toDate(value: unknown, fieldName: string): Date {
   );
 }
 
-export const confirmSubscriptionSession = functions.https.onCall(
+export const confirmBundleSession = functions.https.onCall(
   async (data, context) => {
-    functions.logger.info('confirmSubscriptionSession: Starting', {
+    functions.logger.info('confirmBundleSession: Starting', {
       timestamp: new Date().toISOString(),
     });
 
@@ -167,7 +167,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
       }
 
       // Diagnostic log
-      functions.logger.info('confirmSubscriptionSession: slot fields resolved', {
+      functions.logger.info('confirmBundleSession: slot fields resolved', {
         requestId,
         subscriptionId,
         slotDateType:  (requestData.slotDate  as any)?.constructor?.name ?? typeof requestData.slotDate,
@@ -183,7 +183,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
 
       // ── 10. Idempotency guard ───────────────────────────────────────────────
       if (freshRequestData.status === STATUS.ACCEPTED && freshRequestData.sessionId) {
-        functions.logger.info('confirmSubscriptionSession: idempotent', {
+        functions.logger.info('confirmBundleSession: idempotent', {
           requestId,
           sessionId: freshRequestData.sessionId,
         });
@@ -307,7 +307,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         slotInfo
       );
 
-      functions.logger.info('confirmSubscriptionSession: Session consumed', {
+      functions.logger.info('confirmBundleSession: Session consumed', {
         subscriptionId,
         sessionId:         result.sessionId,
         remainingSessions: result.remainingSessions,
@@ -369,7 +369,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         );
       });
 
-      functions.logger.info('confirmSubscriptionSession: Commission tracked', {
+      functions.logger.info('confirmBundleSession: Commission tracked', {
         subscriptionId,
         sessionId:       result.sessionId,
         commissionAmount,
@@ -391,7 +391,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
         },
       });
 
-      functions.logger.info('confirmSubscriptionSession: Completed successfully', {
+      functions.logger.info('confirmBundleSession: Completed successfully', {
         subscriptionId,
         sessionId:         result.sessionId,
         remainingSessions: result.remainingSessions,
@@ -409,7 +409,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
       // correct gRPC code (failed-precondition, permission-denied, etc.)
       // instead of a generic 'internal' error.
       if (error instanceof functions.https.HttpsError) {
-        functions.logger.error('confirmSubscriptionSession: HttpsError', {
+        functions.logger.error('confirmBundleSession: HttpsError', {
           code:          error.code,
           message:       error.message,
           requestId,
@@ -421,7 +421,7 @@ export const confirmSubscriptionSession = functions.https.onCall(
       // Unexpected errors (TypeErrors, network failures, etc.)
       const message = error instanceof Error ? error.message : 'Unknown error';
       const stack   = error instanceof Error ? error.stack   : undefined;
-      functions.logger.error('confirmSubscriptionSession: Unexpected error', {
+      functions.logger.error('confirmBundleSession: Unexpected error', {
         requestId,
         subscriptionId,
         error:  message,

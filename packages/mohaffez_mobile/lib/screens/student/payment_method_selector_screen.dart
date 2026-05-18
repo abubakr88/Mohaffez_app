@@ -39,7 +39,7 @@ class _PaymentMethodSelectorScreenState
   void initState() {
     super.initState();
     if (widget.hasActiveSubscription) {
-      selectedMethod = BookingPaymentMethod.subscriptionCredit;
+      selectedMethod = BookingPaymentMethod.bundleCredit;
     }
   }
 
@@ -67,7 +67,7 @@ class _PaymentMethodSelectorScreenState
                   const SizedBox(height: 8),
                     if (widget.hasActiveSubscription)
                       _buildPaymentOption(
-                        method: BookingPaymentMethod.subscriptionCredit,
+                        method: BookingPaymentMethod.bundleCredit,
                         icon: Icons.card_membership,
                         title: 'استخدام رصيد الباقة',
                         benefits: [
@@ -353,7 +353,7 @@ class _PaymentMethodSelectorScreenState
         return 'شراء الباقة والحجز';
       case BookingPaymentMethod.payAfterAcceptance:
         return 'إرسال الطلب';
-      case BookingPaymentMethod.subscriptionCredit:
+      case BookingPaymentMethod.bundleCredit:
         return 'تأكيد الحجز';
       default:
         return 'متابعة';

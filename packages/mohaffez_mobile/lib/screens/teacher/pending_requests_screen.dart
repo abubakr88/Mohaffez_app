@@ -16,7 +16,7 @@ import '../../shared/widgets/request_payment_type_badge.dart';
 import '../../tour/tour_guard_helper.dart';
 
 // FIX Bug 1: import BookingPaymentMethod so we can reference
-// BookingPaymentMethod.subscriptionCredit.value ('subscription_credit')
+// BookingPaymentMethod.bundleCredit.value ('subscription_credit')
 // instead of the hard-coded typo 'subscriptioncredit'.
 
 class PendingRequestsScreen extends ConsumerStatefulWidget {
@@ -326,14 +326,14 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
     // Path A: bundle session uses existing subscription credit
     // Check selectedPaymentMethod OR planType for bundle/subscription
     final bool isSubscriptionCredit = (selectedPaymentMethod ==
-                BookingPaymentMethod.subscriptionCredit.value ||
+                BookingPaymentMethod.bundleCredit.value ||
             planType == 'bundle' ||
             planType == 'subscription') &&
         subscriptionId != null;
 
     if (isSubscriptionCredit) {
       // FIX: removed subscriptionId parameter — CF reads it from Firestore.
-      await _confirmSubscriptionSession(data);
+      await _confirmBundleSession(data);
       if (mounted) setState(() => _isLoadingAccept[requestId] = false);
       return;
     }
@@ -527,7 +527,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
   // FIXED:   mohaffezId now uses currentUser.uid, not request['mohaffezId'],
   //          so the CF permission check (context.auth.uid !== data.mohaffezId)
   //          can never fail due to a stale/mismatched Firestore value.
-  Future<void> _confirmSubscriptionSession(
+  Future<void> _confirmBundleSession(
     Map<String, dynamic> request,
   ) async {
     final currentUser = ref.read(currentUserProvider).value;
@@ -562,7 +562,7 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       );
 
       final callable = FirebaseFunctions.instance.httpsCallable(
-        'confirmSubscriptionSession',
+        'confirmBundleSession',
         options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
       );
 
