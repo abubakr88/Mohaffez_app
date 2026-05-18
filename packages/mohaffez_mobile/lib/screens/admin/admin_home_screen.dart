@@ -380,6 +380,14 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                   ),
                   const SizedBox(height: AppThemeConstants.spaceSm),
                   const _NavCard(
+                    title: 'إضافة رصيد لمحفظة',
+                    subtitle: 'استرداد أو مكافأة لطالب أو محفظ',
+                    icon: Icons.add_card_rounded,
+                    iconColor: Color(0xFF059669),
+                    routeName: 'admin-credit-wallet',
+                  ),
+                  const SizedBox(height: AppThemeConstants.spaceSm),
+                  const _NavCard(
                     title: ArabicLabels.promoCodes,
                     subtitle: 'إنشاء وإدارة أكواد الخصم',
                     icon: Icons.discount_rounded,

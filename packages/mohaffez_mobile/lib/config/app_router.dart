@@ -79,6 +79,7 @@ import '../screens/admin/admin_slot_locks_screen.dart';
 import '../screens/admin/admin_payment_events_screen.dart';
 import '../screens/admin/admin_audit_log_screen.dart';
 import '../screens/admin/admin_wallet_settings_screen.dart';
+import '../screens/admin/admin_credit_wallet_screen.dart';
 import '../screens/admin/admin_wallet_topups_screen.dart';
 import '../screens/admin/admin_process_payouts_screen.dart';
 import '../screens/admin/admin_teacher_commissions_screen.dart';
@@ -809,6 +810,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'admin-wallet-topups',
             builder: (context, state) =>
                 const AdminWalletTopupsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/credit-wallet',
+            name: 'admin-credit-wallet',
+            builder: (context, state) =>
+                const AdminCreditWalletScreen(),
           ),
           GoRoute(
             path: '/admin/process-payouts',
