@@ -32,7 +32,10 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
-  String selectedSessionType = 'home';
+  // Empty by default — student must tap a session-type tile after plans load.
+  // Hardcoding any value (e.g. 'home') let students complete a booking with
+  // an unsupported session type when the teacher had no plan for that type.
+  String selectedSessionType = '';
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
   int? selectedDayOfWeek;
@@ -149,23 +152,21 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     final profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
     final plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
 
-    // Auto-switch to the first session type that has a plan
+    // Reset selection if the currently-selected type loses its plan
+    // (e.g. teacher deactivates it mid-session). We don't auto-pick a new
+    // type — the student must tap one explicitly. Empty string = "none
+    // selected"; the picker tiles render that as no-selection state.
     ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
       next.whenData((plans) {
-        if (!_hasPlanForType(plans, selectedSessionType)) {
-          const order = ['home', 'mosque', 'online'];
-          final first = order.firstWhere(
-            (t) => _hasPlanForType(plans, t),
-            orElse: () => selectedSessionType,
-          );
-          if (first != selectedSessionType && mounted) {
-            setState(() {
-              selectedSessionType = first;
-              selectedTimeSlot = null;
-              selectedDate = null;
-              selectedDayOfWeek = null;
-            });
-          }
+        if (selectedSessionType.isNotEmpty &&
+            !_hasPlanForType(plans, selectedSessionType) &&
+            mounted) {
+          setState(() {
+            selectedSessionType = '';
+            selectedTimeSlot = null;
+            selectedDate = null;
+            selectedDayOfWeek = null;
+          });
         }
       });
     });
