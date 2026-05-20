@@ -32,6 +32,7 @@ class SystemConfigModel {
   final bool credentialReviewRequired;
   final bool autoApproveMohaffez;
   final bool allowUnverifiedBooking;
+  final bool paymobEnabled;
   final int maxCredentialFiles;
   final double examPassingScore;
   final int examMaxRetries;
@@ -72,6 +73,7 @@ class SystemConfigModel {
     required this.credentialReviewRequired,
     required this.autoApproveMohaffez,
     required this.allowUnverifiedBooking,
+    required this.paymobEnabled,
     required this.maxCredentialFiles,
     required this.examPassingScore,
     required this.examMaxRetries,
@@ -155,6 +157,8 @@ class SystemConfigModel {
           data['autoApproveMohaffez'] as bool? ?? defaults.autoApproveMohaffez,
       allowUnverifiedBooking: data['allowUnverifiedBooking'] as bool? ??
           defaults.allowUnverifiedBooking,
+      paymobEnabled:
+          data['paymobEnabled'] as bool? ?? defaults.paymobEnabled,
       maxCredentialFiles: (data['maxCredentialFiles'] as num?)?.toInt() ??
           defaults.maxCredentialFiles,
       examPassingScore: (data['examPassingScore'] as num?)?.toDouble() ??
@@ -206,6 +210,7 @@ class SystemConfigModel {
       credentialReviewRequired: true,
       autoApproveMohaffez: false,
       allowUnverifiedBooking: false,
+      paymobEnabled: false,
       maxCredentialFiles: 5,
       examPassingScore: 70.0,
       examMaxRetries: 3,
@@ -250,6 +255,7 @@ class SystemConfigModel {
       'credentialReviewRequired': credentialReviewRequired,
       'autoApproveMohaffez': autoApproveMohaffez,
       'allowUnverifiedBooking': allowUnverifiedBooking,
+      'paymobEnabled': paymobEnabled,
       'maxCredentialFiles': maxCredentialFiles,
       'examPassingScore': examPassingScore,
       'examMaxRetries': examMaxRetries,

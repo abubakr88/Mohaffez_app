@@ -10,9 +10,9 @@ export { sendPaymentDeadlineReminders } from './notifications/paymentDeadlineRem
 export { sendSessionReminders } from './notifications/sessionReminders';
 
 // Payment functions
-/* WEBHOOK_DISABLED - re-enable when Paymob gateway is activated
+// Paymob webhook is always exported; gated at runtime by
+// systemConfig/global.paymobEnabled. Admin toggles from the web panel.
 export { paymobWebhook } from './payments/paymobWebhook';
-*/
 export { projectPaymentAnalytics } from './payments/projections';
 export { checkExpiredPayments } from './payments/expiredPayments';
 export { onPaymentCreated } from './payments/triggers';

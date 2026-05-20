@@ -136,6 +136,15 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     if (widget.showBundlePlansOnly) {
       _selectedDPMethod = _DpMethod.direct;
     }
+    // Force direct when Paymob is globally disabled (coming-soon state).
+    final paymobOn = ref
+            .read(systemConfigProvider)
+            .valueOrNull
+            ?.paymobEnabled ??
+        false;
+    if (!paymobOn) {
+      _selectedDPMethod = _DpMethod.direct;
+    }
     debugPrint(
       '🔍 [PaymentScreen] isLockedRequest=$isLockedRequest planId=${widget.lockedRequest?['planId']} paymentAmount=${widget.lockedRequest?['paymentAmount']}',
     );
@@ -349,12 +358,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     // Don't show for free sessions
     if (pricing.finalPrice <= 0.01) return const SizedBox.shrink();
 
-    // Only show when arrived from a real booking request
-    if (widget.requestId == null || widget.requestId!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // Still loading
+    // Still loading wallet info — show spinner so the toggle slot is reserved.
     if (_loadingWallets) {
       return const Padding(
         padding: EdgeInsets.only(top: 16),
@@ -362,8 +366,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       );
     }
 
-    // Teacher hasn't saved any wallet numbers → hide silently
-    if (!_hasDirectPayment) return const SizedBox.shrink();
+    // Toggle always renders when there's a non-free payment so the
+    // "قريبا" Paymob badge stays visible during the coming-soon phase.
+    // Direct option is shown as disabled when teacher has no wallet AND
+    // we're not in a bundle flow (where direct is always viable).
+    final paymobOn =
+        ref.watch(systemConfigProvider).valueOrNull?.paymobEnabled ?? false;
+    final directAvailable = _hasDirectPayment || widget.showBundlePlansOnly;
 
     // ── Render toggle ─────────────────────────────────────────────────────────
     return Padding(
@@ -380,8 +389,15 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () =>
-                      setState(() => _selectedDPMethod = _DpMethod.online),
+                  onTap: paymobOn
+                      ? () => setState(
+                          () => _selectedDPMethod = _DpMethod.online)
+                      : () => ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'الدفع الإلكتروني قادم قريباً، استخدم الدفع المباشر الآن.'),
+                            ),
+                          ),
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
@@ -389,25 +405,62 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _selectedDPMethod == _DpMethod.online
-                            ? AppThemeConstants.secondary
-                            : AppThemeConstants.grey300,
-                        width: _selectedDPMethod == _DpMethod.online ? 2 : 1,
+                        color: !paymobOn
+                            ? AppThemeConstants.grey300
+                            : (_selectedDPMethod == _DpMethod.online
+                                ? AppThemeConstants.secondary
+                                : AppThemeConstants.grey300),
+                        width: (paymobOn &&
+                                _selectedDPMethod == _DpMethod.online)
+                            ? 2
+                            : 1,
                       ),
-                      color: _selectedDPMethod == _DpMethod.online
-                          ? AppThemeConstants.secondary.withValues(alpha: 0.08)
-                          : AppThemeConstants.white,
+                      color: !paymobOn
+                          ? AppThemeConstants.grey100
+                          : (_selectedDPMethod == _DpMethod.online
+                              ? AppThemeConstants.secondary
+                                  .withValues(alpha: 0.08)
+                              : AppThemeConstants.white),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.credit_card, color: AppThemeConstants.secondary),
-                        SizedBox(width: 8),
+                        Icon(
+                          Icons.credit_card,
+                          color: paymobOn
+                              ? AppThemeConstants.secondary
+                              : AppThemeConstants.grey500,
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'دفع إلكتروني',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: paymobOn
+                                  ? AppThemeConstants.textPrimary
+                                  : AppThemeConstants.grey500,
+                            ),
                           ),
                         ),
+                        if (!paymobOn) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppThemeConstants.grey300,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'قريبا',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppThemeConstants.grey700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -416,8 +469,15 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: InkWell(
-                  onTap: () =>
-                      setState(() => _selectedDPMethod = _DpMethod.direct),
+                  onTap: directAvailable
+                      ? () => setState(
+                          () => _selectedDPMethod = _DpMethod.direct)
+                      : () => ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'لم يفعّل المحفظ الدفع المباشر بعد.'),
+                            ),
+                          ),
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
@@ -425,23 +485,41 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _selectedDPMethod == _DpMethod.direct
-                            ? AppThemeConstants.success
-                            : AppThemeConstants.grey300,
-                        width: _selectedDPMethod == _DpMethod.direct ? 2 : 1,
+                        color: !directAvailable
+                            ? AppThemeConstants.grey300
+                            : (_selectedDPMethod == _DpMethod.direct
+                                ? AppThemeConstants.success
+                                : AppThemeConstants.grey300),
+                        width: (directAvailable &&
+                                _selectedDPMethod == _DpMethod.direct)
+                            ? 2
+                            : 1,
                       ),
-                      color: _selectedDPMethod == _DpMethod.direct
-                          ? AppThemeConstants.success.withValues(alpha: 0.08)
-                          : AppThemeConstants.white,
+                      color: !directAvailable
+                          ? AppThemeConstants.grey100
+                          : (_selectedDPMethod == _DpMethod.direct
+                              ? AppThemeConstants.success
+                                  .withValues(alpha: 0.08)
+                              : AppThemeConstants.white),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.account_balance_wallet, color: AppThemeConstants.success),
-                        SizedBox(width: 8),
+                        Icon(
+                          Icons.account_balance_wallet,
+                          color: directAvailable
+                              ? AppThemeConstants.success
+                              : AppThemeConstants.grey500,
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'دفع مباشر',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: directAvailable
+                                  ? AppThemeConstants.textPrimary
+                                  : AppThemeConstants.grey500,
+                            ),
                           ),
                         ),
                       ],

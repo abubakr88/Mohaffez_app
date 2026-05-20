@@ -19,18 +19,15 @@ class QuranService {
   // ignore: unused_field
   static const int _imageWidth = 1024; // Resolution: 1024px width
 
-  /// Get page image URL from CDN (NOT local assets)
-/// Get page image URL from a working CDN
+  /// Get page image URL.
+  /// Mobile: quran.islam-db.com (no CORS restriction on native).
+  /// Web: quran.ksu.edu.sa (sends CORS headers, required by browsers).
   String getPageImageUrl(int pageNumber) {
-    // 3-digit, zero-padded page number: 1 -> 001, 12 -> 012
     final padded = pageNumber.toString().padLeft(3, '0');
+    if (kIsWeb) {
+      return 'https://quran.ksu.edu.sa/images/png/$padded.png';
+    }
     return 'https://quran.islam-db.com/data/pages/quranpages_1024/images/page$padded.png';
-  }
-
-  /// Alternative: Use quran.ksu.edu.sa (Saudi Arabia server - very reliable)
-  String getPageImageUrlKSU(int pageNumber) {
-    final paddedPage = pageNumber.toString().padLeft(3, '0');
-    return 'https://quran.ksu.edu.sa/images/png/$paddedPage.png';
   }
 
   Future<Map<String, dynamic>> getPageData(int pageNumber) async {

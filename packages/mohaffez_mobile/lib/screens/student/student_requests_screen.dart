@@ -105,15 +105,20 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
 
       if (!context.mounted) return;
 
-      // ── KEY FIX: Route based on payment method ─────────────────────────
+      // ── Route based on payment method + Paymob toggle ──────────────────
       // Requests created via "Request First" flow (DirectBookingRequestScreen)
-      // have selectedPaymentMethod = 'directpayment'.  These must go to
-      // DirectPaymentScreen (cash/wallet mark-as-paid), NOT StudentPaymentScreen
-      // which shows Paymob plan selection.
+      // carry selectedPaymentMethod = 'directpayment'. Normally they go to
+      // DirectPaymentScreen (wallet mark-as-paid).
+      //
+      // When admin has enabled Paymob globally, we route them instead to
+      // StudentPaymentScreen so the student can pick card OR direct at
+      // pay-time — direct_payment_screen has no Paymob option of its own.
       final selectedPaymentMethod =
           lockedRequest['selectedPaymentMethod'] as String?;
+      final paymobOn =
+          ref.read(systemConfigProvider).valueOrNull?.paymobEnabled ?? false;
 
-      if (selectedPaymentMethod == 'directpayment') {
+      if (selectedPaymentMethod == 'directpayment' && !paymobOn) {
         _openDirectPaymentScreen(
           requestId: requestId,
           mohaffezId: mohaffezId,
@@ -123,10 +128,14 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         return;
       }
 
-      // ── Original flow: plan selection + Paymob / online gateway ─────────
+      // ── Plan selection + Paymob/online gateway via toggle ──────────────
+      // Pass requestId as a query param — the route reads it from there,
+      // not from lockedRequest. Without it, StudentPaymentScreen treats
+      // the visit as a fresh booking and the locked-request UI is skipped.
       if (!mounted) return;
+      final qs = Uri(queryParameters: {'requestId': requestId}).query;
       context.push(
-        '/payment/$mohaffezId',
+        '/payment/$mohaffezId?$qs',
         extra: {
           'lockedRequest': lockedRequest,
         },

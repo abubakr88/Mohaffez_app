@@ -30,12 +30,12 @@ class AdminConfigPage extends ConsumerWidget {
   }
 }
 
-class _ConfigForm extends StatelessWidget {
+class _ConfigForm extends ConsumerWidget {
   const _ConfigForm({required this.config});
   final SystemConfigModel config;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return DSGrid(
       tabletColumns: 1,
       desktopColumns: 2,
@@ -126,6 +126,31 @@ class _ConfigForm extends StatelessWidget {
               _InfoRow(label: 'درجة النجاح',            value: '${config.examPassingScore.toStringAsFixed(0)}%'),
               _InfoRow(label: 'أقصى محاولات',           value: '${config.examMaxRetries}'),
               _InfoRow(label: 'فترة الانتظار (يوم)',    value: '${config.examRetryCooldownDays}'),
+            ],
+          ),
+        ),
+        DSCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SectionHeader(title: 'بوابة الدفع Paymob'),
+              const SizedBox(height: DSSpacing.lg),
+              _SwitchRow(
+                label: 'تفعيل الدفع الإلكتروني (Paymob)',
+                value: config.paymobEnabled,
+                onChanged: (v) async {
+                  await ref
+                      .read(systemConfigNotifierProvider.notifier)
+                      .updateGlobalConfig({'paymobEnabled': v});
+                },
+              ),
+              const SizedBox(height: DSSpacing.md),
+              Text(
+                config.paymobEnabled
+                    ? 'الدفع الإلكتروني مفعّل. تأكد من ضبط PAYMOB_HMAC_SECRET في إعدادات الـ Functions.'
+                    : 'الدفع الإلكتروني معطّل. سيظهر للطلاب كـ "قريبا". لا تفعّل إلا بعد توقيع عقد Paymob واستلام بيانات الـ HMAC.',
+                style: DSText.caption(context, color: DSColors.text3),
+              ),
             ],
           ),
         ),

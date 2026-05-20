@@ -522,6 +522,56 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
               _buildAmountCard(),
               const SizedBox(height: AppThemeConstants.spaceLg),
 
+              if (!(ref
+                      .watch(systemConfigProvider)
+                      .valueOrNull
+                      ?.paymobEnabled ??
+                  false)) ...[
+                Container(
+                  padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.grey100,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppThemeConstants.grey300),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.credit_card,
+                          color: AppThemeConstants.grey600, size: 22),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'الدفع الإلكتروني بالبطاقة (Paymob) قادم قريباً. استخدم أحد طرق الدفع المباشر أدناه حالياً.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: AppThemeConstants.grey700,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppThemeConstants.grey300,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'قريبا',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppThemeConstants.grey700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppThemeConstants.spaceLg),
+              ],
+
               const Text(
                 'اختر طريقة الدفع',
                 style: TextStyle(

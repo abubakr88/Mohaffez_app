@@ -130,6 +130,22 @@ class _AdminSystemSettingsScreenState
           'minimumWithdrawAmount', 'حد السحب الأدنى', c.minimumWithdrawAmount),
       _switchTile(
           'freeSessionEnabled', 'تفعيل الجلسات المجانية', c.freeSessionEnabled),
+      const Divider(height: 24),
+      _switchTile(
+          'paymobEnabled', 'تفعيل الدفع الإلكتروني (Paymob)', c.paymobEnabled),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Text(
+          c.paymobEnabled
+              ? 'الدفع الإلكتروني مفعّل. تأكد من ضبط PAYMOB_HMAC_SECRET في إعدادات الـ Functions.'
+              : 'الدفع الإلكتروني معطّل ويظهر للطلاب كـ "قريبا". لا تفعّل إلا بعد توقيع عقد Paymob واستلام بيانات الـ HMAC.',
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppThemeConstants.grey600,
+            height: 1.5,
+          ),
+        ),
+      ),
       _saveButton(),
     ]);
   }
@@ -281,20 +297,28 @@ class _AdminSystemSettingsScreenState
 
   Widget _sliderTile(
       String key, String title, double initial, double min, double max) {
+    // Snap to whole-percent steps so we never store junk like 0.1122.
+    // For a 0..0.2 range that gives 20 divisions = 1% per step.
+    final divisions = ((max - min) * 100).round().clamp(1, 1000);
     return StatefulBuilder(
       builder: (_, setState) {
-        final current = (updates[key] as double?) ?? initial;
+        final raw = (updates[key] as double?) ?? initial;
+        // Round to nearest division step so display matches stored value.
+        final stepped = (raw * 100).round() / 100;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('$title: ${(current * 100).toStringAsFixed(0)}%'),
+            Text('$title: ${(stepped * 100).toStringAsFixed(0)}%'),
             Slider(
-              value: current,
+              value: stepped.clamp(min, max),
               min: min,
               max: max,
+              divisions: divisions,
+              label: '${(stepped * 100).toStringAsFixed(0)}%',
               onChanged: (v) {
-                setState(() => updates[key] = v);
-                // No outer setState needed - updates map is mutated by reference
+                // Quantize on write so what's stored matches what's shown.
+                final snapped = (v * 100).round() / 100;
+                setState(() => updates[key] = snapped);
               },
             ),
           ],
