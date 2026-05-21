@@ -225,10 +225,22 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           );
         }
 
-        // 9a. Read system config for maxActiveSubscriptions + commissionRate
+        // 9a. Read system config for maxActiveSubscriptions + commissionRate.
+        // Per-teacher rate (set by recomputeTeacherTiers) takes precedence
+        // over the global rate; both reads inside the txn for consistency.
         const PER_SESSION_TYPE_LIMIT = 1; // one active bundle per studentId+mohaffezId+sessionType
-        const configSnap = await transaction.get(db.collection('systemConfig').doc('global'));
-        const commissionRate: number = (configSnap.data()?.commissionRate as number) ?? 0.05;
+        const [configSnap, teacherSnap] = await Promise.all([
+          transaction.get(db.collection('systemConfig').doc('global')),
+          transaction.get(db.collection('users').doc(mohaffezId as string)),
+        ]);
+        const teacherRate = teacherSnap.data()?.commissionRate;
+        const globalRate = configSnap.data()?.commissionRate;
+        const commissionRate: number =
+          typeof teacherRate === 'number' && teacherRate >= 0
+            ? teacherRate
+            : typeof globalRate === 'number' && globalRate >= 0
+              ? globalRate
+              : 0.05;
 
         // 9b. FIX-3: Resolve sessionType with explicit priority order
         const resolvedSessionType: string = (() => {

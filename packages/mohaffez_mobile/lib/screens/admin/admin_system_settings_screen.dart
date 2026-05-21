@@ -3,6 +3,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/widgets/admin_app_bar.dart';
+import 'admin_commission_tiers_screen.dart';
 
 class AdminSystemSettingsScreen extends ConsumerStatefulWidget {
   const AdminSystemSettingsScreen({super.key});
@@ -122,8 +123,38 @@ class _AdminSystemSettingsScreenState
 
   Widget _financialTab(SystemConfigModel c) {
     return _sectionList([
-      _sliderTile('commissionRate', ArabicLabels.commissionRate,
+      // Per-teacher tiered commission editor (admin sets the ladder).
+      ListTile(
+        leading: const Icon(Icons.layers_outlined,
+            color: AppThemeConstants.primary),
+        title: const Text('شرائح العمولة (للمحفظين)',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(
+          '${c.commissionTiers.length} شرائح — تنخفض العمولة كلما زادت حلقات المحفظ المكتملة',
+          style: const TextStyle(fontSize: 12),
+        ),
+        trailing: const Icon(Icons.chevron_left),
+        contentPadding: EdgeInsets.zero,
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const AdminCommissionTiersScreen(),
+        )),
+      ),
+      const Divider(height: 24),
+      _sliderTile('commissionRate', 'نسبة العمولة الاحتياطية (للمحفظين الجدد)',
           c.commissionRate, 0, 0.2),
+      const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Text(
+          'تُستخدم هذه النسبة فقط عندما لم تُحتسب شريحة محفظ بعد. '
+          'المحفظون المُقيَّمون يستخدمون نسبة شريحتهم.',
+          style: TextStyle(
+            fontSize: 11,
+            color: AppThemeConstants.grey600,
+            height: 1.5,
+          ),
+        ),
+      ),
+      const Divider(height: 24),
       _numberField('paymentDeadlineHours', ArabicLabels.paymentDeadlineHours,
           c.paymentDeadlineHours),
       _numberField(
@@ -158,6 +189,23 @@ class _AdminSystemSettingsScreenState
         'meetingStartLeadTimeMinutes',
         'مهلة بدء الجلسة الأونلاين قبل موعدها (دقائق)',
         c.meetingStartLeadTimeMinutes,
+      ),
+      _numberField(
+        'lateSessionGraceMinutes',
+        'مهلة السماح للتأخر عن الموعد (دقائق)',
+        c.lateSessionGraceMinutes,
+      ),
+      const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Text(
+          'الحلقات التي تبدأ متأخرة بأكثر من هذه الدقائق لا تُحتسب في '
+          'شريحة عمولة المحفظ (لكن يقبض ثمنها كاملاً).',
+          style: TextStyle(
+            fontSize: 11,
+            color: AppThemeConstants.grey600,
+            height: 1.5,
+          ),
+        ),
       ),
       _numberField('maxPendingRequestsPerStudent', 'أقصى طلبات معلقة للطالب',
           c.maxPendingRequestsPerStudent),

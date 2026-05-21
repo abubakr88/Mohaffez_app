@@ -109,8 +109,20 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         );
       }
 
-      const configSnap = await tx.get(db.collection('systemConfig').doc('global'));
-      const commissionRate: number = (configSnap.data()?.commissionRate as number) ?? 0.05;
+      // Per-teacher commission rate (set by recomputeTeacherTiers) wins
+      // over the global rate; both reads inside the txn for consistency.
+      const [configSnap, teacherSnap] = await Promise.all([
+        tx.get(db.collection('systemConfig').doc('global')),
+        tx.get(db.collection('users').doc(mohaffezId as string)),
+      ]);
+      const teacherRate = teacherSnap.data()?.commissionRate;
+      const globalRate = configSnap.data()?.commissionRate;
+      const commissionRate: number =
+        typeof teacherRate === 'number' && teacherRate >= 0
+          ? teacherRate
+          : typeof globalRate === 'number' && globalRate >= 0
+            ? globalRate
+            : 0.05;
 
       const parsedSlotDate  = parseFlutterDate(slotDate  as string);
       const parsedSlotStart = parseFlutterDate(slotStart as string);

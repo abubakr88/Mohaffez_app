@@ -54,6 +54,12 @@ export {
   rejectCommissionPayment,
 } from './payments/commissions';
 
+// Per-teacher commission tier recompute (rolling 30-day revenue → tier).
+export {
+  recomputeTeacherTiers,
+  recomputeTeacherTiersNow,
+} from './payments/recomputeTeacherTiers';
+
 // Suspension triggers
 export { onUserSuspended } from './onUserSuspended';
 export { onUserUnsuspended } from './onUserUnsuspended';

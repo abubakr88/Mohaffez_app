@@ -81,13 +81,25 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     }
     const totalPiastres = egpToPiastres(amountEgp);
 
-    const configSnap = await tx.get(db.collection('systemConfig').doc('global'));
+    const mohaffezId = req.mohaffezId as string;
+
+    // Per-teacher commission rate (set by recomputeTeacherTiers) takes
+    // precedence over the global rate. Both reads must happen inside the
+    // transaction for consistency with the rest of the write set.
+    const [configSnap, teacherSnap] = await Promise.all([
+      tx.get(db.collection('systemConfig').doc('global')),
+      tx.get(db.collection('users').doc(mohaffezId)),
+    ]);
+    const teacherRate = teacherSnap.data()?.commissionRate;
+    const globalRate = configSnap.data()?.commissionRate;
     const commissionRate: number =
-      (configSnap.data()?.commissionRate as number) ?? 0.05;
+      (typeof teacherRate === 'number' && teacherRate >= 0
+        ? teacherRate
+        : typeof globalRate === 'number' && globalRate >= 0
+          ? globalRate
+          : 0.05);
     const commissionPiastres = Math.round(totalPiastres * commissionRate);
     const teacherPiastres = totalPiastres - commissionPiastres;
-
-    const mohaffezId = req.mohaffezId as string;
 
     // Read weekly commission summary BEFORE writes.
     const sessionDate = (req.slotStart ?? req.slotDate) as admin.firestore.Timestamp | undefined;

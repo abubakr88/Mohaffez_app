@@ -19,10 +19,16 @@ class RateSessionScreen extends ConsumerStatefulWidget {
   ConsumerState<RateSessionScreen> createState() => _RateSessionScreenState();
 }
 
+/// Punctuality answer maps directly to the `startedLate` boolean on the
+/// session doc. Only [late] flips the flag to true; the other two leave it
+/// as on-time so the session counts toward the teacher's tier.
+enum _Punctuality { onTime, slightlyLate, late }
+
 class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
   int rating = 0; // Default to 0 to require explicit user selection
   final notesController = TextEditingController();
   bool _isSubmitting = false;
+  _Punctuality? _punctuality;
 
   @override
   void dispose() {
@@ -42,6 +48,15 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
       );
       return;
     }
+    if (_punctuality == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى الإجابة عن سؤال الالتزام بالموعد'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     try {
@@ -49,6 +64,7 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
             sessionId: widget.sessionId,
             rating: rating,
             notes: notesController.text.trim(),
+            startedLate: _punctuality == _Punctuality.late,
           );
 
       if (mounted) {
@@ -222,6 +238,42 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
 
               const SizedBox(height: 32),
 
+              // Punctuality question
+              const Text(
+                'هل بدأت الحلقة في الوقت المحدد؟',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _PunctualityChip(
+                    label: 'في الوقت',
+                    icon: Icons.check_circle_outline,
+                    selected: _punctuality == _Punctuality.onTime,
+                    color: AppThemeConstants.success,
+                    onTap: () => setState(() => _punctuality = _Punctuality.onTime),
+                  ),
+                  _PunctualityChip(
+                    label: 'تأخر بسيط (أقل من 10 دقائق)',
+                    icon: Icons.schedule,
+                    selected: _punctuality == _Punctuality.slightlyLate,
+                    color: AppThemeConstants.warning,
+                    onTap: () =>
+                        setState(() => _punctuality = _Punctuality.slightlyLate),
+                  ),
+                  _PunctualityChip(
+                    label: 'متأخر أكثر من 10 دقائق',
+                    icon: Icons.error_outline,
+                    selected: _punctuality == _Punctuality.late,
+                    color: AppThemeConstants.error,
+                    onTap: () => setState(() => _punctuality = _Punctuality.late),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
               // Notes Section
               const Text(
                 'ملاحظاتك (اختياري)',
@@ -291,6 +343,57 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PunctualityChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _PunctualityChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.12) : AppThemeConstants.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : AppThemeConstants.grey300,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: selected ? color : AppThemeConstants.grey600),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? color : AppThemeConstants.textPrimary,
+              ),
+            ),
+          ],
         ),
       ),
     );

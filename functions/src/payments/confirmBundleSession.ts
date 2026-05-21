@@ -6,9 +6,8 @@ import { db, FieldValue } from '../utils/admin';
 import { getWeekNumber, getWeekStart, getWeekEnd, getNextMonday, parseFlutterDate } from '../utils/dateHelpers';
 import { consumeSubscriptionAndCreateSession, SlotInfo } from './handlers';
 import { createAndSendNotification } from '../utils/notificationHelpers';
+import { resolveCommissionRate } from '../utils/commissionRate';
 import { PaymentDocument } from '../types/payment.types';
-
-const COMMISSION_RATE = 0.05;
 
 const STATUS = {
   PENDING: 'pending',
@@ -318,7 +317,9 @@ export const confirmBundleSession = functions.https.onCall(
       const weekNumber       = getWeekNumber(now);
       const weekStart        = getWeekStart(now);
       const weekEnd          = getWeekEnd(now);
-      const commissionAmount = amount * COMMISSION_RATE;
+      // Per-teacher rate from recomputeTeacherTiers, fallback to global.
+      const commissionRate   = await resolveCommissionRate(mohaffezId as string);
+      const commissionAmount = amount * commissionRate;
 
       await db.runTransaction(async (tx) => {
         // Individual commission record.
@@ -334,7 +335,7 @@ export const confirmBundleSession = functions.https.onCall(
           sessionRequestId:       requestId,
           amount,
           commissionAmount,
-          commissionRate:         COMMISSION_RATE,
+          commissionRate:         commissionRate,
           paymentMethod:          'subscription',
           status:                 'pending',
           weekNumber,
@@ -360,7 +361,7 @@ export const confirmBundleSession = functions.https.onCall(
             totalSessions:    FieldValue.increment(1),
             totalRevenue:     FieldValue.increment(amount),
             commissionAmount: FieldValue.increment(commissionAmount),
-            commissionRate:   COMMISSION_RATE,
+            commissionRate:   commissionRate,
             status:           'pending',
             dueDate:          admin.firestore.Timestamp.fromDate(getNextMonday(weekEnd)),
             updatedAt:        FieldValue.serverTimestamp(),

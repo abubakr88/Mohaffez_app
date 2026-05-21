@@ -11,6 +11,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../services/app_version_service.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
+import '../../shared/widgets/teacher_tier_card.dart';
 import '../../tour/tour_mode_state.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -236,6 +237,8 @@ class MohaffezHomeContent extends ConsumerWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
+                      TeacherTierCard(teacherId: mohaffezId),
+                      const SizedBox(height: 12),
                       _NextSessionCountdown(nextSessionDate: nextSessionDate),
                       if (nextSessionDate != null) const SizedBox(height: 20),
                       _ActionsSection(mohaffezId: mohaffezId),

@@ -1204,15 +1204,17 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     String? muraja,
     String? notes,
     int? rating,
+    bool? startedLate,
   }) async {
     final updates = <String, dynamic>{};
     if (hifz != null) updates['hifzAssignment'] = hifz;
     if (muraja != null) updates['murajaAssignment'] = muraja;
     if (notes != null) updates['reviewNotes'] = notes;
     if (rating != null) updates['teacherRating'] = rating;
+    if (startedLate != null) updates['startedLate'] = startedLate;
     if (updates.isNotEmpty) {
       await updateSession(sessionId, updates);
-      
+
       // Note: Teacher rating update is now handled by Cloud Function
       // Client-side query not allowed due to Firestore security rules
     }
