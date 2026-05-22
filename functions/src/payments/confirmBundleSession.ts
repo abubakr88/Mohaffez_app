@@ -6,7 +6,6 @@ import { db, FieldValue } from '../utils/admin';
 import { getWeekNumber, getWeekStart, getWeekEnd, getNextMonday, parseFlutterDate } from '../utils/dateHelpers';
 import { consumeSubscriptionAndCreateSession, SlotInfo } from './handlers';
 import { createAndSendNotification } from '../utils/notificationHelpers';
-import { resolveCommissionRate } from '../utils/commissionRate';
 import { PaymentDocument } from '../types/payment.types';
 
 const STATUS = {
@@ -313,16 +312,24 @@ export const confirmBundleSession = functions.https.onCall(
       });
 
       // ── 19. Commission tracking (separate transaction) ────────────────────
+      // NOTE on bundle/subscription commission flow:
+      // Bundle session consumption does NOT currently credit the teacher's
+      // wallet ledger (separate pre-existing gap — the bundle purchase money
+      // never propagates into teacher's pending bucket). Until that gap is
+      // closed, the docs below are TRACKING ONLY and are not the source of
+      // truth for what the teacher gets paid.
+      //
+      // The commission rate is also not computed here anymore — the cycle
+      // settlement step (`recomputeTeacherTiers`) determines the rate at
+      // cycle end, using THAT cycle's session count. We write the gross
+      // amount and leave commission fields null/0 for settlement to fill.
       const now              = new Date();
       const weekNumber       = getWeekNumber(now);
       const weekStart        = getWeekStart(now);
       const weekEnd          = getWeekEnd(now);
-      // Per-teacher rate from recomputeTeacherTiers, fallback to global.
-      const commissionRate   = await resolveCommissionRate(mohaffezId as string);
-      const commissionAmount = amount * commissionRate;
 
       await db.runTransaction(async (tx) => {
-        // Individual commission record.
+        // Individual commission record (tracking only).
         const commRef = db.collection('commissions').doc();
         tx.set(commRef, {
           id:                     commRef.id,
@@ -334,10 +341,10 @@ export const confirmBundleSession = functions.https.onCall(
           directPaymentRequestId: null,
           sessionRequestId:       requestId,
           amount,
-          commissionAmount,
-          commissionRate:         commissionRate,
+          commissionAmount:       0,
+          commissionRate:         null,
           paymentMethod:          'subscription',
-          status:                 'pending',
+          status:                 'pending_settlement',
           weekNumber,
           year:                   now.getFullYear(),
           weekStart:              admin.firestore.Timestamp.fromDate(weekStart),
@@ -360,9 +367,7 @@ export const confirmBundleSession = functions.https.onCall(
             weekEnd:          admin.firestore.Timestamp.fromDate(weekEnd),
             totalSessions:    FieldValue.increment(1),
             totalRevenue:     FieldValue.increment(amount),
-            commissionAmount: FieldValue.increment(commissionAmount),
-            commissionRate:   commissionRate,
-            status:           'pending',
+            status:           'pending_settlement',
             dueDate:          admin.firestore.Timestamp.fromDate(getNextMonday(weekEnd)),
             updatedAt:        FieldValue.serverTimestamp(),
           },
@@ -372,8 +377,9 @@ export const confirmBundleSession = functions.https.onCall(
 
       functions.logger.info('confirmBundleSession: Commission tracked', {
         subscriptionId,
-        sessionId:       result.sessionId,
-        commissionAmount,
+        sessionId: result.sessionId,
+        grossAmount: amount,
+        commissionDeferredTo: 'cycle_settlement',
       });
 
       // ── 20. Notification to student ───────────────────────────────────────

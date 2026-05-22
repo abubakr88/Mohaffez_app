@@ -56,14 +56,20 @@ export const requestPayout = functions.https.onCall(async (data, context) => {
   const piastres = egpToPiastres(amountEgp);
 
   return db.runTransaction(async (tx) => {
-    // Pre-check balance (read-only — no debit until startPayout).
+    // Pre-check available balance only — pending (current-cycle) earnings
+    // are NOT withdrawable until the bi-weekly settlement runs and moves
+    // them into available. This is the "no mid-cycle withdrawals" rule.
     const walletRef = db.collection('wallets').doc(walletIdForUser(mohaffezId));
     const walletSnap = await tx.get(walletRef);
     const balance = (walletSnap.data()?.balancePiastres as number) ?? 0;
+    const pending = (walletSnap.data()?.pendingCyclePiastres as number) ?? 0;
     if (balance < piastres) {
+      const pendingNote = pending > 0
+        ? ` (لديك ${(pending / 100).toFixed(2)} ج.م قيد التسوية — تُتاح بعد نهاية الدورة الحالية)`
+        : '';
       throw new functions.https.HttpsError(
         'failed-precondition',
-        `رصيد غير كافٍ. الرصيد الحالي: ${(balance / 100).toFixed(2)} ج.م`,
+        `الرصيد المتاح للسحب ${(balance / 100).toFixed(2)} ج.م${pendingNote}`,
       );
     }
 

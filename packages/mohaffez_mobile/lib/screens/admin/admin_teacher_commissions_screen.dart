@@ -18,6 +18,7 @@ class AdminTeacherCommissionsScreen extends ConsumerStatefulWidget {
 
 class _AdminTeacherCommissionsScreenState
     extends ConsumerState<AdminTeacherCommissionsScreen> {
+  bool _isRunningJob = false;
   final Map<String, bool> _markingPaid = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -107,9 +108,53 @@ class _AdminTeacherCommissionsScreenState
     }
   }
 
-  // ignore: unused_element
-  void _refresh() {
-    ref.invalidate(adminActionsProvider);
+  Future<void> _triggerCommissionJob() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تأكيد'),
+          content: const Text('هل أنت متأكد من تشغيل عملية حساب العمولات؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.warning),
+              child: const Text('تشغيل'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirm != true) return;
+    setState(() => _isRunningJob = true);
+    try {
+      await ref.read(adminActionsProvider.notifier).triggerCommissionJob();
+      final st = ref.read(adminActionsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor:
+              st.hasError ? AppThemeConstants.error : AppThemeConstants.success,
+          content: Text(st.hasError
+              ? 'حدث خطأ أثناء معالجة العمولات'
+              : 'تمت معالجة العمولات بنجاح ✓'),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('حدث خطأ أثناء تشغيل عملية العمولة'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isRunningJob = false);
+    }
   }
 
   @override
@@ -359,6 +404,23 @@ class _AdminTeacherCommissionsScreenState
               ],
             );
           },
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _isRunningJob ? null : _triggerCommissionJob,
+          backgroundColor: _isRunningJob
+              ? AppThemeConstants.textSecondary
+              : AppThemeConstants.primary,
+          icon: _isRunningJob
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppThemeConstants.onPrimary,
+                  ),
+                )
+              : const Icon(Icons.play_arrow),
+          label: Text(_isRunningJob ? 'جاري التشغيل...' : 'تشغيل عملية العمولة'),
         ),
       ),
     );

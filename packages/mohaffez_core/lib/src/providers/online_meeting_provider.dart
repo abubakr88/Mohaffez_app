@@ -18,6 +18,10 @@ class MeetingInfo {
   final DateTime? endedAt;
   final DateTime? studentJoinedAt;
   final DateTime? teacherJoinedAt;
+  /// Root-level session status (`pending`, `accepted`, `completed`, …).
+  /// Once `completed`, the meeting button must render the ended state
+  /// regardless of meetingEndedAt/sessionTime — see `_computeState`.
+  final String status;
 
   const MeetingInfo({
     required this.provider,
@@ -31,6 +35,7 @@ class MeetingInfo {
     this.endedAt,
     this.studentJoinedAt,
     this.teacherJoinedAt,
+    this.status = '',
   });
 
   factory MeetingInfo.fromDoc(Map<String, dynamic> doc) {
@@ -54,6 +59,7 @@ class MeetingInfo {
       endedAt: ts(doc['meetingEndedAt']),
       studentJoinedAt: ts(doc['meetingStudentJoinedAt']),
       teacherJoinedAt: ts(doc['meetingTeacherJoinedAt']),
+      status: doc['status'] as String? ?? '',
     );
   }
 }
@@ -81,13 +87,16 @@ final meetingInfoProvider =
     final data = doc.data();
     if (data == null) return null;
     // Build MeetingInfo whenever there is anything to show — either the
-    // meeting{} map exists or the teacher has stamped a root-level activity
-    // timestamp (start / join). Otherwise return null so the button stays
-    // in pendingMeetingLink.
+    // meeting{} map exists, the teacher has stamped a root-level activity
+    // timestamp (start / join), or the session has reached a terminal
+    // status (completed/cancelled). Otherwise return null so the button
+    // stays in pendingMeetingLink.
+    final status = data['status'] as String? ?? '';
+    final isTerminal = status == 'completed' || status == 'cancelled';
     final hasActivity = data['meetingStartedAt'] != null ||
         data['meetingStudentJoinedAt'] != null ||
         data['meetingTeacherJoinedAt'] != null;
-    if (data['meeting'] == null && !hasActivity) return null;
+    if (data['meeting'] == null && !hasActivity && !isTerminal) return null;
     return MeetingInfo.fromDoc(data);
   });
 });
@@ -107,7 +116,6 @@ final meetingButtonStateProvider =
     ref.watch(_meetingClockProvider);
     final systemConfig = ref.watch(systemConfigProvider).valueOrNull;
     final leadTimeMinutes = systemConfig?.meetingStartLeadTimeMinutes ?? 60;
-  print('DEBUG CONFIG: systemConfig: $systemConfig, leadTimeMinutes: $leadTimeMinutes');
   // NTP correction disabled — the `ntp` package returns unreliable offsets
   // on some devices. Device clock is used directly.
   // final offset = ref.watch(serverClockProvider).offset ?? Duration.zero;
@@ -132,6 +140,14 @@ MeetingButtonState _computeState({
   required int leadTimeMinutes,
   required DateTime now,
 }) {
+  // Terminal session status wins over everything. Once the teacher hits
+  // "complete" (or the auto-end CF marks it completed), no role should
+  // ever see a join button again.
+  if (info != null &&
+      (info.status == 'completed' || info.status == 'cancelled')) {
+    return MeetingButtonState.ended;
+  }
+
   if (info == null || info.url.isEmpty) {
     return MeetingButtonState.pendingMeetingLink;
   }
@@ -140,13 +156,10 @@ MeetingButtonState _computeState({
   // `sessionDate` is day-only (midnight) — never use it alone for time math.
   final sessionTime = info.slotStart ?? info.sessionDate;
 
-  // ended: ONLY when the teacher explicitly ends the session (meetingEndedAt).
-  // Stale-guard: ignore if we're still before the session's start time.
+  // ended: teacher explicitly stamped meetingEndedAt (legacy path — the
+  // status check above already catches normal completions).
   if (info.endedAt != null) {
-    if (sessionTime == null || !now.isBefore(sessionTime)) {
-      return MeetingButtonState.ended;
-    }
-    // else: stale endedAt — fall through.
+    return MeetingButtonState.ended;
   }
 
   // Teacher started → both roles see inProgress.

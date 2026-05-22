@@ -1,7 +1,7 @@
 // Compact card the teacher sees on home/profile showing their current
 // commission tier, current rate, and a progress bar towards the next tier.
 //
-// Tier data is recomputed weekly by the Cloud Function
+// Tier data is recomputed bi-weekly (1st and 15th) by the Cloud Function
 // `recomputeTeacherTiers` — until that runs at least once for a teacher,
 // the card shows the global rate with a neutral "we're still calculating"
 // caption instead of incorrect tier info.
@@ -31,29 +31,24 @@ class TeacherTierCard extends ConsumerWidget {
     final effective = info?.effectiveRate(cfg.commissionRate) ?? cfg.commissionRate;
     final currentTier = info?.currentTier(tiers);
     final nextTier = info?.nextTier(tiers);
-    final revenue = info?.last30dRevenueEgp ?? 0;
-    final sessions = info?.sessionsLast30d ?? 0;
-    final lateSessions = info?.lateSessionsLast30d ?? 0;
-    final totalSessions = info?.totalSessionsLast30d ?? sessions;
+    final sessions = info?.sessionsLast14d ?? 0;
+    final lateSessions = info?.lateSessionsLast14d ?? 0;
+    final totalSessions = info?.totalSessionsLast14d ?? sessions;
     final notYetEvaluated = info?.evaluatedAt == null;
 
     final progressTowardNext = (nextTier == null || currentTier == null)
         ? null
         : _progressTowardNext(
-            revenue: revenue,
-            currentMin: currentTier.minRevenueEgp,
-            nextMin: nextTier.minRevenueEgp,
+            sessions: sessions,
+            currentMin: currentTier.minSessions,
+            nextMin: nextTier.minSessions,
           );
 
-    // Estimate how many more sessions the teacher needs to reach the next
-    // tier — uses their own average session price so the number is honest.
+    // Exact number of additional on-time sessions needed to reach next tier.
     int? sessionsToNextTier;
-    if (nextTier != null && sessions > 0 && revenue > 0) {
-      final avgPrice = revenue / sessions;
-      final gap = nextTier.minRevenueEgp - revenue;
-      if (avgPrice > 0 && gap > 0) {
-        sessionsToNextTier = (gap / avgPrice).ceil();
-      }
+    if (nextTier != null) {
+      final gap = nextTier.minSessions - sessions;
+      if (gap > 0) sessionsToNextTier = gap;
     }
 
     return Container(
@@ -127,8 +122,7 @@ class TeacherTierCard extends ConsumerWidget {
             )
           else ...[
             Text(
-              'أكملت $totalSessions حلقة خلال آخر 30 يوم '
-              '(${revenue.toStringAsFixed(0)} ج.م)',
+              'أكملت $totalSessions حلقة خلال آخر 14 يوم',
               style: const TextStyle(
                 color: AppThemeConstants.white,
                 fontSize: 13,
@@ -161,14 +155,11 @@ class TeacherTierCard extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 sessionsToNextTier != null
-                    ? 'أكمل ~$sessionsToNextTier حلقة إضافية في وقتها لتنخفض '
+                    ? 'أكمل $sessionsToNextTier حلقة إضافية في وقتها لتنخفض '
                         'عمولة المنصة إلى '
                         '${(nextTier.rate * 100).toStringAsFixed(0)}% '
                         '(${nextTier.badge ?? ''} ${nextTier.labelAr})'
-                    : 'تبقى ${(nextTier.minRevenueEgp - revenue).clamp(0, double.infinity).toStringAsFixed(0)} ج.م '
-                        'لتنخفض عمولة المنصة إلى '
-                        '${(nextTier.rate * 100).toStringAsFixed(0)}% '
-                        '(${nextTier.badge ?? ''} ${nextTier.labelAr})',
+                    : 'وصلت لحد شريحة ${nextTier.labelAr} — انتظر إعادة الاحتساب',
                 style: const TextStyle(
                   color: AppThemeConstants.white,
                   fontSize: 12,
@@ -191,12 +182,12 @@ class TeacherTierCard extends ConsumerWidget {
   }
 
   double _progressTowardNext({
-    required double revenue,
-    required double currentMin,
-    required double nextMin,
+    required int sessions,
+    required int currentMin,
+    required int nextMin,
   }) {
     final span = nextMin - currentMin;
     if (span <= 0) return 1.0;
-    return (revenue - currentMin) / span;
+    return (sessions - currentMin) / span;
   }
 }

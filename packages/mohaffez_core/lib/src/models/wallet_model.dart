@@ -28,6 +28,12 @@ class WalletModel with _$WalletModel {
     required String ownerId,
     required WalletOwnerType ownerType,
     required int balancePiastres,
+    /// Teacher-only. Gross earnings of the current commission cycle, not
+    /// yet settled. Becomes part of [balancePiastres] (net of commission)
+    /// when the bi-weekly settlement runs. Not withdrawable.
+    @Default(0) int pendingCyclePiastres,
+    /// Teacher-only. Timestamp of the last cycle settlement on this wallet.
+    @TimestampConverter() DateTime? lastSettledAt,
     @Default('EGP') String currency,
     @TimestampConverter() DateTime? createdAt,
     @TimestampConverter() DateTime? updatedAt,
@@ -47,6 +53,12 @@ class WalletModel with _$WalletModel {
   /// Convenience: display value in EGP. Server is source of truth in piastres.
   double get balanceEgp => balancePiastres / 100.0;
 
+  /// Teacher-only. Current cycle's gross earnings in EGP, awaiting settlement.
+  double get pendingCycleEgp => pendingCyclePiastres / 100.0;
+
+  /// Teacher-only. True when there is current-cycle gross still pending.
+  bool get hasPendingCycleEarnings => pendingCyclePiastres > 0;
+
   /// A brand-new wallet for a user who has never had any ledger activity.
   /// Used so UI can render `0.00 ج.م` instead of a spinner forever when no
   /// wallet doc has been created yet (wallets are created lazily server-side).
@@ -55,5 +67,6 @@ class WalletModel with _$WalletModel {
         ownerId: userId,
         ownerType: type,
         balancePiastres: 0,
+        pendingCyclePiastres: 0,
       );
 }

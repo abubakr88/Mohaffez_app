@@ -15,9 +15,9 @@ class CommissionTierModel {
   /// Display label in Arabic, e.g. 'البداية', 'نشط'.
   final String labelAr;
 
-  /// Inclusive lower bound on the teacher's rolling-30d revenue (EGP) to
-  /// qualify for this tier. Sorted ascending defines the ladder.
-  final double minRevenueEgp;
+  /// Inclusive lower bound on on-time sessions completed in the rolling 14-day
+  /// window to qualify for this tier. Sorted ascending defines the ladder.
+  final int minSessions;
 
   /// Commission rate applied to all transactions while the teacher sits
   /// on this tier (0.0–1.0).
@@ -29,7 +29,7 @@ class CommissionTierModel {
   const CommissionTierModel({
     required this.id,
     required this.labelAr,
-    required this.minRevenueEgp,
+    required this.minSessions,
     required this.rate,
     this.badge,
   });
@@ -38,7 +38,7 @@ class CommissionTierModel {
     return CommissionTierModel(
       id: data['id'] as String? ?? '',
       labelAr: data['labelAr'] as String? ?? '',
-      minRevenueEgp: (data['minRevenueEgp'] as num?)?.toDouble() ?? 0,
+      minSessions: (data['minSessions'] as num?)?.toInt() ?? 0,
       rate: (data['rate'] as num?)?.toDouble() ?? 0.10,
       badge: data['badge'] as String?,
     );
@@ -47,7 +47,7 @@ class CommissionTierModel {
   Map<String, dynamic> toMap() => {
         'id': id,
         'labelAr': labelAr,
-        'minRevenueEgp': minRevenueEgp,
+        'minSessions': minSessions,
         'rate': rate,
         if (badge != null) 'badge': badge,
       };
@@ -55,65 +55,72 @@ class CommissionTierModel {
   CommissionTierModel copyWith({
     String? id,
     String? labelAr,
-    double? minRevenueEgp,
+    int? minSessions,
     double? rate,
     String? badge,
   }) {
     return CommissionTierModel(
       id: id ?? this.id,
       labelAr: labelAr ?? this.labelAr,
-      minRevenueEgp: minRevenueEgp ?? this.minRevenueEgp,
+      minSessions: minSessions ?? this.minSessions,
       rate: rate ?? this.rate,
       badge: badge ?? this.badge,
     );
   }
 
   /// Default tier table seeded when admin hasn't configured one yet.
-  /// Numbers come from the design discussion; admin can tune via the
-  /// admin tier editor without redeploying.
+  /// Thresholds are on-time sessions per 14-day window; admin can tune via
+  /// the admin tier editor without redeploying.
   static const List<CommissionTierModel> defaultTiers = [
     CommissionTierModel(
       id: 'starter',
       labelAr: 'البداية',
-      minRevenueEgp: 0,
+      minSessions: 0,
       rate: 0.15,
       badge: '🌱',
     ),
     CommissionTierModel(
       id: 'active',
       labelAr: 'نشط',
-      minRevenueEgp: 2000,
+      minSessions: 8,
       rate: 0.12,
       badge: '⭐',
     ),
     CommissionTierModel(
+      id: 'intermediate',
+      labelAr: 'متوسط',
+      minSessions: 14,
+      rate: 0.10,
+      badge: '✨',
+    ),
+    CommissionTierModel(
       id: 'distinguished',
       labelAr: 'متميز',
-      minRevenueEgp: 5000,
+      minSessions: 20,
       rate: 0.08,
       badge: '🏆',
     ),
     CommissionTierModel(
       id: 'elite',
       labelAr: 'نخبة',
-      minRevenueEgp: 10000,
+      minSessions: 35,
       rate: 0.05,
       badge: '💎',
     ),
   ];
 
-  /// Given a sorted-ascending tier list and a revenue value, returns the
+  /// Given a sorted-ascending tier list and a session count, returns the
   /// highest-qualifying tier. Returns null if list is empty.
-  static CommissionTierModel? tierForRevenue(
+  static CommissionTierModel? tierForSessions(
     List<CommissionTierModel> tiers,
-    double revenueEgp,
+    int sessions,
   ) {
     if (tiers.isEmpty) return null;
     final sorted = [...tiers]
-      ..sort((a, b) => a.minRevenueEgp.compareTo(b.minRevenueEgp));
+      ..sort((a, b) => a.minSessions.compareTo(b.minSessions));
     CommissionTierModel current = sorted.first;
     for (final t in sorted) {
-      if (revenueEgp >= t.minRevenueEgp) current = t;
+      if (sessions >= t.minSessions) current = t;
     }
     return current;
   }

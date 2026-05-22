@@ -147,27 +147,60 @@ class _BalanceCard extends ConsumerWidget {
               'تعذر تحميل الرصيد',
               style: TextStyle(color: AppThemeConstants.white),
             ),
-            data: (w) => Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            data: (w) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  w.balanceEgp.toStringAsFixed(2),
-                  style: const TextStyle(
-                    color: AppThemeConstants.white,
-                    fontSize: 38,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 6),
-                  child: Text('ج.م',
-                      style: TextStyle(
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      w.balanceEgp.toStringAsFixed(2),
+                      style: const TextStyle(
                         color: AppThemeConstants.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      )),
+                        fontSize: 38,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 6),
+                      child: Text('ج.م',
+                          style: TextStyle(
+                            color: AppThemeConstants.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          )),
+                    ),
+                  ],
                 ),
+                if (w.hasPendingCycleEarnings) ...[
+                  const SizedBox(height: AppThemeConstants.spaceMd),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.hourglass_bottom_rounded,
+                            color: AppThemeConstants.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'قيد التسوية: ${w.pendingCycleEgp.toStringAsFixed(2)} ج.م — تُتاح بعد نهاية الدورة الحالية بعد خصم العمولة',
+                            style: const TextStyle(
+                              color: AppThemeConstants.white,
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

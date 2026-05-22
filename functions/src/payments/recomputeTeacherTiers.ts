@@ -3,10 +3,8 @@
 // to teachers than "every other Sunday".
 //
 // For each teacher:
-//   1. Sum sessionPrice of hafizSessions where mohaffezId == teacher
-//      AND status == 'completed' AND isPaid == true AND completedAt within
-//      the last 30 days.
-//   2. Look up the matching tier in systemConfig.commissionTiers.
+//   1. Count completed, paid, on-time hafizSessions within the last 14 days.
+//   2. Look up the matching tier in systemConfig.commissionTiers (by session count).
 //   3. Write { commissionRate, commissionTier, tierStats } to the user doc.
 //   4. Append a history entry under users/{teacherId}/commissionHistory.
 //   5. If the tier changed since last run, send a notification (up = celebratory,
@@ -17,23 +15,29 @@
 import * as functions from 'firebase-functions';
 import admin, { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
+import {
+  postLedgerEntry,
+  walletIdForUser,
+  SYSTEM_WALLETS,
+} from '../wallet/walletUtils';
 
 interface TierConfig {
   id: string;
   labelAr: string;
-  minRevenueEgp: number;
+  minSessions: number;
   rate: number;
   badge?: string;
 }
 
 const DEFAULT_TIERS: TierConfig[] = [
-  { id: 'starter', labelAr: 'البداية', minRevenueEgp: 0, rate: 0.15, badge: '🌱' },
-  { id: 'active', labelAr: 'نشط', minRevenueEgp: 2000, rate: 0.12, badge: '⭐' },
-  { id: 'distinguished', labelAr: 'متميز', minRevenueEgp: 5000, rate: 0.08, badge: '🏆' },
-  { id: 'elite', labelAr: 'نخبة', minRevenueEgp: 10000, rate: 0.05, badge: '💎' },
+  { id: 'starter', labelAr: 'البداية', minSessions: 0, rate: 0.15, badge: '🌱' },
+  { id: 'active', labelAr: 'نشط', minSessions: 8, rate: 0.12, badge: '⭐' },
+  { id: 'intermediate', labelAr: 'متوسط', minSessions: 14, rate: 0.10, badge: '✨' },
+  { id: 'distinguished', labelAr: 'متميز', minSessions: 20, rate: 0.08, badge: '🏆' },
+  { id: 'elite', labelAr: 'نخبة', minSessions: 35, rate: 0.05, badge: '💎' },
 ];
 
-const ROLLING_WINDOW_DAYS = 30;
+const ROLLING_WINDOW_DAYS = 14;
 const TEACHER_PAGE_SIZE = 200;
 
 async function loadTiers(): Promise<TierConfig[]> {
@@ -46,21 +50,21 @@ async function loadTiers(): Promise<TierConfig[]> {
       return {
         id: String(e.id ?? ''),
         labelAr: String(e.labelAr ?? ''),
-        minRevenueEgp: Number(e.minRevenueEgp ?? 0),
+        minSessions: Number(e.minSessions ?? 0),
         rate: Number(e.rate ?? 0.10),
         badge: e.badge ? String(e.badge) : undefined,
       } as TierConfig;
     })
     .filter((t) => t.id.length > 0);
   if (tiers.length === 0) return DEFAULT_TIERS;
-  tiers.sort((a, b) => a.minRevenueEgp - b.minRevenueEgp);
+  tiers.sort((a, b) => a.minSessions - b.minSessions);
   return tiers;
 }
 
-function pickTier(tiers: TierConfig[], revenueEgp: number): TierConfig {
+function pickTier(tiers: TierConfig[], sessionCount: number): TierConfig {
   let current = tiers[0];
   for (const t of tiers) {
-    if (revenueEgp >= t.minRevenueEgp) current = t;
+    if (sessionCount >= t.minSessions) current = t;
   }
   return current;
 }
@@ -68,7 +72,6 @@ function pickTier(tiers: TierConfig[], revenueEgp: number): TierConfig {
 interface TeacherStats {
   totalRevenueEgp: number;
   sessionCount: number;
-  /// On-time + late together — used for display only ("منها X متأخرة").
   totalSessionsIncludingLate: number;
   lateSessionsCount: number;
 }
@@ -124,10 +127,6 @@ async function maybeNotifyTierChange(
   next: TierConfig,
 ): Promise<void> {
   if (!previousTierId || previousTierId === next.id) return;
-  const isPromotion = previousTierId !== next.id; // up vs down handled by tier order
-  // We don't track direction explicitly; copy is celebratory for any change
-  // up, neutral for changes down. Determine direction by re-loading tiers.
-  // (Cheap: tiers are <10 items.)
   const tiers = await loadTiers();
   const oldIdx = tiers.findIndex((t) => t.id === previousTierId);
   const newIdx = tiers.findIndex((t) => t.id === next.id);
@@ -143,7 +142,7 @@ async function maybeNotifyTierChange(
       userId: teacherId,
       title,
       body,
-      type: isPromotion ? 'tier_change' : 'tier_change',
+      type: 'tier_change',
       data: { tierId: next.id, rate: String(next.rate) },
     });
   } catch (err) {
@@ -157,9 +156,11 @@ async function recomputeForTeacher(
   now: Date,
   windowStart: Date,
   nextEval: Date,
+  options: { settleWallet: boolean } = { settleWallet: false },
 ): Promise<void> {
   const stats = await statsForTeacher(teacherId, windowStart);
-  const tier = pickTier(tiers, stats.totalRevenueEgp);
+  // Tier is determined by on-time session count, not revenue.
+  const tier = pickTier(tiers, stats.sessionCount);
 
   const userRef = db.collection('users').doc(teacherId);
   const userSnap = await userRef.get();
@@ -169,12 +170,12 @@ async function recomputeForTeacher(
     commissionRate: tier.rate,
     commissionTier: tier.id,
     tierStats: {
-      last30dRevenueEgp: stats.totalRevenueEgp,
-      // sessionsLast30d intentionally counts ONLY on-time sessions —
-      // matches the number used for tier math and motivation copy.
-      sessionsLast30d: stats.sessionCount,
-      totalSessionsLast30d: stats.totalSessionsIncludingLate,
-      lateSessionsLast30d: stats.lateSessionsCount,
+      last14dRevenueEgp: stats.totalRevenueEgp,
+      // sessionsLast14d counts ONLY on-time sessions — the number used for
+      // tier assignment and the progress bar in the teacher card.
+      sessionsLast14d: stats.sessionCount,
+      totalSessionsLast14d: stats.totalSessionsIncludingLate,
+      lateSessionsLast14d: stats.lateSessionsCount,
       evaluatedAt: admin.firestore.Timestamp.fromDate(now),
       nextEvalAt: admin.firestore.Timestamp.fromDate(nextEval),
       windowStart: admin.firestore.Timestamp.fromDate(windowStart),
@@ -183,8 +184,6 @@ async function recomputeForTeacher(
 
   await userRef.set(update, { merge: true });
 
-  // History entry keyed by ISO date so re-runs on the same day overwrite,
-  // not duplicate.
   const historyId = now.toISOString().slice(0, 10);
   await userRef
     .collection('commissionHistory')
@@ -200,10 +199,95 @@ async function recomputeForTeacher(
       { merge: true },
     );
 
+  // ── Cycle settlement: drain the teacher's `pending` bucket using the
+  // rate we just computed for THIS cycle. Only runs during the scheduled
+  // bi-weekly job (not on the real-time per-session refresh, which would
+  // settle before the cycle ends and use a half-baked tier).
+  if (options.settleWallet) {
+    await settleCycleForTeacher(teacherId, tier.rate, now, historyId);
+  }
+
   await maybeNotifyTierChange(teacherId, previousTierId, tier);
 }
 
-async function runRecompute(): Promise<{ teachersProcessed: number }> {
+/**
+ * Drain teacher's pending bucket → available (net of commission) + system
+ * revenue (commission). Idempotent on `groupId = settle_{teacherId}_{cycleId}`
+ * so a retry on the same cycle is a no-op. No-op if pending == 0.
+ */
+async function settleCycleForTeacher(
+  teacherId: string,
+  rate: number,
+  now: Date,
+  cycleId: string,
+): Promise<void> {
+  const walletRef = db.collection('wallets').doc(walletIdForUser(teacherId));
+  const walletSnap = await walletRef.get();
+  if (!walletSnap.exists) return;
+  const pendingPiastres =
+    (walletSnap.data()?.pendingCyclePiastres as number) ?? 0;
+  if (pendingPiastres <= 0) {
+    // Still stamp lastSettledAt so the teacher UI can show "settled at" even
+    // for zero-pending cycles.
+    await walletRef.update({
+      lastSettledAt: admin.firestore.Timestamp.fromDate(now),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return;
+  }
+
+  const commissionPiastres = Math.round(pendingPiastres * rate);
+  const teacherNetPiastres = pendingPiastres - commissionPiastres;
+
+  try {
+    await db.runTransaction(async (tx) => {
+      await postLedgerEntry(tx, {
+        type: 'cycle_settlement',
+        legs: [
+          // Drain pending bucket.
+          {
+            walletId: walletIdForUser(teacherId),
+            ownerType: 'mohaffez',
+            amountPiastres: -pendingPiastres,
+            target: 'pending',
+          },
+          // Credit net to available bucket (skip leg if zero — e.g. 100% rate edge case).
+          ...(teacherNetPiastres > 0
+            ? [{
+                walletId: walletIdForUser(teacherId),
+                ownerType: 'mohaffez' as const,
+                amountPiastres: teacherNetPiastres,
+              }]
+            : []),
+          // Platform commission. Skip if zero (e.g. starter tier with 0% rate).
+          ...(commissionPiastres > 0
+            ? [{
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system' as const,
+                amountPiastres: commissionPiastres,
+              }]
+            : []),
+        ],
+        reason: `Cycle settlement: pending=${pendingPiastres} rate=${rate}`,
+        groupId: `settle_${teacherId}_${cycleId}`,
+        createdBy: 'system',
+        metadata: { rate, cycleId, pendingPiastres, commissionPiastres },
+      });
+      tx.update(walletRef, {
+        lastSettledAt: admin.firestore.Timestamp.fromDate(now),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+  } catch (err) {
+    functions.logger.error('settleCycleForTeacher failed', {
+      teacherId, rate, pendingPiastres, err,
+    });
+  }
+}
+
+async function runRecompute(
+  options: { settleWallet: boolean } = { settleWallet: true },
+): Promise<{ teachersProcessed: number }> {
   const tiers = await loadTiers();
   const now = new Date();
   const windowStart = new Date(now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000);
@@ -225,7 +309,7 @@ async function runRecompute(): Promise<{ teachersProcessed: number }> {
 
     for (const doc of page.docs) {
       try {
-        await recomputeForTeacher(doc.id, tiers, now, windowStart, nextEval);
+        await recomputeForTeacher(doc.id, tiers, now, windowStart, nextEval, options);
         teachersProcessed += 1;
       } catch (err) {
         functions.logger.error('tier recompute failed for teacher', {
@@ -254,16 +338,39 @@ export const recomputeTeacherTiers = functions
   });
 
 // Callable — lets admin force a recompute from the panel without waiting
-// a week. Restricted to admin custom-claim.
+// for the next scheduled run. Restricted to admin custom-claim.
+//
+// By default this REFRESHES TIER STATS ONLY — it does NOT settle wallets.
+// Settling would end the current commission cycle early (draining all
+// teachers' pending balances). To force a full cycle close, pass
+// `{ settleWallets: true }`.
 export const recomputeTeacherTiersNow = functions
   .region('us-central1')
-  .https.onCall(async (_data, context) => {
+  .https.onCall(async (data, context) => {
     if (context.auth?.token?.admin !== true) {
       throw new functions.https.HttpsError(
         'permission-denied',
         'Admin only.',
       );
     }
-    const result = await runRecompute();
-    return { ok: true, ...result };
+    const settleWallets = (data as { settleWallets?: boolean } | undefined)?.settleWallets === true;
+    const result = await runRecompute({ settleWallet: settleWallets });
+    return { ok: true, settleWallets, ...result };
   });
+
+// Called by other triggers (e.g. onSessionCompleted) to refresh a single
+// teacher's tier immediately, instead of waiting for the bi-weekly cron.
+// Failures are logged but never thrown — recompute is best-effort and must
+// not break the caller's primary flow.
+export async function recomputeForTeacherById(teacherId: string): Promise<void> {
+  if (!teacherId) return;
+  try {
+    const tiers = await loadTiers();
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000);
+    const nextEval = new Date(now.getTime() + 14 * 86_400_000);
+    await recomputeForTeacher(teacherId, tiers, now, windowStart, nextEval);
+  } catch (err) {
+    functions.logger.warn('recomputeForTeacherById failed', { teacherId, err });
+  }
+}

@@ -84,7 +84,6 @@ import '../screens/admin/admin_wallet_topups_screen.dart';
 import '../screens/admin/admin_process_payouts_screen.dart';
 import '../screens/admin/admin_teacher_commissions_screen.dart';
 import '../screens/admin/admin_teacher_requests_screen.dart';
-import '../screens/admin/commission_dashboard_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
@@ -786,12 +785,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'admin-payment-events',
             builder: (context, state) =>
                 const AdminPaymentEventsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/commissions',
-            name: 'admin-commissions',
-            builder: (context, state) =>
-                const CommissionDashboardScreen(),
           ),
           GoRoute(
             path: '/admin/teacher-commissions',

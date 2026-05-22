@@ -166,9 +166,12 @@ class DirectPaymentService {
         'amount':                     amount,
         'sessionType':                sessionType,
         'preferredTimeSlot':          preferredTimeSlot,
-        if (slotDate != null)         'slotDate': slotDate.toIso8601String(),
-        if (slotStart != null)        'slotStart': slotStart.toIso8601String(),
-        if (slotEnd != null)          'slotEnd': slotEnd.toIso8601String(),
+        // Always send UTC. The server (parseFlutterDate) assumes any string
+        // missing a timezone is UTC, so a naive local toIso8601String() ends
+        // up stored as `+UTC_offset` hours into the future. Egypt = +3h shift.
+        if (slotDate != null)         'slotDate': slotDate.toUtc().toIso8601String(),
+        if (slotStart != null)        'slotStart': slotStart.toUtc().toIso8601String(),
+        if (slotEnd != null)          'slotEnd': slotEnd.toUtc().toIso8601String(),
         'paymentMethod':              paymentMethod,
         if (studentNote != null)      'studentNote':    studentNote,
         if (imamAddressText != null)  'imamAddressText': imamAddressText,

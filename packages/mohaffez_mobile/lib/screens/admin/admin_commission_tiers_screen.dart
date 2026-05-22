@@ -40,13 +40,13 @@ class _AdminCommissionTiersScreenState
         ? const CommissionTierModel(
             id: 'tier_new',
             labelAr: 'مستوى جديد',
-            minRevenueEgp: 0,
+            minSessions: 0,
             rate: 0.10,
           )
         : CommissionTierModel(
             id: 'tier_${_tiers.length + 1}',
             labelAr: 'مستوى جديد',
-            minRevenueEgp: _tiers.last.minRevenueEgp + 1000,
+            minSessions: _tiers.last.minSessions + 10,
             rate: (_tiers.last.rate - 0.01).clamp(0.0, 1.0),
           );
     setState(() => _draft = [..._tiers, next]);
@@ -71,8 +71,8 @@ class _AdminCommissionTiersScreenState
       if (t.rate < 0 || t.rate > 1) {
         return 'نسبة العمولة في "${t.labelAr}" خارج المدى (0–100%)';
       }
-      if (t.minRevenueEgp < 0) {
-        return 'حد الإيراد في "${t.labelAr}" لا يمكن أن يكون سالباً';
+      if (t.minSessions < 0) {
+        return 'حد الحلقات في "${t.labelAr}" لا يمكن أن يكون سالباً';
       }
     }
     return null;
@@ -92,7 +92,7 @@ class _AdminCommissionTiersScreenState
     setState(() => _saving = true);
     try {
       final sorted = [..._tiers]
-        ..sort((a, b) => a.minRevenueEgp.compareTo(b.minRevenueEgp));
+        ..sort((a, b) => a.minSessions.compareTo(b.minSessions));
       await ref
           .read(systemConfigNotifierProvider.notifier)
           .updateGlobalConfig({
@@ -251,11 +251,12 @@ class _IntroCard extends StatelessWidget {
           ),
           SizedBox(height: 8),
           Text(
-            'يُحسب إيراد كل محفظ خلال آخر 30 يوماً تلقائياً مرتين شهرياً '
-            '(يومَي 1 و15 من كل شهر). كلما زاد إيراده، انتقل لشريحة أعلى '
-            'وانخفضت نسبة العمولة المخصومة. يمكنك تعديل الحدود والنسب أدناه، '
-            'ثم الضغط على "إعادة احتساب الآن" لتطبيق التغييرات فوراً بدلاً '
-            'من انتظار الدورة التلقائية.',
+            'يُحسب عدد حلقات كل محفظ المكتملة في وقتها خلال آخر 14 يوماً '
+            'تلقائياً مرتين شهرياً (يومَي 1 و15 من كل شهر). كلما زاد عدد '
+            'حلقاته، انتقل لشريحة أعلى وانخفضت نسبة العمولة المخصومة. '
+            'يمكنك تعديل الحدود والنسب أدناه، ثم الضغط على '
+            '"إعادة احتساب الآن" لتطبيق التغييرات فوراً بدلاً من انتظار '
+            'الدورة التلقائية.',
             style: TextStyle(fontSize: 13, height: 1.6),
           ),
         ],
@@ -284,7 +285,7 @@ class _TierEditorState extends State<_TierEditor> {
   late final TextEditingController _idCtrl;
   late final TextEditingController _labelCtrl;
   late final TextEditingController _badgeCtrl;
-  late final TextEditingController _minRevCtrl;
+  late final TextEditingController _minSessionsCtrl;
   late final TextEditingController _rateCtrl;
 
   @override
@@ -293,8 +294,8 @@ class _TierEditorState extends State<_TierEditor> {
     _idCtrl = TextEditingController(text: widget.tier.id);
     _labelCtrl = TextEditingController(text: widget.tier.labelAr);
     _badgeCtrl = TextEditingController(text: widget.tier.badge ?? '');
-    _minRevCtrl = TextEditingController(
-        text: widget.tier.minRevenueEgp.toStringAsFixed(0));
+    _minSessionsCtrl = TextEditingController(
+        text: widget.tier.minSessions.toString());
     _rateCtrl = TextEditingController(
         text: (widget.tier.rate * 100).toStringAsFixed(2));
   }
@@ -304,19 +305,19 @@ class _TierEditorState extends State<_TierEditor> {
     _idCtrl.dispose();
     _labelCtrl.dispose();
     _badgeCtrl.dispose();
-    _minRevCtrl.dispose();
+    _minSessionsCtrl.dispose();
     _rateCtrl.dispose();
     super.dispose();
   }
 
   void _emit() {
-    final min = double.tryParse(_minRevCtrl.text) ?? 0;
+    final minSessions = int.tryParse(_minSessionsCtrl.text) ?? 0;
     final ratePct = double.tryParse(_rateCtrl.text) ?? 0;
     widget.onChanged(widget.tier.copyWith(
       id: _idCtrl.text.trim(),
       labelAr: _labelCtrl.text.trim(),
       badge: _badgeCtrl.text.trim().isEmpty ? null : _badgeCtrl.text.trim(),
-      minRevenueEgp: min,
+      minSessions: minSessions,
       rate: (ratePct / 100).clamp(0.0, 1.0),
     ));
   }
@@ -382,12 +383,11 @@ class _TierEditorState extends State<_TierEditor> {
             children: [
               Expanded(
                 child: TextField(
-                  controller: _minRevCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
+                  controller: _minSessionsCtrl,
+                  keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'الحد الأدنى للإيراد',
-                    suffixText: 'ج.م / 30 يوم',
+                    labelText: 'الحد الأدنى من الحلقات',
+                    suffixText: 'حلقة / 14 يوم',
                     isDense: true,
                     border: OutlineInputBorder(),
                   ),

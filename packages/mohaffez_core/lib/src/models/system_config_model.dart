@@ -49,6 +49,12 @@ class SystemConfigModel {
   /// and excluded from tier calculations. Configurable by admin.
   final int lateSessionGraceMinutes;
 
+  /// Maximum allowed duration (in minutes) for a session once the teacher
+  /// taps "Start". A scheduled Cloud Function auto-completes sessions
+  /// whose `meetingStartedAt` is older than this and that are still not
+  /// marked `completed`. Default: 90 minutes.
+  final int sessionMaxDurationMinutes;
+
   const SystemConfigModel({
     required this.commissionRate,
     required this.directPaymentCommission,
@@ -91,6 +97,7 @@ class SystemConfigModel {
     required this.adminWallets,
     required this.commissionTiers,
     required this.lateSessionGraceMinutes,
+    required this.sessionMaxDurationMinutes,
   });
 
   factory SystemConfigModel.fromFirestore(DocumentSnapshot doc) {
@@ -192,6 +199,9 @@ class SystemConfigModel {
       lateSessionGraceMinutes:
           (data['lateSessionGraceMinutes'] as num?)?.toInt() ??
               defaults.lateSessionGraceMinutes,
+      sessionMaxDurationMinutes:
+          (data['sessionMaxDurationMinutes'] as num?)?.toInt() ??
+              defaults.sessionMaxDurationMinutes,
     );
   }
 
@@ -238,6 +248,7 @@ class SystemConfigModel {
       adminWallets: {},
       commissionTiers: CommissionTierModel.defaultTiers,
       lateSessionGraceMinutes: 10,
+      sessionMaxDurationMinutes: 90,
     );
   }
 
@@ -285,6 +296,7 @@ class SystemConfigModel {
       'adminWallets': adminWallets,
       'commissionTiers': commissionTiers.map((t) => t.toMap()).toList(),
       'lateSessionGraceMinutes': lateSessionGraceMinutes,
+      'sessionMaxDurationMinutes': sessionMaxDurationMinutes,
     };
   }
 }

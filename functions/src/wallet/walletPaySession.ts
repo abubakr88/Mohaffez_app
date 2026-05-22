@@ -83,23 +83,12 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
 
     const mohaffezId = req.mohaffezId as string;
 
-    // Per-teacher commission rate (set by recomputeTeacherTiers) takes
-    // precedence over the global rate. Both reads must happen inside the
-    // transaction for consistency with the rest of the write set.
-    const [configSnap, teacherSnap] = await Promise.all([
-      tx.get(db.collection('systemConfig').doc('global')),
-      tx.get(db.collection('users').doc(mohaffezId)),
-    ]);
-    const teacherRate = teacherSnap.data()?.commissionRate;
-    const globalRate = configSnap.data()?.commissionRate;
-    const commissionRate: number =
-      (typeof teacherRate === 'number' && teacherRate >= 0
-        ? teacherRate
-        : typeof globalRate === 'number' && globalRate >= 0
-          ? globalRate
-          : 0.05);
-    const commissionPiastres = Math.round(totalPiastres * commissionRate);
-    const teacherPiastres = totalPiastres - commissionPiastres;
+    // Commission is NO LONGER deducted at session-payment time. The teacher
+    // is credited the GROSS amount into their `pending` bucket, and the
+    // bi-weekly settlement step (`recomputeTeacherTiers`) deducts commission
+    // at the end of the cycle using THAT cycle's actual tier rate. This
+    // ensures the rate a teacher earned by hitting a tier mid-cycle applies
+    // to the same cycle's payout, not the next one.
 
     // Read weekly commission summary BEFORE writes.
     const sessionDate = (req.slotStart ?? req.slotDate) as admin.firestore.Timestamp | undefined;
@@ -116,12 +105,10 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
     const summarySnap = await tx.get(summaryRef);
 
-    // Post the ledger entry. Four legs:
-    //  - debit student wallet (full amount)
-    //  - credit teacher wallet (amount − commission)
-    //  - credit system_revenue (commission)
-    //  - The student paid the platform; teacher earned net. No fourth leg needed
-    //    because student debit = teacher credit + revenue credit.
+    // Post the ledger entry. Two legs:
+    //  - debit student wallet (full amount, available bucket)
+    //  - credit teacher wallet (full amount, PENDING bucket)
+    // Commission is deducted later by cycle settlement, not here.
     const ledger = await postLedgerEntry(tx, {
       type: 'session_payment',
       legs: [
@@ -133,12 +120,8 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
         {
           walletId: walletIdForUser(mohaffezId),
           ownerType: 'mohaffez',
-          amountPiastres: teacherPiastres,
-        },
-        {
-          walletId: SYSTEM_WALLETS.revenue,
-          ownerType: 'system',
-          amountPiastres: commissionPiastres,
+          amountPiastres: totalPiastres,
+          target: 'pending',
         },
       ],
       reason: `Session payment: ${req.planTitle ?? 'single session'}`,
@@ -146,7 +129,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       groupId: `paysession_${sessionRequestId}`,
       createdBy: studentId,
       metadata: {
-        commissionRate,
+        grossPiastres: totalPiastres,
         planType: req.planType ?? 'single',
       },
     });
@@ -193,16 +176,15 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // Update or create weekly commission summary (kept for backward compatibility
-    // with the existing teacher commission dashboard, even though the commission
-    // is already collected via the ledger split — this summary is now informational).
-    const commissionAmountEgp = commissionPiastres / 100;
+    // Weekly summary: aggregate gross revenue only. Commission is unknown
+    // until the cycle settlement runs (using THAT cycle's tier rate), so we
+    // leave commissionAmount at 0 here and let `recomputeTeacherTiers`
+    // back-fill it during settlement.
     if (summarySnap.exists) {
       tx.update(summaryRef, {
         totalSessions: FieldValue.increment(1),
         totalRevenue: FieldValue.increment(amountEgp),
-        commissionAmount: FieldValue.increment(commissionAmountEgp),
-        status: 'paid', // wallet flow auto-settles
+        status: 'pending_settlement',
         updatedAt: FieldValue.serverTimestamp(),
       });
     } else {
@@ -213,9 +195,9 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
         year,
         totalSessions: 1,
         totalRevenue: amountEgp,
-        commissionAmount: commissionAmountEgp,
-        commissionRate,
-        status: 'paid', // wallet flow auto-settles
+        commissionAmount: 0,
+        commissionRate: null,
+        status: 'pending_settlement',
         weekStart: admin.firestore.Timestamp.fromDate(getWeekStart(sessionDateObj)),
         weekEnd: admin.firestore.Timestamp.fromDate(getWeekEnd(sessionDateObj)),
         dueDate: admin.firestore.Timestamp.fromDate(getNextMonday(sessionDateObj)),
@@ -246,8 +228,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       sessionId: sessionRef.id,
       groupId: ledger.groupId,
       debitedPiastres: totalPiastres,
-      teacherCreditedPiastres: teacherPiastres,
-      commissionPiastres,
+      teacherPendingCreditedPiastres: totalPiastres,
     };
   });
 });
@@ -286,18 +267,37 @@ export const refundSessionPayment = functions.https.onCall(async (data, context)
 
     const totalEgp = s.sessionPrice as number;
     const totalPiastres = egpToPiastres(totalEgp);
-    const commissionRate = 0.05; // TODO: store commissionRate on session for accuracy
-    const commissionPiastres = Math.round(totalPiastres * commissionRate);
-    const teacherPiastres = totalPiastres - commissionPiastres;
+
+    // Refund logic depends on whether the cycle settlement has already run
+    // on this session:
+    //  - BEFORE settlement: teacher's pending bucket holds the GROSS. Reverse
+    //    with 2 legs (student credit + teacher pending debit).
+    //  - AFTER settlement: pending has already been drained. Money lives in
+    //    teacher's available + system_revenue. Reverse with 3 legs using
+    //    the rate that was applied at settlement (stored on the session).
+    const settled = s.settledAt != null;
+    const legs = settled
+      ? (() => {
+          const rate =
+            typeof s.settlementCommissionRate === 'number'
+              ? (s.settlementCommissionRate as number)
+              : 0.10;
+          const commissionPiastres = Math.round(totalPiastres * rate);
+          const teacherNet = totalPiastres - commissionPiastres;
+          return [
+            { walletId: walletIdForUser(s.studentId as string), ownerType: 'student' as const, amountPiastres: totalPiastres },
+            { walletId: walletIdForUser(s.mohaffezId as string), ownerType: 'mohaffez' as const, amountPiastres: -teacherNet },
+            { walletId: SYSTEM_WALLETS.revenue, ownerType: 'system' as const, amountPiastres: -commissionPiastres },
+          ];
+        })()
+      : [
+          { walletId: walletIdForUser(s.studentId as string), ownerType: 'student' as const, amountPiastres: totalPiastres },
+          { walletId: walletIdForUser(s.mohaffezId as string), ownerType: 'mohaffez' as const, amountPiastres: -totalPiastres, target: 'pending' as const },
+        ];
 
     const result = await postLedgerEntry(tx, {
       type: 'session_refund',
-      legs: [
-        // Reverse of session_payment.
-        { walletId: walletIdForUser(s.studentId as string), ownerType: 'student', amountPiastres: totalPiastres },
-        { walletId: walletIdForUser(s.mohaffezId as string), ownerType: 'mohaffez', amountPiastres: -teacherPiastres },
-        { walletId: SYSTEM_WALLETS.revenue, ownerType: 'system', amountPiastres: -commissionPiastres },
-      ],
+      legs,
       reason: reason.trim(),
       relatedSessionId: sessionId,
       groupId: `refund_${sessionId}`,

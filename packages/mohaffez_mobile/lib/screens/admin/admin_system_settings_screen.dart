@@ -207,6 +207,23 @@ class _AdminSystemSettingsScreenState
           ),
         ),
       ),
+      _numberField(
+        'sessionMaxDurationMinutes',
+        'أقصى مدة للحلقة بعد بدئها (دقائق)',
+        c.sessionMaxDurationMinutes,
+      ),
+      const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Text(
+          'بعد مرور هذه المدة من بدء الحلقة، يقوم النظام بإنهائها '
+          'تلقائياً وتسجيلها كمكتملة (الافتراضي 90 دقيقة).',
+          style: TextStyle(
+            fontSize: 11,
+            color: AppThemeConstants.grey600,
+            height: 1.5,
+          ),
+        ),
+      ),
       _numberField('maxPendingRequestsPerStudent', 'أقصى طلبات معلقة للطالب',
           c.maxPendingRequestsPerStudent),
       _numberField('maxAdvanceBookingDays', 'أقصى حجز مسبق (أيام)',

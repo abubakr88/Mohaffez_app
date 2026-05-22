@@ -13,15 +13,30 @@ export type TxType =
   | 'topup'              // external money → user wallet (via system_topups)
   | 'session_payment'    // student wallet → teacher wallet + system_revenue
   | 'session_refund'     // reverse of session_payment
+  | 'cycle_settlement'   // teacher pending → teacher available + system_revenue
   | 'payout'             // teacher wallet → system_payouts (then bank)
   | 'payout_reversal'    // failed payout, money back to teacher
   | 'promo_credit'       // system → user (signup bonus, referral, etc.)
   | 'adjustment';        // admin manual fix; reason required
 
+/**
+ * Which "bucket" of a wallet a ledger leg targets.
+ * - 'available' (default): standard balance. Withdrawable. Past, settled
+ *   earnings live here, plus refunds, top-ups, promo credits.
+ * - 'pending': teacher-only, holds gross earnings of the CURRENT commission
+ *   cycle. Not withdrawable. Drained to `available` (net of commission) by
+ *   the bi-weekly `recomputeTeacherTiers` settlement step.
+ */
+export type LedgerTarget = 'available' | 'pending';
+
 export interface WalletDoc {
   ownerId: string;
   ownerType: OwnerType;
   balancePiastres: number;
+  /** Teacher-only. Gross earnings of current cycle, awaiting commission deduction. */
+  pendingCyclePiastres?: number;
+  /** Teacher-only. Last time the cycle settlement ran on this wallet. */
+  lastSettledAt?: admin.firestore.FieldValue | admin.firestore.Timestamp | null;
   currency: 'EGP';
   createdAt: admin.firestore.FieldValue | admin.firestore.Timestamp;
   updatedAt: admin.firestore.FieldValue | admin.firestore.Timestamp;
@@ -75,6 +90,8 @@ export async function readOrCreateWallet(
     ownerId: walletId,
     ownerType,
     balancePiastres: 0,
+    pendingCyclePiastres: 0,
+    lastSettledAt: null,
     currency: 'EGP',
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -87,6 +104,11 @@ export interface LedgerLeg {
   ownerType: OwnerType;
   /** Signed: negative = debit, positive = credit. */
   amountPiastres: number;
+  /**
+   * Which sub-balance to touch. Defaults to 'available'. Use 'pending' for
+   * mid-cycle teacher session credits and for the settlement-time debit.
+   */
+  target?: LedgerTarget;
 }
 
 export interface LedgerEntryInput {
@@ -162,20 +184,50 @@ export async function postLedgerEntry(
   for (let i = 0; i < input.legs.length; i++) {
     const leg = input.legs[i];
     const state = walletStates[i];
-    const newBalance = state.data.balancePiastres + leg.amountPiastres;
-    if (state.data.ownerType !== 'system' && newBalance < 0) {
+    const target: LedgerTarget = leg.target ?? 'available';
+
+    // Pending bucket only makes sense for teacher wallets. System wallets
+    // and student wallets always use 'available'.
+    if (target === 'pending' && state.data.ownerType !== 'mohaffez') {
+      throw new functions.https.HttpsError(
+        'internal',
+        `pending bucket only valid for mohaffez wallets (leg ${i} → ${leg.walletId})`,
+      );
+    }
+
+    const currentAvailable = state.data.balancePiastres;
+    const currentPending = state.data.pendingCyclePiastres ?? 0;
+    const newAvailable =
+      target === 'available' ? currentAvailable + leg.amountPiastres : currentAvailable;
+    const newPending =
+      target === 'pending' ? currentPending + leg.amountPiastres : currentPending;
+
+    if (state.data.ownerType !== 'system' && newAvailable < 0) {
       throw new functions.https.HttpsError(
         'failed-precondition',
         `insufficient balance in wallet ${leg.walletId}`,
       );
     }
+    if (newPending < 0) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `insufficient pending balance in wallet ${leg.walletId}`,
+      );
+    }
+
     if (state.existed) {
-      tx.update(state.ref, {
-        balancePiastres: newBalance,
+      const update: Record<string, unknown> = {
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      };
+      if (target === 'available') update.balancePiastres = newAvailable;
+      if (target === 'pending') update.pendingCyclePiastres = newPending;
+      tx.update(state.ref, update);
     } else {
-      tx.set(state.ref, { ...state.data, balancePiastres: newBalance });
+      tx.set(state.ref, {
+        ...state.data,
+        balancePiastres: newAvailable,
+        pendingCyclePiastres: newPending,
+      });
     }
   }
 
@@ -203,6 +255,7 @@ export async function postLedgerEntry(
       walletId: leg.walletId,
       ownerType: leg.ownerType,
       amountPiastres: leg.amountPiastres,
+      target: leg.target ?? 'available',
       type: input.type,
       reason: input.reason,
       relatedSessionId: input.relatedSessionId ?? null,

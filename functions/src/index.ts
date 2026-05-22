@@ -72,6 +72,7 @@ export {
   onSessionAcceptedCreateMeeting,
   onMeetingStarted,
   sendOnlineSessionReminder,
+  autoEndOverdueSessions,
 } from './onlineSessions';
 
 // Wallet system (double-entry ledger)

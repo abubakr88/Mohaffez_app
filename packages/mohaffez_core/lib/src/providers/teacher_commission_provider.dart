@@ -1,11 +1,12 @@
 // Per-teacher commission info streamed from `users/{teacherId}`.
 //
 // Three fields on the user doc are written by the Cloud Function
-// `recomputeTeacherTiers` (scheduled weekly):
+// `recomputeTeacherTiers` (scheduled bi-weekly, 1st and 15th):
 //   commissionRate   — double, effective rate for this teacher
 //   commissionTier   — string id matching one of systemConfig.commissionTiers
-//   tierStats        — map { last30dRevenueEgp, evaluatedAt, nextEvalAt,
-//                            sessionsLast30d }
+//   tierStats        — map { last14dRevenueEgp, evaluatedAt, nextEvalAt,
+//                            sessionsLast14d, totalSessionsLast14d,
+//                            lateSessionsLast14d }
 //
 // Until the CF has run for a given teacher, all three are absent —
 // `TeacherCommissionInfo.fallbackTo(global)` returns the global rate
@@ -20,17 +21,17 @@ import 'system_config_provider.dart';
 class TeacherCommissionInfo {
   final double? rate;
   final String? tierId;
-  final double last30dRevenueEgp;
+  final double last14dRevenueEgp;
 
   /// On-time sessions only — what the tier math uses.
-  final int sessionsLast30d;
+  final int sessionsLast14d;
 
   /// On-time + late combined — for "أكملت X" copy on the card.
-  final int totalSessionsLast30d;
+  final int totalSessionsLast14d;
 
   /// Sessions the student flagged as late at rating time — excluded
   /// from tier math but shown to the teacher for transparency.
-  final int lateSessionsLast30d;
+  final int lateSessionsLast14d;
 
   final DateTime? evaluatedAt;
   final DateTime? nextEvalAt;
@@ -38,10 +39,10 @@ class TeacherCommissionInfo {
   const TeacherCommissionInfo({
     this.rate,
     this.tierId,
-    this.last30dRevenueEgp = 0,
-    this.sessionsLast30d = 0,
-    this.totalSessionsLast30d = 0,
-    this.lateSessionsLast30d = 0,
+    this.last14dRevenueEgp = 0,
+    this.sessionsLast14d = 0,
+    this.totalSessionsLast14d = 0,
+    this.lateSessionsLast14d = 0,
     this.evaluatedAt,
     this.nextEvalAt,
   });
@@ -56,7 +57,7 @@ class TeacherCommissionInfo {
     if (tiers.isEmpty) return null;
     if (tierId == null) {
       final sorted = [...tiers]
-        ..sort((a, b) => a.minRevenueEgp.compareTo(b.minRevenueEgp));
+        ..sort((a, b) => a.minSessions.compareTo(b.minSessions));
       return sorted.first;
     }
     return tiers.firstWhere(
@@ -70,7 +71,7 @@ class TeacherCommissionInfo {
   CommissionTierModel? nextTier(List<CommissionTierModel> tiers) {
     if (tiers.isEmpty) return null;
     final sorted = [...tiers]
-      ..sort((a, b) => a.minRevenueEgp.compareTo(b.minRevenueEgp));
+      ..sort((a, b) => a.minSessions.compareTo(b.minSessions));
     final current = currentTier(sorted);
     if (current == null) return null;
     final idx = sorted.indexWhere((t) => t.id == current.id);
@@ -86,17 +87,17 @@ class TeacherCommissionInfo {
       return null;
     }
 
-    final onTime = (stats['sessionsLast30d'] as num?)?.toInt() ?? 0;
-    final lateCount = (stats['lateSessionsLast30d'] as num?)?.toInt() ?? 0;
+    final onTime = (stats['sessionsLast14d'] as num?)?.toInt() ?? 0;
+    final lateCount = (stats['lateSessionsLast14d'] as num?)?.toInt() ?? 0;
     return TeacherCommissionInfo(
       rate: (data['commissionRate'] as num?)?.toDouble(),
       tierId: data['commissionTier'] as String?,
-      last30dRevenueEgp:
-          (stats['last30dRevenueEgp'] as num?)?.toDouble() ?? 0,
-      sessionsLast30d: onTime,
-      lateSessionsLast30d: lateCount,
-      totalSessionsLast30d:
-          (stats['totalSessionsLast30d'] as num?)?.toInt() ?? (onTime + lateCount),
+      last14dRevenueEgp:
+          (stats['last14dRevenueEgp'] as num?)?.toDouble() ?? 0,
+      sessionsLast14d: onTime,
+      lateSessionsLast14d: lateCount,
+      totalSessionsLast14d:
+          (stats['totalSessionsLast14d'] as num?)?.toInt() ?? (onTime + lateCount),
       evaluatedAt: toDate(stats['evaluatedAt']),
       nextEvalAt: toDate(stats['nextEvalAt']),
     );

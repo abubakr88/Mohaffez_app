@@ -150,8 +150,9 @@ class _StudentSessionsScreenState
     }).toList();
 
     final upcoming = all.where((s) {
+      final st = (s['status'] as String?)?.toLowerCase();
       final d = _toDateTime(s['sessionDate']);
-      return d != null && !d.isBefore(todayStart);
+      return st == 'accepted' && d != null && !d.isBefore(todayStart);
     }).toList()
       ..sort((a, b) {
         final aDate = _toDateTime(a['slotStart']) ?? _toDateTime(a['sessionDate']);
@@ -163,8 +164,9 @@ class _StudentSessionsScreenState
       });
 
     final completed = all.where((s) {
+      final st = (s['status'] as String?)?.toLowerCase();
       final d = _toDateTime(s['sessionDate']);
-      return d != null && d.isBefore(todayStart);
+      return st == 'completed' || (d != null && d.isBefore(todayStart));
     }).toList();
 
     final withAssignments = all.where((s) =>
