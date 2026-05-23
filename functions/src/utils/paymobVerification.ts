@@ -28,16 +28,13 @@ interface PaymobVerificationObject {
   success?: boolean;
 }
 
-export function verifyPaymobHmac(
-  obj: PaymobVerificationObject,
-  receivedHmac: string
-): boolean {
-  if (!PAYMOB_HMAC_SECRET) {
-    functions.logger.error('PAYMOB_HMAC_SECRET not configured');
-    return false;
-  }
-
-  const hmacString = [
+/**
+ * Build the concatenated string Paymob signs.
+ * Field order MUST match Paymob's documented order — do not reorder.
+ * Exported for testing.
+ */
+export function buildPaymobHmacString(obj: PaymobVerificationObject): string {
+  return [
     obj.amount_cents?.toString() || '',
     obj.created_at?.toString() || '',
     obj.currency?.toString() || '',
@@ -59,11 +56,33 @@ export function verifyPaymobHmac(
     obj.source_data?.type?.toString() || 'NA',
     obj.success?.toString() || 'false',
   ].join('');
+}
 
-  const calculatedHmac = crypto
-    .createHmac('sha512', PAYMOB_HMAC_SECRET)
-    .update(hmacString)
+/**
+ * Pure HMAC verification — takes the secret as an argument so it can be
+ * unit-tested without Firebase config. Production callers should use
+ * `verifyPaymobHmac` which reads the secret from runtime config.
+ */
+export function verifyPaymobHmacWithSecret(
+  obj: PaymobVerificationObject,
+  receivedHmac: string,
+  secret: string,
+): boolean {
+  if (!secret) return false;
+  const calculated = crypto
+    .createHmac('sha512', secret)
+    .update(buildPaymobHmacString(obj))
     .digest('hex');
+  return calculated === receivedHmac;
+}
 
-  return calculatedHmac === receivedHmac;
+export function verifyPaymobHmac(
+  obj: PaymobVerificationObject,
+  receivedHmac: string,
+): boolean {
+  if (!PAYMOB_HMAC_SECRET) {
+    functions.logger.error('PAYMOB_HMAC_SECRET not configured');
+    return false;
+  }
+  return verifyPaymobHmacWithSecret(obj, receivedHmac, PAYMOB_HMAC_SECRET);
 }
