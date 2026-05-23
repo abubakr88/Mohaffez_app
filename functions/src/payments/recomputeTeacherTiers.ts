@@ -21,7 +21,7 @@ import {
   SYSTEM_WALLETS,
 } from '../wallet/walletUtils';
 
-interface TierConfig {
+export interface TierConfig {
   id: string;
   labelAr: string;
   minSessions: number;
@@ -29,13 +29,34 @@ interface TierConfig {
   badge?: string;
 }
 
-const DEFAULT_TIERS: TierConfig[] = [
+export const DEFAULT_TIERS: TierConfig[] = [
   { id: 'starter', labelAr: 'البداية', minSessions: 0, rate: 0.15, badge: '🌱' },
   { id: 'active', labelAr: 'نشط', minSessions: 8, rate: 0.12, badge: '⭐' },
   { id: 'intermediate', labelAr: 'متوسط', minSessions: 14, rate: 0.10, badge: '✨' },
   { id: 'distinguished', labelAr: 'متميز', minSessions: 20, rate: 0.08, badge: '🏆' },
   { id: 'elite', labelAr: 'نخبة', minSessions: 35, rate: 0.05, badge: '💎' },
 ];
+
+/**
+ * Effective commission rate = base tier rate + accumulated penalty.
+ * Capped at 100% so the teacher never owes more than they earned.
+ */
+export function computeEffectiveRate(baseRate: number, penaltyPct: number): number {
+  return Math.min(baseRate + penaltyPct / 100, 1.0);
+}
+
+/**
+ * Cycle settlement math (in piastres = EGP × 100, integer-safe).
+ * Returns the commission deducted and the teacher's net payout.
+ */
+export function computeSettlementPiastres(
+  pendingPiastres: number,
+  effectiveRate: number,
+): { commissionPiastres: number; teacherNetPiastres: number } {
+  const commissionPiastres = Math.round(pendingPiastres * effectiveRate);
+  const teacherNetPiastres = pendingPiastres - commissionPiastres;
+  return { commissionPiastres, teacherNetPiastres };
+}
 
 const ROLLING_WINDOW_DAYS = 14;
 const TEACHER_PAGE_SIZE = 200;
@@ -61,7 +82,7 @@ async function loadTiers(): Promise<TierConfig[]> {
   return tiers;
 }
 
-function pickTier(tiers: TierConfig[], sessionCount: number): TierConfig {
+export function pickTier(tiers: TierConfig[], sessionCount: number): TierConfig {
   let current = tiers[0];
   for (const t of tiers) {
     if (sessionCount >= t.minSessions) current = t;
@@ -166,13 +187,17 @@ async function recomputeForTeacher(
   const userSnap = await userRef.get();
   const previousTierId = userSnap.data()?.commissionTier as string | undefined;
 
-  const update = {
-    commissionRate: tier.rate,
+  // Cancellation penalty: stored as percent points (e.g. 1.5 = 1.5%).
+  // Only the highest penalty in the cycle applies (enforced by onSessionCancelled).
+  // Converts to decimal and adds on top of the base tier rate.
+  const penaltyPct = (userSnap.data()?.commissionPenaltyPercent as number | undefined) ?? 0;
+  const effectiveRate = computeEffectiveRate(tier.rate, penaltyPct);
+
+  const update: Record<string, unknown> = {
+    commissionRate: tier.rate,          // base tier rate (no penalty — for display)
     commissionTier: tier.id,
     tierStats: {
       last14dRevenueEgp: stats.totalRevenueEgp,
-      // sessionsLast14d counts ONLY on-time sessions — the number used for
-      // tier assignment and the progress bar in the teacher card.
       sessionsLast14d: stats.sessionCount,
       totalSessionsLast14d: stats.totalSessionsIncludingLate,
       lateSessionsLast14d: stats.lateSessionsCount,
@@ -181,6 +206,11 @@ async function recomputeForTeacher(
       windowStart: admin.firestore.Timestamp.fromDate(windowStart),
     },
   };
+
+  // Reset penalty after applying it this cycle
+  if (penaltyPct > 0) {
+    update.commissionPenaltyPercent = 0;
+  }
 
   await userRef.set(update, { merge: true });
 
@@ -192,6 +222,8 @@ async function recomputeForTeacher(
       {
         tier: tier.id,
         rate: tier.rate,
+        effectiveRate,           // actual rate used for settlement (base + penalty)
+        penaltyPct,              // penalty applied this cycle (0 if none)
         revenueEgp: stats.totalRevenueEgp,
         sessions: stats.sessionCount,
         computedAt: FieldValue.serverTimestamp(),
@@ -200,11 +232,10 @@ async function recomputeForTeacher(
     );
 
   // ── Cycle settlement: drain the teacher's `pending` bucket using the
-  // rate we just computed for THIS cycle. Only runs during the scheduled
-  // bi-weekly job (not on the real-time per-session refresh, which would
-  // settle before the cycle ends and use a half-baked tier).
+  // effective rate (base tier + any cancellation penalty for this cycle).
+  // Only runs during the scheduled bi-weekly job.
   if (options.settleWallet) {
-    await settleCycleForTeacher(teacherId, tier.rate, now, historyId);
+    await settleCycleForTeacher(teacherId, effectiveRate, now, historyId);
   }
 
   await maybeNotifyTierChange(teacherId, previousTierId, tier);
@@ -236,8 +267,10 @@ async function settleCycleForTeacher(
     return;
   }
 
-  const commissionPiastres = Math.round(pendingPiastres * rate);
-  const teacherNetPiastres = pendingPiastres - commissionPiastres;
+  const { commissionPiastres, teacherNetPiastres } = computeSettlementPiastres(
+    pendingPiastres,
+    rate,
+  );
 
   try {
     await db.runTransaction(async (tx) => {

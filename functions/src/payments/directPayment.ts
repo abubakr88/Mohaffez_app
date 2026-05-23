@@ -109,20 +109,26 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         );
       }
 
-      // Per-teacher commission rate (set by recomputeTeacherTiers) wins
-      // over the global rate; both reads inside the txn for consistency.
+      // Effective rate = teacher tier rate + accumulated cycle penalty (capped at 100%).
+      // Locked in here so confirmation can't drift to a different number later.
       const [configSnap, teacherSnap] = await Promise.all([
         tx.get(db.collection('systemConfig').doc('global')),
         tx.get(db.collection('users').doc(mohaffezId as string)),
       ]);
-      const teacherRate = teacherSnap.data()?.commissionRate;
+      const teacherBase = teacherSnap.data()?.commissionRate;
       const globalRate = configSnap.data()?.commissionRate;
-      const commissionRate: number =
-        typeof teacherRate === 'number' && teacherRate >= 0
-          ? teacherRate
+      const baseRate: number =
+        typeof teacherBase === 'number' && teacherBase >= 0
+          ? teacherBase
           : typeof globalRate === 'number' && globalRate >= 0
             ? globalRate
             : 0.05;
+      const rawPenalty = teacherSnap.data()?.commissionPenaltyPercent;
+      const penaltyPct =
+        typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0
+          ? rawPenalty
+          : 0;
+      const commissionRate = Math.min(baseRate + penaltyPct / 100, 1.0);
 
       const parsedSlotDate  = parseFlutterDate(slotDate  as string);
       const parsedSlotStart = parseFlutterDate(slotStart as string);
@@ -382,8 +388,15 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           );
         }
 
-        const configSnap = await tx.get(db.collection('systemConfig').doc('global'));
-        const commissionRate: number = (configSnap.data()?.commissionRate as number) ?? 0.05;
+        // Trust the rate that was locked in at studentMarkedDirectPayment time
+        // (resolved from the teacher's tier + penalty). Falling back to the global
+        // rate here would silently undercharge teachers on tiers above the legacy 10%.
+        const lockedInRate = dp.commissionRate;
+        const lockedInAmount = dp.commissionAmount;
+        const commissionRate: number =
+          typeof lockedInRate === 'number' && isFinite(lockedInRate) && lockedInRate >= 0
+            ? lockedInRate
+            : 0.05;
 
         // ✅ FIX Bug1: instanceof guard before .toDate() — prevents TypeError → INTERNAL
         if (!(dp.sessionDate instanceof admin.firestore.Timestamp)) {
@@ -452,7 +465,11 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           updatedAt:                 FieldValue.serverTimestamp(),
         });
 
-        const commissionAmount = (dp.amount as number) * commissionRate;
+        // Prefer the amount already computed at request time; recompute as fallback
+        const commissionAmount =
+          typeof lockedInAmount === 'number' && isFinite(lockedInAmount) && lockedInAmount >= 0
+            ? lockedInAmount
+            : (dp.amount as number) * commissionRate;
         const weekStart = getWeekStart(sessionDateObj);
         const weekEnd   = getWeekEnd(sessionDateObj);
         const dueDate   = getNextMonday(sessionDateObj);

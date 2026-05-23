@@ -225,22 +225,28 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           );
         }
 
-        // 9a. Read system config for maxActiveSubscriptions + commissionRate.
-        // Per-teacher rate (set by recomputeTeacherTiers) takes precedence
-        // over the global rate; both reads inside the txn for consistency.
+        // 9a. Read system config + effective commission rate.
+        // Effective rate = tier rate + accumulated cycle penalty (capped at 100%).
+        // Bundle commission must be consistent with single-session commission.
         const PER_SESSION_TYPE_LIMIT = 1; // one active bundle per studentId+mohaffezId+sessionType
         const [configSnap, teacherSnap] = await Promise.all([
           transaction.get(db.collection('systemConfig').doc('global')),
           transaction.get(db.collection('users').doc(mohaffezId as string)),
         ]);
-        const teacherRate = teacherSnap.data()?.commissionRate;
+        const teacherBase = teacherSnap.data()?.commissionRate;
         const globalRate = configSnap.data()?.commissionRate;
-        const commissionRate: number =
-          typeof teacherRate === 'number' && teacherRate >= 0
-            ? teacherRate
+        const baseRate: number =
+          typeof teacherBase === 'number' && teacherBase >= 0
+            ? teacherBase
             : typeof globalRate === 'number' && globalRate >= 0
               ? globalRate
               : 0.05;
+        const rawPenalty = teacherSnap.data()?.commissionPenaltyPercent;
+        const penaltyPct =
+          typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0
+            ? rawPenalty
+            : 0;
+        const commissionRate = Math.min(baseRate + penaltyPct / 100, 1.0);
 
         // 9b. FIX-3: Resolve sessionType with explicit priority order
         const resolvedSessionType: string = (() => {
