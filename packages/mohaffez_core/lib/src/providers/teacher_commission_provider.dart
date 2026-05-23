@@ -33,6 +33,10 @@ class TeacherCommissionInfo {
   /// from tier math but shown to the teacher for transparency.
   final int lateSessionsLast14d;
 
+  /// Accumulated cancellation/no-show penalty for the current cycle,
+  /// in percent points (e.g. 1.5 = 1.5%). Reset to 0 at settlement.
+  final double penaltyPct;
+
   final DateTime? evaluatedAt;
   final DateTime? nextEvalAt;
 
@@ -43,13 +47,20 @@ class TeacherCommissionInfo {
     this.sessionsLast14d = 0,
     this.totalSessionsLast14d = 0,
     this.lateSessionsLast14d = 0,
+    this.penaltyPct = 0,
     this.evaluatedAt,
     this.nextEvalAt,
   });
 
-  /// Returns the effective rate, falling back to [globalRate] when this
-  /// teacher hasn't been evaluated yet.
-  double effectiveRate(double globalRate) => rate ?? globalRate;
+  /// Returns the effective rate (base tier rate + cycle penalty),
+  /// falling back to [globalRate] when this teacher hasn't been
+  /// evaluated yet. Capped at 100% so teachers never owe more than
+  /// they earned.
+  double effectiveRate(double globalRate) {
+    final base = rate ?? globalRate;
+    final effective = base + penaltyPct / 100;
+    return effective > 1.0 ? 1.0 : effective;
+  }
 
   /// Looks up the matching tier definition from the configured ladder.
   /// Falls back to the lowest tier when [tierId] is unset.
@@ -98,6 +109,7 @@ class TeacherCommissionInfo {
       lateSessionsLast14d: lateCount,
       totalSessionsLast14d:
           (stats['totalSessionsLast14d'] as num?)?.toInt() ?? (onTime + lateCount),
+      penaltyPct: (data['commissionPenaltyPercent'] as num?)?.toDouble() ?? 0,
       evaluatedAt: toDate(stats['evaluatedAt']),
       nextEvalAt: toDate(stats['nextEvalAt']),
     );

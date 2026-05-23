@@ -27,14 +27,31 @@ class MohaffezCommissionScreen extends ConsumerStatefulWidget {
 
 class _MohaffezCommissionScreenState
     extends ConsumerState<MohaffezCommissionScreen> {
+  /// Whole-number rates render as "15%", fractional as "8.5%" so any
+  /// cycle penalty stays visible to the teacher.
+  String _formatRate(double rate) {
+    final pct = rate * 100;
+    return pct == pct.roundToDouble()
+        ? pct.toInt().toString()
+        : pct.toStringAsFixed(1);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final configAsync = ref.watch(systemConfigProvider);
-    final commissionRate = configAsync.when(
-      data: (config) => config.commissionRate,
-      loading: () => 0.05,
-      error: (_, __) => 0.05,
-    );
+    // Effective rate = per-teacher tier rate + accumulated cycle penalty.
+    // Falls back to the global config rate (and then to 0.05) while the
+    // per-teacher info is still loading or the teacher hasn't been
+    // evaluated yet. Must match the backend resolveTeacherRate() so the
+    // displayed rate never contradicts the amount charged.
+    final globalRate = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.commissionRate ??
+        0.05;
+    final teacherInfo = ref
+        .watch(teacherCommissionInfoProvider(widget.mohaffezId))
+        .valueOrNull;
+    final commissionRate = teacherInfo?.effectiveRate(globalRate) ?? globalRate;
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -98,7 +115,7 @@ class _MohaffezCommissionScreenState
                         fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  Text('معدل العمولة: ${(commissionRate * 100).toInt()}%',
+                  Text('معدل العمولة: ${_formatRate(commissionRate)}%',
                       style: TextStyle(color: AppThemeConstants.onPrimary.withValues(alpha: 0.7), fontSize: 12)),
                 ]),
               ),
