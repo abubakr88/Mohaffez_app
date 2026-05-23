@@ -2,6 +2,7 @@
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../tour/tour_guard_helper.dart';
 
@@ -34,6 +35,53 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
   void dispose() {
     notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _reportTeacherNoShow() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.person_off, color: AppThemeConstants.error),
+            SizedBox(width: 8),
+            Text('المحفظ لم يحضر'),
+          ]),
+          content: const Text(
+            'هل أنت متأكد أن المحفظ لم يحضر الجلسة؟ سيتم استرداد مبلغ الجلسة كاملاً إلى محفظتك وتسجيل تحذير على حساب المحفظ.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
+              child: const Text('تأكيد الغياب', style: TextStyle(color: AppThemeConstants.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('onTeacherNoShowReported')
+          .call({'sessionId': widget.sessionId});
+      if (mounted) context.pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذّر الإبلاغ: ${e.toString()}'),
+            backgroundColor: AppThemeConstants.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _submitRating() async {
@@ -341,6 +389,25 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
                   ),
                 ),
               ),
+
+              const SizedBox(height: 16),
+
+              // Teacher no-show report
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _reportTeacherNoShow,
+                  icon: const Icon(Icons.person_off_outlined, size: 18),
+                  label: const Text('المحفظ لم يحضر الجلسة'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppThemeConstants.error,
+                    side: const BorderSide(color: AppThemeConstants.error),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
             ],
           ),
         ),

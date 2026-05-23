@@ -166,14 +166,14 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     final String refundPolicy;
     final Color policyColor;
 
-    if (hoursUntilSession >= 24) {
-      refundPolicy = 'استرداد كامل للمبلغ';
+    if (hoursUntilSession > 3) {
+      refundPolicy = 'سيتم استرداد المبلغ كاملاً إلى محفظتك';
       policyColor = AppThemeConstants.success;
-    } else if (hoursUntilSession >= 2) {
-      refundPolicy = 'استرداد جزئي 50% من المبلغ';
+    } else if (hoursUntilSession >= 1) {
+      refundPolicy = 'سيتم استرداد 50% من المبلغ إلى محفظتك';
       policyColor = AppThemeConstants.warning;
     } else {
-      refundPolicy = 'لا يوجد استرداد للمبلغ';
+      refundPolicy = 'لا يوجد استرداد — الإلغاء قبل أقل من ساعة';
       policyColor = AppThemeConstants.error;
     }
 
@@ -269,7 +269,9 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     try {
       final sessionId = session.id;
       if (sessionId == null) throw Exception('معرّف الجلسة غير موجود');
-      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId);
+      final role = ref.read(currentUserProvider).value?.role ?? 'student';
+      final cancelledBy = role == 'mohaffez' ? 'teacher' : 'student';
+      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId, cancelledBy: cancelledBy);
       if (mounted) {
         Navigator.pop(context); // close loading
         Navigator.pop(context); // close session details
@@ -523,12 +525,12 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
                                   .format(session.sessionDate!),
                             ),
                           ],
-                          if (session.location.isNotEmpty) ...[
+                          if ((session.location ?? '').isNotEmpty) ...[
                             const Divider(height: 24),
                             _InfoRow(
                               icon: Icons.location_on,
                               label: 'الموقع',
-                              value: session.location,
+                              value: session.location!,
                             ),
                           ],
                           if (session.currentPage != null) ...[
@@ -962,10 +964,10 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       final String refundPolicy;
       final Color policyColor;
 
-      if (hoursUntil >= 24) {
-        refundPolicy = 'استرداد كامل للمبلغ';
+      if (hoursUntil > 3) {
+        refundPolicy = 'استرداد كامل للمبلغ (100%)';
         policyColor = AppThemeConstants.success;
-      } else if (hoursUntil >= 2) {
+      } else if (hoursUntil >= 1) {
         refundPolicy = 'استرداد جزئي 50% من المبلغ';
         policyColor = AppThemeConstants.warning;
       } else {

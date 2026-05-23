@@ -194,10 +194,10 @@ class AcceptedSessionsScreen extends ConsumerWidget {
                     icon: Icons.access_time,
                     text: timeText,
                     color: AppThemeConstants.textSecondary),
-              if (session.location.isNotEmpty)
+              if ((session.location ?? '').isNotEmpty)
                 _InfoRow(
                     icon: isOnline ? Icons.link : Icons.location_on,
-                    text: session.location,
+                    text: session.location!,
                     color: AppThemeConstants.error),
             ],
           ),

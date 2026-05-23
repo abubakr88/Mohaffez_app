@@ -75,6 +75,13 @@ export {
   autoEndOverdueSessions,
 } from './onlineSessions';
 
+// Cancellation & no-show policy
+export {
+  onSessionCancelled,
+  onStudentNoShowReported,
+  onTeacherNoShowReported,
+} from './cancellations';
+
 // Wallet system (double-entry ledger)
 export {
   verifyWalletTopUp,

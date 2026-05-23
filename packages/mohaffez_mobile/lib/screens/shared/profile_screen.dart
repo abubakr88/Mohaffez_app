@@ -499,9 +499,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Rewards card — students only
+                          // Rewards card + wallet balance — students only
                           if (!isMohaffez) ...[
                             _RewardsTeaserCard(userId: user.uid, dateOfBirth: user.dateOfBirth),
+                            const SizedBox(height: 12),
+                            _StudentWalletCard(userId: user.uid),
                             const SizedBox(height: 12),
                           ],
 
@@ -609,6 +611,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   subtitle: 'التحكم في بيانات حسابك',
                                   color: _DS.purple,
                                   onTap: () => context.push('/privacy-settings'),
+                                ),
+                                _ActionTile(
+                                  icon: Icons.policy_rounded,
+                                  title: 'سياسة الإلغاء والغياب',
+                                  subtitle: 'قواعد الإلغاء والاسترداد لكلا الطرفين',
+                                  color: _DS.teal700,
+                                  onTap: () => context.push('/cancellation-policy'),
                                 ),
                                 _ActionTile(
                                   icon: Icons.location_on_rounded,
@@ -1342,6 +1351,75 @@ class _RewardsTeaserCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Student Wallet Balance Card ───────────────────────────────────────────────
+class _StudentWalletCard extends ConsumerWidget {
+  final String userId;
+  const _StudentWalletCard({required this.userId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final walletAsync = ref.watch(walletProvider(
+      (userId: userId, ownerType: WalletOwnerType.student),
+    ));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppThemeConstants.surface,
+        borderRadius: _DS.r16,
+        boxShadow: _DS.subtleShadow,
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _DS.teal500.withValues(alpha: 0.12),
+              borderRadius: _DS.r12,
+            ),
+            child: const Icon(Icons.account_balance_wallet_rounded,
+                color: _DS.teal500, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('رصيد محفظتي',
+                    style: TextStyle(
+                        fontSize: 13, color: AppThemeConstants.textSecondary)),
+                walletAsync.when(
+                  data: (w) => Text(
+                    '${w.balanceEgp.toStringAsFixed(2)} ج.م',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: _DS.teal800,
+                    ),
+                  ),
+                  loading: () => const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                  error: (_, __) => const Text('—',
+                      style: TextStyle(
+                          fontSize: 20, color: AppThemeConstants.textSecondary)),
+                ),
+              ],
+            ),
+          ),
+          const Text('المبالغ المستردة\nتُضاف هنا',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: AppThemeConstants.textSecondary,
+                  height: 1.4)),
+        ],
       ),
     );
   }

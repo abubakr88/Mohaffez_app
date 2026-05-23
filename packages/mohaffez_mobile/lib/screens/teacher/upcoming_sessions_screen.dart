@@ -9,6 +9,7 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/meeting_launcher_service.dart';
 
@@ -450,22 +451,37 @@ class SessionCard extends ConsumerWidget {
 
   // ✅ Mark as No-Show
   Future<void> _markAsNoShow(BuildContext context, WidgetRef ref) async {
-    final reason = await showDialog<String>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => _NoShowReasonDialog(),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.person_off, color: AppThemeConstants.warning),
+            SizedBox(width: 8),
+            Text('تسجيل غياب الطالب'),
+          ]),
+          content: const Text(
+            'هل أنت متأكد أن الطالب لم يحضر؟ سيُسجَّل تحذير على حسابه وتحتسب الجلسة كمكتملة لك.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.warning),
+              child: const Text('تأكيد الغياب', style: TextStyle(color: AppThemeConstants.white)),
+            ),
+          ],
+        ),
+      ),
     );
 
-    if (reason == null) return; // User cancelled
+    if (confirmed != true || !context.mounted) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('hafizSessions')
-          .doc(session['id'] as String)
-          .update({
-        'status': 'no-show',
-        'noShowReason': reason,
-        'noShowMarkedAt': FieldValue.serverTimestamp(),
-      });
+      await FirebaseFunctions.instance
+          .httpsCallable('onStudentNoShowReported')
+          .call({'sessionId': session['id'] as String});
 
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -574,7 +590,7 @@ class SessionCard extends ConsumerWidget {
     );
 
     try {
-      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId);
+      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId, cancelledBy: 'teacher');
 
       if (!context.mounted) return;
       Navigator.of(context).pop();
@@ -914,17 +930,22 @@ class SessionCard extends ConsumerWidget {
 
               const SizedBox(height: 16),
               const Divider(height: 1),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.cancel_outlined, color: AppThemeConstants.error),
-                  tooltip: ArabicLabels.cancelSession,
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('إلغاء الجلسة'),
                   onPressed: () => _showCancelSessionDialog(
                     context,
                     ref,
                     session['id'] as String,
                     session['studentName'] as String? ?? 'الطالب',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppThemeConstants.error,
+                    side: const BorderSide(color: AppThemeConstants.error),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),
@@ -1071,54 +1092,6 @@ class SessionCard extends ConsumerWidget {
 }
 
 // ============================================================================
-// NO-SHOW REASON DIALOG
-// ============================================================================
-
-class _NoShowReasonDialog extends StatefulWidget {
-  @override
-  State<_NoShowReasonDialog> createState() => _NoShowReasonDialogState();
-}
-
-class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
-  final reasonController = TextEditingController();
-
-  @override
-  void dispose() {
-    reasonController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: AlertDialog(
-        title: const Text('سبب عدم الحضور'),
-        content: TextField(
-          controller: reasonController,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'اختياري: يمكنك توضيح سبب عدم حضور الطالب',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, null),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () =>
-                Navigator.pop(context, reasonController.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.warning),
-            child: const Text('تأكيد'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Teacher's "ابدأ الجلسة" button. Reads `meetingButtonStateProvider` so it
 /// disables itself before `sessionDate − leadTime` and changes label after
 /// the teacher has clicked start. All the actual work of writing

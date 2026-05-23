@@ -405,5 +405,45 @@ export const autoEndOverdueSessions = functions
       scanned: snap.size,
       ended: endedCount,
     });
+
+    // ── Online teacher no-show detection ──────────────────────────────────
+    // If an online session's slotStart was > 60 minutes ago and the teacher
+    // never joined (meetingTeacherJoinedAt == null), flag it as teacher no-show.
+    // This triggers onSessionCancelled which issues full refund + 1.5% penalty.
+    const noShowCutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 60 * 60 * 1000);
+    const noShowSnap = await db
+      .collection('hafizSessions')
+      .where('sessionType', '==', 'online')
+      .where('status', '==', 'accepted')
+      .where('slotStart', '<=', noShowCutoff)
+      .where('meetingTeacherJoinedAt', '==', null)
+      .limit(AUTO_END_BATCH_SIZE)
+      .get();
+
+    let noShowCount = 0;
+    for (const doc of noShowSnap.docs) {
+      const d = doc.data() as SessionDoc;
+      if (d.teacherNoShow === true || d.studentNoShow === true) continue;
+      try {
+        await doc.ref.update({
+          teacherNoShow: true,
+          status: 'cancelled',
+          cancelledBy: 'teacher',
+          cancelledAt: FieldValue.serverTimestamp(),
+          autoNoShow: true,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        noShowCount++;
+      } catch (err) {
+        functions.logger.error('autoEndOverdueSessions: failed to flag teacher no-show', {
+          sessionId: doc.id, err,
+        });
+      }
+    }
+
+    if (noShowCount > 0) {
+      functions.logger.info('autoEndOverdueSessions: teacher no-shows flagged', { noShowCount });
+    }
+
     return null;
   });

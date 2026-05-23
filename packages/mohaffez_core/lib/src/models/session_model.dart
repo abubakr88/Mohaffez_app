@@ -18,7 +18,7 @@ class SessionModel with _$SessionModel {
     required String mohaffezName,
     required String studentName,
     required String sessionType,
-    required String location,
+    String? location,
 
     String? mohaffezPhone,
     double? imamAddressLat,
@@ -46,6 +46,12 @@ class SessionModel with _$SessionModel {
     @TimestampConverter() DateTime? completedAt,
 
     String? status,
+    String? cancelledBy,              // 'student' | 'teacher'
+    @TimestampConverter() DateTime? cancelledAt,
+    @Default(false) bool studentNoShow, // teacher reported: student didn't attend
+    @Default(false) bool teacherNoShow, // student reported: teacher didn't attend
+    double? refundAmount,             // EGP refunded to student on cancellation
+    double? refundPercent,            // 0, 50, or 100
 
     // PAYMENT FIELDS
     @Default(false) bool isPaid,

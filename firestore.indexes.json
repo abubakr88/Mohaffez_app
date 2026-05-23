@@ -65,6 +65,17 @@
       "collectionGroup": "hafizSessions",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "sessionType", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "meetingTeacherJoinedAt", "order": "ASCENDING" },
+        { "fieldPath": "slotStart", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hafizSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "mohaffezId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "completedAt", "order": "ASCENDING" },
