@@ -29,6 +29,12 @@ import {
   getWeekEnd,
   getNextMonday,
 } from '../utils/dateHelpers';
+import {
+  postLedgerEntry,
+  egpToPiastres,
+  walletIdForUser,
+  SYSTEM_WALLETS,
+} from '../wallet/walletUtils';
 
 class AlreadyConfirmedError extends Error {
   constructor(public readonly existingSubscriptionId: string) {
@@ -493,6 +499,41 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             dueDate:         admin.firestore.Timestamp.fromDate(getNextMonday(commissionDateObj)),
             createdAt:       FieldValue.serverTimestamp(),
             updatedAt:       FieldValue.serverTimestamp(),
+          });
+        }
+
+        // PHASE B (dual-write): shadow the bundle commission onto the wallet
+        // ledger so the unified wallet UI (Phase C) can surface it. Legacy
+        // weeklyCommissionSummaries above remains the source of truth until
+        // Phase B step 3 (settlement integration). Idempotent on dp.id.
+        if (commissionAmount > 0) {
+          const commissionPiastres = egpToPiastres(commissionAmount);
+          await postLedgerEntry(transaction, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -commissionPiastres,
+                target: 'pending',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: commissionPiastres,
+              },
+            ],
+            reason: `Direct bundle commission — rate ${commissionRate}`,
+            groupId: `direct_commission_bundle_${dp.id as string}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId: dp.id,
+              planType,
+              sessionsCount,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
           });
         }
 

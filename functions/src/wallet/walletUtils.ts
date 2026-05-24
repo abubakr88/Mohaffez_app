@@ -17,6 +17,8 @@ export type TxType =
   | 'payout'             // teacher wallet → system_payouts (then bank)
   | 'payout_reversal'    // failed payout, money back to teacher
   | 'promo_credit'       // system → user (signup bonus, referral, etc.)
+  | 'direct_session_commission'         // cash session: teacher pending -X, system +X
+  | 'direct_session_commission_reversal' // cancelled cash session: reverse the above
   | 'adjustment';        // admin manual fix; reason required
 
 /**
@@ -208,7 +210,11 @@ export async function postLedgerEntry(
         `insufficient balance in wallet ${leg.walletId}`,
       );
     }
-    if (newPending < 0) {
+    // Pending CAN go negative for mohaffez wallets — it represents
+    // commission owed from cash sessions (Phase B). For non-mohaffez
+    // wallets pending shouldn't even be touched (guarded above), so
+    // this branch only matters for the teacher path.
+    if (newPending < 0 && state.data.ownerType !== 'mohaffez') {
       throw new functions.https.HttpsError(
         'failed-precondition',
         `insufficient pending balance in wallet ${leg.walletId}`,

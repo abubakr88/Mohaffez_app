@@ -240,6 +240,77 @@ export const onSessionCancelled = functions.firestore
       });
     }
 
+    // PHASE B step 2: reverse the direct-commission ledger entry posted at
+    // confirmation time, so a cancelled session no longer counts as commission
+    // owed by the teacher. Symmetric: any cancellation reverses the full
+    // commission. The dual-write weeklyCommissionSummary doc is NOT reversed
+    // here (parity with current behavior — that field is the legacy display).
+    //
+    // Idempotent on `direct_commission_reversal_{directPaymentRequestId}`.
+    // No-op if the original commission entry was never posted (e.g. pre-Phase-B
+    // sessions, or sessions where commission was 0).
+    const dpReqId = after.directPaymentRequestId as string | undefined;
+    if (paymentType === 'directpayment' && dpReqId) {
+      try {
+        await db.runTransaction(async (tx) => {
+          // Look up original commission entry by its group id.
+          const originalGroupRef = db
+            .collection('walletTransactionGroups')
+            .doc(`direct_commission_${dpReqId}`);
+          const bundleGroupRef = db
+            .collection('walletTransactionGroups')
+            .doc(`direct_commission_bundle_${dpReqId}`);
+          const [originalSnap, bundleSnap] = await Promise.all([
+            tx.get(originalGroupRef),
+            tx.get(bundleGroupRef),
+          ]);
+
+          // Pick whichever original exists; bundle wins if both somehow do.
+          const originalSnapToUse = bundleSnap.exists ? bundleSnap : originalSnap;
+          if (!originalSnapToUse.exists) return; // nothing to reverse
+
+          const meta = originalSnapToUse.data() as { metadata?: { commissionEgp?: number } };
+          const commissionEgp = meta?.metadata?.commissionEgp;
+          if (typeof commissionEgp !== 'number' || commissionEgp <= 0) return;
+
+          const commissionPiastres = egpToPiastres(commissionEgp);
+
+          await postLedgerEntry(tx, {
+            type: 'direct_session_commission_reversal',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: commissionPiastres,
+                target: 'pending',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: -commissionPiastres,
+              },
+            ],
+            reason: `Reverse direct-session commission — session cancelled (${cancelledBy})`,
+            relatedSessionId: sessionId,
+            groupId: `direct_commission_reversal_${dpReqId}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId: dpReqId,
+              cancelledBy,
+              teacherNoShow,
+              commissionEgp,
+            },
+          });
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        functions.logger.error(`[onSessionCancelled] commission reversal failed ${sessionId}: ${msg}`);
+        // Don't throw — refund already posted, admin alert exists. A failed
+        // reversal becomes a manual ops task (will show up as a teacher
+        // still owing commission on a cancelled session).
+      }
+    }
+
     functions.logger.info('[onSessionCancelled]', {
       sessionId, cancelledBy, refundPercent, penaltyPercent, teacherNoShow,
     });

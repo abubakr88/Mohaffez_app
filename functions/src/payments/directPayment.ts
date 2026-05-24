@@ -10,6 +10,12 @@ import {
   getNextMonday,
   parseFlutterDate,
 } from '../utils/dateHelpers';
+import {
+  postLedgerEntry,
+  egpToPiastres,
+  walletIdForUser,
+  SYSTEM_WALLETS,
+} from '../wallet/walletUtils';
 
 const STATUS = {
   PENDING: 'pending',
@@ -497,6 +503,47 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
             dueDate:         admin.firestore.Timestamp.fromDate(dueDate),
             createdAt:       FieldValue.serverTimestamp(),
             updatedAt:       FieldValue.serverTimestamp(),
+          });
+        }
+
+        // PHASE B (dual-write): also post the commission to the wallet ledger
+        // so the teacher's pending bucket reflects the debt. Idempotent on
+        // `direct_commission_{directPaymentRequestId}`. The legacy
+        // weeklyCommissionSummaries doc above is the current source of truth
+        // for the "مستحقات المنصة" screen; this entry is a shadow that the
+        // unified wallet UI (Phase C) will surface.
+        // TODO Phase B step 2: reverse this entry from onSessionCancelled when
+        //   a direct-payment session is cancelled (currently the dues remain).
+        // TODO Phase B step 3: teach `settleCycleForTeacher` to drain a
+        //   negative pending balance against the system_revenue wallet so
+        //   teachers without offsetting online earnings settle correctly.
+        if (commissionAmount > 0) {
+          const commissionPiastres = egpToPiastres(commissionAmount);
+          await postLedgerEntry(tx, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -commissionPiastres,
+                target: 'pending',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: commissionPiastres,
+              },
+            ],
+            reason: `Direct session commission — rate ${commissionRate}`,
+            relatedSessionId: sessionRef.id,
+            groupId: `direct_commission_${directPaymentRequestId}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
           });
         }
 
