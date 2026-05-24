@@ -526,7 +526,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
                 walletId: walletIdForUser(mohaffezId),
                 ownerType: 'mohaffez',
                 amountPiastres: -commissionPiastres,
-                target: 'pending',
+                target: 'dues',
               },
               {
                 walletId: SYSTEM_WALLETS.revenue,

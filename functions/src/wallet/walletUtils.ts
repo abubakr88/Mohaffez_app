@@ -28,8 +28,12 @@ export type TxType =
  * - 'pending': teacher-only, holds gross earnings of the CURRENT commission
  *   cycle. Not withdrawable. Drained to `available` (net of commission) by
  *   the bi-weekly `recomputeTeacherTiers` settlement step.
+ * - 'dues': teacher-only, accumulates commission OWED to the platform from
+ *   direct-payment (cash) sessions. Negative values mean the teacher owes.
+ *   Drained at settlement against the teacher's available balance; any
+ *   remaining debt rolls forward into the next cycle.
  */
-export type LedgerTarget = 'available' | 'pending';
+export type LedgerTarget = 'available' | 'pending' | 'dues';
 
 export interface WalletDoc {
   ownerId: string;
@@ -37,6 +41,13 @@ export interface WalletDoc {
   balancePiastres: number;
   /** Teacher-only. Gross earnings of current cycle, awaiting commission deduction. */
   pendingCyclePiastres?: number;
+  /**
+   * Teacher-only. Accumulated commission OWED to the platform from
+   * direct-payment (cash) sessions this cycle. Negative when the teacher
+   * owes; zeroed at settlement (debt drained from available, leftover
+   * rolls forward as a still-negative value).
+   */
+  directCommissionOwedPiastres?: number;
   /** Teacher-only. Last time the cycle settlement ran on this wallet. */
   lastSettledAt?: admin.firestore.FieldValue | admin.firestore.Timestamp | null;
   currency: 'EGP';
@@ -93,6 +104,7 @@ export async function readOrCreateWallet(
     ownerType,
     balancePiastres: 0,
     pendingCyclePiastres: 0,
+    directCommissionOwedPiastres: 0,
     lastSettledAt: null,
     currency: 'EGP',
     createdAt: FieldValue.serverTimestamp(),
@@ -188,21 +200,23 @@ export async function postLedgerEntry(
     const state = walletStates[i];
     const target: LedgerTarget = leg.target ?? 'available';
 
-    // Pending bucket only makes sense for teacher wallets. System wallets
-    // and student wallets always use 'available'.
-    if (target === 'pending' && state.data.ownerType !== 'mohaffez') {
+    // Pending + dues buckets only make sense for teacher wallets.
+    if ((target === 'pending' || target === 'dues') && state.data.ownerType !== 'mohaffez') {
       throw new functions.https.HttpsError(
         'internal',
-        `pending bucket only valid for mohaffez wallets (leg ${i} → ${leg.walletId})`,
+        `${target} bucket only valid for mohaffez wallets (leg ${i} → ${leg.walletId})`,
       );
     }
 
     const currentAvailable = state.data.balancePiastres;
     const currentPending = state.data.pendingCyclePiastres ?? 0;
+    const currentDues = state.data.directCommissionOwedPiastres ?? 0;
     const newAvailable =
       target === 'available' ? currentAvailable + leg.amountPiastres : currentAvailable;
     const newPending =
       target === 'pending' ? currentPending + leg.amountPiastres : currentPending;
+    const newDues =
+      target === 'dues' ? currentDues + leg.amountPiastres : currentDues;
 
     if (state.data.ownerType !== 'system' && newAvailable < 0) {
       throw new functions.https.HttpsError(
@@ -210,16 +224,15 @@ export async function postLedgerEntry(
         `insufficient balance in wallet ${leg.walletId}`,
       );
     }
-    // Pending CAN go negative for mohaffez wallets — it represents
-    // commission owed from cash sessions (Phase B). For non-mohaffez
-    // wallets pending shouldn't even be touched (guarded above), so
-    // this branch only matters for the teacher path.
-    if (newPending < 0 && state.data.ownerType !== 'mohaffez') {
+    if (newPending < 0) {
       throw new functions.https.HttpsError(
         'failed-precondition',
         `insufficient pending balance in wallet ${leg.walletId}`,
       );
     }
+    // `dues` is allowed to be negative — that IS the debt. Positive dues
+    // (overpayment) is also valid (e.g. teacher pre-paid more than owed)
+    // and would be drained back to available at settlement.
 
     if (state.existed) {
       const update: Record<string, unknown> = {
@@ -227,12 +240,14 @@ export async function postLedgerEntry(
       };
       if (target === 'available') update.balancePiastres = newAvailable;
       if (target === 'pending') update.pendingCyclePiastres = newPending;
+      if (target === 'dues') update.directCommissionOwedPiastres = newDues;
       tx.update(state.ref, update);
     } else {
       tx.set(state.ref, {
         ...state.data,
         balancePiastres: newAvailable,
         pendingCyclePiastres: newPending,
+        directCommissionOwedPiastres: newDues,
       });
     }
   }

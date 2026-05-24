@@ -53,24 +53,18 @@ Both are 2-leg entries: teacher pending ± commission, system_revenue ∓ commis
 
 ---
 
-## What's still missing (followups)
+## Step 3 (done): settlement drains dues from available
 
-### Step 3: settlement must drain negative pending correctly
+Decision taken: a separate `dues` bucket (not mixed into `pending`).
 
-`settleCycleForTeacher` ([recomputeTeacherTiers.ts:228](../functions/src/payments/recomputeTeacherTiers.ts#L228)) currently:
-1. Reads `pendingCyclePiastres`
-2. If positive: deducts commission, moves net to `balancePiastres`
-3. If zero or negative: bails out early after stamping `lastSettledAt`
+`WalletDoc` gained a new field `directCommissionOwedPiastres` (≤ 0 when teacher owes). The `LedgerTarget` enum gained a third value `'dues'`. Direct-commission ledger entries now use `target: 'dues'` instead of `target: 'pending'`, so the online-pending bucket stays clean (gross earnings only) and settlement math doesn't get confused.
 
-The "negative" path is wrong for Phase B. If a teacher has only direct-commission debts (negative pending), settlement should:
-- Take the absolute value from their `balancePiastres` to pay the debt
-- Or, if available balance is insufficient, leave the debt in pending for next cycle (or alert admin)
+`settleCycleForTeacher` now runs in two steps:
 
-**Decision needed before step 3**: what happens when a teacher has more direct-commission debt than they have available balance + online pending earnings? Options:
-- a) Leave the debt in pending (rolls into next cycle, becomes a running tab)
-- b) Block payouts until paid (teacher can't withdraw at all while in debt)
-- c) Admin alert + manual reconciliation
-- Recommendation: **(a)** for now, with a UI warning. Migrate to **(b)** once the wallet UI exposes the debt clearly.
+1. **Online settlement** (unchanged behavior): drain `pending` → `available` net of commission, credit `system_revenue`.
+2. **Dues settlement** (new): if `directCommissionOwedPiastres < 0`, drain as much as possible from the teacher's `available` balance (capped to keep available ≥ 0). Remaining debt rolls forward in dues. An `adminAlerts` entry is created if the settlement was partial or fully unsettleable.
+
+This is option **(a)** from the design discussion (roll forward). Option (b) — block payouts when in debt — can be layered on later by checking `directCommissionOwedPiastres < 0` in `requestPayout`.
 
 ### Step 4: deprecate `weeklyCommissionSummaries`
 

@@ -61,6 +61,12 @@ export function computeSettlementPiastres(
 const ROLLING_WINDOW_DAYS = 14;
 const TEACHER_PAGE_SIZE = 200;
 
+interface WalletLikeData {
+  balancePiastres?: number;
+  pendingCyclePiastres?: number;
+  directCommissionOwedPiastres?: number;
+}
+
 async function loadTiers(): Promise<TierConfig[]> {
   const snap = await db.collection('systemConfig').doc('global').get();
   const raw = snap.data()?.commissionTiers as unknown[] | undefined;
@@ -242,9 +248,20 @@ async function recomputeForTeacher(
 }
 
 /**
- * Drain teacher's pending bucket → available (net of commission) + system
- * revenue (commission). Idempotent on `groupId = settle_{teacherId}_{cycleId}`
- * so a retry on the same cycle is a no-op. No-op if pending == 0.
+ * Two-step cycle settlement for a teacher:
+ *
+ *   1. Drain `pending` (online gross earnings) → `available` net of
+ *      commission. Same as before.
+ *   2. Drain `dues` (direct-payment commission owed) from `available`,
+ *      capped by what's available so the wallet never goes negative.
+ *      Any remaining debt stays in dues and rolls into the next cycle.
+ *
+ * Both steps run inside one transaction. Both are idempotent on their
+ * own groupId, so a retry of step 1 doesn't re-run step 2 or vice versa.
+ *
+ * Phase B step 3. Settles teachers who have ONLY dues (no online
+ * earnings), partially settles teachers with both, and leaves
+ * unsettleable debt for next cycle.
  */
 async function settleCycleForTeacher(
   teacherId: string,
@@ -255,11 +272,14 @@ async function settleCycleForTeacher(
   const walletRef = db.collection('wallets').doc(walletIdForUser(teacherId));
   const walletSnap = await walletRef.get();
   if (!walletSnap.exists) return;
+
   const pendingPiastres =
     (walletSnap.data()?.pendingCyclePiastres as number) ?? 0;
-  if (pendingPiastres <= 0) {
-    // Still stamp lastSettledAt so the teacher UI can show "settled at" even
-    // for zero-pending cycles.
+  const duesPiastres =
+    (walletSnap.data()?.directCommissionOwedPiastres as number) ?? 0;
+
+  // Nothing to settle either way: just stamp the timestamp.
+  if (pendingPiastres <= 0 && duesPiastres >= 0) {
     await walletRef.update({
       lastSettledAt: admin.firestore.Timestamp.fromDate(now),
       updatedAt: FieldValue.serverTimestamp(),
@@ -267,55 +287,133 @@ async function settleCycleForTeacher(
     return;
   }
 
-  const { commissionPiastres, teacherNetPiastres } = computeSettlementPiastres(
-    pendingPiastres,
-    rate,
-  );
+  // ── STEP 1: settle online pending → available + revenue ──
+  if (pendingPiastres > 0) {
+    const { commissionPiastres, teacherNetPiastres } = computeSettlementPiastres(
+      pendingPiastres,
+      rate,
+    );
 
-  try {
-    await db.runTransaction(async (tx) => {
-      await postLedgerEntry(tx, {
-        type: 'cycle_settlement',
-        legs: [
-          // Drain pending bucket.
-          {
-            walletId: walletIdForUser(teacherId),
-            ownerType: 'mohaffez',
-            amountPiastres: -pendingPiastres,
-            target: 'pending',
-          },
-          // Credit net to available bucket (skip leg if zero — e.g. 100% rate edge case).
-          ...(teacherNetPiastres > 0
-            ? [{
-                walletId: walletIdForUser(teacherId),
-                ownerType: 'mohaffez' as const,
-                amountPiastres: teacherNetPiastres,
-              }]
-            : []),
-          // Platform commission. Skip if zero (e.g. starter tier with 0% rate).
-          ...(commissionPiastres > 0
-            ? [{
-                walletId: SYSTEM_WALLETS.revenue,
-                ownerType: 'system' as const,
-                amountPiastres: commissionPiastres,
-              }]
-            : []),
-        ],
-        reason: `Cycle settlement: pending=${pendingPiastres} rate=${rate}`,
-        groupId: `settle_${teacherId}_${cycleId}`,
-        createdBy: 'system',
-        metadata: { rate, cycleId, pendingPiastres, commissionPiastres },
+    try {
+      await db.runTransaction(async (tx) => {
+        await postLedgerEntry(tx, {
+          type: 'cycle_settlement',
+          legs: [
+            {
+              walletId: walletIdForUser(teacherId),
+              ownerType: 'mohaffez',
+              amountPiastres: -pendingPiastres,
+              target: 'pending',
+            },
+            ...(teacherNetPiastres > 0
+              ? [{
+                  walletId: walletIdForUser(teacherId),
+                  ownerType: 'mohaffez' as const,
+                  amountPiastres: teacherNetPiastres,
+                }]
+              : []),
+            ...(commissionPiastres > 0
+              ? [{
+                  walletId: SYSTEM_WALLETS.revenue,
+                  ownerType: 'system' as const,
+                  amountPiastres: commissionPiastres,
+                }]
+              : []),
+          ],
+          reason: `Cycle settlement: pending=${pendingPiastres} rate=${rate}`,
+          groupId: `settle_${teacherId}_${cycleId}`,
+          createdBy: 'system',
+          metadata: { rate, cycleId, pendingPiastres, commissionPiastres },
+        });
       });
-      tx.update(walletRef, {
-        lastSettledAt: admin.firestore.Timestamp.fromDate(now),
-        updatedAt: FieldValue.serverTimestamp(),
+    } catch (err) {
+      functions.logger.error('settleCycleForTeacher: pending step failed', {
+        teacherId, rate, pendingPiastres, err,
       });
-    });
-  } catch (err) {
-    functions.logger.error('settleCycleForTeacher failed', {
-      teacherId, rate, pendingPiastres, err,
-    });
+    }
   }
+
+  // ── STEP 2: drain direct-commission dues from available ──
+  // `duesPiastres` is ≤ 0 (negative = owed). Try to wipe as much as the
+  // teacher's available balance permits; leftover rolls forward.
+  if (duesPiastres < 0) {
+    try {
+      await db.runTransaction(async (tx) => {
+        // Re-read wallet (available may have just gone up from step 1)
+        const freshSnap = await tx.get(walletRef);
+        if (!freshSnap.exists) return;
+        const fresh = freshSnap.data() as WalletLikeData;
+        const currentAvailable = fresh.balancePiastres ?? 0;
+        const currentDues = fresh.directCommissionOwedPiastres ?? 0;
+        if (currentDues >= 0) return; // already cleared by a concurrent path
+        const debt = -currentDues; // positive amount owed
+        const drainable = Math.min(debt, Math.max(currentAvailable, 0));
+
+        if (drainable <= 0) {
+          // Teacher has no available balance to pay dues. Leave the debt
+          // in dues to roll forward into next cycle. Admin alert so ops
+          // can decide whether to follow up.
+          await db.collection('adminAlerts').add({
+            type: 'teacher_dues_unsettled',
+            mohaffezId: teacherId,
+            duesOwedEgp: debt / 100,
+            cycleId,
+            note: 'Available balance was 0 at settlement; debt rolls forward.',
+            resolved: false,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+
+        await postLedgerEntry(tx, {
+          type: 'cycle_settlement',
+          legs: [
+            // Take from teacher's available balance...
+            {
+              walletId: walletIdForUser(teacherId),
+              ownerType: 'mohaffez',
+              amountPiastres: -drainable,
+            },
+            // ...and zero out (or reduce) the dues bucket.
+            {
+              walletId: walletIdForUser(teacherId),
+              ownerType: 'mohaffez',
+              amountPiastres: drainable,
+              target: 'dues',
+            },
+          ],
+          reason: `Direct-commission dues settlement: drained ${drainable} of ${debt}`,
+          groupId: `settle_dues_${teacherId}_${cycleId}`,
+          createdBy: 'system',
+          metadata: { cycleId, duesOwedPiastres: debt, drainedPiastres: drainable },
+        });
+
+        // Partial-settle case: log so ops can see rolling debt.
+        if (drainable < debt) {
+          await db.collection('adminAlerts').add({
+            type: 'teacher_dues_partially_settled',
+            mohaffezId: teacherId,
+            settledEgp: drainable / 100,
+            remainingOwedEgp: (debt - drainable) / 100,
+            cycleId,
+            note: 'Partial settlement; remaining dues rolled forward.',
+            resolved: false,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    } catch (err) {
+      functions.logger.error('settleCycleForTeacher: dues step failed', {
+        teacherId, duesPiastres, err,
+      });
+    }
+  }
+
+  // Stamp the settlement timestamp regardless of step outcomes.
+  await walletRef.update({
+    lastSettledAt: admin.firestore.Timestamp.fromDate(now),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
 }
 
 async function runRecompute(
