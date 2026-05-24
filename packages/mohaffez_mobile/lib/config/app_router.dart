@@ -53,7 +53,6 @@ import '../screens/teacher/mohaffez_student_detail_screen.dart';
 import '../screens/teacher/mohaffez_wallet_settings_screen.dart';
 import '../screens/teacher/mohaffez_wallet_screen.dart';
 import '../screens/teacher/request_payout_screen.dart';
-import '../screens/teacher/mohaffez_commission_screen.dart';
 import '../screens/teacher/availability_management_screen.dart';
 import '../screens/teacher/pending_requests_screen.dart';
 import '../screens/teacher/direct_payment_confirmations_screen.dart';
@@ -83,7 +82,6 @@ import '../screens/admin/admin_wallet_settings_screen.dart';
 import '../screens/admin/admin_credit_wallet_screen.dart';
 import '../screens/admin/admin_wallet_topups_screen.dart';
 import '../screens/admin/admin_process_payouts_screen.dart';
-import '../screens/admin/admin_teacher_commissions_screen.dart';
 import '../screens/admin/admin_teacher_requests_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
 import '../shared/theme/theme_extensions.dart';
@@ -492,14 +490,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const RequestPayoutScreen(),
           ),
           GoRoute(
-            path: '/mohaffez-commissions',
-            name: 'mohaffez-commissions',
-            builder: (context, state) {
-              final uid = ref.read(currentUserIdProvider) ?? '';
-              return MohaffezCommissionScreen(mohaffezId: uid);
-            },
-          ),
-          GoRoute(
             path: '/payment/:mohaffezId',
             name: 'payment',
             builder: (context, state) {
@@ -791,12 +781,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'admin-payment-events',
             builder: (context, state) =>
                 const AdminPaymentEventsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/teacher-commissions',
-            name: 'admin-teacher-commissions',
-            builder: (context, state) =>
-                const AdminTeacherCommissionsScreen(),
           ),
           GoRoute(
             path: '/admin/wallet-numbers',

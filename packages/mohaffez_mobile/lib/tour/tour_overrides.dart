@@ -4,7 +4,6 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import '../providers/mohaffez_profile_providers.dart';
 import '../providers/quiz_access_provider.dart';
 import '../providers/student_count_provider.dart';
-import '../screens/teacher/mohaffez_commission_screen.dart';
 import '../screens/teacher/mohaffez_student_detail_screen.dart';
 import 'tour_fixtures.dart';
 import 'tour_mode_state.dart';
@@ -199,8 +198,6 @@ List<Override> _teacherOverrides(DemoTeacherFixture fixture) {
         .overrideWith((ref, _) => Stream.value(fixture.pendingRequests)),
     mohaffezStudentsProvider
         .overrideWith((ref, _) async => _demoStudentSummaries),
-    weeklyCommissionsProvider
-        .overrideWith((ref, _) => Stream.value(const [])),
     // Teacher viewing their own profile page
     mohaffezProfileProvider.overrideWith((ref, _) async => {
       'uid': fixture.user.uid,

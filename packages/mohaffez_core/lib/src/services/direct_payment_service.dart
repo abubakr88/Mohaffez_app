@@ -7,72 +7,6 @@ class DirectPaymentService {
   static final _functions = FirebaseFunctions.instance;
   static final _db = FirebaseFirestore.instance;
 
-  static String _commissionKey(WeeklyCommissionSummary summary) =>
-      '${summary.mohaffezId}_${summary.year}_w${summary.weekNumber}';
-
-  static WeeklyCommissionSummary _mergeCommissionSummary(
-    WeeklyCommissionSummary current,
-    WeeklyCommissionSummary legacy,
-  ) {
-    return WeeklyCommissionSummary(
-      id: current.id,
-      mohaffezId: current.mohaffezId.isNotEmpty
-          ? current.mohaffezId
-          : legacy.mohaffezId,
-      mohaffezName: current.mohaffezName.isNotEmpty
-          ? current.mohaffezName
-          : legacy.mohaffezName,
-      weekNumber: current.weekNumber != 0 ? current.weekNumber : legacy.weekNumber,
-      year: current.year != 0 ? current.year : legacy.year,
-      totalSessions: current.totalSessions + legacy.totalSessions,
-      totalRevenue: current.totalRevenue + legacy.totalRevenue,
-      commissionAmount: current.commissionAmount + legacy.commissionAmount,
-      commissionRate:
-          current.commissionRate != 0 ? current.commissionRate : legacy.commissionRate,
-      status: current.status,
-      weekStart: current.weekStart ?? legacy.weekStart,
-      weekEnd: current.weekEnd ?? legacy.weekEnd,
-      dueDate: current.dueDate ?? legacy.dueDate,
-      paidAt: current.paidAt ?? legacy.paidAt,
-      mohaffezReportedAt: current.mohaffezReportedAt ?? legacy.mohaffezReportedAt,
-      mohaffezNote: current.mohaffezNote ?? legacy.mohaffezNote,
-      paymentReference: current.paymentReference ?? legacy.paymentReference,
-      paymentMethod: current.paymentMethod ?? legacy.paymentMethod,
-      reportedAmount: current.reportedAmount ?? legacy.reportedAmount,
-      paidAmount: current.paidAmount ?? legacy.paidAmount,
-      adminConfirmationNote:
-          current.adminConfirmationNote ?? legacy.adminConfirmationNote,
-      markedPaidBy: current.markedPaidBy ?? legacy.markedPaidBy,
-      rejectionReason: current.rejectionReason ?? legacy.rejectionReason,
-      rejectedAt: current.rejectedAt ?? legacy.rejectedAt,
-      rejectedBy: current.rejectedBy ?? legacy.rejectedBy,
-    );
-  }
-
-  static List<WeeklyCommissionSummary> _mergeCommissionLists(
-    List<WeeklyCommissionSummary> summaries,
-    List<WeeklyCommissionSummary> legacySummaries,
-  ) {
-    final merged = <String, WeeklyCommissionSummary>{
-      for (final summary in summaries) _commissionKey(summary): summary,
-    };
-
-    for (final legacy in legacySummaries) {
-      final key = _commissionKey(legacy);
-      final current = merged[key];
-      merged[key] =
-          current == null ? legacy : _mergeCommissionSummary(current, legacy);
-    }
-
-    final list = merged.values.toList()
-      ..sort((a, b) {
-        final byYear = b.year.compareTo(a.year);
-        if (byYear != 0) return byYear;
-        return b.weekNumber.compareTo(a.weekNumber);
-      });
-    return list;
-  }
-
   // ── Teacher: save wallet numbers ─────────────────────────────────────────
   static Future<void> saveMohaffezWalletNumbers({
     required String mohaffezId,
@@ -307,51 +241,6 @@ class DirectPaymentService {
         .doc(directPaymentRequestId)
         .snapshots()
         .map((s) => s.exists ? DirectPaymentModel.fromFirestore(s) : null);
-  }
-
-  // ── Stream: weekly commission summaries for mohaffez ─────────────────────
-  static Stream<List<WeeklyCommissionSummary>> watchCommissions(
-      String mohaffezId) {
-    return _db
-        .collection('weeklyCommissionSummaries')
-        .where('mohaffezId', isEqualTo: mohaffezId)
-        .orderBy('weekNumber', descending: true)
-        .limit(12)
-        .snapshots()
-        .asyncMap((summarySnap) async {
-      final legacySnap = await _db
-          .collection('weeklyCommissions')
-          .where('mohaffezId', isEqualTo: mohaffezId)
-          .orderBy('weekNumber', descending: true)
-          .limit(12)
-          .get();
-
-      return _mergeCommissionLists(
-        summarySnap.docs.map((d) => WeeklyCommissionSummary.fromFirestore(d)).toList(),
-        legacySnap.docs.map((d) => WeeklyCommissionSummary.fromFirestore(d)).toList(),
-      );
-    });
-  }
-
-  // ── Stream: ALL commission summaries (admin view) ─────────────────────────
-  static Stream<List<WeeklyCommissionSummary>> watchAllCommissions() {
-    return _db
-        .collection('weeklyCommissionSummaries')
-        .orderBy('dueDate', descending: true)
-        .limit(50)
-        .snapshots()
-        .asyncMap((summarySnap) async {
-      final legacySnap = await _db
-          .collection('weeklyCommissions')
-          .orderBy('dueDate', descending: true)
-          .limit(50)
-          .get();
-
-      return _mergeCommissionLists(
-        summarySnap.docs.map((d) => WeeklyCommissionSummary.fromFirestore(d)).toList(),
-        legacySnap.docs.map((d) => WeeklyCommissionSummary.fromFirestore(d)).toList(),
-      );
-    });
   }
 
   // ── Fetch admin wallet numbers ────────────────────────────────────────────

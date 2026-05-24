@@ -3,13 +3,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
-import {
-  getWeekNumber,
-  getWeekStart,
-  getWeekEnd,
-  getNextMonday,
-  parseFlutterDate,
-} from '../utils/dateHelpers';
+import { parseFlutterDate } from '../utils/dateHelpers';
 import {
   postLedgerEntry,
   egpToPiastres,
@@ -411,14 +405,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
             'directPaymentRequests doc has invalid or missing sessionDate.'
           );
         }
-        const sessionDate   = dp.sessionDate as admin.firestore.Timestamp;
-        const sessionDateObj = sessionDate.toDate(); // ✅ safe
-
-        const weekNumber  = getWeekNumber(sessionDateObj);
-        const year        = sessionDateObj.getFullYear();
-        const summaryId = `${mohaffezId}_${year}_w${weekNumber}`;
-        const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
-        const summarySnap = await tx.get(summaryRef);
+        const sessionDate = dp.sessionDate as admin.firestore.Timestamp;
 
         // ── WRITES ──
         const sessionRef = db.collection('hafizSessions').doc();
@@ -476,47 +463,11 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           typeof lockedInAmount === 'number' && isFinite(lockedInAmount) && lockedInAmount >= 0
             ? lockedInAmount
             : (dp.amount as number) * commissionRate;
-        const weekStart = getWeekStart(sessionDateObj);
-        const weekEnd   = getWeekEnd(sessionDateObj);
-        const dueDate   = getNextMonday(sessionDateObj);
 
-        if (summarySnap.exists) {
-          tx.update(summaryRef, {
-            totalSessions:   FieldValue.increment(1),
-            totalRevenue:    FieldValue.increment(dp.amount as number),
-            commissionAmount: FieldValue.increment(commissionAmount),
-            updatedAt:       FieldValue.serverTimestamp(),
-          });
-        } else {
-          tx.set(summaryRef, {
-            mohaffezId,
-            mohaffezName:    dp.mohaffezName,
-            weekNumber,
-            year,
-            totalSessions:   1,
-            totalRevenue:    dp.amount,
-            commissionAmount,
-            commissionRate,
-            status:          'pending',
-            weekStart:       admin.firestore.Timestamp.fromDate(weekStart),
-            weekEnd:         admin.firestore.Timestamp.fromDate(weekEnd),
-            dueDate:         admin.firestore.Timestamp.fromDate(dueDate),
-            createdAt:       FieldValue.serverTimestamp(),
-            updatedAt:       FieldValue.serverTimestamp(),
-          });
-        }
-
-        // PHASE B (dual-write): also post the commission to the wallet ledger
-        // so the teacher's pending bucket reflects the debt. Idempotent on
-        // `direct_commission_{directPaymentRequestId}`. The legacy
-        // weeklyCommissionSummaries doc above is the current source of truth
-        // for the "مستحقات المنصة" screen; this entry is a shadow that the
-        // unified wallet UI (Phase C) will surface.
-        // TODO Phase B step 2: reverse this entry from onSessionCancelled when
-        //   a direct-payment session is cancelled (currently the dues remain).
-        // TODO Phase B step 3: teach `settleCycleForTeacher` to drain a
-        //   negative pending balance against the system_revenue wallet so
-        //   teachers without offsetting online earnings settle correctly.
+        // Post direct-payment commission to the wallet ledger. Teacher's
+        // `dues` bucket goes negative by the commission amount; settlement
+        // (every 14 days) drains it from the teacher's available balance.
+        // Idempotent on direct_commission_{directPaymentRequestId}.
         if (commissionAmount > 0) {
           const commissionPiastres = egpToPiastres(commissionAmount);
           await postLedgerEntry(tx, {

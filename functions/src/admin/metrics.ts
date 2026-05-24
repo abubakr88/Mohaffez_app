@@ -114,35 +114,16 @@ async function computeAdminMetrics(): Promise<Omit<AdminMetrics, 'generatedAt'>>
   }
 
   // ── COMMISSIONS ────────────────────────────────────────────────────────
-  const commissionSnap = await db
-    .collection('weeklyCommissionSummaries')
-    .get();
-
-  let outstanding = 0;
-  let overdue = 0;
-  let pendingVerif = 0;
-  let paidThisMonth = 0;
-  let paidLastMonth = 0;
-
-  for (const doc of commissionSnap.docs) {
-    const d = doc.data();
-    const amt = (d.commissionAmount as number) ?? 0;
-    const status = d.status as string;
-    if (status === 'paid') {
-      const paidAt = (d.paidAt as admin.firestore.Timestamp | undefined)?.toDate();
-      if (paidAt && paidAt >= thisMonthStart) {
-        paidThisMonth += (d.paidAmount as number) ?? amt;
-      } else if (paidAt && paidAt >= lastMonthStart) {
-        paidLastMonth += (d.paidAmount as number) ?? amt;
-      }
-    } else {
-      outstanding += amt;
-      if (status === 'overdue') overdue += amt;
-      if (status === 'pendingVerification' || status === 'awaiting_confirmation') {
-        pendingVerif += amt;
-      }
-    }
-  }
+  // Legacy weeklyCommissionSummaries removed; commission now lives in the
+  // wallet ledger (see Phase B). These dashboard fields are stubbed at 0
+  // until the metrics are migrated to read from `walletTransactionGroups`
+  // filtered by type ∈ {direct_session_commission, cycle_settlement}.
+  // TODO: migrate to ledger-based aggregation.
+  const outstanding = 0;
+  const overdue = 0;
+  const pendingVerif = 0;
+  const paidThisMonth = 0;
+  const paidLastMonth = 0;
 
   // ── SESSIONS ────────────────────────────────────────────────────────────
   const [completedThisMonthAgg, completedLastMonthAgg, cancelledThisMonthAgg, pendingNowAgg] =

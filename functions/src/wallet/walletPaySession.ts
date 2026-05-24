@@ -16,13 +16,6 @@ import {
   walletIdForUser,
   SYSTEM_WALLETS,
 } from './walletUtils';
-import {
-  getWeekNumber,
-  getWeekStart,
-  getWeekEnd,
-  getNextMonday,
-} from '../utils/dateHelpers';
-
 interface PayFromWalletRequest {
   sessionRequestId: string;
   /** Required when the sessionRequest doc has no paymentAmount yet
@@ -98,12 +91,6 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
         'request has invalid slotStart/slotDate',
       );
     }
-    const sessionDateObj = sessionDate.toDate();
-    const weekNumber = getWeekNumber(sessionDateObj);
-    const year = sessionDateObj.getFullYear();
-    const summaryId = `${mohaffezId}_${year}_w${weekNumber}`;
-    const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
-    const summarySnap = await tx.get(summaryRef);
 
     // Post the ledger entry. Two legs:
     //  - debit student wallet (full amount, available bucket)
@@ -176,35 +163,9 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // Weekly summary: aggregate gross revenue only. Commission is unknown
-    // until the cycle settlement runs (using THAT cycle's tier rate), so we
-    // leave commissionAmount at 0 here and let `recomputeTeacherTiers`
-    // back-fill it during settlement.
-    if (summarySnap.exists) {
-      tx.update(summaryRef, {
-        totalSessions: FieldValue.increment(1),
-        totalRevenue: FieldValue.increment(amountEgp),
-        status: 'pending_settlement',
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    } else {
-      tx.set(summaryRef, {
-        mohaffezId,
-        mohaffezName: req.mohaffezName ?? '',
-        weekNumber,
-        year,
-        totalSessions: 1,
-        totalRevenue: amountEgp,
-        commissionAmount: 0,
-        commissionRate: null,
-        status: 'pending_settlement',
-        weekStart: admin.firestore.Timestamp.fromDate(getWeekStart(sessionDateObj)),
-        weekEnd: admin.firestore.Timestamp.fromDate(getWeekEnd(sessionDateObj)),
-        dueDate: admin.firestore.Timestamp.fromDate(getNextMonday(sessionDateObj)),
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    }
+    // Wallet ledger above is the source of truth for commission; teacher's
+    // `pending` bucket holds gross revenue, drained by recomputeTeacherTiers
+    // at settlement using that cycle's tier rate.
 
     // Notify teacher.
     const notifRef = db.collection('notifications').doc();

@@ -2,8 +2,8 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { db, FieldValue } from '../utils/admin';
-import { getWeekNumber, getWeekStart, getWeekEnd, getNextMonday, parseFlutterDate } from '../utils/dateHelpers';
+import { db } from '../utils/admin';
+import { parseFlutterDate } from '../utils/dateHelpers';
 import { consumeSubscriptionAndCreateSession, SlotInfo } from './handlers';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import { PaymentDocument } from '../types/payment.types';
@@ -311,76 +311,15 @@ export const confirmBundleSession = functions.https.onCall(
         remainingSessions: result.remainingSessions,
       });
 
-      // ── 19. Commission tracking (separate transaction) ────────────────────
-      // NOTE on bundle/subscription commission flow:
-      // Bundle session consumption does NOT currently credit the teacher's
-      // wallet ledger (separate pre-existing gap — the bundle purchase money
-      // never propagates into teacher's pending bucket). Until that gap is
-      // closed, the docs below are TRACKING ONLY and are not the source of
-      // truth for what the teacher gets paid.
-      //
-      // The commission rate is also not computed here anymore — the cycle
-      // settlement step (`recomputeTeacherTiers`) determines the rate at
-      // cycle end, using THAT cycle's session count. We write the gross
-      // amount and leave commission fields null/0 for settlement to fill.
-      const now              = new Date();
-      const weekNumber       = getWeekNumber(now);
-      const weekStart        = getWeekStart(now);
-      const weekEnd          = getWeekEnd(now);
-
-      await db.runTransaction(async (tx) => {
-        // Individual commission record (tracking only).
-        const commRef = db.collection('commissions').doc();
-        tx.set(commRef, {
-          id:                     commRef.id,
-          mohaffezId,
-          mohaffezName,
-          studentId,
-          sessionId:              result.sessionId,
-          subscriptionId,
-          directPaymentRequestId: null,
-          sessionRequestId:       requestId,
-          amount,
-          commissionAmount:       0,
-          commissionRate:         null,
-          paymentMethod:          'subscription',
-          status:                 'pending_settlement',
-          weekNumber,
-          year:                   now.getFullYear(),
-          weekStart:              admin.firestore.Timestamp.fromDate(weekStart),
-          weekEnd:                admin.firestore.Timestamp.fromDate(weekEnd),
-          createdAt:              FieldValue.serverTimestamp(),
-          paidAt:                 null,
-        });
-
-        // Upsert weekly summary (merge:true makes this idempotent).
-        const summaryId  = `${mohaffezId}_${now.getFullYear()}_w${weekNumber}`;
-        const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
-        tx.set(
-          summaryRef,
-          {
-            mohaffezId,
-            mohaffezName,
-            weekNumber,
-            year:             now.getFullYear(),
-            weekStart:        admin.firestore.Timestamp.fromDate(weekStart),
-            weekEnd:          admin.firestore.Timestamp.fromDate(weekEnd),
-            totalSessions:    FieldValue.increment(1),
-            totalRevenue:     FieldValue.increment(amount),
-            status:           'pending_settlement',
-            dueDate:          admin.firestore.Timestamp.fromDate(getNextMonday(weekEnd)),
-            updatedAt:        FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-      });
-
-      functions.logger.info('confirmBundleSession: Commission tracked', {
-        subscriptionId,
-        sessionId: result.sessionId,
-        grossAmount: amount,
-        commissionDeferredTo: 'cycle_settlement',
-      });
+      // ── 19. (Removed: legacy weeklyCommissionSummaries tracking)
+      // Bundle/subscription session payment flows do not credit the teacher's
+      // wallet ledger today (separate pre-existing gap — bundle purchase
+      // money doesn't propagate into the teacher's pending bucket). The old
+      // weeklyCommissionSummaries write was tracking-only and is removed
+      // along with the rest of the legacy commission system. When the bundle
+      // ledger flow is built, it should mirror walletPaySession's pattern:
+      // post a `session_payment` ledger entry crediting the teacher's
+      // pending bucket so settlement deducts commission correctly.
 
       // ── 20. Notification to student ───────────────────────────────────────
       await createAndSendNotification({

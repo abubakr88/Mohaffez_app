@@ -35,7 +35,6 @@ export {
   unsuspendUser,
   deleteUserAccount,
   sendBroadcastNotification,
-  triggerCommissionJobManually,
   triggerCleanupJobManually,
   approveCredential,
   rejectCredential,
@@ -46,13 +45,6 @@ export { checkMaintenanceMode } from './admin/maintenanceCheck';
 export { checkVersion } from './admin/appVersion';
 export { setAdminClaim } from './setAdminClaim';
 export { getAdminMetrics, refreshAdminMetrics } from './admin/metrics';
-
-export {
-  processWeeklyCommissions,
-  markCommissionPaid,
-  mohaffezReportCommissionPayment,
-  rejectCommissionPayment,
-} from './payments/commissions';
 
 // Per-teacher commission tier recompute (rolling 30-day revenue → tier).
 export {
