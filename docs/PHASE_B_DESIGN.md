@@ -66,25 +66,35 @@ Decision taken: a separate `dues` bucket (not mixed into `pending`).
 
 This is option **(a)** from the design discussion (roll forward). Option (b) — block payouts when in debt — can be layered on later by checking `directCommissionOwedPiastres < 0` in `requestPayout`.
 
-### Step 4: deprecate `weeklyCommissionSummaries`
+### Step 4: deprecate `weeklyCommissionSummaries` (still pending)
 
-Once the unified UI ships and admin metrics are migrated to read from the ledger:
+Once admin metrics are migrated to read from the ledger:
 - Stop writing `weeklyCommissionSummaries` in `mohaffezConfirmDirectPayment` and `confirmBundleDirectPayment`
-- Migrate the "مستحقات المنصة" screen to read from ledger entries filtered by `type: 'direct_session_commission'`
-- Optionally backfill ledger entries for historical `weeklyCommissionSummaries` docs (or accept they only show in the legacy screen until expired)
+- Backfill ledger entries for historical `weeklyCommissionSummaries` docs (or accept they only show in the legacy screen until expired)
 - Delete `weeklyCommissionSummaries` collection after a retention period
+- Remove the legacy "مستحقات المنصة" screen entirely (currently kept as an archive)
 
-### Step 5: unified UI (Phase C)
+## Phase C (done — UI unified)
 
-Single "محفظتي" screen with:
-- Tier card at top
-- Available balance (withdrawable)
-- Pending this cycle, broken down: online inflow, online commission, direct commission, estimated net at next settlement
-- Outstanding dues from prior cycles (if any leftover from step 3 option a)
-- "طلب سحب" (disabled if balance ≤ 0)
-- "تسوية فورية للمستحقات" optional — for teachers wanting to clear dues before settlement
+Status: shipped. The teacher wallet screen (`mohaffez_wallet_screen.dart`) now surfaces all three buckets:
 
-Old `مستحقات المنصة` route → 301 redirect to wallet with dues section pre-expanded.
+- **Available balance** — withdrawable, settled from prior cycles. Bold gradient card at top.
+- **Cycle breakdown card** — shows current-cycle pending and dues with line items:
+  - `+` online inflow (gross pending)
+  - `−` estimated online commission at the teacher's current effective rate
+  - `−` direct dues owed this cycle
+  - `=` estimated net that will land in `available` at next settlement
+  - A warning callout fires when net would be negative
+- **Dues card** — only visible when the teacher owes platform commission this cycle. Replaces the standalone "مستحقات المنصة" screen for new dues.
+- **Payout button** — auto-disabled when balance ≤ 0
+- Existing payouts list + transactions list (now also renders `direct_session_commission`, `direct_session_commission_reversal`, and `cycle_settlement` ledger types)
+
+The legacy "مستحقات المنصة" screen is kept (still reachable from the home grid) because pre-Phase-B sessions live there only — no ledger entries exist for them. A banner at the top points teachers to the unified wallet for current-cycle activity. Once step 4 ships (backfill + retire `weeklyCommissionSummaries`), the legacy screen can be deleted.
+
+### Still missing in Phase C
+
+- **"تسوية فورية للمستحقات"** button — optional flow letting a teacher clear current-cycle dues immediately by moving money from `available` to `system_revenue` before settlement runs. Not blocking; teachers can just wait for bi-weekly settlement.
+- **Test coverage** — Phase C is UI; widget tests would catch layout/null regressions. None added yet.
 
 ---
 

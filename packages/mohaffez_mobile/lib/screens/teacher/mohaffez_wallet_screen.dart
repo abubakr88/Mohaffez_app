@@ -1,13 +1,27 @@
 // lib/screens/teacher/mohaffez_wallet_screen.dart
 //
-// Teacher wallet: balance, recent ledger entries, payout request history,
-// and entry point to start a new payout.
+// Unified teacher wallet. Phase C of the wallet/dues merge: this screen
+// replaces both the old "محفظتي" balance view AND the legacy "مستحقات
+// المنصة" screen by surfacing all three buckets in one place:
+//
+//   • Available balance — withdrawable, settled from prior cycles.
+//   • Pending this cycle — gross online earnings minus expected commission
+//     and minus any direct-payment commission owed (live estimate of what
+//     will land in `available` at the next settlement).
+//   • Direct dues — commission owed from cash sessions this cycle. Drained
+//     against `available` at settlement; leftover rolls forward.
+//
+// The legacy 'مستحقات المنصة' screen is still reachable but routes here
+// (see app_router.dart). When Phase B step 4 deprecates the legacy
+// weeklyCommissionSummaries collection, that screen can be deleted.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:mohaffez_core/mohaffez_core.dart';
+
+import '../../shared/widgets/teacher_tier_card.dart';
 
 class MohaffezWalletScreen extends ConsumerWidget {
   const MohaffezWalletScreen({super.key});
@@ -44,13 +58,19 @@ class MohaffezWalletScreen extends ConsumerWidget {
                 )));
                 ref.invalidate(walletTransactionsProvider(user.uid));
                 ref.invalidate(payoutRequestsProvider(user.uid));
+                ref.invalidate(teacherCommissionInfoProvider(user.uid));
               },
               child: ListView(
                 padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
                 children: [
-                  _BalanceCard(uid: user.uid),
+                  TeacherTierCard(teacherId: user.uid),
                   const SizedBox(height: AppThemeConstants.spaceLg),
-                  _PayoutButton(),
+                  _AvailableCard(uid: user.uid),
+                  const SizedBox(height: AppThemeConstants.spaceMd),
+                  _CycleBreakdownCard(uid: user.uid),
+                  _DuesCard(uid: user.uid),
+                  const SizedBox(height: AppThemeConstants.spaceLg),
+                  _PayoutButton(uid: user.uid),
                   const SizedBox(height: AppThemeConstants.spaceXl),
                   const _SectionLabel(label: 'طلبات السحب'),
                   const SizedBox(height: AppThemeConstants.spaceMd),
@@ -86,9 +106,13 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _BalanceCard extends ConsumerWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// AVAILABLE BALANCE CARD
+// Headline number, what the teacher can withdraw right now.
+// ─────────────────────────────────────────────────────────────────────────────
+class _AvailableCard extends ConsumerWidget {
   final String uid;
-  const _BalanceCard({required this.uid});
+  const _AvailableCard({required this.uid});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -122,7 +146,7 @@ class _BalanceCard extends ConsumerWidget {
               const Icon(Icons.account_balance_wallet,
                   color: AppThemeConstants.white, size: 28),
               const SizedBox(width: AppThemeConstants.spaceSm),
-              Text('الأرباح المتاحة للسحب',
+              Text('الرصيد المتاح للسحب',
                   style: TextStyle(
                     color: AppThemeConstants.white.withValues(alpha: 0.9),
                     fontSize: 14,
@@ -147,60 +171,27 @@ class _BalanceCard extends ConsumerWidget {
               'تعذر تحميل الرصيد',
               style: TextStyle(color: AppThemeConstants.white),
             ),
-            data: (w) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            data: (w) => Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      w.balanceEgp.toStringAsFixed(2),
-                      style: const TextStyle(
-                        color: AppThemeConstants.white,
-                        fontSize: 38,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 6),
-                      child: Text('ج.م',
-                          style: TextStyle(
-                            color: AppThemeConstants.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          )),
-                    ),
-                  ],
-                ),
-                if (w.hasPendingCycleEarnings) ...[
-                  const SizedBox(height: AppThemeConstants.spaceMd),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppThemeConstants.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.hourglass_bottom_rounded,
-                            color: AppThemeConstants.white, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'قيد التسوية: ${w.pendingCycleEgp.toStringAsFixed(2)} ج.م — تُتاح بعد نهاية الدورة الحالية بعد خصم العمولة',
-                            style: const TextStyle(
-                              color: AppThemeConstants.white,
-                              fontSize: 12,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                Text(
+                  w.balanceEgp.toStringAsFixed(2),
+                  style: const TextStyle(
+                    color: AppThemeConstants.white,
+                    fontSize: 38,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
+                ),
+                const SizedBox(width: 6),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: Text('ج.م',
+                      style: TextStyle(
+                        color: AppThemeConstants.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      )),
+                ),
               ],
             ),
           ),
@@ -210,16 +201,316 @@ class _BalanceCard extends ConsumerWidget {
   }
 }
 
-class _PayoutButton extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// CYCLE BREAKDOWN CARD
+// Shows the teacher how the current cycle nets out:
+//   + online inflow (gross pending)
+//   − estimated online commission (at the teacher's current effective rate)
+//   − direct dues owed
+//   = estimated net that will land in `available` at next settlement
+// ─────────────────────────────────────────────────────────────────────────────
+class _CycleBreakdownCard extends ConsumerWidget {
+  final String uid;
+  const _CycleBreakdownCard({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final walletAsync = ref.watch(walletProvider((
+      userId: uid,
+      ownerType: WalletOwnerType.mohaffez,
+    )));
+    final teacherInfo =
+        ref.watch(teacherCommissionInfoProvider(uid)).valueOrNull;
+    final globalRate =
+        ref.watch(systemConfigProvider).valueOrNull?.commissionRate ?? 0.05;
+    final effectiveRate = teacherInfo?.effectiveRate(globalRate) ?? globalRate;
+
+    return walletAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (w) {
+        if (!w.hasPendingCycleEarnings && !w.hasDuesOwed) {
+          // No current-cycle activity at all → don't clutter the screen.
+          return const SizedBox.shrink();
+        }
+        final onlineGross = w.pendingCycleEgp;
+        final onlineCommission = onlineGross * effectiveRate;
+        final duesEgp = w.directCommissionOwedEgp; // positive
+        final estimatedNet = onlineGross - onlineCommission - duesEgp;
+        final nextEvalLabel = teacherInfo?.nextEvalAt != null
+            ? DateFormat('d MMM', 'ar').format(teacherInfo!.nextEvalAt!)
+            : null;
+
+        return Container(
+          padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+          decoration: BoxDecoration(
+            color: AppThemeConstants.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: AppThemeConstants.primary.withValues(alpha: 0.18)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.hourglass_bottom_rounded,
+                      color: AppThemeConstants.primary, size: 20),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'قيد التسوية — الدورة الحالية',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppThemeConstants.textPrimary,
+                    ),
+                  ),
+                  if (nextEvalLabel != null) ...[
+                    const Spacer(),
+                    Text(
+                      'التسوية القادمة: $nextEvalLabel',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppThemeConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: AppThemeConstants.spaceMd),
+              if (onlineGross > 0)
+                _BreakdownRow(
+                  sign: '+',
+                  label: 'دخل أونلاين',
+                  amount: onlineGross,
+                  color: AppThemeConstants.success,
+                ),
+              if (onlineGross > 0)
+                _BreakdownRow(
+                  sign: '−',
+                  label:
+                      'عمولة المنصة المتوقعة (${_formatRate(effectiveRate)}%)',
+                  amount: onlineCommission,
+                  color: AppThemeConstants.textSecondary,
+                ),
+              if (duesEgp > 0)
+                _BreakdownRow(
+                  sign: '−',
+                  label: 'مستحقات جلسات مباشرة',
+                  amount: duesEgp,
+                  color: AppThemeConstants.warning,
+                ),
+              const Divider(height: 24),
+              _BreakdownRow(
+                sign: '=',
+                label: 'صافي متوقع عند التسوية',
+                amount: estimatedNet < 0 ? 0 : estimatedNet,
+                color: AppThemeConstants.primary,
+                bold: true,
+              ),
+              if (estimatedNet < 0) ...[
+                const SizedBox(height: AppThemeConstants.spaceSm),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color:
+                        AppThemeConstants.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          color: AppThemeConstants.warning, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'مستحقاتك على المنصة هذه الدورة أكبر من دخلك الأونلاين. سيتم خصم الفارق من رصيدك المتاح عند التسوية.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppThemeConstants.warning
+                                .withValues(alpha: 0.9),
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatRate(double rate) {
+    final pct = rate * 100;
+    return pct == pct.roundToDouble()
+        ? pct.toInt().toString()
+        : pct.toStringAsFixed(1);
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  final String sign;
+  final String label;
+  final double amount;
+  final Color color;
+  final bool bold;
+
+  const _BreakdownRow({
+    required this.sign,
+    required this.label,
+    required this.amount,
+    required this.color,
+    this.bold = false,
+  });
+
   @override
   Widget build(BuildContext context) {
+    final textStyle = TextStyle(
+      fontSize: bold ? 14 : 13,
+      fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+      color: bold ? AppThemeConstants.textPrimary : AppThemeConstants.textPrimary,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 14,
+            child: Text(sign,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: bold ? 14 : 13,
+                )),
+          ),
+          const SizedBox(width: 4),
+          Expanded(child: Text(label, style: textStyle)),
+          Text('${amount.toStringAsFixed(2)} ج.م',
+              style: textStyle.copyWith(color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DUES CARD — only visible when teacher owes platform from cash sessions.
+// Replaces the standalone "مستحقات المنصة" screen for in-cycle dues.
+// Historical/legacy dues (pre-Phase-B sessions) still live in the legacy
+// `weeklyCommissionSummaries`-backed screen until Phase B step 4 ships.
+// ─────────────────────────────────────────────────────────────────────────────
+class _DuesCard extends ConsumerWidget {
+  final String uid;
+  const _DuesCard({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final walletAsync = ref.watch(walletProvider((
+      userId: uid,
+      ownerType: WalletOwnerType.mohaffez,
+    )));
+    return walletAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (w) {
+        if (!w.hasDuesOwed) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: AppThemeConstants.spaceMd),
+          child: Container(
+            padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+            decoration: BoxDecoration(
+              color: AppThemeConstants.warning.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: AppThemeConstants.warning.withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.receipt_long_rounded,
+                        color: AppThemeConstants.warning, size: 20),
+                    SizedBox(width: 6),
+                    Text(
+                      'مستحقات على المنصة (دفع مباشر)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppThemeConstants.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppThemeConstants.spaceSm),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      w.directCommissionOwedEgp.toStringAsFixed(2),
+                      style: const TextStyle(
+                        color: AppThemeConstants.warning,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 6),
+                      child: Text('ج.م',
+                          style: TextStyle(
+                            color: AppThemeConstants.warning,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          )),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppThemeConstants.spaceSm),
+                const Text(
+                  'عمولة المنصة المستحقة على الجلسات التي استلمت ثمنها نقداً هذه الدورة. تُخصم تلقائياً من رصيدك المتاح عند التسوية القادمة. ما تبقّى يُرحّل إلى الدورة التالية.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppThemeConstants.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYOUT BUTTON — disabled when balance ≤ 0
+// ─────────────────────────────────────────────────────────────────────────────
+class _PayoutButton extends ConsumerWidget {
+  final String uid;
+  const _PayoutButton({required this.uid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final walletAsync = ref.watch(walletProvider((
+      userId: uid,
+      ownerType: WalletOwnerType.mohaffez,
+    )));
+    final canPayout =
+        walletAsync.valueOrNull != null && walletAsync.value!.balanceEgp > 0;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () => context.push('/request-payout'),
+        onPressed: canPayout ? () => context.push('/request-payout') : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppThemeConstants.secondary,
           foregroundColor: AppThemeConstants.white,
+          disabledBackgroundColor: AppThemeConstants.grey300,
           padding:
               const EdgeInsets.symmetric(vertical: AppThemeConstants.spaceMd),
           shape: RoundedRectangleBorder(
@@ -254,7 +545,6 @@ class _PayoutsList extends ConsumerWidget {
         if (payouts.isEmpty) {
           return _emptyBox('لم تقدّم أي طلب سحب بعد');
         }
-        // Show last 5; full list would be a separate screen.
         return Column(
           children: payouts.take(5).map((p) => _PayoutTile(p: p)).toList(),
         );
@@ -480,12 +770,18 @@ class _TxTile extends StatelessWidget {
         return Icons.school;
       case WalletTxType.sessionRefund:
         return Icons.undo;
+      case WalletTxType.cycleSettlement:
+        return Icons.event_available_outlined;
       case WalletTxType.payout:
         return Icons.account_balance;
       case WalletTxType.payoutReversal:
         return Icons.undo;
       case WalletTxType.promoCredit:
         return Icons.card_giftcard;
+      case WalletTxType.directSessionCommission:
+        return Icons.receipt_long_outlined;
+      case WalletTxType.directSessionCommissionReversal:
+        return Icons.undo;
       case WalletTxType.adjustment:
         return Icons.tune;
     }
@@ -499,12 +795,18 @@ class _TxTile extends StatelessWidget {
         return 'دخل من جلسة';
       case WalletTxType.sessionRefund:
         return 'استرداد جلسة';
+      case WalletTxType.cycleSettlement:
+        return 'تسوية دورة';
       case WalletTxType.payout:
         return 'سحب رصيد';
       case WalletTxType.payoutReversal:
         return 'إلغاء سحب';
       case WalletTxType.promoCredit:
         return 'مكافأة';
+      case WalletTxType.directSessionCommission:
+        return 'عمولة جلسة مباشرة';
+      case WalletTxType.directSessionCommissionReversal:
+        return 'إلغاء عمولة جلسة';
       case WalletTxType.adjustment:
         return 'تسوية';
     }

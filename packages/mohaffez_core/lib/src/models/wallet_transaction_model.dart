@@ -19,12 +19,18 @@ enum WalletTxType {
   sessionPayment,
   @JsonValue('session_refund')
   sessionRefund,
+  @JsonValue('cycle_settlement')
+  cycleSettlement,
   @JsonValue('payout')
   payout,
   @JsonValue('payout_reversal')
   payoutReversal,
   @JsonValue('promo_credit')
   promoCredit,
+  @JsonValue('direct_session_commission')
+  directSessionCommission,
+  @JsonValue('direct_session_commission_reversal')
+  directSessionCommissionReversal,
   @JsonValue('adjustment')
   adjustment,
 }

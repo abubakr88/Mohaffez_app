@@ -83,6 +83,50 @@ class _MohaffezCommissionScreenState
                 .fold(0.0, (s, w) => s + w.commissionAmount);
 
             return Column(children: [
+              // Cross-link to the unified wallet (Phase C). This screen is
+              // becoming an archive of legacy weekly summaries; new dues
+              // are surfaced inside محفظتي directly.
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color:
+                          AppThemeConstants.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_balance_wallet_rounded,
+                        color: AppThemeConstants.primary, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'مستحقاتك الجديدة الآن داخل "محفظتي" مع باقي الرصيد.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.push('/mohaffez-wallet'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppThemeConstants.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                      ),
+                      child: const Text('فتح',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          )),
+                    ),
+                  ],
+                ),
+              ),
               // Summary card
               Container(
                 margin: const EdgeInsets.all(16),
