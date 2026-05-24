@@ -66,13 +66,15 @@ Decision taken: a separate `dues` bucket (not mixed into `pending`).
 
 This is option **(a)** from the design discussion (roll forward). Option (b) — block payouts when in debt — can be layered on later by checking `directCommissionOwedPiastres < 0` in `requestPayout`.
 
-### Step 4: deprecate `weeklyCommissionSummaries` (still pending)
+### Step 4: deprecate `weeklyCommissionSummaries` ✅ done (no-launch shortcut)
 
-Once admin metrics are migrated to read from the ledger:
-- Stop writing `weeklyCommissionSummaries` in `mohaffezConfirmDirectPayment` and `confirmBundleDirectPayment`
-- Backfill ledger entries for historical `weeklyCommissionSummaries` docs (or accept they only show in the legacy screen until expired)
-- Delete `weeklyCommissionSummaries` collection after a retention period
-- Remove the legacy "مستحقات المنصة" screen entirely (currently kept as an archive)
+App had no production data, so the migration was a straight deletion — no backfill needed:
+- Deleted `commissions.ts` (processWeeklyCommissions, markCommissionPaid, mohaffezReportCommissionPayment, rejectCommissionPayment, triggerCommissionJobManually)
+- Removed all `weeklyCommissionSummaries` writes from walletPaySession, confirmBundleSession, directPayment, confirmBundleDirectPayment
+- Removed `triggerCommissionJobManually` from adminActions.ts + index.ts
+- Stubbed commission dashboard fields in metrics.ts to 0 (TODO: migrate to ledger-based aggregation)
+- Deleted `MohaffezCommissionScreen`, `AdminTeacherCommissionsScreen`, routes, nav tiles, model class, service methods, provider notifier methods, tour override
+- `WeeklyCommissionSummary` model class deleted from `direct_payment_model.dart`
 
 ## Phase C (done — UI unified)
 
@@ -89,7 +91,7 @@ Status: shipped. The teacher wallet screen (`mohaffez_wallet_screen.dart`) now s
 - **Payout button** — auto-disabled when balance ≤ 0
 - Existing payouts list + transactions list (now also renders `direct_session_commission`, `direct_session_commission_reversal`, and `cycle_settlement` ledger types)
 
-The legacy "مستحقات المنصة" screen is kept (still reachable from the home grid) because pre-Phase-B sessions live there only — no ledger entries exist for them. A banner at the top points teachers to the unified wallet for current-cycle activity. Once step 4 ships (backfill + retire `weeklyCommissionSummaries`), the legacy screen can be deleted.
+The legacy "مستحقات المنصة" screen has been deleted (Phase B step 4). The unified wallet screen is now the sole UI for all commission and balance information.
 
 ### Still missing in Phase C
 
