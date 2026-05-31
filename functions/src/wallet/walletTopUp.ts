@@ -58,19 +58,58 @@ export const verifyWalletTopUp = functions.https.onCall(async (data, context) =>
     const finalAmountEgp = (paidAmountEgp ?? req.amountEgp) as number;
     const piastres = egpToPiastres(finalAmountEgp);
 
+    // When the user is a teacher with outstanding dues, divert the topup to
+    // pay down dues first — otherwise the topup just sits in `available` and
+    // the teacher can neither withdraw nor have the debt cleared until the
+    // next bi-weekly settlement.
+    //   - up to `debt` piastres → dues bucket (reduces what teacher owes)
+    //   - remainder → available bucket (normal topup)
+    // Single balanced 3-leg entry: system_topups −piastres, dues +duesCredit,
+    // available +availCredit; duesCredit + availCredit = piastres.
+    let duesCreditPiastres = 0;
+    if (ownerType === 'mohaffez') {
+      const teacherWalletRef = db.collection('wallets').doc(walletIdForUser(userId));
+      const teacherWalletSnap = await tx.get(teacherWalletRef);
+      const currentDues =
+        (teacherWalletSnap.data()?.directCommissionOwedPiastres as number) ?? 0;
+      const debtPiastres = currentDues < 0 ? -currentDues : 0;
+      duesCreditPiastres = Math.min(debtPiastres, piastres);
+    }
+    const availableCreditPiastres = piastres - duesCreditPiastres;
+
+    const legs: Parameters<typeof postLedgerEntry>[1]['legs'] = [
+      { walletId: SYSTEM_WALLETS.topups, ownerType: 'system', amountPiastres: -piastres },
+    ];
+    if (availableCreditPiastres > 0) {
+      legs.push({
+        walletId: walletIdForUser(userId),
+        ownerType,
+        amountPiastres: availableCreditPiastres,
+      });
+    }
+    if (duesCreditPiastres > 0) {
+      legs.push({
+        walletId: walletIdForUser(userId),
+        ownerType,
+        amountPiastres: duesCreditPiastres,
+        target: 'dues' as const,
+      });
+    }
+
     const result = await postLedgerEntry(tx, {
       type: 'topup',
-      legs: [
-        { walletId: SYSTEM_WALLETS.topups, ownerType: 'system', amountPiastres: -piastres },
-        { walletId: walletIdForUser(userId), ownerType, amountPiastres: piastres },
-      ],
-      reason: adminNote || 'Manual transfer verified',
+      legs,
+      reason: duesCreditPiastres > 0
+        ? `${adminNote || 'Manual transfer verified'} — ${(duesCreditPiastres / 100).toFixed(2)} ج.م سُدد من المستحقات`
+        : adminNote || 'Manual transfer verified',
       relatedPaymentId: topUpRequestId,
       groupId: `topup_${topUpRequestId}`,
       createdBy: adminUid,
       metadata: {
         method: req.method ?? null,
         reference: req.referenceNumber ?? null,
+        duesCreditPiastres,
+        availableCreditPiastres,
       },
     });
 

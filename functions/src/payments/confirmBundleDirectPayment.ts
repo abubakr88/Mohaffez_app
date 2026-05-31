@@ -24,7 +24,9 @@ import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import {
-  postLedgerEntry,
+  prepareLedgerEntry,
+  commitLedgerEntry,
+  LedgerPrep,
   egpToPiastres,
   walletIdForUser,
   SYSTEM_WALLETS,
@@ -229,10 +231,30 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         // Effective rate = tier rate + accumulated cycle penalty (capped at 100%).
         // Bundle commission must be consistent with single-session commission.
         const PER_SESSION_TYPE_LIMIT = 1; // one active bundle per studentId+mohaffezId+sessionType
-        const [configSnap, teacherSnap] = await Promise.all([
+        const [configSnap, teacherSnap, teacherWalletSnap] = await Promise.all([
           transaction.get(db.collection('systemConfig').doc('global')),
           transaction.get(db.collection('users').doc(mohaffezId as string)),
+          transaction.get(db.collection('wallets').doc(walletIdForUser(mohaffezId as string))),
         ]);
+
+        // Direct-payment debt cap: a teacher who already owes the platform
+        // more than the configured threshold cannot accept new direct-payment
+        // bundles. Same rule as single-session direct payment.
+        const duesPiastres =
+          (teacherWalletSnap.data()?.directCommissionOwedPiastres as number) ?? 0;
+        const debtPiastres = duesPiastres < 0 ? -duesPiastres : 0;
+        const thresholdEgp =
+          (configSnap.data()?.directPaymentDebtThresholdEgp as number) ?? 500;
+        const thresholdPiastres = egpToPiastres(thresholdEgp);
+        if (debtPiastres > thresholdPiastres) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
+              `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
+              `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+          );
+        }
+
         const teacherBase = teacherSnap.data()?.commissionRate;
         const globalRate = configSnap.data()?.commissionRate;
         const baseRate: number =
@@ -335,6 +357,40 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         const initialRemaining = isSlotCoupled
           ? sessionsCount - 1
           : sessionsCount;
+
+        // Pre-read wallet state for the commission ledger entry before any
+        // writes. Firestore transactions require all reads before all writes.
+        const commissionPiastres = commissionAmount > 0 ? egpToPiastres(commissionAmount) : 0;
+        let ledgerPrep: LedgerPrep | null = null;
+        if (commissionAmount > 0) {
+          ledgerPrep = await prepareLedgerEntry(transaction, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -commissionPiastres,
+                target: 'dues',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: commissionPiastres,
+              },
+            ],
+            reason: `Direct bundle commission — rate ${commissionRate}`,
+            groupId: `direct_commission_bundle_${dp.id as string}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId: dp.id,
+              planType,
+              sessionsCount,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
+          });
+        }
 
         // 9g. Write subscription
         const initialStatus = initialRemaining > 0 ? 'active' : 'depleted';
@@ -461,13 +517,9 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 9i-commission. Post bundle commission to the wallet ledger.
-        // Teacher's `dues` bucket goes negative by the commission amount;
-        // settlement (every 14 days) drains it from the available balance.
-        // Idempotent on direct_commission_bundle_{dp.id}.
-        if (commissionAmount > 0) {
-          const commissionPiastres = egpToPiastres(commissionAmount);
-          await postLedgerEntry(transaction, {
+        // 9i-commission. Commit the commission ledger entry (reads were done before writes above).
+        if (ledgerPrep !== null) {
+          commitLedgerEntry(transaction, {
             type: 'direct_session_commission',
             legs: [
               {
@@ -493,7 +545,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
               commissionRate,
               commissionEgp: commissionAmount,
             },
-          });
+          }, ledgerPrep);
         }
 
         // FIX double-write-2: DELETED step 9j - it was updating the same

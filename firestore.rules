@@ -261,13 +261,16 @@ service cloud.firestore {
                     );
 
       // ─── Student cancel rule ───
+      // `accepted` is included so a student can cancel an already-confirmed
+      // booking; the parallel hafizSessions update is gated by its own rule.
       allow update: if isAuthenticated() &&
                     request.auth.uid == resource.data.studentId &&
                     request.resource.data.status == 'cancelled' &&
                     resource.data.status in [
                       'pending',
                       'awaitingpayment',
-                      'awaitingdirectpaymentconfirmation'
+                      'awaitingdirectpaymentconfirmation',
+                      'accepted'
                     ] &&
                     onlyUpdating([
                       'status', 'cancelledAt', 'cancelledBy',
@@ -322,6 +325,15 @@ service cloud.firestore {
         ||
         (request.auth.uid == resource.data.studentId &&
          onlyUpdating(['studentFeedback', 'teacherRating', 'reviewNotes', 'startedLate', 'meetingStudentJoinedAt', 'updatedAt']))
+        ||
+        // Student cancels their own session. Only from 'accepted' (no
+        // re-cancelling, no cancelling completed sessions); status must
+        // transition to 'cancelled' and cancelledBy must be 'student'.
+        (request.auth.uid == resource.data.studentId &&
+         resource.data.status == 'accepted' &&
+         request.resource.data.status == 'cancelled' &&
+         request.resource.data.cancelledBy == 'student' &&
+         onlyUpdating(['status', 'cancelledBy', 'cancelledAt', 'updatedAt']))
         ||
         (isAuthenticated() &&
          onlyUpdating([

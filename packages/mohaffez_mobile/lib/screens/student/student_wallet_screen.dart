@@ -332,6 +332,8 @@ class _TxTile extends StatelessWidget {
       case WalletTxType.directSessionCommissionReversal:
         return Icons.undo;
       case WalletTxType.adjustment:
+      case WalletTxType.commissionRateChange:
+      case WalletTxType.penaltyApplied:
         return Icons.tune;
     }
   }
@@ -357,6 +359,8 @@ class _TxTile extends StatelessWidget {
       case WalletTxType.directSessionCommissionReversal:
         return 'إلغاء عمولة جلسة';
       case WalletTxType.adjustment:
+      case WalletTxType.commissionRateChange:
+      case WalletTxType.penaltyApplied:
         return 'تسوية';
     }
   }

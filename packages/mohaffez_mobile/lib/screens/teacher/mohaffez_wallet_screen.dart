@@ -257,12 +257,15 @@ class _CycleBreakdownCard extends ConsumerWidget {
                   const Icon(Icons.hourglass_bottom_rounded,
                       color: AppThemeConstants.primary, size: 20),
                   const SizedBox(width: 6),
-                  const Text(
-                    'قيد التسوية — الدورة الحالية',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: AppThemeConstants.textPrimary,
+                  const Flexible(
+                    child: Text(
+                      'قيد التسوية — الدورة الحالية',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppThemeConstants.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (nextEvalLabel != null) ...[
@@ -437,7 +440,7 @@ class _DuesCard extends ConsumerWidget {
                         color: AppThemeConstants.warning, size: 20),
                     SizedBox(width: 6),
                     Text(
-                      'مستحقات على المنصة (دفع مباشر)',
+                      'مستحقات المنصة (دفع مباشر)',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -489,7 +492,9 @@ class _DuesCard extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PAYOUT BUTTON — disabled when balance ≤ 0
+// PAYOUT BUTTON — disabled when available − dues ≤ 0. When the teacher owes
+// the platform more than they hold, surface a "add money" CTA pointing at
+// the topup flow instead so they can clear the debt.
 // ─────────────────────────────────────────────────────────────────────────────
 class _PayoutButton extends ConsumerWidget {
   final String uid;
@@ -501,28 +506,136 @@ class _PayoutButton extends ConsumerWidget {
       userId: uid,
       ownerType: WalletOwnerType.mohaffez,
     )));
-    final canPayout =
-        walletAsync.valueOrNull != null && walletAsync.value!.balanceEgp > 0;
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: canPayout ? () => context.push('/request-payout') : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppThemeConstants.secondary,
-          foregroundColor: AppThemeConstants.white,
-          disabledBackgroundColor: AppThemeConstants.grey300,
-          padding:
-              const EdgeInsets.symmetric(vertical: AppThemeConstants.spaceMd),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    final wallet = walletAsync.valueOrNull;
+    if (wallet == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Effective rate = base tier + cycle penalty (same math as
+    // recomputeTeacherTiers / requestPayout). Needed to project the
+    // cycle's pending-net.
+    final globalRate = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.commissionRate ??
+        0.05;
+    final teacherInfo =
+        ref.watch(teacherCommissionInfoProvider(uid)).valueOrNull;
+    final effectiveRate = teacherInfo?.effectiveRate(globalRate) ?? globalRate;
+
+    final available = wallet.balanceEgp;
+    final debt = wallet.directCommissionOwedEgp; // positive when owed
+    final pendingGross = wallet.pendingCycleEgp;
+    final pendingNet = pendingGross * (1 - effectiveRate);
+    // Projected balance at end-of-cycle settlement. If positive, the dues
+    // will be auto-cleared from this cycle's earnings and the teacher can
+    // safely withdraw their current available balance.
+    final projected = available + pendingNet - debt;
+    final inDebt = debt > 0;
+    final solventViaPending = inDebt && projected >= 0;
+    final canPayout = available > 0 && projected > 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (inDebt) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: solventViaPending
+                  ? AppThemeConstants.accentBlueLight
+                  : AppThemeConstants.errorLight,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: solventViaPending
+                      ? AppThemeConstants.accentBlue
+                      : AppThemeConstants.error),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  solventViaPending
+                      ? Icons.info_outline
+                      : Icons.warning_amber_rounded,
+                  color: solventViaPending
+                      ? AppThemeConstants.accentBlue
+                      : AppThemeConstants.error,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'عليك مستحقات للمنصة بقيمة ${debt.toStringAsFixed(2)} ج.م',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: solventViaPending
+                                ? AppThemeConstants.accentBlue
+                                : AppThemeConstants.error,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        solventViaPending
+                            ? 'لا داعي للقلق — صافي أرباح الدورة الحالية يغطي '
+                                'المستحقات. سيُسدَّد تلقائياً عند التسوية.'
+                            : 'لا يمكنك السحب حتى يتم سداد المستحقات. '
+                                'يمكنك إضافة رصيد لمحفظتك لتسوية الحساب.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: solventViaPending
+                                ? AppThemeConstants.accentBlue
+                                : AppThemeConstants.error),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (!solventViaPending)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/wallet-topup'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppThemeConstants.error,
+                  side: const BorderSide(color: AppThemeConstants.error),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: AppThemeConstants.spaceSm),
+                ),
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text(
+                  'سداد المستحقات (إضافة رصيد)',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+        ElevatedButton.icon(
+          onPressed: canPayout ? () => context.push('/request-payout') : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppThemeConstants.secondary,
+            foregroundColor: AppThemeConstants.white,
+            disabledBackgroundColor: AppThemeConstants.grey300,
+            padding: const EdgeInsets.symmetric(
+                vertical: AppThemeConstants.spaceMd),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.account_balance),
+          label: const Text(
+            'طلب سحب رصيد',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
-        icon: const Icon(Icons.account_balance),
-        label: const Text(
-          'طلب سحب رصيد',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-      ),
+      ],
     );
   }
 }
@@ -704,8 +817,13 @@ class _TxTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCredit = tx.isCredit;
-    final color = isCredit ? AppThemeConstants.success : AppThemeConstants.error;
+    final infoEvent = _isInfoEvent;
+    final isCredit = !infoEvent && tx.isCredit;
+    final color = infoEvent
+        ? (tx.type == WalletTxType.penaltyApplied
+            ? AppThemeConstants.warning
+            : AppThemeConstants.primary)
+        : (isCredit ? AppThemeConstants.success : AppThemeConstants.error);
     final sign = isCredit ? '+' : '−';
     final dateStr = tx.createdAt != null
         ? DateFormat('d MMM · HH:mm', 'ar').format(tx.createdAt!)
@@ -736,7 +854,7 @@ class _TxTile extends StatelessWidget {
                         fontWeight: FontWeight.bold, fontSize: 14)),
                 if (tx.reason.isNotEmpty)
                   Text(tx.reason,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           color: AppThemeConstants.textSecondary,
@@ -749,18 +867,23 @@ class _TxTile extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            '$sign ${tx.absAmountEgp.toStringAsFixed(2)} ج.م',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
+          if (!infoEvent)
+            Text(
+              '$sign ${tx.absAmountEgp.toStringAsFixed(2)} ج.م',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
             ),
-          ),
         ],
       ),
     );
   }
+
+  bool get _isInfoEvent =>
+      tx.type == WalletTxType.commissionRateChange ||
+      tx.type == WalletTxType.penaltyApplied;
 
   IconData _iconFor(WalletTxType t) {
     switch (t) {
@@ -784,6 +907,10 @@ class _TxTile extends StatelessWidget {
         return Icons.undo;
       case WalletTxType.adjustment:
         return Icons.tune;
+      case WalletTxType.commissionRateChange:
+        return Icons.percent_rounded;
+      case WalletTxType.penaltyApplied:
+        return Icons.warning_amber_rounded;
     }
   }
 
@@ -809,6 +936,10 @@ class _TxTile extends StatelessWidget {
         return 'إلغاء عمولة جلسة';
       case WalletTxType.adjustment:
         return 'تسوية';
+      case WalletTxType.commissionRateChange:
+        return 'تغيير معدل العمولة';
+      case WalletTxType.penaltyApplied:
+        return 'عقوبة إلغاء / غياب';
     }
   }
 }

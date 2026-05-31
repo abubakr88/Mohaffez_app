@@ -17,6 +17,7 @@ import admin, { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import {
   postLedgerEntry,
+  postWalletEvent,
   walletIdForUser,
   SYSTEM_WALLETS,
 } from '../wallet/walletUtils';
@@ -213,8 +214,12 @@ async function recomputeForTeacher(
     },
   };
 
-  // Reset penalty after applying it this cycle
-  if (penaltyPct > 0) {
+  // Reset penalty only when we're actually settling the cycle. The real-time
+  // refresh triggered by onSessionCompleted re-runs this function with
+  // settleWallet: false purely to update tierStats display — if we cleared
+  // the penalty there, the next completed session would wipe the cancellation
+  // penalty before the bi-weekly cron ever got a chance to charge it.
+  if (penaltyPct > 0 && options.settleWallet) {
     update.commissionPenaltyPercent = 0;
   }
 
@@ -236,6 +241,49 @@ async function recomputeForTeacher(
       },
       { merge: true },
     );
+
+  // ── Record informational wallet events for tier/rate changes ────────────
+  const oldTierSnap = previousTierId ? tiers.find((t) => t.id === previousTierId) : undefined;
+  const oldBaseRate = oldTierSnap?.rate ?? tier.rate;
+  const oldPenaltyPct = (userSnap.data()?.commissionPenaltyPercent as number | undefined) ?? 0;
+  const oldEffective = Math.min(oldBaseRate + oldPenaltyPct / 100, 1.0);
+
+  // Tier changed → record a commission_rate_change event.
+  if (previousTierId && previousTierId !== tier.id) {
+    const eventId = `tier_change_${teacherId}_${historyId}`;
+    await postWalletEvent(teacherId, {
+      type: 'commission_rate_change',
+      eventId,
+      reason: `تغيير الشريحة: ${oldTierSnap?.labelAr ?? previousTierId} ← ${tier.labelAr} (${(oldBaseRate * 100).toFixed(0)}% → ${(tier.rate * 100).toFixed(0)}%)`,
+      metadata: {
+        oldTierId: previousTierId,
+        newTierId: tier.id,
+        oldBaseRate,
+        newBaseRate: tier.rate,
+        oldEffectiveRate: oldEffective,
+        newEffectiveRate: effectiveRate,
+        cycleId: historyId,
+      },
+    });
+  }
+
+  // Penalty was reset at settlement → record event showing rate dropping back to base.
+  if (options.settleWallet && penaltyPct > 0) {
+    const penaltyEventId = `penalty_reset_${teacherId}_${historyId}`;
+    await postWalletEvent(teacherId, {
+      type: 'commission_rate_change',
+      eventId: penaltyEventId,
+      reason: `إعادة ضبط العقوبة عند التسوية: ${(effectiveRate * 100).toFixed(1)}% → ${(tier.rate * 100).toFixed(0)}%`,
+      metadata: {
+        tierId: tier.id,
+        baseRate: tier.rate,
+        penaltyResetPct: penaltyPct,
+        oldEffectiveRate: effectiveRate,
+        newEffectiveRate: tier.rate,
+        cycleId: historyId,
+      },
+    });
+  }
 
   // ── Cycle settlement: drain the teacher's `pending` bucket using the
   // effective rate (base tier + any cancellation penalty for this cycle).

@@ -19,7 +19,9 @@ export type TxType =
   | 'promo_credit'       // system → user (signup bonus, referral, etc.)
   | 'direct_session_commission'         // cash session: teacher pending -X, system +X
   | 'direct_session_commission_reversal' // cancelled cash session: reverse the above
-  | 'adjustment';        // admin manual fix; reason required
+  | 'adjustment'         // admin manual fix; reason required
+  | 'commission_rate_change' // informational: tier changed or penalty reset at settlement
+  | 'penalty_applied';   // informational: cancellation/no-show penalty incremented
 
 /**
  * Which "bucket" of a wallet a ledger leg targets.
@@ -146,61 +148,69 @@ export interface LedgerEntryInput {
   metadata?: Record<string, unknown>;
 }
 
+/** Opaque result of the reads phase of a ledger entry. Pass to commitLedgerEntry. */
+export interface LedgerPrep {
+  groupRef: FirebaseFirestore.DocumentReference;
+  walletStates: Array<{ ref: FirebaseFirestore.DocumentReference; data: WalletDoc; existed: boolean }>;
+  alreadyPosted: boolean;
+}
+
 /**
- * Post a ledger entry atomically. All legs and wallet balance updates land
- * in the same Firestore transaction the caller passes in. Throws if legs
- * don't balance to zero.
+ * Phase 1: perform all reads for a ledger entry (idempotency check + wallet
+ * state). Must be called before any writes in the enclosing transaction.
+ * Pass the returned LedgerPrep to commitLedgerEntry once all other reads are
+ * done and before any writes start.
  */
-export async function postLedgerEntry(
+export async function prepareLedgerEntry(
   tx: FirebaseFirestore.Transaction,
   input: LedgerEntryInput,
-): Promise<{ groupId: string; idempotent: boolean }> {
+): Promise<LedgerPrep> {
   if (!input.legs || input.legs.length < 2) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'ledger entry needs at least two legs',
-    );
+    throw new functions.https.HttpsError('invalid-argument', 'ledger entry needs at least two legs');
   }
-
   const net = input.legs.reduce((sum, l) => sum + l.amountPiastres, 0);
   if (net !== 0) {
-    throw new functions.https.HttpsError(
-      'internal',
-      `ledger legs do not balance: net=${net}`,
-    );
+    throw new functions.https.HttpsError('internal', `ledger legs do not balance: net=${net}`);
   }
-
   for (const leg of input.legs) {
     if (!Number.isInteger(leg.amountPiastres) || leg.amountPiastres === 0) {
-      throw new functions.https.HttpsError(
-        'internal',
-        'leg amount must be non-zero integer piastres',
-      );
+      throw new functions.https.HttpsError('internal', 'leg amount must be non-zero integer piastres');
     }
     if (!leg.walletId) {
       throw new functions.https.HttpsError('internal', 'leg missing walletId');
     }
   }
 
-  // Idempotency: check if this groupId was already posted.
   const groupRef = db.collection('walletTransactionGroups').doc(input.groupId);
   const groupSnap = await tx.get(groupRef);
   if (groupSnap.exists) {
-    return { groupId: input.groupId, idempotent: true };
+    return { groupRef, walletStates: [], alreadyPosted: true };
   }
 
-  // Read all affected wallets up front (Firestore: all reads before writes).
   const walletStates = await Promise.all(
     input.legs.map((leg) => readOrCreateWallet(tx, leg.walletId, leg.ownerType)),
   );
+  return { groupRef, walletStates, alreadyPosted: false };
+}
 
-  // Apply balance changes and check non-negative for user wallets.
+/**
+ * Phase 2: apply all writes for a ledger entry using pre-read state from
+ * prepareLedgerEntry. Call this after all reads in the transaction are done.
+ */
+export function commitLedgerEntry(
+  tx: FirebaseFirestore.Transaction,
+  input: LedgerEntryInput,
+  prep: LedgerPrep,
+): { groupId: string; idempotent: boolean } {
+  if (prep.alreadyPosted) {
+    return { groupId: input.groupId, idempotent: true };
+  }
+
   for (let i = 0; i < input.legs.length; i++) {
     const leg = input.legs[i];
-    const state = walletStates[i];
+    const state = prep.walletStates[i];
     const target: LedgerTarget = leg.target ?? 'available';
 
-    // Pending + dues buckets only make sense for teacher wallets.
     if ((target === 'pending' || target === 'dues') && state.data.ownerType !== 'mohaffez') {
       throw new functions.https.HttpsError(
         'internal',
@@ -230,14 +240,10 @@ export async function postLedgerEntry(
         `insufficient pending balance in wallet ${leg.walletId}`,
       );
     }
-    // `dues` is allowed to be negative — that IS the debt. Positive dues
-    // (overpayment) is also valid (e.g. teacher pre-paid more than owed)
-    // and would be drained back to available at settlement.
+    // `dues` is allowed to be negative — that IS the debt.
 
     if (state.existed) {
-      const update: Record<string, unknown> = {
-        updatedAt: FieldValue.serverTimestamp(),
-      };
+      const update: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
       if (target === 'available') update.balancePiastres = newAvailable;
       if (target === 'pending') update.pendingCyclePiastres = newPending;
       if (target === 'dues') update.directCommissionOwedPiastres = newDues;
@@ -252,8 +258,7 @@ export async function postLedgerEntry(
     }
   }
 
-  // Write the group marker (idempotency lock).
-  tx.set(groupRef, {
+  tx.set(prep.groupRef, {
     type: input.type,
     reason: input.reason,
     legCount: input.legs.length,
@@ -266,8 +271,6 @@ export async function postLedgerEntry(
     metadata: input.metadata ?? null,
   });
 
-  // Write one walletTransactions row per leg. These are the queryable ledger
-  // entries. The group marker exists only for idempotency + reason lookup.
   for (let i = 0; i < input.legs.length; i++) {
     const leg = input.legs[i];
     const txRef = db.collection('walletTransactions').doc();
@@ -288,6 +291,77 @@ export async function postLedgerEntry(
   }
 
   return { groupId: input.groupId, idempotent: false };
+}
+
+/**
+ * Post a ledger entry atomically. All legs and wallet balance updates land
+ * in the same Firestore transaction the caller passes in. Throws if legs
+ * don't balance to zero.
+ *
+ * NOTE: This function performs reads then writes internally. It is safe to
+ * call only when no other writes have been issued in the transaction yet.
+ * If you need to interleave ledger writes with other writes, use
+ * prepareLedgerEntry + commitLedgerEntry separately.
+ */
+export async function postLedgerEntry(
+  tx: FirebaseFirestore.Transaction,
+  input: LedgerEntryInput,
+): Promise<{ groupId: string; idempotent: boolean }> {
+  const prep = await prepareLedgerEntry(tx, input);
+  return commitLedgerEntry(tx, input, prep);
+}
+
+/**
+ * Post an informational wallet event (no money movement).
+ * Writes to walletTransactionGroups + walletTransactions with amountPiastres=0
+ * so the teacher can see it in their transaction history.
+ * Idempotent: a second call with the same eventId is a no-op.
+ */
+export async function postWalletEvent(
+  teacherId: string,
+  event: {
+    type: 'commission_rate_change' | 'penalty_applied';
+    eventId: string;
+    reason: string;
+    metadata: Record<string, unknown>;
+  },
+): Promise<void> {
+  const groupRef = db.collection('walletTransactionGroups').doc(event.eventId);
+  const txRef = db.collection('walletTransactions').doc();
+  try {
+    await db.runTransaction(async (tx) => {
+      const groupSnap = await tx.get(groupRef);
+      if (groupSnap.exists) return;
+      tx.set(groupRef, {
+        type: event.type,
+        reason: event.reason,
+        legCount: 1,
+        netPiastres: 0,
+        relatedSessionId: null,
+        relatedPaymentId: null,
+        relatedPayoutId: null,
+        createdBy: 'system',
+        createdAt: FieldValue.serverTimestamp(),
+        metadata: event.metadata,
+      });
+      tx.set(txRef, {
+        groupId: event.eventId,
+        walletId: walletIdForUser(teacherId),
+        ownerType: 'mohaffez',
+        amountPiastres: 0,
+        target: 'available',
+        type: event.type,
+        reason: event.reason,
+        relatedSessionId: null,
+        relatedPaymentId: null,
+        relatedPayoutId: null,
+        createdBy: 'system',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    });
+  } catch (err) {
+    functions.logger.warn('postWalletEvent failed', { teacherId, eventId: event.eventId, err });
+  }
 }
 
 /** Guard: callable is admin (custom claim) or throws.

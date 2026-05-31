@@ -745,6 +745,11 @@ Widget _buildDrawer(
                 _drawerTile(context, title: 'تأكيد المدفوعات',
                     icon: Icons.payments_rounded, route: 'direct-payment-confirmations',
                     color: AppThemeConstants.warning),
+                _drawerTileWithUid(context, title: 'الجلسات المنتهية',
+                    icon: Icons.history_rounded,
+                    route: '/completed-sessions',
+                    uid: user.uid,
+                    color: _ShellDS.teal500),
               ],
 
               // ── Student extras ────────────────────────────────────────────
@@ -958,6 +963,42 @@ Widget _drawerTile(
     onTap: () {
       context.pop();
       context.go('/$route');
+    },
+  );
+}
+
+// Variant of _drawerTile for routes that need a query parameter (e.g.
+// /completed-sessions requires ?mohaffezId=$uid). Pass the full route path
+// with leading slash and the uid to append as `mohaffezId`.
+Widget _drawerTileWithUid(
+  BuildContext context, {
+  required String title,
+  required IconData icon,
+  required String route,
+  required String uid,
+  Color? color,
+}) {
+  final c = color ?? AppThemeConstants.textSecondary;
+  return ListTile(
+    dense: true,
+    leading: Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, size: 20, color: c),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+          fontSize: 14, fontWeight: FontWeight.w500, color: AppThemeConstants.textPrimary),
+    ),
+    trailing: const Icon(Icons.arrow_back_ios_new_rounded,
+        size: 13, color: AppThemeConstants.textMuted),
+    onTap: () {
+      context.pop();
+      context.push('$route?mohaffezId=$uid');
     },
   );
 }

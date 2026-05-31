@@ -59,6 +59,35 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       );
     }
 
+    // Detect bundle/subscription payments. The full bundle price is debited
+    // here but only the first session is created — the remaining N−1 sessions
+    // live on the subscription doc and are consumed later via the bundle
+    // session-booking flow. Mirrors confirmBundleDirectPayment's logic.
+    const planType = (req.planType as string | undefined) ?? 'single';
+    const isBundle = planType === 'bundle' || planType === 'subscription';
+    const sessionsCount = isBundle
+      ? Math.max(1, Number(req.sessionsCount ?? 1))
+      : 1;
+    const mohaffezId = req.mohaffezId as string;
+
+    // For bundles, enforce the one-active-bundle-per-(student,teacher,type)
+    // rule and skip if one already exists (e.g. a prior pay-from-wallet
+    // attempt that succeeded but lost the response). Must be read before any
+    // writes happen below.
+    let existingActiveSubId: string | null = null;
+    if (isBundle) {
+      const activeSubs = await tx.get(
+        db.collection('subscriptions')
+          .where('studentId', '==', studentId)
+          .where('mohaffezId', '==', mohaffezId)
+          .where('sessionType', '==', req.sessionType ?? '')
+          .where('status', '==', 'active'),
+      );
+      if (activeSubs.size > 0) {
+        existingActiveSubId = activeSubs.docs[0].id;
+      }
+    }
+
     // Prefer the price already on the doc when it's a positive number
     // (set by an earlier flow); otherwise fall back to client-provided
     // amount. `||` (not `??`) so that an explicit 0 also falls through.
@@ -74,7 +103,12 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     }
     const totalPiastres = egpToPiastres(amountEgp);
 
-    const mohaffezId = req.mohaffezId as string;
+    if (isBundle && existingActiveSubId) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'لديك باقة نشطة بالفعل لهذا النوع من الجلسات',
+      );
+    }
 
     // Commission is NO LONGER deducted at session-payment time. The teacher
     // is credited the GROSS amount into their `pending` bucket, and the
@@ -126,6 +160,21 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       return { success: true, message: 'already posted', groupId: ledger.groupId };
     }
 
+    // Per-session price for the bundle, used as `sessionPrice` on this
+    // (first) session doc. For singles it equals amountEgp.
+    const perSessionEgp = isBundle ? amountEgp / sessionsCount : amountEgp;
+
+    // For bundles, allocate the subscription ID up-front so we can stamp it
+    // on the first session doc — onSessionCancelled uses session.subscriptionId
+    // to detect bundle sessions and restore a session credit instead of
+    // refunding money.
+    let subscriptionId: string | null = null;
+    let subRef: FirebaseFirestore.DocumentReference | null = null;
+    if (isBundle) {
+      subRef = db.collection('subscriptions').doc();
+      subscriptionId = subRef.id;
+    }
+
     // Create the session doc, marked paid + accepted.
     const sessionRef = db.collection('hafizSessions').doc();
     tx.set(sessionRef, {
@@ -142,9 +191,10 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       slotEnd: req.slotEnd,
       status: 'accepted',
       isPaid: true,
-      sessionPrice: amountEgp,
+      sessionPrice: perSessionEgp,
       paymentType: 'wallet',
       walletLedgerGroupId: ledger.groupId,
+      subscriptionId,
       createdAt: FieldValue.serverTimestamp(),
       acceptedAt: FieldValue.serverTimestamp(),
       reminder24hSent: false,
@@ -153,11 +203,45 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       sessionRating: 10,
     });
 
+    if (isBundle && subRef) {
+      const validityDays = typeof req.validityDays === 'number'
+        ? (req.validityDays as number)
+        : null;
+      let expiryDate: admin.firestore.Timestamp | null = null;
+      if (validityDays && validityDays > 0) {
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + validityDays);
+        expiryDate = admin.firestore.Timestamp.fromDate(expiry);
+      }
+      const remaining = Math.max(0, sessionsCount - 1);
+      tx.set(subRef, {
+        studentId,
+        studentName: req.studentName ?? '',
+        mohaffezId,
+        mohaffezName: req.mohaffezName ?? '',
+        planId: (req.planId as string | undefined) ?? '',
+        planTitle: (req.planTitle as string | undefined) ?? '',
+        planType,
+        sessionType: req.sessionType ?? '',
+        totalSessions: sessionsCount,
+        remainingSessions: remaining,
+        totalPaid: amountEgp,
+        paymentTransactionId: ledger.groupId,
+        firstSessionId: sessionRef.id,
+        startDate: FieldValue.serverTimestamp(),
+        expiryDate,
+        status: remaining === 0 ? 'depleted' : 'active',
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
     tx.update(reqRef, {
       status: 'accepted',
       isPaid: true,
       paidAt: FieldValue.serverTimestamp(),
       sessionId: sessionRef.id,
+      subscriptionId,
       paymentType: 'wallet',
       walletLedgerGroupId: ledger.groupId,
       updatedAt: FieldValue.serverTimestamp(),
@@ -187,6 +271,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     return {
       success: true,
       sessionId: sessionRef.id,
+      subscriptionId,
       groupId: ledger.groupId,
       debitedPiastres: totalPiastres,
       teacherPendingCreditedPiastres: totalPiastres,

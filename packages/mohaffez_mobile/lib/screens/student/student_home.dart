@@ -121,25 +121,26 @@ class StudentHomeContent extends ConsumerWidget {
 
     final nextSessionDate = studentUpcomingAsync.when(
       data: (sessions) {
+        // Use slotStart (precise start time) — sessionDate normalizes to
+        // midnight, which incorrectly excludes today's later sessions from
+        // "upcoming" (00:00 today is already before `now`).
         final future = sessions.where((s) {
-          final d = s['sessionDate'] as DateTime?;
-          return d != null && d.isAfter(now);
+          final start = (s['slotStart'] as DateTime?) ??
+              (s['sessionDate'] as DateTime?);
+          return start != null && start.isAfter(now);
         }).toList();
         if (future.isEmpty) return null;
-        // Sort by actual datetime (sessionDate + slotStart) to get the earliest session
         future.sort((a, b) {
-          final da = a['sessionDate'] as DateTime?;
-          final db = b['sessionDate'] as DateTime?;
-          if (da == null || db == null) return 0;
-          final slotStartA = a['slotStart'] as DateTime?;
-          final slotStartB = b['slotStart'] as DateTime?;
-          if (slotStartA != null && slotStartB != null) {
-            return slotStartA.compareTo(slotStartB);
-          }
-          return da.compareTo(db);
+          final sa = (a['slotStart'] as DateTime?) ??
+              (a['sessionDate'] as DateTime?);
+          final sb = (b['slotStart'] as DateTime?) ??
+              (b['sessionDate'] as DateTime?);
+          if (sa == null || sb == null) return 0;
+          return sa.compareTo(sb);
         });
         final next = future.first;
-        return next['slotStart'] as DateTime? ?? next['sessionDate'] as DateTime?;
+        return (next['slotStart'] as DateTime?) ??
+            (next['sessionDate'] as DateTime?);
       },
       loading: () => null,
       error: (_, __) => null,
@@ -171,8 +172,9 @@ class StudentHomeContent extends ConsumerWidget {
 
     final upcomingSessionsCount = studentUpcomingAsync.when(
       data: (sessions) => sessions.where((s) {
-        final d = s['sessionDate'] as DateTime?;
-        return d != null && d.isAfter(now);
+        final start = (s['slotStart'] as DateTime?) ??
+            (s['sessionDate'] as DateTime?);
+        return start != null && start.isAfter(now);
       }).length,
       loading: () => 0,
       error: (_, __) => 0,
@@ -248,16 +250,16 @@ class StudentHomeContent extends ConsumerWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
+                      _LevelStripCard(
+                        studentId: studentId,
+                        dateOfBirth: user?.dateOfBirth,
+                      ),
+                      const SizedBox(height: 20),
                       _NextSessionCountdown(nextSessionDate: nextSessionDate),
                       if (nextSessionDate != null) const SizedBox(height: 20),
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 20),
                       _QuizAccessCard(studentId: studentId),
-                      const SizedBox(height: 20),
-                      _LevelStripCard(
-                        studentId: studentId,
-                        dateOfBirth: user?.dateOfBirth,
-                      ),
                       const SizedBox(height: 28),
                       _AssignmentsSection(studentId: studentId),
                       const SizedBox(height: 16),
@@ -713,9 +715,6 @@ class _ActionsSection extends StatelessWidget {
       _ActionData(icon: Icons.event_note_rounded, label: 'جدولي',
           color: _DS.darkTeal, bg: _DS.darkTealBg,
           onTap: () => context.go('/my-schedule')),
-      _ActionData(icon: Icons.hourglass_top_rounded, label: 'طلباتي',
-          color: _DS.purple, bg: _DS.purpleBg,
-          onTap: () => context.go('/requests')),
       _ActionData(icon: Icons.wallet_rounded, label: 'اشتراكاتي',
           color: _DS.gold, bg: _DS.goldBg,
           onTap: () => context.push('/active-subscriptions')),
@@ -1550,7 +1549,9 @@ class _EmptyCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LEVEL STRIP CARD
+// LEVEL STRIP CARD — visual parity with TeacherTierCard: teal gradient,
+// emoji + level on the left, level-name pill on the right, progress bar
+// underneath, and a hint for sessions remaining to next level.
 // ═══════════════════════════════════════════════════════════════════════════════
 class _LevelStripCard extends ConsumerWidget {
   final String studentId;
@@ -1563,11 +1564,11 @@ class _LevelStripCard extends ConsumerWidget {
 
     return sessionsAsync.when(
       loading: () => Container(
-        height: 72,
+        height: 110,
+        margin: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: _DS.goldBg,
-          borderRadius: _DS.r16,
-          border: Border.all(color: _DS.gold.withValues(alpha: 0.3)),
+          color: AppThemeConstants.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
       error: (_, __) => const SizedBox.shrink(),
@@ -1577,8 +1578,7 @@ class _LevelStripCard extends ConsumerWidget {
         final progress = level.progressTo(sessions);
         final toNext = level.sessionsToNext(sessions);
         final isMax = level.nextMin == -1;
-        final subtitle =
-            isMax ? 'أعلى مستوى 🎉' : 'بقي $toNext جلسة للمستوى التالي';
+        final sessionCount = sessions;
 
         return Material(
           color: Colors.transparent,
@@ -1587,84 +1587,100 @@ class _LevelStripCard extends ConsumerWidget {
               HapticFeedback.lightImpact();
               context.push('/student-rewards');
             },
-            borderRadius: _DS.r16,
+            borderRadius: BorderRadius.circular(14),
             child: Ink(
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _DS.goldBg,
-                borderRadius: _DS.r16,
-                border:
-                    Border.all(color: _DS.gold.withValues(alpha: 0.4), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: _DS.gold.withValues(alpha: 0.12),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                gradient: LinearGradient(
+                  colors: [
+                    AppThemeConstants.primary,
+                    AppThemeConstants.primary.withValues(alpha: 0.85),
+                  ],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: _DS.gold.withValues(alpha: 0.15),
-                            borderRadius: _DS.r12,
-                          ),
-                          child: Center(
-                            child: Text(level.emoji,
-                                style: const TextStyle(fontSize: 22)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                level.name,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: _DS.text1,
-                                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(level.emoji,
+                          style: const TextStyle(fontSize: 28)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'مستواك',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppThemeConstants.white,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                style:
-                                    const TextStyle(fontSize: 12, color: _DS.text2),
+                            ),
+                            Text(
+                              level.name,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppThemeConstants.white,
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppThemeConstants.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '$sessionCount حلقة',
+                          style: const TextStyle(
+                            color: AppThemeConstants.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
                           ),
-                        ),
-                        const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 14,
-                          color: _DS.gold,
-                        ),
-                      ],
-                    ),
-                    if (!isMax) ...[
-                      const SizedBox(height: 10),
-                      ClipRRect(
-                        borderRadius: const BorderRadius.all(Radius.circular(4)),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 5,
-                          backgroundColor: _DS.gold.withValues(alpha: 0.15),
-                          valueColor:
-                              const AlwaysStoppedAnimation<Color>(_DS.gold),
                         ),
                       ),
                     ],
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (!isMax) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: progress.clamp(0.0, 1.0),
+                        minHeight: 8,
+                        backgroundColor:
+                            AppThemeConstants.white.withValues(alpha: 0.25),
+                        valueColor: const AlwaysStoppedAnimation(
+                            AppThemeConstants.white),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'أكمل $toNext حلقة إضافية للوصول إلى المستوى التالي',
+                      style: const TextStyle(
+                        color: AppThemeConstants.white,
+                        fontSize: 12,
+                        height: 1.6,
+                      ),
+                    ),
+                  ] else
+                    const Text(
+                      'وصلت لأعلى مستوى — تهانينا! 🎉',
+                      style: TextStyle(
+                        color: AppThemeConstants.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),

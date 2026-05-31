@@ -151,13 +151,17 @@ export const confirmBundleSession = functions.https.onCall(
       const freshRequestData = requestSnap.data()!;
       const subscription     = subSnap.data()!;
 
-      // For subscription sessions, calculate amount from bundle price
+      // For subscription sessions, calculate amount from bundle price.
+      // `totalPaid` is the canonical field used by createSubscriptionFromPayment,
+      // confirmBundleDirectPayment, and payFromWallet — keep the legacy
+      // alternates as fallbacks for any old docs that used them.
       if (amount === 0 && subscription) {
-        const bundlePrice = (subscription.bundlePrice as number) ?? 
-                           (subscription.totalPrice as number) ?? 
+        const bundlePrice = (subscription.totalPaid as number) ??
+                           (subscription.bundlePrice as number) ??
+                           (subscription.totalPrice as number) ??
                            (subscription.price as number) ?? 0;
-        const totalSessions = (subscription.totalSessions as number) ?? 
-                             (subscription.sessionCount as number) ?? 
+        const totalSessions = (subscription.totalSessions as number) ??
+                             (subscription.sessionCount as number) ??
                              (subscription.sessionsCount as number) ?? 1;
         if (bundlePrice > 0 && totalSessions > 0) {
           amount = bundlePrice / totalSessions;
@@ -265,6 +269,11 @@ export const confirmBundleSession = functions.https.onCall(
         mohaffezPhone:    mohaffezPhone    ?? null,
         isPaid:           true,
         paymentMethod:    'subscription',
+        // Per-session price (bundlePrice / totalSessions). Without this,
+        // statsForTeacher in recomputeTeacherTiers skips the session because
+        // its filter requires sessionPrice > 0, leaving bundle sessions out
+        // of the teacher's tier/revenue calculation entirely.
+        sessionPrice:     amount,
         subscriptionId,
         reminder24hSent:  false,
         reminder1hSent:   false,

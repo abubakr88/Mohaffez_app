@@ -151,8 +151,11 @@ class _StudentSessionsScreenState
 
     final upcoming = all.where((s) {
       final st = (s['status'] as String?)?.toLowerCase();
-      final d = _toDateTime(s['sessionDate']);
-      return st == 'accepted' && d != null && !d.isBefore(todayStart);
+      // Use slotStart so today's later sessions are still counted as upcoming
+      // (sessionDate is midnight, so a 23:10 session at 20:00 would otherwise
+      // fall into "completed" because midnight is "in the past today").
+      final start = _toDateTime(s['slotStart']) ?? _toDateTime(s['sessionDate']);
+      return st == 'accepted' && start != null && start.isAfter(serverNow(ref));
     }).toList()
       ..sort((a, b) {
         final aDate = _toDateTime(a['slotStart']) ?? _toDateTime(a['sessionDate']);
@@ -465,11 +468,22 @@ class _StudentSessionsScreenState
           return db.compareTo(da);
         });
     } else {
+      // "All": upcoming sessions first (soonest at top), then past sessions
+      // (most recent at top). Matches the user expectation that the next
+      // session is the most relevant one to see.
+      final now = DateTime.now();
       filtered.sort((a, b) {
         final da = _toDateTime(a['sessionDate']);
         final db = _toDateTime(b['sessionDate']);
-        if (da == null || db == null) return 0;
-        return db.compareTo(da);
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        final aUpcoming = !da.isBefore(now);
+        final bUpcoming = !db.isBefore(now);
+        if (aUpcoming && !bUpcoming) return -1;
+        if (!aUpcoming && bUpcoming) return 1;
+        if (aUpcoming) return da.compareTo(db); // upcoming: soonest first
+        return db.compareTo(da); // past: most recent first
       });
     }
 

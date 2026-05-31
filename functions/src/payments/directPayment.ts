@@ -5,7 +5,9 @@ import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
 import { parseFlutterDate } from '../utils/dateHelpers';
 import {
-  postLedgerEntry,
+  prepareLedgerEntry,
+  commitLedgerEntry,
+  LedgerPrep,
   egpToPiastres,
   walletIdForUser,
   SYSTEM_WALLETS,
@@ -111,10 +113,30 @@ export const studentMarkedDirectPayment = functions.https.onCall(
 
       // Effective rate = teacher tier rate + accumulated cycle penalty (capped at 100%).
       // Locked in here so confirmation can't drift to a different number later.
-      const [configSnap, teacherSnap] = await Promise.all([
+      // Also load teacher wallet to enforce the direct-payment debt cap — a
+      // teacher who already owes the platform > threshold can't accept new
+      // direct-payment bookings until they pay it down.
+      const [configSnap, teacherSnap, teacherWalletSnap] = await Promise.all([
         tx.get(db.collection('systemConfig').doc('global')),
         tx.get(db.collection('users').doc(mohaffezId as string)),
+        tx.get(db.collection('wallets').doc(walletIdForUser(mohaffezId as string))),
       ]);
+
+      const duesPiastres =
+        (teacherWalletSnap.data()?.directCommissionOwedPiastres as number) ?? 0;
+      const debtPiastres = duesPiastres < 0 ? -duesPiastres : 0;
+      const thresholdEgp =
+        (configSnap.data()?.directPaymentDebtThresholdEgp as number) ?? 500;
+      const thresholdPiastres = egpToPiastres(thresholdEgp);
+      if (debtPiastres > thresholdPiastres) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
+            `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
+            `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+        );
+      }
+
       const teacherBase = teacherSnap.data()?.commissionRate;
       const globalRate = configSnap.data()?.commissionRate;
       const baseRate: number =
@@ -407,11 +429,51 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
         }
         const sessionDate = dp.sessionDate as admin.firestore.Timestamp;
 
-        // ── WRITES ──
+        // Compute commission before writes so we can pre-read wallet state.
+        const commissionAmount =
+          typeof lockedInAmount === 'number' && isFinite(lockedInAmount) && lockedInAmount >= 0
+            ? lockedInAmount
+            : (dp.amount as number) * commissionRate;
+
+        // Create session ref (generates ID only — no read).
         const sessionRef = db.collection('hafizSessions').doc();
         const slotStart  = dp.slotStart as admin.firestore.Timestamp;
         const slotEnd    = dp.slotEnd   as admin.firestore.Timestamp;
 
+        // Pre-read wallet state for the commission ledger entry before any
+        // writes. Firestore transactions require all reads before all writes.
+        let ledgerPrep: LedgerPrep | null = null;
+        if (commissionAmount > 0) {
+          const commissionPiastres = egpToPiastres(commissionAmount);
+          ledgerPrep = await prepareLedgerEntry(tx, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -commissionPiastres,
+                target: 'dues',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: commissionPiastres,
+              },
+            ],
+            reason: `Direct session commission — rate ${commissionRate}`,
+            relatedSessionId: sessionRef.id,
+            groupId: `direct_commission_${directPaymentRequestId}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
+          });
+        }
+
+        // ── WRITES ──
         tx.set(sessionRef, {
           requestId:           (dp.sessionRequestId as string | null) ?? null,
           mohaffezId,
@@ -458,31 +520,21 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           updatedAt:                 FieldValue.serverTimestamp(),
         });
 
-        // Prefer the amount already computed at request time; recompute as fallback
-        const commissionAmount =
-          typeof lockedInAmount === 'number' && isFinite(lockedInAmount) && lockedInAmount >= 0
-            ? lockedInAmount
-            : (dp.amount as number) * commissionRate;
-
-        // Post direct-payment commission to the wallet ledger. Teacher's
-        // `dues` bucket goes negative by the commission amount; settlement
-        // (every 14 days) drains it from the teacher's available balance.
-        // Idempotent on direct_commission_{directPaymentRequestId}.
-        if (commissionAmount > 0) {
-          const commissionPiastres = egpToPiastres(commissionAmount);
-          await postLedgerEntry(tx, {
+        // Commit the commission ledger entry (reads were done before writes above).
+        if (ledgerPrep !== null) {
+          commitLedgerEntry(tx, {
             type: 'direct_session_commission',
             legs: [
               {
                 walletId: walletIdForUser(mohaffezId),
                 ownerType: 'mohaffez',
-                amountPiastres: -commissionPiastres,
+                amountPiastres: -egpToPiastres(commissionAmount),
                 target: 'dues',
               },
               {
                 walletId: SYSTEM_WALLETS.revenue,
                 ownerType: 'system',
-                amountPiastres: commissionPiastres,
+                amountPiastres: egpToPiastres(commissionAmount),
               },
             ],
             reason: `Direct session commission — rate ${commissionRate}`,
@@ -495,7 +547,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
               commissionRate,
               commissionEgp: commissionAmount,
             },
-          });
+          }, ledgerPrep);
         }
 
         const notifRef = db.collection('notifications').doc();

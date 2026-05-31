@@ -55,6 +55,11 @@ class SystemConfigModel {
   /// marked `completed`. Default: 90 minutes.
   final int sessionMaxDurationMinutes;
 
+  /// Teachers whose `directCommissionOwedPiastres` debt exceeds this amount
+  /// (in EGP) cannot accept new direct-payment bookings until they pay it
+  /// down. Server-enforced. Default: 500 EGP.
+  final double directPaymentDebtThresholdEgp;
+
   const SystemConfigModel({
     required this.commissionRate,
     required this.directPaymentCommission,
@@ -98,6 +103,7 @@ class SystemConfigModel {
     required this.commissionTiers,
     required this.lateSessionGraceMinutes,
     required this.sessionMaxDurationMinutes,
+    required this.directPaymentDebtThresholdEgp,
   });
 
   factory SystemConfigModel.fromFirestore(DocumentSnapshot doc) {
@@ -202,6 +208,9 @@ class SystemConfigModel {
       sessionMaxDurationMinutes:
           (data['sessionMaxDurationMinutes'] as num?)?.toInt() ??
               defaults.sessionMaxDurationMinutes,
+      directPaymentDebtThresholdEgp:
+          (data['directPaymentDebtThresholdEgp'] as num?)?.toDouble() ??
+              defaults.directPaymentDebtThresholdEgp,
     );
   }
 
@@ -249,6 +258,7 @@ class SystemConfigModel {
       commissionTiers: CommissionTierModel.defaultTiers,
       lateSessionGraceMinutes: 10,
       sessionMaxDurationMinutes: 90,
+      directPaymentDebtThresholdEgp: 500.0,
     );
   }
 
@@ -297,6 +307,7 @@ class SystemConfigModel {
       'commissionTiers': commissionTiers.map((t) => t.toMap()).toList(),
       'lateSessionGraceMinutes': lateSessionGraceMinutes,
       'sessionMaxDurationMinutes': sessionMaxDurationMinutes,
+      'directPaymentDebtThresholdEgp': directPaymentDebtThresholdEgp,
     };
   }
 }

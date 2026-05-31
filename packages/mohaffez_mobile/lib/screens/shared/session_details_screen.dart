@@ -1,5 +1,6 @@
 // lib/screens/session_details_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -155,6 +156,101 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     );
   }
 
+  // ── Teacher no-show report (student-initiated, post-start) ────────────────
+  Future<void> _reportTeacherNoShow(SessionModel session) async {
+    final sessionId = session.id;
+    if (sessionId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.person_off, color: AppThemeConstants.error),
+            SizedBox(width: 8),
+            Text('المحفظ لم يحضر'),
+          ]),
+          content: const Text(
+            'هل أنت متأكد أن المحفظ لم يحضر الجلسة؟ سيتم استرداد مبلغ '
+            'الجلسة كاملاً إلى محفظتك وتسجيل تحذير على حساب المحفظ.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('تراجع'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.error),
+              child: const Text(
+                'تأكيد الغياب',
+                style: TextStyle(color: AppThemeConstants.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // Capture before the async gap — the Firestore listener may rebuild
+    // this screen during the callable. Same pattern as showCancellationDialog.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final screenNavigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final loadingRoute = DialogRoute<void>(
+      // ignore: use_build_context_synchronously
+      context: navigator.context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('جارٍ الإبلاغ...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    navigator.push(loadingRoute);
+
+    void dismissLoading() {
+      if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
+    }
+
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('onTeacherNoShowReported')
+          .call({'sessionId': sessionId});
+      dismissLoading();
+      if (screenNavigator.canPop()) screenNavigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('تم تسجيل الإبلاغ — سيتم استرداد المبلغ إلى محفظتك'),
+          backgroundColor: AppThemeConstants.success,
+        ),
+      );
+    } catch (e) {
+      dismissLoading();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('تعذّر الإبلاغ: ${e.toString()}'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+    }
+  }
+
   // ── Cancellation dialog ────────────────────────────────────────────────────
   Future<void> showCancellationDialog(
     SessionModel session,
@@ -163,10 +259,55 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     final hoursUntilSession =
         session.sessionDate!.difference(DateTime.now()).inHours;
 
+    // Branch on role and bundle-vs-single:
+    // - Bundle sessions never move money. Restored session credit (>3h) or
+    //   lost session (<3h student cancel).
+    // - Single sessions follow the refund-% policy.
+    final role = ref.read(currentUserProvider).value?.role ?? 'student';
+    final isTeacher = role == 'mohaffez';
+    final isBundle = session.subscriptionId != null ||
+        session.paymentType == 'bundle' ||
+        session.paymentType == 'subscription';
+
     final String refundPolicy;
     final Color policyColor;
 
-    if (hoursUntilSession > 3) {
+    if (isBundle && isTeacher) {
+      // Teacher cancel of bundle: session credit restored to student's bundle,
+      // teacher pays commission penalty only.
+      const base = 'لن يتم تحويل أموال — ستُعاد الحلقة إلى رصيد باقة الطالب';
+      String? penalty;
+      if (hoursUntilSession < 1) {
+        penalty = '\nبالإضافة إلى زيادة عمولة المنصة بـ 1% لهذه الدورة';
+      } else if (hoursUntilSession < 3) {
+        penalty = '\nبالإضافة إلى زيادة عمولة المنصة بـ 0.5% لهذه الدورة';
+      }
+      refundPolicy = penalty == null ? base : '$base$penalty';
+      policyColor = AppThemeConstants.warning;
+    } else if (isBundle && !isTeacher) {
+      // Student cancel of bundle: >3h restores the session credit; <3h loses it.
+      if (hoursUntilSession > 3) {
+        refundPolicy = 'ستُعاد الحلقة إلى رصيد باقتك (لا يوجد استرداد نقدي للباقات)';
+        policyColor = AppThemeConstants.success;
+      } else {
+        refundPolicy = 'ستفقد هذه الحلقة من الباقة — الإلغاء المتأخر لا يُعاد';
+        policyColor = AppThemeConstants.error;
+      }
+    } else if (isTeacher) {
+      final priceText = (session.sessionPrice ?? 0) > 0
+          ? '${session.sessionPrice!.toStringAsFixed(0)} ج.م '
+          : '';
+      // ignore: unnecessary_brace_in_string_interps
+      final base = 'كامل المبلغ ${priceText}سيُخصم من أرباحك ويُعاد إلى محفظة الطالب';
+      String? penalty;
+      if (hoursUntilSession < 1) {
+        penalty = '\nبالإضافة إلى زيادة عمولة المنصة بـ 1% لهذه الدورة';
+      } else if (hoursUntilSession < 3) {
+        penalty = '\nبالإضافة إلى زيادة عمولة المنصة بـ 0.5% لهذه الدورة';
+      }
+      refundPolicy = penalty == null ? base : '$base$penalty';
+      policyColor = AppThemeConstants.error;
+    } else if (hoursUntilSession > 3) {
       refundPolicy = 'سيتم استرداد المبلغ كاملاً إلى محفظتك';
       policyColor = AppThemeConstants.success;
     } else if (hoursUntilSession >= 1) {
@@ -245,9 +386,18 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    // Show loading spinner
-    showDialog(
-      context: context,
+    // Capture before the async gap. The Firestore listener may rebuild this
+    // screen during `cancelSession`, invalidating `context`. Using captured
+    // references and DialogRoute-by-reference dismissal avoids both the
+    // "Cannot pop the last page" GoRouter crash and the "_debugLocked"
+    // navigator assertion seen when popping during a rebuild.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final screenNavigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final loadingRoute = DialogRoute<void>(
+      // ignore: use_build_context_synchronously
+      context: navigator.context,
       barrierDismissible: false,
       builder: (_) => const Center(
         child: Card(
@@ -265,6 +415,13 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         ),
       ),
     );
+    navigator.push(loadingRoute);
+
+    void dismissLoading() {
+      if (loadingRoute.isActive) {
+        navigator.removeRoute(loadingRoute);
+      }
+    }
 
     try {
       final sessionId = session.id;
@@ -272,26 +429,26 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       final role = ref.read(currentUserProvider).value?.role ?? 'student';
       final cancelledBy = role == 'mohaffez' ? 'teacher' : 'student';
       await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId, cancelledBy: cancelledBy);
-      if (mounted) {
-        Navigator.pop(context); // close loading
-        Navigator.pop(context); // close session details
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إلغاء الجلسة بنجاح'),
-            backgroundColor: AppThemeConstants.success,
-          ),
-        );
+      dismissLoading();
+      // Close session details screen — only if it's still in the stack and
+      // we're not popping the last page.
+      if (screenNavigator.canPop()) {
+        screenNavigator.pop();
       }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('تم إلغاء الجلسة بنجاح'),
+          backgroundColor: AppThemeConstants.success,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppThemeConstants.error,
-          ),
-        );
-      }
+      dismissLoading();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
     }
   }
 
@@ -953,13 +1110,54 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       );
     }
 
+    // Student, accepted, started > graceMinutes ago: offer "report teacher
+    // no-show". Grace window prevents premature reports right at start time
+    // (teacher may be 1-2 min late, joining now). Calls onTeacherNoShowReported
+    // which sets teacherNoShow=true and triggers full refund + 1.5%
+    // commission penalty on the teacher.
+    //
+    // Use slotStart (precise start time, e.g. 23:10), not sessionDate which
+    // is the date-only field (midnight). Comparing against sessionDate would
+    // make the button appear from 00:10 AM onward instead of 10 min after
+    // the actual start.
+    final graceMinutes = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.lateSessionGraceMinutes ??
+        10;
+    final startTime = session.slotStart ?? session.sessionDate;
+    if (isStudent &&
+        session.status == 'accepted' &&
+        startTime != null &&
+        DateTime.now().isAfter(
+            startTime.add(Duration(minutes: graceMinutes)))) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _reportTeacherNoShow(session),
+              icon: const Icon(Icons.person_off),
+              label: const Text('إبلاغ عن غياب المعلم واسترداد المبلغ'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.error,
+                foregroundColor: AppThemeConstants.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     // Student: cancel button + refund policy banner
     if (isStudent &&
         session.status == 'accepted' &&
-        session.sessionDate != null &&
-        session.sessionDate!.isAfter(DateTime.now())) {
+        startTime != null &&
+        startTime.isAfter(DateTime.now())) {
       final hoursUntil =
-          session.sessionDate!.difference(DateTime.now()).inHours;
+          startTime.difference(DateTime.now()).inHours;
 
       final String refundPolicy;
       final Color policyColor;

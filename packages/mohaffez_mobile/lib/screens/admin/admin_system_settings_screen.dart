@@ -159,6 +159,24 @@ class _AdminSystemSettingsScreenState
           c.paymentDeadlineHours),
       _numberField(
           'minimumWithdrawAmount', 'حد السحب الأدنى', c.minimumWithdrawAmount),
+      _numberField(
+        'directPaymentDebtThresholdEgp',
+        'الحد الأقصى لمستحقات المنصة قبل حظر الدفع المباشر (ج.م)',
+        c.directPaymentDebtThresholdEgp,
+      ),
+      const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Text(
+          'إذا تجاوزت مستحقات المحفظ هذا المبلغ، لن يتمكن من قبول حجوزات '
+          'دفع مباشر جديدة حتى يسددها. السحب من المحفظة يُحسم منه المبلغ '
+          'المستحق أيضاً.',
+          style: TextStyle(
+            fontSize: 11,
+            color: AppThemeConstants.grey600,
+            height: 1.4,
+          ),
+        ),
+      ),
       _switchTile(
           'freeSessionEnabled', 'تفعيل الجلسات المجانية', c.freeSessionEnabled),
       const Divider(height: 24),

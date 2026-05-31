@@ -33,6 +33,10 @@ enum WalletTxType {
   directSessionCommissionReversal,
   @JsonValue('adjustment')
   adjustment,
+  @JsonValue('commission_rate_change')
+  commissionRateChange,
+  @JsonValue('penalty_applied')
+  penaltyApplied,
 }
 
 @freezed

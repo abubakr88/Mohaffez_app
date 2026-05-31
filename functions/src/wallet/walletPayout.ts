@@ -59,10 +59,46 @@ export const requestPayout = functions.https.onCall(async (data, context) => {
     // Pre-check available balance only — pending (current-cycle) earnings
     // are NOT withdrawable until the bi-weekly settlement runs and moves
     // them into available. This is the "no mid-cycle withdrawals" rule.
-    const walletRef = db.collection('wallets').doc(walletIdForUser(mohaffezId));
-    const walletSnap = await tx.get(walletRef);
+    //
+    // Dues-vs-pending solvency: a teacher whose `available` is short of
+    // their dues can still withdraw if the current cycle's net earnings
+    // (pending − commission) will more than cover the dues at settlement.
+    // The platform recovers the dues either way, so blocking would only
+    // hurt liquidity. Only block when:
+    //   available + pendingNet − dues < requested
+    // (i.e., even after pending settles and pays the dues, the post-
+    // settlement balance can't cover this withdrawal.)
+    const [walletSnap, teacherSnap, cfgSnap] = await Promise.all([
+      tx.get(db.collection('wallets').doc(walletIdForUser(mohaffezId))),
+      tx.get(db.collection('users').doc(mohaffezId)),
+      tx.get(db.collection('systemConfig').doc('global')),
+    ]);
     const balance = (walletSnap.data()?.balancePiastres as number) ?? 0;
     const pending = (walletSnap.data()?.pendingCyclePiastres as number) ?? 0;
+    // `directCommissionOwedPiastres` is ≤ 0 when teacher owes (debt = -dues).
+    const dues = (walletSnap.data()?.directCommissionOwedPiastres as number) ?? 0;
+    const debt = dues < 0 ? -dues : 0;
+
+    // Effective commission rate: per-teacher tier rate + cycle penalty,
+    // falling back to global. Mirrors resolveTeacherRate logic but inlined
+    // because that helper does its own reads outside our transaction.
+    const teacherBase = teacherSnap.data()?.commissionRate;
+    const globalRate = cfgSnap.data()?.commissionRate;
+    const baseRate: number =
+      typeof teacherBase === 'number' && teacherBase >= 0
+        ? teacherBase
+        : typeof globalRate === 'number' && globalRate >= 0
+          ? globalRate
+          : 0.05;
+    const rawPenalty = teacherSnap.data()?.commissionPenaltyPercent;
+    const penaltyPct =
+      typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0
+        ? rawPenalty
+        : 0;
+    const effectiveRate = Math.min(baseRate + penaltyPct / 100, 1.0);
+    const pendingNet = Math.round(pending * (1 - effectiveRate));
+    const projected = balance + pendingNet - debt; // post-settlement net
+
     if (balance < piastres) {
       const pendingNote = pending > 0
         ? ` (لديك ${(pending / 100).toFixed(2)} ج.م قيد التسوية — تُتاح بعد نهاية الدورة الحالية)`
@@ -70,6 +106,16 @@ export const requestPayout = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError(
         'failed-precondition',
         `الرصيد المتاح للسحب ${(balance / 100).toFixed(2)} ج.م${pendingNote}`,
+      );
+    }
+
+    if (debt > 0 && projected < piastres) {
+      const projectedDisplay = (Math.max(projected, 0) / 100).toFixed(2);
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `لديك مستحقات للمنصة (${(debt / 100).toFixed(2)} ج.م) أكبر من ` +
+          `الرصيد المتاح + صافي الدورة الحالية. الحد الأقصى للسحب: ` +
+          `${projectedDisplay} ج.م. يمكنك شحن المحفظة لسداد المستحقات.`,
       );
     }
 
