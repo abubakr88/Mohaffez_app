@@ -273,9 +273,12 @@ class SessionRepository {
       'studentId': studentId,
       'studentName': studentName,
       'mohaffezName': mohaffezName,
-      'slotDate': slotDate.toIso8601String(),
-      'slotStart': slotStart.toIso8601String(),
-      'slotEnd': slotEnd.toIso8601String(),
+      // Always UTC — server parseFlutterDate assumes naive strings are UTC,
+      // so sending local time without `.toUtc()` shifts the stored value by
+      // the device's UTC offset (e.g. +3h in Cairo).
+      'slotDate': slotDate.toUtc().toIso8601String(),
+      'slotStart': slotStart.toUtc().toIso8601String(),
+      'slotEnd': slotEnd.toUtc().toIso8601String(),
       'sessionType': sessionType,
       'preferredTimeSlot': timeSlot,
       ...additionalData,

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../services/paymob_callback_parser.dart';
+
 
 class PaymentWebViewScreen extends ConsumerStatefulWidget {
   const PaymentWebViewScreen({
@@ -96,15 +98,11 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
     );
   }
 
-  bool _isSuccessUrl(String url) {
-    final lower = url.toLowerCase();
-    return lower.contains('success') || lower.contains('completed');
-  }
+  bool _isSuccessUrl(String url) =>
+      parsePaymobCallback(url) == PaymobCallbackResult.success;
 
-  bool _isFailureUrl(String url) {
-    final lower = url.toLowerCase();
-    return lower.contains('fail') || lower.contains('error');
-  }
+  bool _isFailureUrl(String url) =>
+      parsePaymobCallback(url) == PaymobCallbackResult.failure;
 
   String getPaymentStage(int progress) {
     if (progress < 30) return 'الاتصال ببوابة الدفع...';

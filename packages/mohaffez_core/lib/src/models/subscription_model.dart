@@ -59,11 +59,7 @@ extension SubscriptionExtension on SubscriptionModel {
   bool get isDepleted => status == SubscriptionStatus.depleted;
   bool get hasSessionsLeft => remainingSessions > 0;
   
-  // BUG-6 FIX: Check if this is a bundle or subscription
-  bool get isBundleOrSubscription =>
-      planType == PlanType.bundle || planType == PlanType.subscription;
   bool get isBundle => planType == PlanType.bundle;
-  bool get isSubscription => planType == PlanType.subscription;
   
   bool get canBookSession {
     if (!isActive) return false;

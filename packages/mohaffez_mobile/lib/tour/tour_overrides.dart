@@ -4,7 +4,6 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import '../providers/mohaffez_profile_providers.dart';
 import '../providers/quiz_access_provider.dart';
 import '../providers/student_count_provider.dart';
-import '../screens/teacher/mohaffez_commission_screen.dart';
 import '../screens/teacher/mohaffez_student_detail_screen.dart';
 import 'tour_fixtures.dart';
 import 'tour_mode_state.dart';
@@ -25,11 +24,24 @@ List<Override> buildTourOverrides(TourRole role, Object fixture) {
 }
 
 List<Override> _commonOverrides(UserModel user) {
+  final ownerType = user.role == 'mohaffez'
+      ? WalletOwnerType.mohaffez
+      : WalletOwnerType.student;
   return [
     currentUserProvider.overrideWith((ref) => Stream.value(user)),
     isUserSuspendedProvider.overrideWith((ref) => Stream.value(false)),
     unreadNotificationsCountProvider
         .overrideWith((ref, _) => Stream.value(0)),
+    // Wallet system — synthetic UIDs have no real wallet docs in Firestore.
+    // Provide an empty wallet + empty ledger so tour-mode users can navigate
+    // to the wallet screen without triggering PERMISSION_DENIED.
+    walletProvider.overrideWith(
+      (ref, _) => Stream.value(WalletModel.empty(user.uid, ownerType)),
+    ),
+    walletTransactionsProvider
+        .overrideWith((ref, _) => Stream.value(const [])),
+    payoutRequestsProvider
+        .overrideWith((ref, _) => Stream.value(const [])),
   ];
 }
 
@@ -186,8 +198,6 @@ List<Override> _teacherOverrides(DemoTeacherFixture fixture) {
         .overrideWith((ref, _) => Stream.value(fixture.pendingRequests)),
     mohaffezStudentsProvider
         .overrideWith((ref, _) async => _demoStudentSummaries),
-    weeklyCommissionsProvider
-        .overrideWith((ref, _) => Stream.value(const [])),
     // Teacher viewing their own profile page
     mohaffezProfileProvider.overrideWith((ref, _) async => {
       'uid': fixture.user.uid,

@@ -261,13 +261,16 @@ service cloud.firestore {
                     );
 
       // ─── Student cancel rule ───
+      // `accepted` is included so a student can cancel an already-confirmed
+      // booking; the parallel hafizSessions update is gated by its own rule.
       allow update: if isAuthenticated() &&
                     request.auth.uid == resource.data.studentId &&
                     request.resource.data.status == 'cancelled' &&
                     resource.data.status in [
                       'pending',
                       'awaitingpayment',
-                      'awaitingdirectpaymentconfirmation'
+                      'awaitingdirectpaymentconfirmation',
+                      'accepted'
                     ] &&
                     onlyUpdating([
                       'status', 'cancelledAt', 'cancelledBy',
@@ -321,7 +324,16 @@ service cloud.firestore {
            .hasAny(['meeting', 'meetingReminderSent', 'meetingReminderSentAt']))
         ||
         (request.auth.uid == resource.data.studentId &&
-         onlyUpdating(['studentFeedback', 'teacherRating', 'reviewNotes', 'meetingStudentJoinedAt', 'updatedAt']))
+         onlyUpdating(['studentFeedback', 'teacherRating', 'reviewNotes', 'startedLate', 'meetingStudentJoinedAt', 'updatedAt']))
+        ||
+        // Student cancels their own session. Only from 'accepted' (no
+        // re-cancelling, no cancelling completed sessions); status must
+        // transition to 'cancelled' and cancelledBy must be 'student'.
+        (request.auth.uid == resource.data.studentId &&
+         resource.data.status == 'accepted' &&
+         request.resource.data.status == 'cancelled' &&
+         request.resource.data.cancelledBy == 'student' &&
+         onlyUpdating(['status', 'cancelledBy', 'cancelledAt', 'updatedAt']))
         ||
         (isAuthenticated() &&
          onlyUpdating([
@@ -657,6 +669,54 @@ service cloud.firestore {
     match /appVersions/{versionId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // ============================================
+    // WALLET SYSTEM
+    // All mutations go through Cloud Functions (Admin SDK bypasses these
+    // rules). Clients have read-only access to their own data + create-only
+    // access to their own top-up request submissions.
+    // ============================================
+
+    match /wallets/{walletId} {
+      // A user can read their own wallet. Admin can read any wallet.
+      // System wallets (system_*) are admin-only.
+      allow read: if isAdmin() ||
+                     (isAuthenticated() && walletId == request.auth.uid);
+      allow write: if false; // server-only
+    }
+
+    match /walletTransactions/{txId} {
+      // A user can read transactions on their own wallet. Admin reads all.
+      allow read: if isAdmin() ||
+                     (isAuthenticated() && resource.data.walletId == request.auth.uid);
+      allow write: if false; // server-only
+    }
+
+    match /walletTransactionGroups/{groupId} {
+      // Group markers are an internal idempotency mechanism. Admin-only.
+      allow read: if isAdmin();
+      allow write: if false; // server-only
+    }
+
+    match /topUpRequests/{requestId} {
+      // User creates their own pending top-up request (with proof).
+      // The Cloud Function verifies it. Listing own requests = read by owner.
+      allow read: if isAdmin() ||
+                     (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.status == 'pending' &&
+                       request.resource.data.amountEgp is number &&
+                       request.resource.data.amountEgp > 0;
+      allow update, delete: if false; // server-only (verifyWalletTopUp)
+    }
+
+    match /payoutRequests/{requestId} {
+      // Teacher reads their own. Admin reads all.
+      allow read: if isAdmin() ||
+                     (isAuthenticated() && resource.data.mohaffezId == request.auth.uid);
+      allow write: if false; // server-only (requestPayout / startPayout / completePayout / failPayout)
     }
 
     // ============================================

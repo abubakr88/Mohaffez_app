@@ -1,9 +1,9 @@
 // ============================================================
-// PAYMOB GATEWAY — DISABLED
-// To re-enable:
-//   1. Set PAYMOB_ENABLED = true in this file
-//   2. Uncomment the export in src/index.ts
-//   3. Set PAYMOB_HMAC_SECRET in Firebase environment config
+// PAYMOB GATEWAY
+// Runtime kill-switch: systemConfig/global.paymobEnabled (Firestore).
+// Admin can flip it from the web admin panel without redeploying.
+// PAYMOB_HMAC_SECRET must still be set in Firebase environment config
+// for HMAC verification to succeed.
 // ============================================================
 // Required Firestore index: payments collection on (idempotencyKey, status)
 import * as functions from 'firebase-functions';
@@ -19,7 +19,15 @@ import {
 } from '../types/payment.types';
 import { PaymentEventType } from '../types/events.types';
 
-const PAYMOB_ENABLED = false;
+async function isPaymobEnabled(): Promise<boolean> {
+  try {
+    const snap = await db.collection('systemConfig').doc('global').get();
+    return snap.exists && snap.data()?.paymobEnabled === true;
+  } catch (err) {
+    functions.logger.error('Failed to read paymobEnabled flag', { err });
+    return false;
+  }
+}
 
 interface PaymobObject {
   id: number;
@@ -44,7 +52,7 @@ interface PaymentLockResult {
   payment: PaymentDocument;
 }
 
-const createEnabledPaymobWebhook = () => {
+const buildPaymobWebhook = () => {
   const eventStore = new EventStore();
   const notificationService = new NotificationService();
   const orchestrationService = new PaymentOrchestrationService(
@@ -54,6 +62,11 @@ const createEnabledPaymobWebhook = () => {
 
   return functions.https.onRequest(async (req, res) => {
     try {
+      if (!(await isPaymobEnabled())) {
+        res.status(503).send('Paymob gateway is disabled');
+        return;
+      }
+
       if (req.method !== 'POST') {
         res.status(405).send('Method not allowed');
         return;
@@ -173,14 +186,7 @@ const createEnabledPaymobWebhook = () => {
   });
 };
 
-const createDisabledPaymobWebhook = () =>
-  functions.https.onRequest((_req, res) => {
-    res.status(503).send('Paymob gateway is disabled');
-  });
-
-export const paymobWebhook = PAYMOB_ENABLED
-  ? createEnabledPaymobWebhook()
-  : createDisabledPaymobWebhook();
+export const paymobWebhook = buildPaymobWebhook();
 
 async function lockPaymentForProcessing(
   paymentId: string,

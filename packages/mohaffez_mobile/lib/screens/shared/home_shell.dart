@@ -707,9 +707,6 @@ Widget _buildDrawer(
                 _drawerTile(context, title: 'أحداث الدفع',
                     icon: Icons.payment_rounded, route: 'admin/payment-events',
                     color: _ShellDS.teal600),
-                _drawerTile(context, title: 'العمولات',
-                    icon: Icons.analytics_rounded, route: 'admin/commissions',
-                    color: _ShellDS.teal500),
                 _drawerTile(context, title: 'الإشعارات الجماعية',
                     icon: Icons.campaign_rounded, route: 'admin/broadcast',
                     color: AppThemeConstants.warning),
@@ -720,9 +717,6 @@ Widget _buildDrawer(
                   _drawerTile(context, title: 'وضع المطوّر',
                       icon: Icons.bug_report_rounded, route: 'admin/dev-mode',
                       color: AppThemeConstants.error),
-                _drawerTile(context, title: 'عمولات المحفظين',
-                    icon: Icons.account_balance_rounded,
-                    route: 'admin/teacher-commissions', color: _ShellDS.teal600),
                 _drawerTile(context, title: 'أرقام محافظ المنصة',
                     icon: Icons.account_balance_wallet_rounded,
                     route: 'admin/wallet-numbers', color: _ShellDS.teal500),
@@ -751,6 +745,11 @@ Widget _buildDrawer(
                 _drawerTile(context, title: 'تأكيد المدفوعات',
                     icon: Icons.payments_rounded, route: 'direct-payment-confirmations',
                     color: AppThemeConstants.warning),
+                _drawerTileWithUid(context, title: 'الجلسات المنتهية',
+                    icon: Icons.history_rounded,
+                    route: '/completed-sessions',
+                    uid: user.uid,
+                    color: _ShellDS.teal500),
               ],
 
               // ── Student extras ────────────────────────────────────────────
@@ -964,6 +963,42 @@ Widget _drawerTile(
     onTap: () {
       context.pop();
       context.go('/$route');
+    },
+  );
+}
+
+// Variant of _drawerTile for routes that need a query parameter (e.g.
+// /completed-sessions requires ?mohaffezId=$uid). Pass the full route path
+// with leading slash and the uid to append as `mohaffezId`.
+Widget _drawerTileWithUid(
+  BuildContext context, {
+  required String title,
+  required IconData icon,
+  required String route,
+  required String uid,
+  Color? color,
+}) {
+  final c = color ?? AppThemeConstants.textSecondary;
+  return ListTile(
+    dense: true,
+    leading: Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, size: 20, color: c),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+          fontSize: 14, fontWeight: FontWeight.w500, color: AppThemeConstants.textPrimary),
+    ),
+    trailing: const Icon(Icons.arrow_back_ios_new_rounded,
+        size: 13, color: AppThemeConstants.textMuted),
+    onTap: () {
+      context.pop();
+      context.push('$route?mohaffezId=$uid');
     },
   );
 }

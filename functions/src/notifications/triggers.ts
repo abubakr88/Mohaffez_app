@@ -3,6 +3,7 @@ import { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import { SessionEventStore } from '../services/SessionEventStore';
 import { SessionRequestEventType, SessionEventType } from '../types/events.types';
+import { recomputeForTeacherById } from '../payments/recomputeTeacherTiers';
 
 type RequestDoc = Record<string, unknown>;
 
@@ -401,6 +402,16 @@ export const onSessionCompleted = functions.firestore
 
     // Only send notifications when status becomes 'completed'
     if (afterStatus !== 'completed') return;
+
+    // ── Refresh this teacher's commission tier in real-time ──────────
+    // The bi-weekly cron (`recomputeTeacherTiers`) still owns the global
+    // schedule, but waiting two weeks to reflect a freshly-completed
+    // session is bad UX — the teacher's home card stays at the old count.
+    // This call updates `users/{mohaffezId}.tierStats` immediately. Errors
+    // are swallowed inside the helper so they can't break notification flow.
+    if (mohaffezId) {
+      await recomputeForTeacherById(mohaffezId);
+    }
 
     // ── Increment student completed-session counter ──────────────────
     if (studentId) {

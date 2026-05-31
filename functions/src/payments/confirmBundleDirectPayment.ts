@@ -24,11 +24,13 @@ import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import {
-  getWeekNumber,
-  getWeekStart,
-  getWeekEnd,
-  getNextMonday,
-} from '../utils/dateHelpers';
+  prepareLedgerEntry,
+  commitLedgerEntry,
+  LedgerPrep,
+  egpToPiastres,
+  walletIdForUser,
+  SYSTEM_WALLETS,
+} from '../wallet/walletUtils';
 
 class AlreadyConfirmedError extends Error {
   constructor(public readonly existingSubscriptionId: string) {
@@ -225,10 +227,48 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           );
         }
 
-        // 9a. Read system config for maxActiveSubscriptions + commissionRate
+        // 9a. Read system config + effective commission rate.
+        // Effective rate = tier rate + accumulated cycle penalty (capped at 100%).
+        // Bundle commission must be consistent with single-session commission.
         const PER_SESSION_TYPE_LIMIT = 1; // one active bundle per studentId+mohaffezId+sessionType
-        const configSnap = await transaction.get(db.collection('systemConfig').doc('global'));
-        const commissionRate: number = (configSnap.data()?.commissionRate as number) ?? 0.05;
+        const [configSnap, teacherSnap, teacherWalletSnap] = await Promise.all([
+          transaction.get(db.collection('systemConfig').doc('global')),
+          transaction.get(db.collection('users').doc(mohaffezId as string)),
+          transaction.get(db.collection('wallets').doc(walletIdForUser(mohaffezId as string))),
+        ]);
+
+        // Direct-payment debt cap: a teacher who already owes the platform
+        // more than the configured threshold cannot accept new direct-payment
+        // bundles. Same rule as single-session direct payment.
+        const duesPiastres =
+          (teacherWalletSnap.data()?.directCommissionOwedPiastres as number) ?? 0;
+        const debtPiastres = duesPiastres < 0 ? -duesPiastres : 0;
+        const thresholdEgp =
+          (configSnap.data()?.directPaymentDebtThresholdEgp as number) ?? 500;
+        const thresholdPiastres = egpToPiastres(thresholdEgp);
+        if (debtPiastres > thresholdPiastres) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
+              `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
+              `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+          );
+        }
+
+        const teacherBase = teacherSnap.data()?.commissionRate;
+        const globalRate = configSnap.data()?.commissionRate;
+        const baseRate: number =
+          typeof teacherBase === 'number' && teacherBase >= 0
+            ? teacherBase
+            : typeof globalRate === 'number' && globalRate >= 0
+              ? globalRate
+              : 0.05;
+        const rawPenalty = teacherSnap.data()?.commissionPenaltyPercent;
+        const penaltyPct =
+          typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0
+            ? rawPenalty
+            : 0;
+        const commissionRate = Math.min(baseRate + penaltyPct / 100, 1.0);
 
         // 9b. FIX-3: Resolve sessionType with explicit priority order
         const resolvedSessionType: string = (() => {
@@ -290,14 +330,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         // 9d. Compute expiry
         const now = new Date();
 
-        // Pre-read commission summary BEFORE any writes (Firestore transaction rule)
-        const commissionDateObj = slotDateTs ? slotDateTs.toDate() : now;
-        const weekNum = getWeekNumber(commissionDateObj);
-        const commissionYear = commissionDateObj.getFullYear();
         const commissionAmount = (dp.amount as number) * commissionRate;
-        const summaryId = `${mohaffezId}_${commissionYear}_w${weekNum}`;
-        const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
-        const summarySnap = await transaction.get(summaryRef);
         const expiryDate =
           validityDays !== null
             ? admin.firestore.Timestamp.fromDate(
@@ -324,6 +357,40 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         const initialRemaining = isSlotCoupled
           ? sessionsCount - 1
           : sessionsCount;
+
+        // Pre-read wallet state for the commission ledger entry before any
+        // writes. Firestore transactions require all reads before all writes.
+        const commissionPiastres = commissionAmount > 0 ? egpToPiastres(commissionAmount) : 0;
+        let ledgerPrep: LedgerPrep | null = null;
+        if (commissionAmount > 0) {
+          ledgerPrep = await prepareLedgerEntry(transaction, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -commissionPiastres,
+                target: 'dues',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: commissionPiastres,
+              },
+            ],
+            reason: `Direct bundle commission — rate ${commissionRate}`,
+            groupId: `direct_commission_bundle_${dp.id as string}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId: dp.id,
+              planType,
+              sessionsCount,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
+          });
+        }
 
         // 9g. Write subscription
         const initialStatus = initialRemaining > 0 ? 'active' : 'depleted';
@@ -450,32 +517,35 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 9i-commission. Write bundle commission to weeklyCommissionSummaries.
-        // summarySnap was pre-read above (before writes) to satisfy Firestore transaction ordering.
-        if (summarySnap.exists) {
-          transaction.update(summaryRef, {
-            totalSessions:    FieldValue.increment(1),
-            totalRevenue:     FieldValue.increment(dp.amount as number),
-            commissionAmount: FieldValue.increment(commissionAmount),
-            updatedAt:        FieldValue.serverTimestamp(),
-          });
-        } else {
-          transaction.set(summaryRef, {
-            mohaffezId,
-            mohaffezName:    dp.mohaffezName,
-            weekNumber:      weekNum,
-            year:            commissionYear,
-            totalSessions:   1,
-            totalRevenue:    dp.amount,
-            commissionAmount,
-            commissionRate,
-            status:          'pending',
-            weekStart:       admin.firestore.Timestamp.fromDate(getWeekStart(commissionDateObj)),
-            weekEnd:         admin.firestore.Timestamp.fromDate(getWeekEnd(commissionDateObj)),
-            dueDate:         admin.firestore.Timestamp.fromDate(getNextMonday(commissionDateObj)),
-            createdAt:       FieldValue.serverTimestamp(),
-            updatedAt:       FieldValue.serverTimestamp(),
-          });
+        // 9i-commission. Commit the commission ledger entry (reads were done before writes above).
+        if (ledgerPrep !== null) {
+          commitLedgerEntry(transaction, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -commissionPiastres,
+                target: 'dues',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: commissionPiastres,
+              },
+            ],
+            reason: `Direct bundle commission — rate ${commissionRate}`,
+            groupId: `direct_commission_bundle_${dp.id as string}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId: dp.id,
+              planType,
+              sessionsCount,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
+          }, ledgerPrep);
         }
 
         // FIX double-write-2: DELETED step 9j - it was updating the same

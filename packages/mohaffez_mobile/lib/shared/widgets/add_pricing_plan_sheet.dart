@@ -18,13 +18,27 @@ class AddPricingPlanSheet extends ConsumerStatefulWidget {
   ConsumerState<AddPricingPlanSheet> createState() => _AddPricingPlanSheetState();
 }
 
+// Paymob gateway fee constants (Egypt). Confirmed with the user:
+//   gatewayFee  = price * 2.75% + 3 EGP
+//   VAT         = gatewayFee * 14%
+//   paymobTotal = gatewayFee + VAT = gatewayFee * 1.14
+const double _kPaymobPercent = 0.0275;
+const double _kPaymobFlat = 3.0;
+const double _kVatRate = 0.14;
+const double _kDefaultCommission = 0.05; // fallback when systemConfig is null
+
 class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   final _formKey = GlobalKey<FormState>();
-  
+
   late TextEditingController _titleController;
   late TextEditingController _priceController;
+  late TextEditingController _netController;
   late TextEditingController _descriptionController;
-  
+
+  // Reentrancy guards so price↔net auto-sync doesn't loop.
+  bool _syncingFromPrice = false;
+  bool _syncingFromNet = false;
+
   PlanType _selectedType = PlanType.single;
   SessionMode _selectedMode = SessionMode.online;
   int _sessionsCount = 1;
@@ -36,13 +50,14 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   void initState() {
     super.initState();
     final plan = widget.existingPlan;
-    
+
     _titleController = TextEditingController(text: plan?.title ?? '');
     _priceController = TextEditingController(
       text: plan?.priceEGP.toString() ?? '',
     );
+    _netController = TextEditingController();
     _descriptionController = TextEditingController(text: plan?.description ?? '');
-    
+
     if (plan != null) {
       _selectedType = plan.type;
       _selectedMode = plan.mode ?? SessionMode.online;
@@ -51,6 +66,88 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       _sessionsPerWeek = plan.sessionsPerWeek;
       _isFreeTrialAvailable = plan.isFreeTrialAvailable;
     }
+
+    _priceController.addListener(_onPriceChanged);
+    _netController.addListener(_onNetChanged);
+
+    // Pre-fill net field from existing price on edit.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onPriceChanged());
+  }
+
+  /// Effective rate for this teacher: per-teacher rate (set by the
+  /// scheduled tier recompute) wins over the global rate. Falls back to
+  /// the hardcoded default while either source is still loading.
+  double get _commissionRate {
+    final teacherInfo = ref
+        .read(teacherCommissionInfoProvider(widget.mohaffezId))
+        .valueOrNull;
+    final global =
+        ref.read(systemConfigProvider).valueOrNull?.commissionRate;
+    if (teacherInfo != null && global != null) {
+      return teacherInfo.effectiveRate(global);
+    }
+    return teacherInfo?.rate ?? global ?? _kDefaultCommission;
+  }
+
+  void _onPriceChanged() {
+    if (_syncingFromNet) return;
+    _syncingFromPrice = true;
+    final price = double.tryParse(_priceController.text);
+    if (price == null || price <= 0) {
+      _netController.text = '';
+    } else {
+      final breakdown = _calcFromPrice(price, _commissionRate);
+      _netController.text = breakdown.net <= 0
+          ? '0'
+          : breakdown.net.toStringAsFixed(2);
+    }
+    _syncingFromPrice = false;
+    if (mounted) setState(() {}); // refresh breakdown card
+  }
+
+  void _onNetChanged() {
+    if (_syncingFromPrice) return;
+    _syncingFromNet = true;
+    final net = double.tryParse(_netController.text);
+    if (net == null || net <= 0) {
+      _priceController.text = '';
+    } else {
+      // price = (net + flat * (1+vat)) / (1 - pct*(1+vat) - commission)
+      final denom = 1 - _kPaymobPercent * (1 + _kVatRate) - _commissionRate;
+      if (denom > 0) {
+        final price = (net + _kPaymobFlat * (1 + _kVatRate)) / denom;
+        _priceController.text = price.toStringAsFixed(2);
+      }
+    }
+    _syncingFromNet = false;
+    if (mounted) setState(() {});
+  }
+
+  /// Pretty-print a 0–1 rate as a percent string, dropping trailing
+  /// zeros so 0.05 → "5%", 0.1122 → "11.22%", 0.1 → "10%".
+  String _formatPercent(double rate) {
+    final pct = rate * 100;
+    var s = pct.toStringAsFixed(2);
+    if (s.contains('.')) {
+      s = s.replaceFirst(RegExp(r'0+$'), '');
+      s = s.replaceFirst(RegExp(r'\.$'), '');
+    }
+    return '$s%';
+  }
+
+  _PriceBreakdown _calcFromPrice(double price, double commissionRate) {
+    final gatewayFee = price * _kPaymobPercent + _kPaymobFlat;
+    final vat = gatewayFee * _kVatRate;
+    final paymobTotal = gatewayFee + vat;
+    final commission = price * commissionRate;
+    final net = price - paymobTotal - commission;
+    return _PriceBreakdown(
+      price: price,
+      gatewayFee: gatewayFee,
+      vat: vat,
+      commission: commission,
+      net: net,
+    );
   }
 
   @override
@@ -101,10 +198,9 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                       value: PlanType.bundle,
                       child: Text('باقة جلسات'),
                     ),
-                    DropdownMenuItem(
-                      value: PlanType.subscription,
-                      child: Text('اشتراك شهري'),
-                    ),
+                    // PlanType.subscription intentionally omitted from the
+                    // picker: same outcome achievable via bundles. The enum
+                    // value stays for backward-compat with existing docs.
                   ],
                   onChanged: (val) {
                     setState(() {
@@ -193,56 +289,50 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   const SizedBox(height: 16),
                 ],
                 
-                // Subscription specific fields
-                if (_selectedType == PlanType.subscription) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: _sessionsPerWeek?.toString() ?? '2',
-                          decoration: const InputDecoration(
-                            labelText: 'جلسات في الأسبوع',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.calendar_today),
-                          ),
-                          keyboardType: TextInputType.number,
-                          onChanged: (val) => _sessionsPerWeek = int.tryParse(val),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: _validityDays?.toString() ?? '30',
-                          decoration: const InputDecoration(
-                            labelText: 'صالح لـ (أيام)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.schedule),
-                          ),
-                          keyboardType: TextInputType.number,
-                          onChanged: (val) => _validityDays = int.tryParse(val),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                
                 // Price
-                TextFormField(
-                  controller: _priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'السعر (جنيه مصري)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.payments),
-                    suffixText: 'ج.م',
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (val) {
-                    if (val == null || val.isEmpty) return 'الرجاء إدخال السعر';
-                    if (double.tryParse(val) == null) return 'الرجاء إدخال رقم صحيح';
-                    return null;
-                  },
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _priceController,
+                        decoration: const InputDecoration(
+                          labelText: 'السعر للطالب',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.payments),
+                          suffixText: 'ج.م',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        validator: (val) {
+                          if (val == null || val.isEmpty) {
+                            return 'الرجاء إدخال السعر';
+                          }
+                          if (double.tryParse(val) == null) {
+                            return 'رقم غير صحيح';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _netController,
+                        decoration: const InputDecoration(
+                          labelText: 'ما ستستلمه',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.account_balance_wallet),
+                          suffixText: 'ج.م',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 12),
+                _buildBreakdownCard(),
                 const SizedBox(height: 16),
                 
                 // Description (optional)
@@ -306,12 +396,6 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       case PlanType.bundle:
         _sessionsCount = 5;
         _titleController.text = 'باقة 5 جلسات';
-        break;
-      case PlanType.subscription:
-        _sessionsCount = 8; // 2 sessions/week * 4 weeks
-        _sessionsPerWeek = 2;
-        _validityDays = 30;
-        _titleController.text = 'اشتراك شهري';
         break;
     }
   }
@@ -429,9 +513,184 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
 
   @override
   void dispose() {
+    _priceController.removeListener(_onPriceChanged);
+    _netController.removeListener(_onNetChanged);
     _titleController.dispose();
     _priceController.dispose();
+    _netController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
+
+  Widget _buildBreakdownCard() {
+    final price = double.tryParse(_priceController.text);
+    if (price == null || price <= 0) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.grey100,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppThemeConstants.grey300),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.calculate_outlined,
+                size: 20, color: AppThemeConstants.grey600),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'أدخل السعر أو ما تريد استلامه لرؤية تفاصيل الخصومات',
+                style: TextStyle(
+                    fontSize: 13, color: AppThemeConstants.grey700),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final b = _calcFromPrice(price, _commissionRate);
+    final isBundle = _selectedType == PlanType.bundle && _sessionsCount > 1;
+    final perSession = isBundle ? (b.net / _sessionsCount) : null;
+    final isNegative = b.net <= 0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isNegative
+            ? AppThemeConstants.error.withValues(alpha: 0.08)
+            : AppThemeConstants.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isNegative
+              ? AppThemeConstants.error
+              : AppThemeConstants.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long,
+                  size: 18, color: AppThemeConstants.primary),
+              const SizedBox(width: 6),
+              Text(
+                'تفاصيل الحساب',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppThemeConstants.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _breakdownRow('السعر للطالب', b.price, isPositive: true),
+          _breakdownRow('رسوم بوابة الدفع (2.75% + 3 ج.م)', -b.gatewayFee),
+          _breakdownRow('ضريبة قيمة مضافة 14%', -b.vat),
+          _breakdownRow(
+              'عمولة التطبيق (${_formatPercent(_commissionRate)})',
+              -b.commission),
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'صافي ما ستستلمه',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+              Text(
+                '${b.net.toStringAsFixed(2)} ج.م',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: isNegative
+                      ? AppThemeConstants.error
+                      : AppThemeConstants.success,
+                ),
+              ),
+            ],
+          ),
+          if (isBundle && perSession != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'تستلم تقريباً ${perSession.toStringAsFixed(2)} ج.م لكل جلسة '
+              '($_sessionsCount جلسات)',
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppThemeConstants.grey700,
+              ),
+            ),
+          ],
+          if (isNegative) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    color: AppThemeConstants.error, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'السعر منخفض جداً — الرسوم والعمولة أكبر من المبلغ.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppThemeConstants.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _breakdownRow(String label, double amount, {bool isPositive = false}) {
+    final sign = amount < 0 ? '−' : (isPositive ? '' : '+');
+    final abs = amount.abs();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '$sign ${abs.toStringAsFixed(2)} ج.م',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isPositive
+                  ? AppThemeConstants.textPrimary
+                  : AppThemeConstants.grey700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceBreakdown {
+  final double price;
+  final double gatewayFee;
+  final double vat;
+  final double commission;
+  final double net;
+
+  const _PriceBreakdown({
+    required this.price,
+    required this.gatewayFee,
+    required this.vat,
+    required this.commission,
+    required this.net,
+  });
 }

@@ -12,8 +12,6 @@ class BundleStripCard extends StatelessWidget {
     switch (type) {
       case PlanType.bundle:
         return 'باقة حلقات';
-      case PlanType.subscription:
-        return 'اشتراك شهري';
       case PlanType.single:
         return 'جلسة مفردة';
     }

@@ -3,13 +3,15 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
+import { parseFlutterDate } from '../utils/dateHelpers';
 import {
-  getWeekNumber,
-  getWeekStart,
-  getWeekEnd,
-  getNextMonday,
-  parseFlutterDate,
-} from '../utils/dateHelpers';
+  prepareLedgerEntry,
+  commitLedgerEntry,
+  LedgerPrep,
+  egpToPiastres,
+  walletIdForUser,
+  SYSTEM_WALLETS,
+} from '../wallet/walletUtils';
 
 const STATUS = {
   PENDING: 'pending',
@@ -109,8 +111,46 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         );
       }
 
-      const configSnap = await tx.get(db.collection('systemConfig').doc('global'));
-      const commissionRate: number = (configSnap.data()?.commissionRate as number) ?? 0.05;
+      // Effective rate = teacher tier rate + accumulated cycle penalty (capped at 100%).
+      // Locked in here so confirmation can't drift to a different number later.
+      // Also load teacher wallet to enforce the direct-payment debt cap — a
+      // teacher who already owes the platform > threshold can't accept new
+      // direct-payment bookings until they pay it down.
+      const [configSnap, teacherSnap, teacherWalletSnap] = await Promise.all([
+        tx.get(db.collection('systemConfig').doc('global')),
+        tx.get(db.collection('users').doc(mohaffezId as string)),
+        tx.get(db.collection('wallets').doc(walletIdForUser(mohaffezId as string))),
+      ]);
+
+      const duesPiastres =
+        (teacherWalletSnap.data()?.directCommissionOwedPiastres as number) ?? 0;
+      const debtPiastres = duesPiastres < 0 ? -duesPiastres : 0;
+      const thresholdEgp =
+        (configSnap.data()?.directPaymentDebtThresholdEgp as number) ?? 500;
+      const thresholdPiastres = egpToPiastres(thresholdEgp);
+      if (debtPiastres > thresholdPiastres) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
+            `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
+            `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+        );
+      }
+
+      const teacherBase = teacherSnap.data()?.commissionRate;
+      const globalRate = configSnap.data()?.commissionRate;
+      const baseRate: number =
+        typeof teacherBase === 'number' && teacherBase >= 0
+          ? teacherBase
+          : typeof globalRate === 'number' && globalRate >= 0
+            ? globalRate
+            : 0.05;
+      const rawPenalty = teacherSnap.data()?.commissionPenaltyPercent;
+      const penaltyPct =
+        typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0
+          ? rawPenalty
+          : 0;
+      const commissionRate = Math.min(baseRate + penaltyPct / 100, 1.0);
 
       const parsedSlotDate  = parseFlutterDate(slotDate  as string);
       const parsedSlotStart = parseFlutterDate(slotStart as string);
@@ -370,8 +410,15 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           );
         }
 
-        const configSnap = await tx.get(db.collection('systemConfig').doc('global'));
-        const commissionRate: number = (configSnap.data()?.commissionRate as number) ?? 0.05;
+        // Trust the rate that was locked in at studentMarkedDirectPayment time
+        // (resolved from the teacher's tier + penalty). Falling back to the global
+        // rate here would silently undercharge teachers on tiers above the legacy 10%.
+        const lockedInRate = dp.commissionRate;
+        const lockedInAmount = dp.commissionAmount;
+        const commissionRate: number =
+          typeof lockedInRate === 'number' && isFinite(lockedInRate) && lockedInRate >= 0
+            ? lockedInRate
+            : 0.05;
 
         // ✅ FIX Bug1: instanceof guard before .toDate() — prevents TypeError → INTERNAL
         if (!(dp.sessionDate instanceof admin.firestore.Timestamp)) {
@@ -380,20 +427,53 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
             'directPaymentRequests doc has invalid or missing sessionDate.'
           );
         }
-        const sessionDate   = dp.sessionDate as admin.firestore.Timestamp;
-        const sessionDateObj = sessionDate.toDate(); // ✅ safe
+        const sessionDate = dp.sessionDate as admin.firestore.Timestamp;
 
-        const weekNumber  = getWeekNumber(sessionDateObj);
-        const year        = sessionDateObj.getFullYear();
-        const summaryId = `${mohaffezId}_${year}_w${weekNumber}`;
-        const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
-        const summarySnap = await tx.get(summaryRef);
+        // Compute commission before writes so we can pre-read wallet state.
+        const commissionAmount =
+          typeof lockedInAmount === 'number' && isFinite(lockedInAmount) && lockedInAmount >= 0
+            ? lockedInAmount
+            : (dp.amount as number) * commissionRate;
 
-        // ── WRITES ──
+        // Create session ref (generates ID only — no read).
         const sessionRef = db.collection('hafizSessions').doc();
         const slotStart  = dp.slotStart as admin.firestore.Timestamp;
         const slotEnd    = dp.slotEnd   as admin.firestore.Timestamp;
 
+        // Pre-read wallet state for the commission ledger entry before any
+        // writes. Firestore transactions require all reads before all writes.
+        let ledgerPrep: LedgerPrep | null = null;
+        if (commissionAmount > 0) {
+          const commissionPiastres = egpToPiastres(commissionAmount);
+          ledgerPrep = await prepareLedgerEntry(tx, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -commissionPiastres,
+                target: 'dues',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: commissionPiastres,
+              },
+            ],
+            reason: `Direct session commission — rate ${commissionRate}`,
+            relatedSessionId: sessionRef.id,
+            groupId: `direct_commission_${directPaymentRequestId}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
+          });
+        }
+
+        // ── WRITES ──
         tx.set(sessionRef, {
           requestId:           (dp.sessionRequestId as string | null) ?? null,
           mohaffezId,
@@ -440,35 +520,34 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           updatedAt:                 FieldValue.serverTimestamp(),
         });
 
-        const commissionAmount = (dp.amount as number) * commissionRate;
-        const weekStart = getWeekStart(sessionDateObj);
-        const weekEnd   = getWeekEnd(sessionDateObj);
-        const dueDate   = getNextMonday(sessionDateObj);
-
-        if (summarySnap.exists) {
-          tx.update(summaryRef, {
-            totalSessions:   FieldValue.increment(1),
-            totalRevenue:    FieldValue.increment(dp.amount as number),
-            commissionAmount: FieldValue.increment(commissionAmount),
-            updatedAt:       FieldValue.serverTimestamp(),
-          });
-        } else {
-          tx.set(summaryRef, {
-            mohaffezId,
-            mohaffezName:    dp.mohaffezName,
-            weekNumber,
-            year,
-            totalSessions:   1,
-            totalRevenue:    dp.amount,
-            commissionAmount,
-            commissionRate,
-            status:          'pending',
-            weekStart:       admin.firestore.Timestamp.fromDate(weekStart),
-            weekEnd:         admin.firestore.Timestamp.fromDate(weekEnd),
-            dueDate:         admin.firestore.Timestamp.fromDate(dueDate),
-            createdAt:       FieldValue.serverTimestamp(),
-            updatedAt:       FieldValue.serverTimestamp(),
-          });
+        // Commit the commission ledger entry (reads were done before writes above).
+        if (ledgerPrep !== null) {
+          commitLedgerEntry(tx, {
+            type: 'direct_session_commission',
+            legs: [
+              {
+                walletId: walletIdForUser(mohaffezId),
+                ownerType: 'mohaffez',
+                amountPiastres: -egpToPiastres(commissionAmount),
+                target: 'dues',
+              },
+              {
+                walletId: SYSTEM_WALLETS.revenue,
+                ownerType: 'system',
+                amountPiastres: egpToPiastres(commissionAmount),
+              },
+            ],
+            reason: `Direct session commission — rate ${commissionRate}`,
+            relatedSessionId: sessionRef.id,
+            groupId: `direct_commission_${directPaymentRequestId}`,
+            createdBy: 'system',
+            metadata: {
+              directPaymentRequestId,
+              sessionAmountEgp: dp.amount,
+              commissionRate,
+              commissionEgp: commissionAmount,
+            },
+          }, ledgerPrep);
         }
 
         const notifRef = db.collection('notifications').doc();

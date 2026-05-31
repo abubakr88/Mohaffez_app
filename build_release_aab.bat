@@ -41,7 +41,7 @@ if %ERRORLEVEL% neq 0 (
 
 echo.
 echo [2/3] Building release App Bundle...
-call flutter build appbundle --dart-define-from-file="%REPO_ROOT%.env" --release
+call flutter build appbundle --flavor prod -t lib/main.dart --dart-define-from-file="%REPO_ROOT%.env" --release
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Build failed. Check the output above.
     pause
@@ -52,7 +52,7 @@ echo.
 echo [3/3] Done!
 echo.
 echo ============================================================
-echo   Output: packages\mohaffez_mobile\build\app\outputs\bundle\release\app-release.aab
+echo   Output: packages\mohaffez_mobile\build\app\outputs\bundle\prodRelease\app-prod-release.aab
 echo   Upload this file to Google Play Console.
 echo ============================================================
 echo.

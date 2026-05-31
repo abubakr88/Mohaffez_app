@@ -3,6 +3,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/widgets/offline_banner.dart';
 import '../../tour/widgets/tour_role_chooser_sheet.dart';
@@ -149,12 +150,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               colors: _LoginTheme.tealGradient,
             ),
           ),
-        ),
-
-        // ── Islamic Geometric Pattern (Subtle) ──────────────
-        CustomPaint(
-          size: Size.infinite,
-          painter: _IslamicPatternPainter(),
         ),
 
         const OfflineBanner(),
@@ -522,6 +517,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ),
             ),
+
+            const SizedBox(height: 8),
+
+            // ── Privacy Policy ────────────────────────────
+            const Center(
+              child: _PrivacyPolicyLink(),
+            ),
           ],
         ),
       ),
@@ -601,47 +603,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 }
 
-// ============================================================
-// ISLAMIC GEOMETRIC PATTERN PAINTER
-// ============================================================
-class _IslamicPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppThemeConstants.surface.withValues(alpha: 0.07)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-
-    const spacing = 64.0;
-    bool rowOffset = false;
-
-    for (double y = spacing * 0.5; y < size.height + spacing; y += spacing) {
-      final xStart = rowOffset ? spacing * 0.5 : 0.0;
-      for (double x = xStart; x < size.width + spacing; x += spacing) {
-        _drawCrescent(canvas, Offset(x, y), 12, paint);
-      }
-      rowOffset = !rowOffset;
-    }
-  }
-
-  void _drawCrescent(Canvas canvas, Offset center, double r, Paint paint) {
-    final path = Path();
-    // Outer arc: full circle
-    path.addArc(
-      Rect.fromCircle(center: center, radius: r),
-      3.14159 * 0.25,   // start at ~bottom-left
-      3.14159 * 1.5,    // sweep 270° (leaving right side open)
-    );
-    // Inner arc: offset circle that creates the crescent cutout
-    final innerCenter = Offset(center.dx + r * 0.35, center.dy);
-    path.addArc(
-      Rect.fromCircle(center: innerCenter, radius: r * 0.78),
-      3.14159 * 1.25,
-      -3.14159 * 1.5,
-    );
-    canvas.drawPath(path, paint);
-  }
+class _PrivacyPolicyLink extends StatelessWidget {
+  const _PrivacyPolicyLink();
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => launchUrl(
+        Uri.parse('https://mohafezy.com/privacy'),
+        mode: LaunchMode.externalApplication,
+      ),
+      child: const Text(
+        'سياسة الخصوصية',
+        style: TextStyle(
+          fontSize: 12,
+          color: _LoginTheme.textMuted,
+          decoration: TextDecoration.underline,
+          decorationColor: _LoginTheme.textMuted,
+        ),
+      ),
+    );
+  }
 }

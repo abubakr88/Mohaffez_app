@@ -12,6 +12,7 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
     final snapshot = await firestore
         .collection('users')
         .where('role', isEqualTo: 'mohaffez')
+        .where('status', isEqualTo: 'active')
         .where('addressLat', isNotEqualTo: null)
         .limit(50) // حد أقصى للنتائج
         .get()
