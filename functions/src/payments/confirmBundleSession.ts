@@ -2,13 +2,11 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { db, FieldValue } from '../utils/admin';
-import { getWeekNumber, getWeekStart, getWeekEnd, getNextMonday, parseFlutterDate } from '../utils/dateHelpers';
+import { db } from '../utils/admin';
+import { parseFlutterDate } from '../utils/dateHelpers';
 import { consumeSubscriptionAndCreateSession, SlotInfo } from './handlers';
 import { createAndSendNotification } from '../utils/notificationHelpers';
 import { PaymentDocument } from '../types/payment.types';
-
-const COMMISSION_RATE = 0.05;
 
 const STATUS = {
   PENDING: 'pending',
@@ -153,13 +151,17 @@ export const confirmBundleSession = functions.https.onCall(
       const freshRequestData = requestSnap.data()!;
       const subscription     = subSnap.data()!;
 
-      // For subscription sessions, calculate amount from bundle price
+      // For subscription sessions, calculate amount from bundle price.
+      // `totalPaid` is the canonical field used by createSubscriptionFromPayment,
+      // confirmBundleDirectPayment, and payFromWallet — keep the legacy
+      // alternates as fallbacks for any old docs that used them.
       if (amount === 0 && subscription) {
-        const bundlePrice = (subscription.bundlePrice as number) ?? 
-                           (subscription.totalPrice as number) ?? 
+        const bundlePrice = (subscription.totalPaid as number) ??
+                           (subscription.bundlePrice as number) ??
+                           (subscription.totalPrice as number) ??
                            (subscription.price as number) ?? 0;
-        const totalSessions = (subscription.totalSessions as number) ?? 
-                             (subscription.sessionCount as number) ?? 
+        const totalSessions = (subscription.totalSessions as number) ??
+                             (subscription.sessionCount as number) ??
                              (subscription.sessionsCount as number) ?? 1;
         if (bundlePrice > 0 && totalSessions > 0) {
           amount = bundlePrice / totalSessions;
@@ -267,6 +269,11 @@ export const confirmBundleSession = functions.https.onCall(
         mohaffezPhone:    mohaffezPhone    ?? null,
         isPaid:           true,
         paymentMethod:    'subscription',
+        // Per-session price (bundlePrice / totalSessions). Without this,
+        // statsForTeacher in recomputeTeacherTiers skips the session because
+        // its filter requires sessionPrice > 0, leaving bundle sessions out
+        // of the teacher's tier/revenue calculation entirely.
+        sessionPrice:     amount,
         subscriptionId,
         reminder24hSent:  false,
         reminder1hSent:   false,
@@ -313,67 +320,15 @@ export const confirmBundleSession = functions.https.onCall(
         remainingSessions: result.remainingSessions,
       });
 
-      // ── 19. Commission tracking (separate transaction) ────────────────────
-      const now              = new Date();
-      const weekNumber       = getWeekNumber(now);
-      const weekStart        = getWeekStart(now);
-      const weekEnd          = getWeekEnd(now);
-      const commissionAmount = amount * COMMISSION_RATE;
-
-      await db.runTransaction(async (tx) => {
-        // Individual commission record.
-        const commRef = db.collection('commissions').doc();
-        tx.set(commRef, {
-          id:                     commRef.id,
-          mohaffezId,
-          mohaffezName,
-          studentId,
-          sessionId:              result.sessionId,
-          subscriptionId,
-          directPaymentRequestId: null,
-          sessionRequestId:       requestId,
-          amount,
-          commissionAmount,
-          commissionRate:         COMMISSION_RATE,
-          paymentMethod:          'subscription',
-          status:                 'pending',
-          weekNumber,
-          year:                   now.getFullYear(),
-          weekStart:              admin.firestore.Timestamp.fromDate(weekStart),
-          weekEnd:                admin.firestore.Timestamp.fromDate(weekEnd),
-          createdAt:              FieldValue.serverTimestamp(),
-          paidAt:                 null,
-        });
-
-        // Upsert weekly summary (merge:true makes this idempotent).
-        const summaryId  = `${mohaffezId}_${now.getFullYear()}_w${weekNumber}`;
-        const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
-        tx.set(
-          summaryRef,
-          {
-            mohaffezId,
-            mohaffezName,
-            weekNumber,
-            year:             now.getFullYear(),
-            weekStart:        admin.firestore.Timestamp.fromDate(weekStart),
-            weekEnd:          admin.firestore.Timestamp.fromDate(weekEnd),
-            totalSessions:    FieldValue.increment(1),
-            totalRevenue:     FieldValue.increment(amount),
-            commissionAmount: FieldValue.increment(commissionAmount),
-            commissionRate:   COMMISSION_RATE,
-            status:           'pending',
-            dueDate:          admin.firestore.Timestamp.fromDate(getNextMonday(weekEnd)),
-            updatedAt:        FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-      });
-
-      functions.logger.info('confirmBundleSession: Commission tracked', {
-        subscriptionId,
-        sessionId:       result.sessionId,
-        commissionAmount,
-      });
+      // ── 19. (Removed: legacy weeklyCommissionSummaries tracking)
+      // Bundle/subscription session payment flows do not credit the teacher's
+      // wallet ledger today (separate pre-existing gap — bundle purchase
+      // money doesn't propagate into the teacher's pending bucket). The old
+      // weeklyCommissionSummaries write was tracking-only and is removed
+      // along with the rest of the legacy commission system. When the bundle
+      // ledger flow is built, it should mirror walletPaySession's pattern:
+      // post a `session_payment` ledger entry crediting the teacher's
+      // pending bucket so settlement deducts commission correctly.
 
       // ── 20. Notification to student ───────────────────────────────────────
       await createAndSendNotification({

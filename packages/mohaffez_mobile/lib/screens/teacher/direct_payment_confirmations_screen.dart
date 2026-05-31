@@ -204,6 +204,18 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
   bool _loading = false;
   bool _confirmed = false;
 
+  /// Derive the actual commission % from the amount that was charged.
+  /// Keeps the displayed rate in sync with the displayed amount, regardless
+  /// of which tier/penalty the backend applied.
+  String _formatRate(double commission, double total) {
+    if (total <= 0) return '0';
+    final pct = (commission / total) * 100;
+    // Show one decimal only if it's not a whole number (e.g. 8.5% but 15%).
+    return pct == pct.roundToDouble()
+        ? pct.toInt().toString()
+        : pct.toStringAsFixed(1);
+  }
+
   // ── Confirm ────────────────────────────────────────────────────────────────
   Future<void> _confirm() async {
     final planType = widget.payment.planType ?? 'single';
@@ -561,7 +573,7 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'عمولة التطبيق (${(widget.commissionRate * 100).toInt()}%): '
+                    'عمولة التطبيق (${_formatRate(p.commissionAmount, p.amount)}%): '
                     '${p.commissionAmount.toStringAsFixed(2)} ج.م  —  '
                     'يصلك صافي: '
                     '${(p.amount - p.commissionAmount).toStringAsFixed(2)} ج.م',

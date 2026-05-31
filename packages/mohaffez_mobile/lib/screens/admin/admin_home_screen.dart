@@ -340,22 +340,6 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                   ),
                   const SizedBox(height: AppThemeConstants.spaceSm),
                   const _NavCard(
-                    title: ArabicLabels.commissionsBoard,
-                    subtitle: 'لوحة تتبع عمولات المنصة',
-                    icon: Icons.analytics_rounded,
-                    iconColor: Color(0xFF0891B2),
-                    routeName: 'admin-commissions',
-                  ),
-                  const SizedBox(height: AppThemeConstants.spaceSm),
-                  const _NavCard(
-                    title: 'عمولات المحفظين',
-                    subtitle: 'عرض عمولات كل محفظ',
-                    icon: Icons.people_alt_rounded,
-                    iconColor: Color(0xFF7C3AED),
-                    routeName: 'admin-teacher-commissions',
-                  ),
-                  const SizedBox(height: AppThemeConstants.spaceSm),
-                  const _NavCard(
                     title: 'أرقام محافظ المنصة',
                     subtitle: 'إدارة حسابات وأرقام المحافظ',
                     icon: Icons.account_balance_wallet_rounded,

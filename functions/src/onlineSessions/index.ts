@@ -311,3 +311,152 @@ export const sendOnlineSessionReminder = functions.pubsub
     functions.logger.info('Online session reminders completed', { checked: snapshot.size, sent });
     return null;
   });
+
+/**
+ * Scheduled: every 10 minutes. Finds sessions whose `meetingStartedAt` is older
+ * than the configured `sessionMaxDurationMinutes` (default 90) and that are still
+ * not marked `completed`, then auto-completes them.
+ *
+ * Why: prevents a session from hanging in an open state forever if the teacher
+ * forgets to tap "End Session". The session is treated like any other completed
+ * session — it counts toward the teacher's commission tier and pays out normally.
+ * Distinguished from manual completion by the `autoCompleted: true` flag, so the
+ * UI can show "تم إنهاؤها تلقائياً" and any rating-required code paths can skip
+ * since no rating was captured.
+ */
+const DEFAULT_SESSION_MAX_DURATION_MIN = 90;
+const AUTO_END_BATCH_SIZE = 100;
+
+async function loadSessionMaxDurationMinutes(): Promise<number> {
+  try {
+    const snap = await db.collection('systemConfig').doc('global').get();
+    const raw = snap.data()?.sessionMaxDurationMinutes;
+    const parsed = typeof raw === 'number' ? raw : Number(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  } catch (err) {
+    functions.logger.warn('autoEndOverdueSessions: failed to read config, using default', { err });
+  }
+  return DEFAULT_SESSION_MAX_DURATION_MIN;
+}
+
+export const autoEndOverdueSessions = functions
+  .region('us-central1')
+  .pubsub.schedule('every 10 minutes')
+  .onRun(async () => {
+    const maxMinutes = await loadSessionMaxDurationMinutes();
+    const cutoff = admin.firestore.Timestamp.fromMillis(
+      Date.now() - maxMinutes * 60 * 1000,
+    );
+
+    // We can't combine `status != completed` with `meetingStartedAt <= cutoff`
+    // in a single Firestore query (composite inequality not supported), so we
+    // query by `meetingStartedAt` and filter status in-memory. Sessions older
+    // than the cutoff that are already completed are simply skipped.
+    const snap = await db
+      .collection('hafizSessions')
+      .where('meetingStartedAt', '<=', cutoff)
+      .where('meetingEndedAt', '==', null)
+      .orderBy('meetingStartedAt', 'asc')
+      .limit(AUTO_END_BATCH_SIZE)
+      .get();
+
+    let endedCount = 0;
+    for (const doc of snap.docs) {
+      const data = doc.data() as SessionDoc;
+      const status = asString(data.status);
+      if (status === 'completed' || status === 'cancelled' || status === 'rejected') {
+        continue;
+      }
+      try {
+        await doc.ref.update({
+          status: 'completed',
+          completedAt: FieldValue.serverTimestamp(),
+          meetingEndedAt: FieldValue.serverTimestamp(),
+          autoCompleted: true,
+          autoCompletedReason: 'max_duration_exceeded',
+          autoCompletedMaxMinutes: maxMinutes,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        endedCount++;
+
+        const mohaffezId = asString(data.mohaffezId);
+        if (mohaffezId) {
+          await createAndSendNotification({
+            userId: mohaffezId,
+            senderId: mohaffezId,
+            title: 'تم إنهاء الحلقة تلقائياً',
+            body: `تجاوزت الحلقة الحد الأقصى (${maxMinutes} دقيقة) فتم تسجيلها كمكتملة. تذكّر الضغط على "إنهاء الحلقة" في المرة القادمة.`,
+            type: 'session_auto_ended',
+            isRead: false,
+            highPriority: false,
+            data: { type: 'session_auto_ended', sessionId: doc.id },
+          });
+        }
+      } catch (err) {
+        functions.logger.error('autoEndOverdueSessions: failed to end session', {
+          sessionId: doc.id,
+          err,
+        });
+      }
+    }
+
+    functions.logger.info('autoEndOverdueSessions complete', {
+      maxMinutes,
+      scanned: snap.size,
+      ended: endedCount,
+    });
+
+    // ── Online teacher no-show detection ──────────────────────────────────
+    // If an online session's slotStart was > 60 minutes ago and the teacher
+    // never joined, flag it as teacher no-show. Triggers onSessionCancelled
+    // which issues full refund + 1.5% penalty.
+    //
+    // We can't filter `meetingTeacherJoinedAt == null` in the query because
+    // session creation doesn't initialize the field — Firestore's `== null`
+    // only matches docs where the field exists AND is null, not docs missing
+    // the field entirely. So we filter in-code below.
+    //
+    // Wrapped in try/catch so a query failure (e.g. missing index) doesn't
+    // silently kill the whole scheduled run — auto-end-overdue above it
+    // must still complete + be observable in logs.
+    try {
+      const noShowCutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 60 * 60 * 1000);
+      const noShowSnap = await db
+        .collection('hafizSessions')
+        .where('sessionType', '==', 'online')
+        .where('status', '==', 'accepted')
+        .where('slotStart', '<=', noShowCutoff)
+        .limit(AUTO_END_BATCH_SIZE)
+        .get();
+
+      let noShowCount = 0;
+      for (const doc of noShowSnap.docs) {
+        const d = doc.data() as SessionDoc;
+        if (d.teacherNoShow === true || d.studentNoShow === true) continue;
+        if (d.meetingTeacherJoinedAt) continue; // teacher actually joined
+        try {
+          await doc.ref.update({
+            teacherNoShow: true,
+            status: 'cancelled',
+            cancelledBy: 'teacher',
+            cancelledAt: FieldValue.serverTimestamp(),
+            autoNoShow: true,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          noShowCount++;
+        } catch (err) {
+          functions.logger.error('autoEndOverdueSessions: failed to flag teacher no-show', {
+            sessionId: doc.id, err,
+          });
+        }
+      }
+
+      functions.logger.info('autoEndOverdueSessions: no-show scan complete', {
+        scanned: noShowSnap.size, noShowCount,
+      });
+    } catch (err) {
+      functions.logger.error('autoEndOverdueSessions: no-show query failed', { err });
+    }
+
+    return null;
+  });

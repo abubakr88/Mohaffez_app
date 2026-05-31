@@ -74,9 +74,20 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _onPriceChanged());
   }
 
-  double get _commissionRate =>
-      ref.read(systemConfigProvider).valueOrNull?.commissionRate ??
-          _kDefaultCommission;
+  /// Effective rate for this teacher: per-teacher rate (set by the
+  /// scheduled tier recompute) wins over the global rate. Falls back to
+  /// the hardcoded default while either source is still loading.
+  double get _commissionRate {
+    final teacherInfo = ref
+        .read(teacherCommissionInfoProvider(widget.mohaffezId))
+        .valueOrNull;
+    final global =
+        ref.read(systemConfigProvider).valueOrNull?.commissionRate;
+    if (teacherInfo != null && global != null) {
+      return teacherInfo.effectiveRate(global);
+    }
+    return teacherInfo?.rate ?? global ?? _kDefaultCommission;
+  }
 
   void _onPriceChanged() {
     if (_syncingFromNet) return;

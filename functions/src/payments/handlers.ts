@@ -266,6 +266,9 @@ export async function consumeSubscriptionAndCreateSession(
         status:               STATUS.ACCEPTED,
         isPaid:               true,
         paymentTransactionId: transactionId,
+        // Stamp subscriptionId so onSessionCancelled can detect bundle
+        // sessions and restore a credit instead of refunding money.
+        subscriptionId:       subscriptionId,
         createdAt:            admin.firestore.FieldValue.serverTimestamp(),
         acceptedAt:           admin.firestore.FieldValue.serverTimestamp(),
         studentId:            payment.studentId,

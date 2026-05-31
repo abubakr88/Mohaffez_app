@@ -65,6 +65,8 @@ class PaymentModel with _$PaymentModel {
     String? gatewayOrderId,
     String? gatewayTransactionId,
     String? failureReason,
+    String? refundReason,         // why refund was issued (cancellation, no-show, etc.)
+    String? originalPaymentId,    // for refund records: links back to the original payment doc
     Map<String, dynamic>? metadata,
     @TimestampConverter() DateTime? paidAt,
     @TimestampConverter() DateTime? createdAt,

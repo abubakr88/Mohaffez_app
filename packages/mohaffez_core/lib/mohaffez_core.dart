@@ -7,6 +7,7 @@
 export 'src/models/booking_result.dart';
 export 'src/models/broadcast_model.dart';
 export 'src/models/challenge_question.dart';
+export 'src/models/commission_tier_model.dart';
 export 'src/models/dev_mode_model.dart';
 export 'src/models/direct_payment_model.dart';
 export 'src/models/exam_question_model.dart';
@@ -65,6 +66,7 @@ export 'src/providers/suspension_provider.dart';
 export 'src/providers/online_meeting_provider.dart';
 export 'src/providers/server_clock_provider.dart';
 export 'src/providers/system_config_provider.dart';
+export 'src/providers/teacher_commission_provider.dart';
 export 'src/providers/teacher_setup_provider.dart';
 export 'src/providers/user_provider.dart';
 export 'src/providers/wallet_provider.dart';

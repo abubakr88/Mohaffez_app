@@ -16,13 +16,6 @@ import {
   walletIdForUser,
   SYSTEM_WALLETS,
 } from './walletUtils';
-import {
-  getWeekNumber,
-  getWeekStart,
-  getWeekEnd,
-  getNextMonday,
-} from '../utils/dateHelpers';
-
 interface PayFromWalletRequest {
   sessionRequestId: string;
   /** Required when the sessionRequest doc has no paymentAmount yet
@@ -66,6 +59,35 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       );
     }
 
+    // Detect bundle/subscription payments. The full bundle price is debited
+    // here but only the first session is created — the remaining N−1 sessions
+    // live on the subscription doc and are consumed later via the bundle
+    // session-booking flow. Mirrors confirmBundleDirectPayment's logic.
+    const planType = (req.planType as string | undefined) ?? 'single';
+    const isBundle = planType === 'bundle' || planType === 'subscription';
+    const sessionsCount = isBundle
+      ? Math.max(1, Number(req.sessionsCount ?? 1))
+      : 1;
+    const mohaffezId = req.mohaffezId as string;
+
+    // For bundles, enforce the one-active-bundle-per-(student,teacher,type)
+    // rule and skip if one already exists (e.g. a prior pay-from-wallet
+    // attempt that succeeded but lost the response). Must be read before any
+    // writes happen below.
+    let existingActiveSubId: string | null = null;
+    if (isBundle) {
+      const activeSubs = await tx.get(
+        db.collection('subscriptions')
+          .where('studentId', '==', studentId)
+          .where('mohaffezId', '==', mohaffezId)
+          .where('sessionType', '==', req.sessionType ?? '')
+          .where('status', '==', 'active'),
+      );
+      if (activeSubs.size > 0) {
+        existingActiveSubId = activeSubs.docs[0].id;
+      }
+    }
+
     // Prefer the price already on the doc when it's a positive number
     // (set by an earlier flow); otherwise fall back to client-provided
     // amount. `||` (not `??`) so that an explicit 0 also falls through.
@@ -81,13 +103,19 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     }
     const totalPiastres = egpToPiastres(amountEgp);
 
-    const configSnap = await tx.get(db.collection('systemConfig').doc('global'));
-    const commissionRate: number =
-      (configSnap.data()?.commissionRate as number) ?? 0.05;
-    const commissionPiastres = Math.round(totalPiastres * commissionRate);
-    const teacherPiastres = totalPiastres - commissionPiastres;
+    if (isBundle && existingActiveSubId) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'لديك باقة نشطة بالفعل لهذا النوع من الجلسات',
+      );
+    }
 
-    const mohaffezId = req.mohaffezId as string;
+    // Commission is NO LONGER deducted at session-payment time. The teacher
+    // is credited the GROSS amount into their `pending` bucket, and the
+    // bi-weekly settlement step (`recomputeTeacherTiers`) deducts commission
+    // at the end of the cycle using THAT cycle's actual tier rate. This
+    // ensures the rate a teacher earned by hitting a tier mid-cycle applies
+    // to the same cycle's payout, not the next one.
 
     // Read weekly commission summary BEFORE writes.
     const sessionDate = (req.slotStart ?? req.slotDate) as admin.firestore.Timestamp | undefined;
@@ -97,19 +125,11 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
         'request has invalid slotStart/slotDate',
       );
     }
-    const sessionDateObj = sessionDate.toDate();
-    const weekNumber = getWeekNumber(sessionDateObj);
-    const year = sessionDateObj.getFullYear();
-    const summaryId = `${mohaffezId}_${year}_w${weekNumber}`;
-    const summaryRef = db.collection('weeklyCommissionSummaries').doc(summaryId);
-    const summarySnap = await tx.get(summaryRef);
 
-    // Post the ledger entry. Four legs:
-    //  - debit student wallet (full amount)
-    //  - credit teacher wallet (amount − commission)
-    //  - credit system_revenue (commission)
-    //  - The student paid the platform; teacher earned net. No fourth leg needed
-    //    because student debit = teacher credit + revenue credit.
+    // Post the ledger entry. Two legs:
+    //  - debit student wallet (full amount, available bucket)
+    //  - credit teacher wallet (full amount, PENDING bucket)
+    // Commission is deducted later by cycle settlement, not here.
     const ledger = await postLedgerEntry(tx, {
       type: 'session_payment',
       legs: [
@@ -121,12 +141,8 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
         {
           walletId: walletIdForUser(mohaffezId),
           ownerType: 'mohaffez',
-          amountPiastres: teacherPiastres,
-        },
-        {
-          walletId: SYSTEM_WALLETS.revenue,
-          ownerType: 'system',
-          amountPiastres: commissionPiastres,
+          amountPiastres: totalPiastres,
+          target: 'pending',
         },
       ],
       reason: `Session payment: ${req.planTitle ?? 'single session'}`,
@@ -134,7 +150,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       groupId: `paysession_${sessionRequestId}`,
       createdBy: studentId,
       metadata: {
-        commissionRate,
+        grossPiastres: totalPiastres,
         planType: req.planType ?? 'single',
       },
     });
@@ -142,6 +158,21 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     if (ledger.idempotent) {
       // Re-entry: nothing to do, ledger already posted on a prior attempt.
       return { success: true, message: 'already posted', groupId: ledger.groupId };
+    }
+
+    // Per-session price for the bundle, used as `sessionPrice` on this
+    // (first) session doc. For singles it equals amountEgp.
+    const perSessionEgp = isBundle ? amountEgp / sessionsCount : amountEgp;
+
+    // For bundles, allocate the subscription ID up-front so we can stamp it
+    // on the first session doc — onSessionCancelled uses session.subscriptionId
+    // to detect bundle sessions and restore a session credit instead of
+    // refunding money.
+    let subscriptionId: string | null = null;
+    let subRef: FirebaseFirestore.DocumentReference | null = null;
+    if (isBundle) {
+      subRef = db.collection('subscriptions').doc();
+      subscriptionId = subRef.id;
     }
 
     // Create the session doc, marked paid + accepted.
@@ -160,9 +191,10 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       slotEnd: req.slotEnd,
       status: 'accepted',
       isPaid: true,
-      sessionPrice: amountEgp,
+      sessionPrice: perSessionEgp,
       paymentType: 'wallet',
       walletLedgerGroupId: ledger.groupId,
+      subscriptionId,
       createdAt: FieldValue.serverTimestamp(),
       acceptedAt: FieldValue.serverTimestamp(),
       reminder24hSent: false,
@@ -171,46 +203,53 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       sessionRating: 10,
     });
 
+    if (isBundle && subRef) {
+      const validityDays = typeof req.validityDays === 'number'
+        ? (req.validityDays as number)
+        : null;
+      let expiryDate: admin.firestore.Timestamp | null = null;
+      if (validityDays && validityDays > 0) {
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + validityDays);
+        expiryDate = admin.firestore.Timestamp.fromDate(expiry);
+      }
+      const remaining = Math.max(0, sessionsCount - 1);
+      tx.set(subRef, {
+        studentId,
+        studentName: req.studentName ?? '',
+        mohaffezId,
+        mohaffezName: req.mohaffezName ?? '',
+        planId: (req.planId as string | undefined) ?? '',
+        planTitle: (req.planTitle as string | undefined) ?? '',
+        planType,
+        sessionType: req.sessionType ?? '',
+        totalSessions: sessionsCount,
+        remainingSessions: remaining,
+        totalPaid: amountEgp,
+        paymentTransactionId: ledger.groupId,
+        firstSessionId: sessionRef.id,
+        startDate: FieldValue.serverTimestamp(),
+        expiryDate,
+        status: remaining === 0 ? 'depleted' : 'active',
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
     tx.update(reqRef, {
       status: 'accepted',
       isPaid: true,
       paidAt: FieldValue.serverTimestamp(),
       sessionId: sessionRef.id,
+      subscriptionId,
       paymentType: 'wallet',
       walletLedgerGroupId: ledger.groupId,
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    // Update or create weekly commission summary (kept for backward compatibility
-    // with the existing teacher commission dashboard, even though the commission
-    // is already collected via the ledger split — this summary is now informational).
-    const commissionAmountEgp = commissionPiastres / 100;
-    if (summarySnap.exists) {
-      tx.update(summaryRef, {
-        totalSessions: FieldValue.increment(1),
-        totalRevenue: FieldValue.increment(amountEgp),
-        commissionAmount: FieldValue.increment(commissionAmountEgp),
-        status: 'paid', // wallet flow auto-settles
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    } else {
-      tx.set(summaryRef, {
-        mohaffezId,
-        mohaffezName: req.mohaffezName ?? '',
-        weekNumber,
-        year,
-        totalSessions: 1,
-        totalRevenue: amountEgp,
-        commissionAmount: commissionAmountEgp,
-        commissionRate,
-        status: 'paid', // wallet flow auto-settles
-        weekStart: admin.firestore.Timestamp.fromDate(getWeekStart(sessionDateObj)),
-        weekEnd: admin.firestore.Timestamp.fromDate(getWeekEnd(sessionDateObj)),
-        dueDate: admin.firestore.Timestamp.fromDate(getNextMonday(sessionDateObj)),
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    }
+    // Wallet ledger above is the source of truth for commission; teacher's
+    // `pending` bucket holds gross revenue, drained by recomputeTeacherTiers
+    // at settlement using that cycle's tier rate.
 
     // Notify teacher.
     const notifRef = db.collection('notifications').doc();
@@ -232,10 +271,10 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     return {
       success: true,
       sessionId: sessionRef.id,
+      subscriptionId,
       groupId: ledger.groupId,
       debitedPiastres: totalPiastres,
-      teacherCreditedPiastres: teacherPiastres,
-      commissionPiastres,
+      teacherPendingCreditedPiastres: totalPiastres,
     };
   });
 });
@@ -274,18 +313,37 @@ export const refundSessionPayment = functions.https.onCall(async (data, context)
 
     const totalEgp = s.sessionPrice as number;
     const totalPiastres = egpToPiastres(totalEgp);
-    const commissionRate = 0.05; // TODO: store commissionRate on session for accuracy
-    const commissionPiastres = Math.round(totalPiastres * commissionRate);
-    const teacherPiastres = totalPiastres - commissionPiastres;
+
+    // Refund logic depends on whether the cycle settlement has already run
+    // on this session:
+    //  - BEFORE settlement: teacher's pending bucket holds the GROSS. Reverse
+    //    with 2 legs (student credit + teacher pending debit).
+    //  - AFTER settlement: pending has already been drained. Money lives in
+    //    teacher's available + system_revenue. Reverse with 3 legs using
+    //    the rate that was applied at settlement (stored on the session).
+    const settled = s.settledAt != null;
+    const legs = settled
+      ? (() => {
+          const rate =
+            typeof s.settlementCommissionRate === 'number'
+              ? (s.settlementCommissionRate as number)
+              : 0.10;
+          const commissionPiastres = Math.round(totalPiastres * rate);
+          const teacherNet = totalPiastres - commissionPiastres;
+          return [
+            { walletId: walletIdForUser(s.studentId as string), ownerType: 'student' as const, amountPiastres: totalPiastres },
+            { walletId: walletIdForUser(s.mohaffezId as string), ownerType: 'mohaffez' as const, amountPiastres: -teacherNet },
+            { walletId: SYSTEM_WALLETS.revenue, ownerType: 'system' as const, amountPiastres: -commissionPiastres },
+          ];
+        })()
+      : [
+          { walletId: walletIdForUser(s.studentId as string), ownerType: 'student' as const, amountPiastres: totalPiastres },
+          { walletId: walletIdForUser(s.mohaffezId as string), ownerType: 'mohaffez' as const, amountPiastres: -totalPiastres, target: 'pending' as const },
+        ];
 
     const result = await postLedgerEntry(tx, {
       type: 'session_refund',
-      legs: [
-        // Reverse of session_payment.
-        { walletId: walletIdForUser(s.studentId as string), ownerType: 'student', amountPiastres: totalPiastres },
-        { walletId: walletIdForUser(s.mohaffezId as string), ownerType: 'mohaffez', amountPiastres: -teacherPiastres },
-        { walletId: SYSTEM_WALLETS.revenue, ownerType: 'system', amountPiastres: -commissionPiastres },
-      ],
+      legs,
       reason: reason.trim(),
       relatedSessionId: sessionId,
       groupId: `refund_${sessionId}`,

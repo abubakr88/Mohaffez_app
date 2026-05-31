@@ -11,6 +11,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../services/app_version_service.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
+import '../../shared/widgets/teacher_tier_card.dart';
 import '../../tour/tour_mode_state.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -236,6 +237,8 @@ class MohaffezHomeContent extends ConsumerWidget {
                         ),
                         const SizedBox(height: 20),
                       ],
+                      TeacherTierCard(teacherId: mohaffezId),
+                      const SizedBox(height: 12),
                       _NextSessionCountdown(nextSessionDate: nextSessionDate),
                       if (nextSessionDate != null) const SizedBox(height: 20),
                       _ActionsSection(mohaffezId: mohaffezId),
@@ -717,9 +720,6 @@ class _ActionsSection extends StatelessWidget {
       _ActionData(icon: Icons.calendar_view_week_rounded, label: 'مواعيدي',
           color: _DS.red, bg: _DS.redBg,
           onTap: () => context.push('/availability')),
-      _ActionData(icon: Icons.receipt_long_rounded, label: 'المستحقات',
-          color: _DS.gold, bg: _DS.goldBg,
-          onTap: () => context.push('/mohaffez-commissions')),
       _ActionData(icon: Icons.account_balance_wallet_rounded, label: 'محفظتي',
           color: _DS.teal600, bg: _DS.teal100,
           onTap: () => context.push('/mohaffez-wallet')),

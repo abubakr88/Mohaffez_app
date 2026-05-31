@@ -361,14 +361,18 @@ class _CountdownButtonState extends ConsumerState<_CountdownButton> {
         60;
 
     final sd = info?.slotStart ?? info?.sessionDate;
-    // Count down to actual session start (not the join window).
-    final DateTime? target = sd;
-    final DateTime? openAt = sd?.subtract(Duration(minutes: leadTimeMinutes));
+    // Count down to the join-window opening (slotStart − leadTime), not the
+    // session start. This is the moment the user can actually act — both
+    // roles see the same number, no "I can join early but the timer says
+    // I can't" confusion. Subtext still shows the real session time so the
+    // agreed meeting time isn't lost.
+    final DateTime? target = sd?.subtract(Duration(minutes: leadTimeMinutes));
+    final actionVerb = isTeacher ? 'البدء' : 'الانضمام';
 
-    String label = 'الجلسة لم تحن بعد';
-    String subtext = openAt != null
-        ? 'يمكنك ${isTeacher ? 'البدء' : 'الانضمام'} من ${_fmtTime(openAt)} · قبل $leadTimeMinutes دقيقة من الموعد'
-        : 'يمكنك ${isTeacher ? 'البدء' : 'الانضمام'} قبل الموعد بـ $leadTimeMinutes دقيقة';
+    String label = 'لم يحن وقت ${isTeacher ? 'البدء' : 'الانضمام'} بعد';
+    String subtext = sd != null
+        ? 'موعد الجلسة ${_fmtTime(sd)} · يمكنك $actionVerb قبلها بـ $leadTimeMinutes دقيقة'
+        : 'يمكنك $actionVerb قبل الموعد بـ $leadTimeMinutes دقيقة';
 
     if (target != null) {
       final diff = target.difference(DateTime.now());
@@ -377,11 +381,11 @@ class _CountdownButtonState extends ConsumerState<_CountdownButton> {
         final m = diff.inMinutes.remainder(60);
         final s = diff.inSeconds.remainder(60);
         if (h > 0) {
-          label = 'الجلسة تبدأ بعد $hس $mد';
+          label = 'يمكنك $actionVerb بعد $hس $mد';
         } else if (m > 0) {
-          label = 'الجلسة تبدأ بعد $mد $sث';
+          label = 'يمكنك $actionVerb بعد $mد $sث';
         } else {
-          label = 'الجلسة تبدأ بعد $sث';
+          label = 'يمكنك $actionVerb بعد $sث';
         }
       }
     }

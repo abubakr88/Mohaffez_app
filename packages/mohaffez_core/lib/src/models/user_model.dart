@@ -37,6 +37,9 @@ class UserModel with _$UserModel {
     @Default(false) bool examPassed,
     @TimestampConverter() DateTime? examNextRetryAt,
     String? gender,
+    // ── Commission Penalty & Warnings ───────────────────────
+    @Default(0.0) double commissionPenaltyPercent, // teacher: highest penalty this cycle (resets each cycle)
+    @Default(0) int cancellationWarnings,          // total warnings issued (admin visibility)
     // ─────────────────────────────────────────────────────────
   }) = _UserModel;
 

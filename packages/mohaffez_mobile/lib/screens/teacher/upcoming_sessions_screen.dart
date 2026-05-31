@@ -9,6 +9,7 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/meeting_launcher_service.dart';
 
@@ -450,22 +451,37 @@ class SessionCard extends ConsumerWidget {
 
   // ✅ Mark as No-Show
   Future<void> _markAsNoShow(BuildContext context, WidgetRef ref) async {
-    final reason = await showDialog<String>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => _NoShowReasonDialog(),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.person_off, color: AppThemeConstants.warning),
+            SizedBox(width: 8),
+            Text('تسجيل غياب الطالب'),
+          ]),
+          content: const Text(
+            'هل أنت متأكد أن الطالب لم يحضر؟ سيُسجَّل تحذير على حسابه وتحتسب الجلسة كمكتملة لك.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.warning),
+              child: const Text('تأكيد الغياب', style: TextStyle(color: AppThemeConstants.white)),
+            ),
+          ],
+        ),
+      ),
     );
 
-    if (reason == null) return; // User cancelled
+    if (confirmed != true || !context.mounted) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('hafizSessions')
-          .doc(session['id'] as String)
-          .update({
-        'status': 'no-show',
-        'noShowReason': reason,
-        'noShowMarkedAt': FieldValue.serverTimestamp(),
-      });
+      await FirebaseFunctions.instance
+          .httpsCallable('onStudentNoShowReported')
+          .call({'sessionId': session['id'] as String});
 
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -488,8 +504,37 @@ class SessionCard extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     String sessionId,
-    String partnerName,
-  ) async {
+    String partnerName, {
+    DateTime? sessionDate,
+    String? paymentType,
+    double? sessionPrice,
+    String? subscriptionId,
+  }) async {
+    // Bundle session: no money moves on cancel. Student's bundle gets the
+    // session credit back (or loses it on late student cancel). Teacher still
+    // pays commission penalty on top, if any.
+    // Single session: full amount is returned to student from the teacher's
+    // earnings (pending/available for wallet, dues for direct payment).
+    final isBundle = subscriptionId != null ||
+        paymentType == 'bundle' ||
+        paymentType == 'subscription';
+    final priceText = (sessionPrice != null && sessionPrice > 0)
+        ? '${sessionPrice.toStringAsFixed(0)} ج.م '
+        : '';
+    final hoursUntil = sessionDate != null
+        ? sessionDate.difference(serverNow(ref)).inHours
+        : 999;
+    String? penaltyText;
+    if (hoursUntil < 1) {
+      penaltyText = 'بالإضافة إلى زيادة عمولة المنصة بـ 1% لهذه الدورة';
+    } else if (hoursUntil < 3) {
+      penaltyText = 'بالإضافة إلى زيادة عمولة المنصة بـ 0.5% لهذه الدورة';
+    }
+    final headlineText = isBundle
+        ? 'لن يتم تحويل أموال — ستُعاد الحلقة إلى رصيد باقة الطالب'
+        // ignore: unnecessary_brace_in_string_interps
+        : 'كامل المبلغ ${priceText}سيُخصم من أرباحك ويُعاد إلى محفظة الطالب';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
@@ -511,6 +556,45 @@ class SessionCard extends ConsumerWidget {
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.errorLight,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppThemeConstants.error),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.account_balance_wallet_outlined,
+                        size: 20, color: AppThemeConstants.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            headlineText,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                color: AppThemeConstants.error,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          if (penaltyText != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              penaltyText,
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppThemeConstants.error),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -553,10 +637,22 @@ class SessionCard extends ConsumerWidget {
 
     if (confirmed != true || !context.mounted) return;
 
-    showDialog(
-      context: context,
+    // Capture the root navigator + messenger before the async gap. The
+    // Firestore realtime listener may unmount this SessionCard before the
+    // Cloud Function returns, invalidating `context`.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Push the loading dialog as a DialogRoute we hold a reference to, then
+    // remove it explicitly via `removeRoute`. `Navigator.pop()` is unsafe here
+    // because when SessionCard unmounts, the dialog (anchored to its context)
+    // may be torn down with it — a subsequent pop() would then pop the actual
+    // page underneath, crashing GoRouter with "no pages left to show".
+    final loadingRoute = DialogRoute<void>(
+      // ignore: use_build_context_synchronously
+      context: navigator.context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(
+      builder: (_) => const Center(
         child: Card(
           child: Padding(
             padding: EdgeInsets.all(24.0),
@@ -572,13 +668,19 @@ class SessionCard extends ConsumerWidget {
         ),
       ),
     );
+    navigator.push(loadingRoute);
+
+    void dismissLoading() {
+      if (loadingRoute.isActive) {
+        navigator.removeRoute(loadingRoute);
+      }
+    }
 
     try {
-      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId);
+      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId, cancelledBy: 'teacher');
 
-      if (!context.mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      dismissLoading();
+      messenger.showSnackBar(
         const SnackBar(
           content: Row(
             children: [
@@ -591,11 +693,14 @@ class SessionCard extends ConsumerWidget {
           duration: Duration(seconds: 3),
         ),
       );
-      ref.invalidate(upcomingSessionsProvider(mohaffezId));
+      // No `ref.invalidate` here — upcomingSessionsProvider is a stream, so
+      // the Firestore listener has already pushed the updated list and this
+      // SessionCard is being disposed. Touching `ref` after disposal throws
+      // "Bad state: Cannot use 'ref' after the widget was disposed", which
+      // would surface as a misleading "cancel failed" snackbar.
     } catch (e) {
-      if (!context.mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      dismissLoading();
+      messenger.showSnackBar(
         SnackBar(
           content: Row(
             children: [
@@ -914,17 +1019,26 @@ class SessionCard extends ConsumerWidget {
 
               const SizedBox(height: 16),
               const Divider(height: 1),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.cancel_outlined, color: AppThemeConstants.error),
-                  tooltip: ArabicLabels.cancelSession,
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('إلغاء الجلسة'),
                   onPressed: () => _showCancelSessionDialog(
                     context,
                     ref,
                     session['id'] as String,
                     session['studentName'] as String? ?? 'الطالب',
+                    sessionDate: sessionDate,
+                    paymentType: session['paymentType'] as String?,
+                    sessionPrice: (session['sessionPrice'] as num?)?.toDouble(),
+                    subscriptionId: session['subscriptionId'] as String?,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppThemeConstants.error,
+                    side: const BorderSide(color: AppThemeConstants.error),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),
@@ -1071,54 +1185,6 @@ class SessionCard extends ConsumerWidget {
 }
 
 // ============================================================================
-// NO-SHOW REASON DIALOG
-// ============================================================================
-
-class _NoShowReasonDialog extends StatefulWidget {
-  @override
-  State<_NoShowReasonDialog> createState() => _NoShowReasonDialogState();
-}
-
-class _NoShowReasonDialogState extends State<_NoShowReasonDialog> {
-  final reasonController = TextEditingController();
-
-  @override
-  void dispose() {
-    reasonController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: AlertDialog(
-        title: const Text('سبب عدم الحضور'),
-        content: TextField(
-          controller: reasonController,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'اختياري: يمكنك توضيح سبب عدم حضور الطالب',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, null),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () =>
-                Navigator.pop(context, reasonController.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.warning),
-            child: const Text('تأكيد'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Teacher's "ابدأ الجلسة" button. Reads `meetingButtonStateProvider` so it
 /// disables itself before `sessionDate − leadTime` and changes label after
 /// the teacher has clicked start. All the actual work of writing

@@ -319,13 +319,21 @@ class _TxTile extends StatelessWidget {
         return Icons.school;
       case WalletTxType.sessionRefund:
         return Icons.undo;
+      case WalletTxType.cycleSettlement:
+        return Icons.event_available_outlined;
       case WalletTxType.payout:
         return Icons.account_balance;
       case WalletTxType.payoutReversal:
         return Icons.undo;
       case WalletTxType.promoCredit:
         return Icons.card_giftcard;
+      case WalletTxType.directSessionCommission:
+        return Icons.receipt_long_outlined;
+      case WalletTxType.directSessionCommissionReversal:
+        return Icons.undo;
       case WalletTxType.adjustment:
+      case WalletTxType.commissionRateChange:
+      case WalletTxType.penaltyApplied:
         return Icons.tune;
     }
   }
@@ -338,13 +346,21 @@ class _TxTile extends StatelessWidget {
         return 'دفع جلسة';
       case WalletTxType.sessionRefund:
         return 'استرداد جلسة';
+      case WalletTxType.cycleSettlement:
+        return 'تسوية دورة';
       case WalletTxType.payout:
         return 'سحب رصيد';
       case WalletTxType.payoutReversal:
         return 'إلغاء سحب';
       case WalletTxType.promoCredit:
         return 'رصيد ترويجي';
+      case WalletTxType.directSessionCommission:
+        return 'عمولة جلسة مباشرة';
+      case WalletTxType.directSessionCommissionReversal:
+        return 'إلغاء عمولة جلسة';
       case WalletTxType.adjustment:
+      case WalletTxType.commissionRateChange:
+      case WalletTxType.penaltyApplied:
         return 'تسوية';
     }
   }

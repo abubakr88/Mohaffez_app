@@ -21,6 +21,7 @@ import '../screens/student/student_rewards_screen.dart';
 import '../screens/shared/settings_screen.dart';
 import '../screens/shared/location_settings_screen.dart';
 import '../screens/shared/privacy_settings_screen.dart';
+import '../screens/shared/cancellation_policy_screen.dart';
 import '../screens/shared/payment_webview_screen.dart';
 import '../screens/shared/pick_location_screen.dart';
 import '../screens/shared/session_details_screen.dart';
@@ -52,7 +53,6 @@ import '../screens/teacher/mohaffez_student_detail_screen.dart';
 import '../screens/teacher/mohaffez_wallet_settings_screen.dart';
 import '../screens/teacher/mohaffez_wallet_screen.dart';
 import '../screens/teacher/request_payout_screen.dart';
-import '../screens/teacher/mohaffez_commission_screen.dart';
 import '../screens/teacher/availability_management_screen.dart';
 import '../screens/teacher/pending_requests_screen.dart';
 import '../screens/teacher/direct_payment_confirmations_screen.dart';
@@ -82,9 +82,7 @@ import '../screens/admin/admin_wallet_settings_screen.dart';
 import '../screens/admin/admin_credit_wallet_screen.dart';
 import '../screens/admin/admin_wallet_topups_screen.dart';
 import '../screens/admin/admin_process_payouts_screen.dart';
-import '../screens/admin/admin_teacher_commissions_screen.dart';
 import '../screens/admin/admin_teacher_requests_screen.dart';
-import '../screens/admin/commission_dashboard_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
@@ -467,6 +465,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'privacy-settings',
             builder: (context, state) => const PrivacySettingsScreen(),
           ),
+          GoRoute(
+            path: '/cancellation-policy',
+            name: 'cancellation-policy',
+            builder: (context, state) => const CancellationPolicyScreen(),
+          ),
 
           // ============================================
           // WALLET & COMMISSIONS
@@ -485,14 +488,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/request-payout',
             name: 'request-payout',
             builder: (context, state) => const RequestPayoutScreen(),
-          ),
-          GoRoute(
-            path: '/mohaffez-commissions',
-            name: 'mohaffez-commissions',
-            builder: (context, state) {
-              final uid = ref.read(currentUserIdProvider) ?? '';
-              return MohaffezCommissionScreen(mohaffezId: uid);
-            },
           ),
           GoRoute(
             path: '/payment/:mohaffezId',
@@ -786,18 +781,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'admin-payment-events',
             builder: (context, state) =>
                 const AdminPaymentEventsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/commissions',
-            name: 'admin-commissions',
-            builder: (context, state) =>
-                const CommissionDashboardScreen(),
-          ),
-          GoRoute(
-            path: '/admin/teacher-commissions',
-            name: 'admin-teacher-commissions',
-            builder: (context, state) =>
-                const AdminTeacherCommissionsScreen(),
           ),
           GoRoute(
             path: '/admin/wallet-numbers',

@@ -35,7 +35,6 @@ export {
   unsuspendUser,
   deleteUserAccount,
   sendBroadcastNotification,
-  triggerCommissionJobManually,
   triggerCleanupJobManually,
   approveCredential,
   rejectCredential,
@@ -47,12 +46,11 @@ export { checkVersion } from './admin/appVersion';
 export { setAdminClaim } from './setAdminClaim';
 export { getAdminMetrics, refreshAdminMetrics } from './admin/metrics';
 
+// Per-teacher commission tier recompute (rolling 30-day revenue → tier).
 export {
-  processWeeklyCommissions,
-  markCommissionPaid,
-  mohaffezReportCommissionPayment,
-  rejectCommissionPayment,
-} from './payments/commissions';
+  recomputeTeacherTiers,
+  recomputeTeacherTiersNow,
+} from './payments/recomputeTeacherTiers';
 
 // Suspension triggers
 export { onUserSuspended } from './onUserSuspended';
@@ -66,7 +64,15 @@ export {
   onSessionAcceptedCreateMeeting,
   onMeetingStarted,
   sendOnlineSessionReminder,
+  autoEndOverdueSessions,
 } from './onlineSessions';
+
+// Cancellation & no-show policy
+export {
+  onSessionCancelled,
+  onStudentNoShowReported,
+  onTeacherNoShowReported,
+} from './cancellations';
 
 // Wallet system (double-entry ledger)
 export {

@@ -1,7 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { auth, db, FieldValue, messaging } from '../utils/admin';
-import { processWeeklyCommissionsNow } from '../payments/commissions';
 import { releaseExpiredSlotLocksNow } from '../cleanup/releaseExpiredSlotLocks';
 
 type TargetRole = 'all' | 'student' | 'mohaffez';
@@ -314,24 +313,6 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
   });
 
   return { recipientCount: successCount };
-});
-
-/**
- * input: {}
- * output: { processed: number }
- */
-export const triggerCommissionJobManually = functions.https.onCall(async (_, context) => {
-  const performedBy = await ensureAdmin(context);
-  const processed = await processWeeklyCommissionsNow();
-
-  await writeAuditLog({
-    action: 'triggerCommissionJobManually',
-    performedBy,
-    data: { processed },
-  });
-
-  functions.logger.info('Admin triggered commissions job', { performedBy, processed });
-  return { processed };
 });
 
 /**

@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../services/photo_upload_service.dart';
 import 'package:flutter/services.dart';
@@ -66,11 +67,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isUploadingPhoto = false;
   final _bioController = TextEditingController();
   final _youtubeController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
 
   @override
   void dispose() {
     _bioController.dispose();
     _youtubeController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -134,67 +139,160 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return host.contains('youtube.com') || host.contains('youtu.be');
   }
 
-  Future<void> _pickAndUploadPhoto(String userId) async {
+  Future<void> _showPhotoOptionsSheet(UserModel user) async {
     if (guardWriteInTour(ref, context)) return;
+    final hasPhoto = user.photoUrl != null && user.photoUrl!.isNotEmpty;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppThemeConstants.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _DS.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded,
+                    color: _DS.teal500),
+                title: const Text('اختيار صورة جديدة'),
+                onTap: () => Navigator.pop(ctx, 'pick'),
+              ),
+              if (hasPhoto)
+                ListTile(
+                  leading: const Icon(Icons.crop_rounded, color: _DS.amber),
+                  title: const Text('تعديل الصورة الحالية'),
+                  onTap: () => Navigator.pop(ctx, 'edit'),
+                ),
+              ListTile(
+                leading: const Icon(Icons.close_rounded, color: _DS.text3),
+                title: const Text(ArabicLabels.cancel),
+                onTap: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (choice == 'pick') {
+      await _pickAndUploadPhoto(user.uid);
+    } else if (choice == 'edit') {
+      await _editCurrentPhoto(user.uid, user.photoUrl!);
+    }
+  }
+
+  Future<String?> _runCropper(String sourcePath) async {
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: sourcePath,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      compressQuality: 85,
+      compressFormat: ImageCompressFormat.jpg,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'اقتصاص الصورة',
+          toolbarColor: const Color(0xFF095752),
+          toolbarWidgetColor: AppThemeConstants.onPrimary,
+          activeControlsWidgetColor: const Color(0xFF1A9E84),
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: true,
+          hideBottomControls: false,
+        ),
+        IOSUiSettings(
+          title: 'اقتصاص الصورة',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+        ),
+      ],
+    );
+    return cropped?.path;
+  }
+
+  Future<void> _uploadCroppedPhoto(String userId, String croppedPath) async {
+    if (!mounted) return;
+    BuildContext? loadingCtx;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        loadingCtx = dialogCtx;
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    await PhotoUploadService.uploadProfilePhoto(
+      userId,
+      File(croppedPath),
+      FirebaseFirestore.instance,
+    );
+
+    if (!mounted) return;
+    final ctx = loadingCtx;
+    if (ctx != null && ctx.mounted && Navigator.canPop(ctx)) {
+      Navigator.of(ctx).pop();
+    }
+    ref.invalidate(currentUserProvider);
+    _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
+  }
+
+  Future<void> _pickAndUploadPhoto(String userId) async {
     if (_isUploadingPhoto) return;
     setState(() => _isUploadingPhoto = true);
     try {
       final picker = ImagePicker();
       final image = await picker.pickImage(source: ImageSource.gallery);
-      if (image == null) {
-        if (mounted) setState(() => _isUploadingPhoto = false);
-        return;
+      if (image == null) return;
+      if (!mounted) return;
+      final croppedPath = await _runCropper(image.path);
+      if (croppedPath == null) return;
+      await _uploadCroppedPhoto(userId, croppedPath);
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).maybePop();
+      _showSnackBar('${ArabicLabels.error}: $e');
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  Future<void> _editCurrentPhoto(String userId, String photoUrl) async {
+    if (_isUploadingPhoto) return;
+    setState(() => _isUploadingPhoto = true);
+    try {
+      // Download the current photo to a temp file so the cropper can work on it.
+      final tempDir = Directory.systemTemp;
+      final tempFile = File(
+        '${tempDir.path}${Platform.pathSeparator}edit_profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      final client = HttpClient();
+      try {
+        final req = await client.getUrl(Uri.parse(photoUrl));
+        final resp = await req.close();
+        if (resp.statusCode != 200) {
+          throw Exception('فشل تحميل الصورة الحالية (HTTP ${resp.statusCode})');
+        }
+        await resp.pipe(tempFile.openWrite());
+      } finally {
+        client.close(force: true);
       }
 
       if (!mounted) return;
-      final cropped = await ImageCropper().cropImage(
-        sourcePath: image.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        compressQuality: 85,
-        compressFormat: ImageCompressFormat.jpg,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'اقتصاص الصورة',
-            toolbarColor: const Color(0xFF095752),
-            toolbarWidgetColor: AppThemeConstants.onPrimary,
-            activeControlsWidgetColor: const Color(0xFF1A9E84),
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: true,
-            hideBottomControls: false,
-          ),
-          IOSUiSettings(
-            title: 'اقتصاص الصورة',
-            aspectRatioLockEnabled: true,
-            resetAspectRatioEnabled: false,
-          ),
-        ],
-      );
-      if (cropped == null) return;
-
-      if (!mounted) return;
-      BuildContext? loadingCtx;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogCtx) {
-          loadingCtx = dialogCtx;
-          return const Center(child: CircularProgressIndicator());
-        },
-      );
-
-      await PhotoUploadService.uploadProfilePhoto(
-        userId,
-        File(cropped.path),
-        FirebaseFirestore.instance,
-      );
-
-      if (!mounted) return;
-      final ctx = loadingCtx;
-      if (ctx != null && ctx.mounted && Navigator.canPop(ctx)) {
-        Navigator.of(ctx).pop();
-      }
-      ref.invalidate(currentUserProvider);
-      _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
+      final croppedPath = await _runCropper(tempFile.path);
+      if (croppedPath == null) return;
+      await _uploadCroppedPhoto(userId, croppedPath);
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop();
@@ -233,6 +331,128 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (e) {
       if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
     }
+  }
+
+  Future<void> _saveName(String userId) async {
+    if (guardWriteInTour(ref, context)) return;
+    final trimmed = _nameController.text.trim();
+    if (trimmed.isEmpty) {
+      _showSnackBar('الاسم لا يمكن أن يكون فارغاً');
+      return;
+    }
+    try {
+      final repository = ref.read(userRepositoryProvider);
+      await repository.updateUser(userId, {'name': trimmed});
+      ref.invalidate(currentUserProvider);
+      if (mounted) _showSnackBar('تم حفظ الاسم بنجاح', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    }
+  }
+
+  Future<void> _savePhone(String userId) async {
+    if (guardWriteInTour(ref, context)) return;
+    final trimmed = _phoneController.text.trim();
+    // Allow clearing the number; otherwise require digits-only (with optional +).
+    if (trimmed.isNotEmpty &&
+        !RegExp(r'^\+?[0-9\s\-]{7,20}$').hasMatch(trimmed)) {
+      _showSnackBar('يرجى إدخال رقم هاتف صحيح');
+      return;
+    }
+    try {
+      final repository = ref.read(userRepositoryProvider);
+      await repository.updateUser(userId, {
+        'phoneNumber': trimmed.isEmpty ? null : trimmed,
+      });
+      ref.invalidate(currentUserProvider);
+      if (mounted) _showSnackBar('تم حفظ رقم الهاتف بنجاح', isSuccess: true);
+    } catch (e) {
+      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    }
+  }
+
+  Future<void> _showEditNameDialog(UserModel user) async {
+    _nameController.text = user.name;
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
+          title: const Text('تعديل الاسم',
+              style: TextStyle(fontWeight: FontWeight.w700, color: _DS.text1)),
+          content: TextField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              hintText: 'الاسم الكامل',
+              border: OutlineInputBorder(borderRadius: _DS.r12),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(ArabicLabels.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _saveName(user.uid);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DS.teal500,
+                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+              ),
+              child: const Text(ArabicLabels.save),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showEditPhoneDialog(UserModel user) async {
+    _phoneController.text = user.phoneNumber ?? '';
+    await showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
+          title: const Text('تعديل رقم الهاتف',
+              style: TextStyle(fontWeight: FontWeight.w700, color: _DS.text1)),
+          content: TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              hintText: '+20XXXXXXXXXX',
+              border: OutlineInputBorder(borderRadius: _DS.r12),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(ArabicLabels.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _savePhone(user.uid);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _DS.teal500,
+                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+              ),
+              child: const Text(ArabicLabels.save),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSnackBar(String message, {bool isSuccess = false}) {
@@ -468,7 +688,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           isMohaffez: isMohaffez,
                           followerCount: isMohaffez ? user.followerCount : 0,
                           rating: isMohaffez ? user.rating : 0,
-                          onEditPhoto: () => _pickAndUploadPhoto(user.uid),
+                          onEditPhoto: () => _showPhotoOptionsSheet(user),
+                          onEditName: () => _showEditNameDialog(user),
                         ),
                       ),
                     ),
@@ -478,6 +699,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 24, 16, 36),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
+                          // Rewards card + wallet balance — students only (top of screen)
+                          if (!isMohaffez) ...[
+                            _RewardsTeaserCard(userId: user.uid, dateOfBirth: user.dateOfBirth),
+                            const SizedBox(height: 12),
+                            _StudentWalletCard(userId: user.uid),
+                            const SizedBox(height: 12),
+                          ],
+
                           // Bio
                           _SectionCard(
                             title: 'نبذة تعريفية',
@@ -499,12 +728,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Rewards card — students only
-                          if (!isMohaffez) ...[
-                            _RewardsTeaserCard(userId: user.uid, dateOfBirth: user.dateOfBirth),
-                            const SizedBox(height: 12),
-                          ],
-
                           // Contact info
                           _SectionCard(
                             title: 'معلومات التواصل',
@@ -519,16 +742,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   color: _DS.blue,
                                   onTap: () => _sendEmail(user.email),
                                 ),
-                                if (user.phoneNumber?.isNotEmpty ?? false) ...[
-                                  const Divider(height: 1, color: _DS.border),
-                                  _ContactRow(
-                                    icon: Icons.phone_rounded,
-                                    label: 'رقم الهاتف',
-                                    value: user.phoneNumber!,
-                                    color: _DS.green,
-                                    onTap: () => _makePhoneCall(user.phoneNumber!),
-                                  ),
-                                ],
+                                const Divider(height: 1, color: _DS.border),
+                                _ContactRow(
+                                  icon: Icons.phone_rounded,
+                                  label: 'رقم الهاتف',
+                                  value: (user.phoneNumber?.isNotEmpty ?? false)
+                                      ? user.phoneNumber!
+                                      : 'أضف رقم الهاتف',
+                                  color: _DS.green,
+                                  onTap: () {
+                                    if (user.phoneNumber?.isNotEmpty ?? false) {
+                                      _makePhoneCall(user.phoneNumber!);
+                                    } else {
+                                      _showEditPhoneDialog(user);
+                                    }
+                                  },
+                                  onEdit: () => _showEditPhoneDialog(user),
+                                ),
                               ],
                             ),
                           ),
@@ -609,6 +839,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   subtitle: 'التحكم في بيانات حسابك',
                                   color: _DS.purple,
                                   onTap: () => context.push('/privacy-settings'),
+                                ),
+                                _ActionTile(
+                                  icon: Icons.policy_rounded,
+                                  title: 'سياسة الإلغاء والغياب',
+                                  subtitle: 'قواعد الإلغاء والاسترداد لكلا الطرفين',
+                                  color: _DS.teal700,
+                                  onTap: () => context.push('/cancellation-policy'),
                                 ),
                                 _ActionTile(
                                   icon: Icons.location_on_rounded,
@@ -693,6 +930,7 @@ class _ProfileHeader extends StatelessWidget {
   final int followerCount;
   final double rating;
   final VoidCallback onEditPhoto;
+  final VoidCallback onEditName;
 
   const _ProfileHeader({
     required this.name,
@@ -701,6 +939,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.followerCount,
     required this.rating,
     required this.onEditPhoto,
+    required this.onEditName,
   });
 
   @override
@@ -757,42 +996,70 @@ class _ProfileHeader extends StatelessWidget {
                             semanticLabel: name,
                           ),
                         ),
-                        Positioned(
-                          bottom: 0, right: 0,
-                          child: GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              onEditPhoto();
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: _DS.teal500,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppThemeConstants.white, width: 2.5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppThemeConstants.black.withValues(alpha: 0.2),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                        if (!kIsWeb)
+                          Positioned(
+                            bottom: 0, right: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                onEditPhoto();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: _DS.teal500,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppThemeConstants.white, width: 2.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppThemeConstants.black.withValues(alpha: 0.2),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(Icons.camera_alt_rounded, color: AppThemeConstants.white, size: 16),
                               ),
-                              child: const Icon(Icons.camera_alt_rounded, color: AppThemeConstants.white, size: 16),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Name (tap pencil to edit)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w800,
+                              color: AppThemeConstants.white, letterSpacing: -0.3,
+                            ),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            onEditName();
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppThemeConstants.white.withValues(alpha: 0.18),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.edit_rounded,
+                              size: 14,
+                              color: AppThemeConstants.white,
                             ),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Name
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w800,
-                        color: AppThemeConstants.white, letterSpacing: -0.3,
-                      ),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
                     // Role chip
@@ -1056,6 +1323,7 @@ class _ContactRow extends StatelessWidget {
   final String value;
   final Color color;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
 
   const _ContactRow({
     required this.icon,
@@ -1063,6 +1331,7 @@ class _ContactRow extends StatelessWidget {
     required this.value,
     required this.color,
     required this.onTap,
+    this.onEdit,
   });
 
   @override
@@ -1104,6 +1373,25 @@ class _ContactRow extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onEdit != null) ...[
+                InkWell(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onEdit!();
+                  },
+                  borderRadius: _DS.r8,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: _DS.teal50,
+                      borderRadius: _DS.r8,
+                    ),
+                    child: const Icon(Icons.edit_rounded,
+                        size: 14, color: _DS.teal500),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: color.withValues(alpha: 0.5)),
             ],
           ),
@@ -1342,6 +1630,75 @@ class _RewardsTeaserCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Student Wallet Balance Card ───────────────────────────────────────────────
+class _StudentWalletCard extends ConsumerWidget {
+  final String userId;
+  const _StudentWalletCard({required this.userId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final walletAsync = ref.watch(walletProvider(
+      (userId: userId, ownerType: WalletOwnerType.student),
+    ));
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppThemeConstants.surface,
+        borderRadius: _DS.r16,
+        boxShadow: _DS.subtleShadow,
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _DS.teal500.withValues(alpha: 0.12),
+              borderRadius: _DS.r12,
+            ),
+            child: const Icon(Icons.account_balance_wallet_rounded,
+                color: _DS.teal500, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('رصيد محفظتي',
+                    style: TextStyle(
+                        fontSize: 13, color: AppThemeConstants.textSecondary)),
+                walletAsync.when(
+                  data: (w) => Text(
+                    '${w.balanceEgp.toStringAsFixed(2)} ج.م',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: _DS.teal800,
+                    ),
+                  ),
+                  loading: () => const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                  error: (_, __) => const Text('—',
+                      style: TextStyle(
+                          fontSize: 20, color: AppThemeConstants.textSecondary)),
+                ),
+              ],
+            ),
+          ),
+          const Text('المبالغ المستردة\nتُضاف هنا',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: AppThemeConstants.textSecondary,
+                  height: 1.4)),
+        ],
       ),
     );
   }

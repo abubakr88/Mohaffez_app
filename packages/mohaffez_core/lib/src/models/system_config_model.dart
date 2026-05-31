@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'commission_tier_model.dart';
+
 class SystemConfigModel {
   final double commissionRate;
   final double directPaymentCommission;
@@ -40,6 +42,23 @@ class SystemConfigModel {
   final DateTime? updatedAt;
   final String updatedBy;
   final Map<String, String?> adminWallets;
+  final List<CommissionTierModel> commissionTiers;
+
+  /// Sessions that started more than this many minutes after their
+  /// scheduled time are flagged `startedLate: true` on `hafizSessions`
+  /// and excluded from tier calculations. Configurable by admin.
+  final int lateSessionGraceMinutes;
+
+  /// Maximum allowed duration (in minutes) for a session once the teacher
+  /// taps "Start". A scheduled Cloud Function auto-completes sessions
+  /// whose `meetingStartedAt` is older than this and that are still not
+  /// marked `completed`. Default: 90 minutes.
+  final int sessionMaxDurationMinutes;
+
+  /// Teachers whose `directCommissionOwedPiastres` debt exceeds this amount
+  /// (in EGP) cannot accept new direct-payment bookings until they pay it
+  /// down. Server-enforced. Default: 500 EGP.
+  final double directPaymentDebtThresholdEgp;
 
   const SystemConfigModel({
     required this.commissionRate,
@@ -81,6 +100,10 @@ class SystemConfigModel {
     required this.updatedAt,
     required this.updatedBy,
     required this.adminWallets,
+    required this.commissionTiers,
+    required this.lateSessionGraceMinutes,
+    required this.sessionMaxDurationMinutes,
+    required this.directPaymentDebtThresholdEgp,
   });
 
   factory SystemConfigModel.fromFirestore(DocumentSnapshot doc) {
@@ -174,6 +197,20 @@ class SystemConfigModel {
         (data['adminWallets'] as Map<String, dynamic>? ?? {})
             .map((k, v) => MapEntry(k, v as String?)),
       ),
+      commissionTiers: (data['commissionTiers'] as List<dynamic>?)
+              ?.map((e) => CommissionTierModel.fromMap(
+                  Map<String, dynamic>.from(e as Map)))
+              .toList() ??
+          defaults.commissionTiers,
+      lateSessionGraceMinutes:
+          (data['lateSessionGraceMinutes'] as num?)?.toInt() ??
+              defaults.lateSessionGraceMinutes,
+      sessionMaxDurationMinutes:
+          (data['sessionMaxDurationMinutes'] as num?)?.toInt() ??
+              defaults.sessionMaxDurationMinutes,
+      directPaymentDebtThresholdEgp:
+          (data['directPaymentDebtThresholdEgp'] as num?)?.toDouble() ??
+              defaults.directPaymentDebtThresholdEgp,
     );
   }
 
@@ -218,6 +255,10 @@ class SystemConfigModel {
       updatedAt: null,
       updatedBy: '',
       adminWallets: {},
+      commissionTiers: CommissionTierModel.defaultTiers,
+      lateSessionGraceMinutes: 10,
+      sessionMaxDurationMinutes: 90,
+      directPaymentDebtThresholdEgp: 500.0,
     );
   }
 
@@ -263,6 +304,10 @@ class SystemConfigModel {
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'updatedBy': updatedBy,
       'adminWallets': adminWallets,
+      'commissionTiers': commissionTiers.map((t) => t.toMap()).toList(),
+      'lateSessionGraceMinutes': lateSessionGraceMinutes,
+      'sessionMaxDurationMinutes': sessionMaxDurationMinutes,
+      'directPaymentDebtThresholdEgp': directPaymentDebtThresholdEgp,
     };
   }
 }
