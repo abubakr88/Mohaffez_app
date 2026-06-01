@@ -60,6 +60,7 @@ export 'src/providers/payment_provider.dart';
 export 'src/providers/pricing_provider.dart';
 export 'src/providers/promo_code_provider.dart';
 export 'src/providers/session_provider_paginated.dart';
+export 'src/providers/student_achievements.dart';
 export 'src/providers/student_rewards_provider.dart';
 export 'src/providers/subscription_provider.dart';
 export 'src/providers/suspension_provider.dart';
