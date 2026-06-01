@@ -254,15 +254,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             filled: true,
                             fillColor: AppThemeConstants.background,
                           ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'الرجاء إدخال كلمة المرور';
-                            }
-                            if (value.length < 8) {
-                              return 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
-                            }
-                            return null;
-                          },
+                          validator: ValidationUtils.password,
                         ),
                         const SizedBox(height: AppThemeConstants.spaceLg),
                         Row(

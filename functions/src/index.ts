@@ -34,6 +34,7 @@ export {
   suspendUser,
   unsuspendUser,
   deleteUserAccount,
+  deleteMyAccount,
   sendBroadcastNotification,
   triggerCleanupJobManually,
   approveCredential,

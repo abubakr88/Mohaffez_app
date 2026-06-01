@@ -93,7 +93,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 32),
           ),
           const SizedBox(height: DSSpacing.lg),
-          Text('المحفظ', style: DSText.display(context, color: DSColors.primary)),
+          Text('محفظي', style: DSText.display(context, color: DSColors.primary)),
           const SizedBox(height: DSSpacing.xs),
           Text(
             'منصة تحفيظ القرآن الكريم',

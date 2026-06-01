@@ -15,7 +15,7 @@ class MohaffezWebApp extends ConsumerWidget {
     final router = ref.watch(webRouterProvider);
 
     return MaterialApp.router(
-      title: 'Mohaffez | محفظ',
+      title: 'Mohafezy | محفظي',
       debugShowCheckedModeBanner: false,
       theme: DSTheme.light(locale),
       locale: locale,

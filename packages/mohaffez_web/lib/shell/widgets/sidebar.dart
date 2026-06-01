@@ -94,7 +94,7 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
             const SizedBox(width: DSSpacing.sm),
             Expanded(
               child: Text(
-                'المحفظ',
+                'محفظي',
                 style: DSText.h3(context, color: Colors.white),
                 overflow: TextOverflow.ellipsis,
               ),
