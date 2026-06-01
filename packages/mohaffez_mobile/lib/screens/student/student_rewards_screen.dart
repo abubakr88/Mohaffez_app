@@ -124,7 +124,7 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) => Dialog(
+      builder: (dialogCtx) => Dialog(
         backgroundColor: Colors.transparent,
         child: Directionality(
           textDirection: TextDirection.rtl,
@@ -160,7 +160,7 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => Navigator.of(dialogCtx).pop(),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _C.teal700,
                           foregroundColor: Colors.white,
@@ -191,7 +191,7 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) => Dialog(
+      builder: (dialogCtx) => Dialog(
         backgroundColor: Colors.transparent,
         child: Stack(
           alignment: Alignment.topCenter,
@@ -237,7 +237,7 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _C.gold,
                         foregroundColor: _C.teal800,
@@ -1230,7 +1230,7 @@ class _AchievementCard extends StatelessWidget {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Directionality(
+      builder: (sheetCtx) => Directionality(
         textDirection: TextDirection.rtl,
         child: Container(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
@@ -1318,7 +1318,7 @@ class _AchievementCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(sheetCtx).pop(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _C.teal700,
                     foregroundColor: Colors.white,

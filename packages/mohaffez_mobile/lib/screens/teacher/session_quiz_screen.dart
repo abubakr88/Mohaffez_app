@@ -99,7 +99,7 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) => Directionality(
+      builder: (dialogCtx) => Directionality(
         textDirection: TextDirection.rtl,
         child: Dialog(
           backgroundColor: Colors.transparent,
@@ -151,7 +151,7 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => Navigator.of(dialogCtx).pop(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F766E),
                       foregroundColor: Colors.white,
