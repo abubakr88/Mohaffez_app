@@ -98,6 +98,9 @@ dependencies:
   # Quiz celebrations
   confetti: ^0.8.0
 
+  # Reward / quiz sound effects (clapping, try-again, level-up…)
+  audioplayers: ^6.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -161,6 +164,7 @@ flutter:
     - assets/images/mastercard.png
     - assets/images/visa.png
     - assets/quran_data.json
+    - assets/sounds/
 
 
 flutter_launcher_icons:

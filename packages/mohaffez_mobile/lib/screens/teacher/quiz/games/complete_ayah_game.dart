@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../data/quran_quiz_bank.dart';
+import '../../../../services/sound_service.dart';
 import '../state/quiz_session_controller.dart';
 import '../widgets/confetti_overlay.dart';
 import '../widgets/quiz_design_tokens.dart';
@@ -51,6 +52,7 @@ class _CompleteAyahGameState extends ConsumerState<CompleteAyahGame> {
   }
 
   void _mark(bool correct) {
+    SoundService.play(correct ? Sfx.clap : Sfx.tryAgain);
     final newStreak =
         ref.read(quizSessionControllerProvider.notifier).recordAnswer(correct);
     setState(() => _marked = correct);

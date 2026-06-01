@@ -12,6 +12,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'app.dart';
 import 'services/notification_service.dart';
+import 'services/sound_service.dart';
 import 'shared/widgets/dev_mode_overlay.dart';
 
 @pragma('vm:entry-point')
@@ -72,6 +73,7 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
     await initializeDateFormatting('ar_EG', null);
 
     await CacheService.initialize();
+    await SoundService.initialize();
 
     final hasStaleData = CacheService.getUserId() != null &&
         FirebaseAuth.instance.currentUser == null;
