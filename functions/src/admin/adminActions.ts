@@ -169,14 +169,22 @@ export const unsuspendUser = functions.https.onCall(async (data, context) => {
  * input: { userId: string }
  * output: { success: true }
  */
-export const deleteUserAccount = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
-  const userId = (data?.userId as string | undefined)?.trim();
-
-  if (!userId) {
-    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
-  }
-
+/**
+ * Shared deletion routine used by both the admin-initiated delete and the
+ * user self-service delete. Cancels all live session requests the user is part
+ * of (as student or teacher), deletes their profile doc, then deletes their
+ * Auth account. Historical/financial records (payments, completed sessions,
+ * wallet ledger) are intentionally retained for legal/accounting purposes.
+ *
+ * @param userId       the account being deleted
+ * @param performedBy  who triggered it (admin uid, or the user's own uid)
+ * @param reason       cancellation reason stamped on live requests
+ */
+async function performAccountDeletion(
+  userId: string,
+  performedBy: string,
+  reason: string,
+): Promise<void> {
   await auth.getUser(userId);
 
   // FIX-DELETE-1: Cancel all live requests, not just pending.
@@ -205,7 +213,7 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
     batch.update(doc.ref, {
       status: 'cancelled',
       cancelledBy: performedBy,
-      cancellationReason: 'admin_delete_user',
+      cancellationReason: reason,
       updatedAt: FieldValue.serverTimestamp(),
     });
   }
@@ -215,10 +223,21 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
   try {
     await auth.deleteUser(userId);
   } catch (authErr) {
-    functions.logger.error('deleteUserAccount: Auth delete failed', { userId, authErr });
+    functions.logger.error('performAccountDeletion: Auth delete failed', { userId, authErr });
     throw new functions.https.HttpsError('internal', 'Failed to delete auth account');
   }
   await batch.commit();
+}
+
+export const deleteUserAccount = functions.https.onCall(async (data, context) => {
+  const performedBy = await ensureAdmin(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+
+  if (!userId) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
+  }
+
+  await performAccountDeletion(userId, performedBy, 'admin_delete_user');
 
   await writeAuditLog({
     action: 'deleteUserAccount',
@@ -227,6 +246,33 @@ export const deleteUserAccount = functions.https.onCall(async (data, context) =>
   });
 
   functions.logger.info('Admin deleted user account', { performedBy, userId });
+  return { success: true };
+});
+
+/**
+ * Self-service account deletion (Google Play Data Safety requirement).
+ * Any authenticated user can permanently delete their OWN account. Takes no
+ * userId argument — the target is always the caller, so one user can never
+ * delete another. Deletion is processed by the Admin SDK, so the client does
+ * not need to re-authenticate first.
+ *
+ * input: {} (none) · output: { success: true }
+ */
+export const deleteMyAccount = functions.https.onCall(async (_data, context) => {
+  const uid = context.auth?.uid;
+  if (!uid) {
+    throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
+  }
+
+  await performAccountDeletion(uid, uid, 'user_self_delete');
+
+  await writeAuditLog({
+    action: 'deleteMyAccount',
+    performedBy: uid,
+    targetUserId: uid,
+  });
+
+  functions.logger.info('User self-deleted account', { uid });
   return { success: true };
 });
 

@@ -470,9 +470,9 @@ class _SearchFilterDelegate extends SliverPersistentHeaderDelegate {
   });
 
   @override
-  double get minExtent => 116;
+  double get minExtent => 172;
   @override
-  double get maxExtent => 116;
+  double get maxExtent => 172;
 
   @override
   bool shouldRebuild(_SearchFilterDelegate old) =>
@@ -498,12 +498,12 @@ class _SearchFilterDelegate extends SliverPersistentHeaderDelegate {
               ]
             : null,
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       child: Column(
         children: [
           // Modern search field
           Container(
-            height: 46,
+            height: 58,
             decoration: BoxDecoration(
               color: AppThemeConstants.white,
               borderRadius: BorderRadius.circular(_R.input),
@@ -541,7 +541,7 @@ class _SearchFilterDelegate extends SliverPersistentHeaderDelegate {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           // Segmented pill filter + sort button
           Row(
             children: [
@@ -573,7 +573,7 @@ class _SegmentedFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 38,
+      height: 58,
       decoration: BoxDecoration(
         color: AppThemeConstants.white,
         borderRadius: BorderRadius.circular(_R.pill + 4),
@@ -614,16 +614,16 @@ class _SegmentedFilter extends StatelessWidget {
                   children: [
                     Icon(
                       s.icon,
-                      size: 14,
+                      size: 16,
                       color: isSelected
                           ? AppThemeConstants.white
                           : AppThemeConstants.textSecondary,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 5),
                     Text(
                       s.label,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight:
                             isSelected ? FontWeight.w700 : FontWeight.w500,
                         color: isSelected
@@ -653,8 +653,8 @@ class _SortIconButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 38,
-        width: 38,
+        height: 58,
+        width: 58,
         decoration: BoxDecoration(
           color: AppThemeConstants.white,
           borderRadius: BorderRadius.circular(_R.pill),
@@ -755,23 +755,26 @@ class StudentCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        // Even vertical wash: crisp white at the top fading to a soft cool
+        // off-white at the bottom — gives gentle depth without the muddy
+        // green corner a diagonal teal gradient produced.
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [
             AppThemeConstants.white,
-            AppThemeConstants.primary.withValues(alpha: 0.025),
+            Color(0xFFF1F7F6),
           ],
         ),
         borderRadius: BorderRadius.circular(_R.card),
         border: Border.all(
-          color: AppThemeConstants.primary.withValues(alpha: 0.06),
+          color: AppThemeConstants.primary.withValues(alpha: 0.08),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppThemeConstants.primary.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: AppThemeConstants.primary.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -840,46 +843,52 @@ class StudentCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (formattedDate != null) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
+                          const SizedBox(height: 5),
+                          // Consolidated meta line: sessions count · last session
+                          Row(
+                            children: [
+                              const Icon(Icons.school_rounded,
+                                  size: 13,
+                                  color: AppThemeConstants.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${student.sessionCount} جلسة',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppThemeConstants.primary,
+                                ),
+                              ),
+                              if (formattedDate != null) ...[
+                                const _MetaDot(),
                                 const Icon(Icons.event_rounded,
                                     size: 13,
                                     color: AppThemeConstants.textMuted),
                                 const SizedBox(width: 4),
-                                Text(
-                                  formattedDate,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppThemeConstants.textSecondary,
+                                Flexible(
+                                  child: Text(
+                                    formattedDate,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppThemeConstants.textSecondary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_left_rounded,
-                        size: 22, color: AppThemeConstants.grey300),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // ── Stats row: sessions + rating ────────────────────────
-                Row(
-                  children: [
-                    _MiniPill(
-                      icon: Icons.school_rounded,
-                      label: '${student.sessionCount} جلسة',
-                      color: AppThemeConstants.primary,
-                    ),
                     if (student.sessionRating > 0) ...[
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       _RatingPill(rating: student.sessionRating),
                     ],
+                    const SizedBox(width: 2),
+                    const Icon(Icons.chevron_left_rounded,
+                        size: 22, color: AppThemeConstants.grey300),
                   ],
                 ),
 
@@ -1006,33 +1015,15 @@ class StudentCard extends StatelessWidget {
 // Card sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _MiniPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _MiniPill(
-      {required this.icon, required this.label, required this.color});
+// Small dot separator used inside the meta line.
+class _MetaDot extends StatelessWidget {
+  const _MetaDot();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(_R.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w700, color: color),
-          ),
-        ],
-      ),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 7),
+      child: Icon(Icons.circle, size: 3, color: AppThemeConstants.textMuted),
     );
   }
 }

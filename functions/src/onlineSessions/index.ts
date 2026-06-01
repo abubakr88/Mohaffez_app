@@ -352,10 +352,15 @@ export const autoEndOverdueSessions = functions
     // in a single Firestore query (composite inequality not supported), so we
     // query by `meetingStartedAt` and filter status in-memory. Sessions older
     // than the cutoff that are already completed are simply skipped.
+    //
+    // We deliberately do NOT filter `meetingEndedAt == null` in the query:
+    // Firestore's `== null` only matches docs where the field exists AND is
+    // null. The teacher-start flow never initializes `meetingEndedAt`, so
+    // every in-progress session is missing the field and would be excluded.
+    // Filter in-memory below instead.
     const snap = await db
       .collection('hafizSessions')
       .where('meetingStartedAt', '<=', cutoff)
-      .where('meetingEndedAt', '==', null)
       .orderBy('meetingStartedAt', 'asc')
       .limit(AUTO_END_BATCH_SIZE)
       .get();
@@ -363,6 +368,7 @@ export const autoEndOverdueSessions = functions
     let endedCount = 0;
     for (const doc of snap.docs) {
       const data = doc.data() as SessionDoc;
+      if (data.meetingEndedAt) continue;
       const status = asString(data.status);
       if (status === 'completed' || status === 'cancelled' || status === 'rejected') {
         continue;

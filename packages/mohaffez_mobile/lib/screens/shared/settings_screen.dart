@@ -1,4 +1,5 @@
-﻿import 'package:firebase_auth/firebase_auth.dart';
+﻿import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -102,10 +103,116 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+
+            Spacing.vLg,
+
+            // منطقة الخطر
+            buildSection(
+              title: 'منطقة الخطر',
+              children: [
+                buildSettingTile(
+                  icon: Icons.delete_forever,
+                  iconColor: AppThemeConstants.error,
+                  title: 'حذف الحساب',
+                  subtitle: 'حذف حسابك وبياناتك نهائياً',
+                  onTap: () => _confirmDeleteAccount(context, ref),
+                ),
+              ],
+            ),
+
+            Spacing.vLg,
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount(
+      BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: AppThemeConstants.error),
+              SizedBox(width: 8),
+              Text('حذف الحساب'),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'سيتم حذف حسابك وبياناتك الشخصية (الاسم، رقم الهاتف، الصورة، الموقع) نهائياً ولا يمكن التراجع عن هذا الإجراء.',
+                style: TextStyle(height: 1.5),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'ملاحظة: تُحفظ سجلات المدفوعات والجلسات المكتملة لأغراض قانونية ومحاسبية.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppThemeConstants.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.error,
+                foregroundColor: AppThemeConstants.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('حذف نهائي'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // Loading indicator while the Cloud Function runs.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await FirebaseFunctions.instance.httpsCallable('deleteMyAccount').call();
+      // Account (incl. Auth) is gone — clear local session and route to login.
+      await ref.read(authNotifierProvider.notifier).logout();
+      if (context.mounted) {
+        Navigator.of(context).pop(); // dismiss loading
+        context.go('/login');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف حسابك بنجاح'),
+            backgroundColor: AppThemeConstants.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // dismiss loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر حذف الحساب: $e'),
+            backgroundColor: AppThemeConstants.error,
+          ),
+        );
+      }
+    }
   }
 
   Widget buildSection({

@@ -167,7 +167,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   ),
                 ),
                 child: Text(
-                  'محفظ',
+                  'محفظي',
                   style: context.textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppThemeConstants.white,
