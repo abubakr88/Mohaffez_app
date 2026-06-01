@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../services/sound_service.dart';
 import 'quiz_design_tokens.dart';
 
 /// Animated success/failure banner.
@@ -59,9 +58,6 @@ class _AnimatedResultBannerState extends State<AnimatedResultBanner>
     _scale = CurvedAnimation(parent: _ac, curve: Curves.elasticOut);
     _fade = CurvedAnimation(parent: _ac, curve: Curves.easeOut);
     _ac.forward();
-    // Central feedback hook — every quiz game renders this banner, so playing
-    // here covers all of them: clap on correct, gentle "try again" on wrong.
-    SoundService.play(widget.correct ? Sfx.clap : Sfx.tryAgain);
   }
 
   @override

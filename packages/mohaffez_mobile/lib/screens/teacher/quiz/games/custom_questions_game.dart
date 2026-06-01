@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:mohaffez_core/mohaffez_core.dart';
+import '../../../../services/sound_service.dart';
 import '../state/quiz_session_controller.dart';
 import '../widgets/confetti_overlay.dart';
 import '../widgets/quiz_buttons.dart';
@@ -52,7 +53,7 @@ class _CustomQuestionsGameState extends ConsumerState<CustomQuestionsGame> {
   }
 
   void _mark(bool correct) {
-    HapticFeedback.lightImpact();
+    SoundService.play(correct ? Sfx.clap : Sfx.tryAgain);
     final newStreak =
         ref.read(quizSessionControllerProvider.notifier).recordAnswer(correct);
     setState(() => _marked = correct);
