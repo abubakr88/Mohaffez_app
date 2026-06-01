@@ -284,7 +284,7 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
     final level = resolveLevel(sessions, age);
     final xp = computeXp(
       sessions: sessions,
-      surahs: memorized.length,
+      memorizedFraction: memorizedQuranFraction(memorizedSet),
       quizCorrect: quiz.totalCorrect,
     );
     final xpTier = resolveXpTier(xp);

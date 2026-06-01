@@ -13,19 +13,55 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, Timestamp;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+// ─── Quran content sizing ───────────────────────────────────────────────────────
+// Per-surah "weight" = how much of the mushaf the surah occupies, derived from
+// the app's own page↔verse map (assets/quran_data.json): each page is split
+// evenly among the surahs appearing on it, so a surah's weight is its fractional
+// page count. Index 0 = surah 1 (الفاتحة). This is why memorization milestones
+// reflect *real* content — e.g. البقرة alone is ~48 pages ≈ 2.4 أجزاء, not "1 of
+// 114 surahs".
+const List<int> surahPageWeight = <int>[
+  17, 795, 447, 488, 356, 381, 430, 166, 348, 224, 232, 224, 108, 108, 91, 240,
+  190, 190, 124, 157, 166, 166, 132, 157, 124, 166, 141, 182, 132, 108, 66, 50,
+  166, 108, 99, 91, 116, 91, 149, 157, 99, 108, 108, 50, 58, 75, 66, 75, 41, 41,
+  50, 41, 41, 50, 50, 50, 75, 58, 58, 41, 25, 25, 25, 33, 33, 33, 41, 33, 33, 33,
+  25, 33, 25, 33, 17, 33, 25, 25, 25, 17, 17, 8, 33, 8, 17, 8, 17, 8, 25, 8, 8,
+  14, 6, 6, 8, 8, 8, 14, 6, 11, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+];
+
+final int _totalSurahWeight =
+    surahPageWeight.fold<int>(0, (a, b) => a + b);
+
+/// Fraction of the whole Quran memorized (0..1), weighted by real surah length.
+double memorizedQuranFraction(Set<int> memorized) {
+  var sum = 0;
+  for (final n in memorized) {
+    if (n >= 1 && n <= 114) sum += surahPageWeight[n - 1];
+  }
+  return (sum / _totalSurahWeight).clamp(0.0, 1.0);
+}
+
+/// How many ajzaa-worth of content the student has memorized (0..30), floored.
+/// Replaces the old "count of surahs" proxy that wildly mis-measured progress.
+int memorizedJuzEquivalent(Set<int> memorized) =>
+    (memorizedQuranFraction(memorized) * 30).floor();
+
 // ─── XP / points system ────────────────────────────────────────────────────────
-/// Points awarded per unit of activity. Tuned so a memorized surah feels far
-/// more valuable than a single quiz answer, while sessions are the steady core.
+/// Points awarded per unit of activity. Memorization is rewarded by the *amount*
+/// of Quran memorized (content-weighted), not by surah count, so a long surah is
+/// worth far more than a short one — consistent with the achievement logic.
 const int xpPerSession = 50;
-const int xpPerSurah = 100;
+const int xpPerFullQuran = 6000; // full memorization → 6000 pts (≈200 per juz)
 const int xpPerQuizCorrect = 10;
 
 int computeXp({
   required int sessions,
-  required int surahs,
+  required double memorizedFraction,
   required int quizCorrect,
 }) =>
-    sessions * xpPerSession + surahs * xpPerSurah + quizCorrect * xpPerQuizCorrect;
+    sessions * xpPerSession +
+    (memorizedFraction * xpPerFullQuran).round() +
+    quizCorrect * xpPerQuizCorrect;
 
 /// A cosmetic XP tier (separate from the session-based [StudentLevel] so the two
 /// progress tracks can coexist — one rewards attendance, one rewards everything).
@@ -71,9 +107,10 @@ XpTier resolveXpTier(int xp) {
   return current;
 }
 
-// ─── Juz milestones (reused by screen + achievements) ──────────────────────────
-/// Which juz each surah (1-114) *starts* in. A juz is treated as "completed" when
-/// every surah starting in it is memorized — matching the existing rewards UI.
+// ─── Juz grouping (display only) ────────────────────────────────────────────────
+/// Which juz each surah (1-114) *starts* in — used purely to group the surah grid
+/// in the UI. NOTE: do not use this to measure memorized content (a surah like
+/// البقرة spans several ajzaa); use [memorizedJuzEquivalent] for that instead.
 const List<int> surahStartJuz = <int>[
   1, 1, 3, 4, 6, 7, 8, 9, 10, 11, 11, 12, 13, 13, 14, 14, 15, 15, 16, 16,
   17, 17, 18, 18, 18, 19, 19, 20, 20, 21, 21, 21, 21, 22, 22, 22, 23, 23, 23, 24,
@@ -83,21 +120,9 @@ const List<int> surahStartJuz = <int>[
   30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
 ];
 
-/// Number of fully-memorized ajzaa given a set of memorized surah numbers.
-int completedJuzCount(Set<int> memorized) {
-  final total = <int, int>{};
-  final done = <int, int>{};
-  for (var n = 1; n <= 114; n++) {
-    final juz = surahStartJuz[n - 1];
-    total[juz] = (total[juz] ?? 0) + 1;
-    if (memorized.contains(n)) done[juz] = (done[juz] ?? 0) + 1;
-  }
-  var count = 0;
-  total.forEach((juz, t) {
-    if ((done[juz] ?? 0) == t) count++;
-  });
-  return count;
-}
+/// Ajzaa-worth of memorized content (0..30). Content-weighted — see
+/// [memorizedJuzEquivalent]. Kept under this name for existing call sites.
+int completedJuzCount(Set<int> memorized) => memorizedJuzEquivalent(memorized);
 
 // ─── Weekly attendance streak ──────────────────────────────────────────────────
 /// Consecutive ISO-week streak counting back from the most recent session.
@@ -267,7 +292,7 @@ List<Achievement> buildAchievementsFull({
   return _build(
     sessions: sessions,
     memorizedCount: memorizedSet.length,
-    completedJuz: completedJuzCount(memorizedSet),
+    juzEquivalent: memorizedJuzEquivalent(memorizedSet),
     weeklyStreak: weeklyStreak,
     quiz: quiz,
   );
@@ -276,7 +301,7 @@ List<Achievement> buildAchievementsFull({
 List<Achievement> _build({
   required int sessions,
   required int memorizedCount,
-  required int completedJuz,
+  required int juzEquivalent,
   required int weeklyStreak,
   required QuizStats quiz,
 }) {
@@ -297,15 +322,15 @@ List<Achievement> _build({
     Achievement(id: 'quiz_correct_50', title: 'قنّاص', emoji: '🏹', hint: '50 إجابة صحيحة', current: quiz.totalCorrect, target: 50, category: AchievementCategory.quiz),
     Achievement(id: 'quiz_streak_5', title: 'سلسلة ذهبية', emoji: '⚡', hint: 'سلسلة 5 إجابات صحيحة', current: quiz.bestStreak, target: 5, category: AchievementCategory.quiz),
     Achievement(id: 'quiz_acc_90', title: 'الدقة العالية', emoji: '💯', hint: 'دقة 90% أو أعلى', current: quiz.accuracyPct, target: 90, category: AchievementCategory.quiz),
-    // Memorization
-    Achievement(id: 'mem_1', title: 'أول سورة', emoji: '🌸', hint: 'احفظ أول سورة', current: memorizedCount, target: 1, category: AchievementCategory.memorization),
-    Achievement(id: 'mem_20', title: 'حافظ الجزء', emoji: '📜', hint: 'حفظ 20 سورة', current: memorizedCount, target: 20, category: AchievementCategory.memorization),
-    Achievement(id: 'mem_57', title: 'حافظ النصف', emoji: '🌙', hint: 'حفظ 57 سورة', current: memorizedCount, target: 57, category: AchievementCategory.memorization),
-    Achievement(id: 'mem_114', title: 'الحافظ الكريم', emoji: '👑', hint: 'حفظ القرآن كاملاً', current: memorizedCount, target: 114, category: AchievementCategory.memorization),
-    // Juz
-    Achievement(id: 'juz_1', title: 'جزء كامل', emoji: '📗', hint: 'أتمم أول جزء', current: completedJuz, target: 1, category: AchievementCategory.juz),
-    Achievement(id: 'juz_3', title: 'ثلاثة أجزاء', emoji: '📚', hint: 'أتمم 3 أجزاء', current: completedJuz, target: 3, category: AchievementCategory.juz),
-    Achievement(id: 'juz_10', title: 'عشرة أجزاء', emoji: '🏆', hint: 'أتمم 10 أجزاء', current: completedJuz, target: 10, category: AchievementCategory.juz),
-    Achievement(id: 'juz_30', title: 'ختمة كاملة', emoji: '🕌', hint: 'أتمم 30 جزءاً', current: completedJuz, target: 30, category: AchievementCategory.juz),
+    // Memorization — measured by *portion of the Quran*, not surah count.
+    Achievement(id: 'mem_first', title: 'أول سورة', emoji: '🌸', hint: 'احفظ أول سورة', current: memorizedCount, target: 1, category: AchievementCategory.memorization),
+    Achievement(id: 'mem_quarter', title: 'ربع القرآن', emoji: '📜', hint: 'احفظ ما يعادل ٧ أجزاء', current: juzEquivalent, target: 7, category: AchievementCategory.memorization),
+    Achievement(id: 'mem_half', title: 'نصف القرآن', emoji: '🌙', hint: 'احفظ ما يعادل ١٥ جزءاً', current: juzEquivalent, target: 15, category: AchievementCategory.memorization),
+    Achievement(id: 'mem_full', title: 'الحافظ الكريم', emoji: '👑', hint: 'احفظ القرآن كاملاً', current: juzEquivalent, target: 30, category: AchievementCategory.memorization),
+    // Juz milestones — content-weighted ajzaa (e.g. البقرة ≈ جزءان ونصف).
+    Achievement(id: 'juz_1', title: 'أول جزء', emoji: '📗', hint: 'احفظ ما يعادل جزءاً كاملاً', current: juzEquivalent, target: 1, category: AchievementCategory.juz),
+    Achievement(id: 'juz_3', title: 'ثلاثة أجزاء', emoji: '📚', hint: 'احفظ ما يعادل ٣ أجزاء', current: juzEquivalent, target: 3, category: AchievementCategory.juz),
+    Achievement(id: 'juz_5', title: 'خمسة أجزاء', emoji: '🏅', hint: 'احفظ ما يعادل ٥ أجزاء', current: juzEquivalent, target: 5, category: AchievementCategory.juz),
+    Achievement(id: 'juz_10', title: 'عشرة أجزاء', emoji: '🏆', hint: 'احفظ ما يعادل ١٠ أجزاء', current: juzEquivalent, target: 10, category: AchievementCategory.juz),
   ];
 }
