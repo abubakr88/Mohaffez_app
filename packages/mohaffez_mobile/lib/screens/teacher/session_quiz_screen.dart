@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'quiz/games/complete_ayah_game.dart';
@@ -15,6 +14,7 @@ import 'quiz/widgets/score_badge.dart';
 import 'quiz/state/quiz_session_controller.dart'
     show quizSessionControllerProvider;
 import 'package:mohaffez_finder_app/providers/quiz_access_provider.dart';
+import '../../services/sound_service.dart';
 
 enum _GameMode {
   selector,
@@ -83,11 +83,95 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
   }
 
   void _goTo(_GameMode m) {
-    HapticFeedback.lightImpact();
+    SoundService.play(Sfx.tap);
     setState(() => _mode = m);
   }
 
   void _backToSelector() => setState(() => _mode = _GameMode.selector);
+
+  /// End-of-challenge reward: celebrate the points earned this session, then
+  /// leave (PopScope persists the results to the session doc).
+  Future<void> _finishQuiz() async {
+    final s = ref.read(quizSessionControllerProvider);
+    final points = s.correct * xpPerQuizCorrect;
+    SoundService.play(Sfx.complete);
+    _confetti.celebrate(intensity: ConfettiIntensity.fireworks);
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (dialogCtx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('🎉', style: TextStyle(fontSize: 48)),
+                const SizedBox(height: 8),
+                const Text('أحسنت!',
+                    style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF111827))),
+                const SizedBox(height: 12),
+                Text(
+                  'أجبت ${s.correct} من ${s.asked} بشكل صحيح',
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF4B5563)),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFD4A44A)),
+                  ),
+                  child: Text(
+                    '+$points نقطة ⭐',
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFB7791F)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'تُضاف نقاطك إلى إنجازاتك في صفحة المكافآت',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogCtx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F766E),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('رائع! 🌟',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
 
   String get _title => switch (_mode) {
         _GameMode.selector        => 'تحديات الجلسة',
@@ -283,6 +367,7 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
           mohaffezId: widget.mohaffezId,
           studentId: widget.studentId,
           onSelect: _goTo,
+          onFinish: _finishQuiz,
         );
       case _GameMode.completeAyah:
         return CompleteAyahGame(
@@ -464,12 +549,14 @@ class _KidsSelector extends ConsumerWidget {
   final String? mohaffezId;
   final String? studentId;
   final ValueChanged<_GameMode> onSelect;
+  final VoidCallback onFinish;
 
   const _KidsSelector({
     required this.studentName,
     required this.mohaffezId,
     required this.studentId,
     required this.onSelect,
+    required this.onFinish,
   });
 
   @override
@@ -543,7 +630,28 @@ class _KidsSelector extends ConsumerWidget {
               correct: session.correct,
               asked: session.asked,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
+            // Finish + claim points
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: onFinish,
+                icon: const Icon(Icons.emoji_events_rounded, size: 20),
+                label: Text(
+                  'أنهِ التحدي واحصل على ${session.correct * xpPerQuizCorrect} نقطة ⭐',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4A44A),
+                  foregroundColor: const Color(0xFF095752),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
           ],
 
           // Bottom hint

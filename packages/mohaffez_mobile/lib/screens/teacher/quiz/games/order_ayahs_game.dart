@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../data/quran_quiz_bank.dart';
+import '../../../../services/sound_service.dart';
 import '../state/quiz_session_controller.dart';
 import '../widgets/confetti_overlay.dart';
 import '../widgets/quiz_buttons.dart';
@@ -76,13 +77,13 @@ class _OrderAyahsGameState extends ConsumerState<OrderAyahsGame> {
         break;
       }
     }
+    SoundService.play(ok ? Sfx.clap : Sfx.tryAgain);
     final newStreak =
         ref.read(quizSessionControllerProvider.notifier).recordAnswer(ok);
     setState(() {
       _submitted = true;
       _correct = ok;
     });
-    HapticFeedback.mediumImpact();
     if (ok) {
       // Order game is harder — use fireworks on a single correct answer too
       widget.confetti.celebrate(
