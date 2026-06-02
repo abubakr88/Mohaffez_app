@@ -257,8 +257,8 @@ export const getAdminMetrics = functions.https.onCall(async (_data, context) => 
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
   }
-  const callerDoc = await db.collection('users').doc(context.auth.uid).get();
-  if (callerDoc.data()?.role !== 'admin') {
+  const isAdmin = (context.auth.token as { admin?: boolean } | undefined)?.admin === true;
+  if (!isAdmin) {
     throw new functions.https.HttpsError('permission-denied', 'للمسؤولين فقط');
   }
 
