@@ -65,24 +65,9 @@ import '../screens/teacher/teacher_certificates_screen.dart';
 import '../screens/teacher/teacher_pending_screen.dart';
 import '../screens/teacher/teacher_rejected_screen.dart';
 import '../screens/teacher/teacher_setup_wizard_screen.dart';
-// Admin screens
-import '../screens/admin/admin_home_screen.dart';
-import '../screens/admin/admin_users_screen.dart';
-import '../screens/admin/admin_user_detail_screen.dart';
-import '../screens/admin/admin_credentials_screen.dart';
-import '../screens/admin/admin_failed_operations_screen.dart';
-import '../screens/admin/admin_promo_codes_screen.dart';
-import '../screens/admin/admin_system_settings_screen.dart';
-import '../screens/admin/admin_dev_mode_screen.dart';
-import '../screens/admin/admin_broadcast_screen.dart';
-import '../screens/admin/admin_slot_locks_screen.dart';
-import '../screens/admin/admin_payment_events_screen.dart';
-import '../screens/admin/admin_audit_log_screen.dart';
-import '../screens/admin/admin_wallet_settings_screen.dart';
-import '../screens/admin/admin_credit_wallet_screen.dart';
-import '../screens/admin/admin_wallet_topups_screen.dart';
-import '../screens/admin/admin_process_payouts_screen.dart';
-import '../screens/admin/admin_teacher_requests_screen.dart';
+// Admin: removed from the consumer mobile app for security — administration now
+// lives only on the web console. Admins who sign in see a "use web" notice.
+import '../screens/shared/admin_web_only_screen.dart';
 import '../shared/widgets/interactive_quran_page.dart';
 import '../shared/theme/theme_extensions.dart';
 import 'guard_manager.dart';
@@ -187,6 +172,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/suspended',
         name: 'suspended',
         builder: (context, state) => const SuspendedScreen(),
+      ),
+      // ── Admin: web-only notice (admin UI removed from mobile for security).
+      // Kept outside HomeShell so admins get a clean full-screen notice + logout,
+      // with no admin chrome/bottom-nav. RoleGuard still routes admins here.
+      GoRoute(
+        path: '/admin-home',
+        name: 'admin-home',
+        builder: (context, state) => const AdminWebOnlyScreen(),
       ),
       // ── One-time account setup (outside HomeShell — no bottom nav) ──
       GoRoute(
@@ -718,105 +711,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
           // ──────────────────────────────────────────────────────────────
 
-          // ============================================
-          // ADMIN ROUTES
-          // ============================================
-          GoRoute(
-            path: '/admin-home',
-            name: 'admin-home',
-            builder: (context, state) => const AdminHomeScreen(),
-          ),
-          GoRoute(
-            path: '/admin/users',
-            name: 'admin-users',
-            builder: (context, state) => const AdminUsersScreen(),
-          ),
-          GoRoute(
-            path: '/admin/user-detail',
-            name: 'admin-user-detail',
-            builder: (context, state) {
-              final user = state.extra as Map<String, dynamic>;
-              return AdminUserDetailScreen(user: user);
-            },
-          ),
-          GoRoute(
-            path: '/admin/credentials',
-            name: 'admin-credentials',
-            builder: (context, state) => const AdminCredentialsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/failed-ops',
-            name: 'admin-failed-ops',
-            builder: (context, state) =>
-                const AdminFailedOperationsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/promo-codes',
-            name: 'admin-promo-codes',
-            builder: (context, state) => const AdminPromoCodesScreen(),
-          ),
-          GoRoute(
-            path: '/admin/settings',
-            name: 'admin-settings',
-            builder: (context, state) =>
-                const AdminSystemSettingsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/dev-mode',
-            name: 'admin-dev-mode',
-            builder: (context, state) => const AdminDevModeScreen(),
-          ),
-          GoRoute(
-            path: '/admin/broadcast',
-            name: 'admin-broadcast',
-            builder: (context, state) => const AdminBroadcastScreen(),
-          ),
-          GoRoute(
-            path: '/admin/slot-locks',
-            name: 'admin-slot-locks',
-            builder: (context, state) => const AdminSlotLocksScreen(),
-          ),
-          GoRoute(
-            path: '/admin/payment-events',
-            name: 'admin-payment-events',
-            builder: (context, state) =>
-                const AdminPaymentEventsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/wallet-numbers',
-            name: 'admin-wallet-numbers',
-            builder: (context, state) =>
-                const AdminWalletSettingsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/wallet-topups',
-            name: 'admin-wallet-topups',
-            builder: (context, state) =>
-                const AdminWalletTopupsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/credit-wallet',
-            name: 'admin-credit-wallet',
-            builder: (context, state) =>
-                const AdminCreditWalletScreen(),
-          ),
-          GoRoute(
-            path: '/admin/process-payouts',
-            name: 'admin-process-payouts',
-            builder: (context, state) =>
-                const AdminProcessPayoutsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/audit-log',
-            name: 'admin-audit-log',
-            builder: (context, state) => const AdminAuditLogScreen(),
-          ),
-          GoRoute(
-            path: '/admin/teacher-requests',
-            name: 'admin-teacher-requests',
-            builder: (context, state) =>
-                const AdminTeacherRequestsScreen(),
-          ),
+          // Admin routes were removed from the mobile app (web console only).
         ],
       ),
     ],

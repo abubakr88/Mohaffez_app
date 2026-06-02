@@ -6,10 +6,11 @@ import { releaseExpiredSlotLocksNow } from '../cleanup/releaseExpiredSlotLocks';
 type TargetRole = 'all' | 'student' | 'mohaffez';
 
 async function isAdminCaller(context: functions.https.CallableContext): Promise<boolean> {
-  if (!context.auth?.uid) return false;
-  if ((context.auth.token as { admin?: boolean }).admin === true) return true;
-  const userDoc = await db.collection('users').doc(context.auth.uid).get();
-  return userDoc.exists && userDoc.data()?.role === 'admin';
+  // Single source of truth: the `admin` custom claim (set only via the
+  // setAdminClaim function). We deliberately do NOT fall back to the Firestore
+  // `users/{uid}.role` field — that decouples admin privilege from any Firestore
+  // write path, so a future rules change can never accidentally grant it.
+  return (context.auth?.token as { admin?: boolean } | undefined)?.admin === true;
 }
 
 async function ensureAdmin(context: functions.https.CallableContext): Promise<string> {
