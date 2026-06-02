@@ -47,7 +47,10 @@ class RevealGameScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      child: Column(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Column(
         children: [
           GestureDetector(
             onTap: revealed
@@ -165,6 +168,8 @@ class RevealGameScaffold extends StatelessWidget {
           BackToMenuButton(onTap: onBackToMenu),
           const SizedBox(height: 16),
         ],
+          ),
+        ),
       ),
     );
   }

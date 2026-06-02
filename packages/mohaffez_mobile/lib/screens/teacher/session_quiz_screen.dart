@@ -571,7 +571,10 @@ class _KidsSelector extends ConsumerWidget {
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(14, 18, 14, 24),
-      child: Column(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Section label
@@ -597,15 +600,16 @@ class _KidsSelector extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
 
-          // 2×2 game grid
+          // Game grid — fixed tile size so columns grow on tablet / web
+          // instead of the two cards stretching huge.
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 240,
+              mainAxisExtent: 196,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 0.88,
             ),
             itemCount: _kidsModes.length,
             itemBuilder: (_, i) => _KidsGameCard(
@@ -662,6 +666,8 @@ class _KidsSelector extends ConsumerWidget {
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }

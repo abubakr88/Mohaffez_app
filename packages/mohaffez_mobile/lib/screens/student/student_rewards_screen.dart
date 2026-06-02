@@ -26,6 +26,10 @@ class _C {
   static const border = Color(0xFFE5EDE9);
 }
 
+/// Caps content width on tablets / web so the phone-first layout stays a
+/// readable centered column instead of stretching edge-to-edge.
+const double _kMaxContentWidth = 720;
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class StudentRewardsScreen extends ConsumerWidget {
   /// Pass the student's user doc so we can read dateOfBirth + uid.
@@ -315,7 +319,10 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
         backgroundColor: _C.bg,
         body: Stack(
           children: [
-            CustomScrollView(
+            Center(
+              child: SizedBox(
+                width: _kMaxContentWidth,
+                child: CustomScrollView(
               slivers: [
                 SliverAppBar(
                   expandedHeight: 286,
@@ -389,12 +396,14 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   sliver: SliverGrid(
+                    // Fixed tile size → columns grow with width instead of the
+                    // cells ballooning on tablet / web.
                     gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 124,
+                      mainAxisExtent: 122,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
-                      childAspectRatio: 0.82,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, i) => _AchievementCard(
@@ -417,6 +426,8 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
               ],
+                ),
+              ),
             ),
 
             Align(
@@ -1463,6 +1474,7 @@ class _SurahsSection extends StatefulWidget {
 
 class _SurahsSectionState extends State<_SurahsSection> {
   bool _showAll = false;
+  bool _memorizedOnly = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1472,12 +1484,20 @@ class _SurahsSectionState extends State<_SurahsSection> {
     }
     final allJuzKeys = byJuz.keys.toList()..sort((a, b) => b.compareTo(a));
 
-    final visibleKeys = (widget.isEarlyStudent && !_showAll)
+    var visibleKeys = (widget.isEarlyStudent && !_showAll)
         ? allJuzKeys.where((j) => j == 30).toList()
         : allJuzKeys;
+    if (_memorizedOnly) {
+      visibleKeys = visibleKeys
+          .where((j) => byJuz[j]!.any(widget.memorizedSet.contains))
+          .toList();
+    }
+
+    final memorizedCount = widget.memorizedSet.length;
+    final pct = (memorizedCount / 114 * 100).round();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1488,31 +1508,115 @@ class _SurahsSectionState extends State<_SurahsSection> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color:
-                      widget.memorizedSet.isNotEmpty ? _C.goldBg : _C.teal50,
+                  color: memorizedCount > 0 ? _C.goldBg : _C.teal50,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${widget.memorizedSet.length} / 114',
+                  '$memorizedCount / 114',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: widget.memorizedSet.isNotEmpty
-                        ? _C.goldDark
-                        : _C.teal700,
+                    color: memorizedCount > 0 ? _C.goldDark : _C.teal700,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          for (final juz in visibleKeys)
-            _JuzGroup(
-              juz: juz,
-              surahs: byJuz[juz]!,
-              memorizedSet: widget.memorizedSet,
+
+          // Overall completion bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _C.border),
             ),
-          if (widget.isEarlyStudent && !_showAll)
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('نسبة إتمام المصحف',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: _C.text2)),
+                    Text('$pct%',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: _C.goldDark)),
+                  ],
+                ),
+                const SizedBox(height: 9),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: memorizedCount / 114),
+                    duration: const Duration(milliseconds: 900),
+                    curve: Curves.easeOutCubic,
+                    builder: (_, v, __) => LinearProgressIndicator(
+                      value: v,
+                      minHeight: 9,
+                      backgroundColor: _C.teal50,
+                      valueColor: const AlwaysStoppedAnimation<Color>(_C.gold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Filter: all vs memorized-only
+          Row(
+            children: [
+              _Chip(
+                label: 'الكل',
+                selected: !_memorizedOnly,
+                onTap: () {
+                  SoundService.play(Sfx.tap);
+                  setState(() => _memorizedOnly = false);
+                },
+              ),
+              _Chip(
+                label: 'المحفوظة فقط',
+                selected: _memorizedOnly,
+                onTap: () {
+                  SoundService.play(Sfx.tap);
+                  setState(() => _memorizedOnly = true);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          if (visibleKeys.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              alignment: Alignment.center,
+              child: const Column(
+                children: [
+                  Text('📖', style: TextStyle(fontSize: 32)),
+                  SizedBox(height: 8),
+                  Text('لا توجد سور محفوظة بعد',
+                      style: TextStyle(color: _C.text3, fontSize: 13)),
+                ],
+              ),
+            )
+          else
+            for (final juz in visibleKeys)
+              _JuzGroup(
+                juz: juz,
+                surahs: byJuz[juz]!,
+                memorizedSet: widget.memorizedSet,
+                memorizedOnly: _memorizedOnly,
+              ),
+
+          if (widget.isEarlyStudent && !_showAll && !_memorizedOnly)
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 8),
               child: GestureDetector(
@@ -1551,91 +1655,160 @@ class _SurahsSectionState extends State<_SurahsSection> {
   }
 }
 
-class _JuzGroup extends StatelessWidget {
+class _JuzGroup extends StatefulWidget {
   final int juz;
   final List<int> surahs;
   final Set<int> memorizedSet;
+  final bool memorizedOnly;
 
   const _JuzGroup({
     required this.juz,
     required this.surahs,
     required this.memorizedSet,
+    this.memorizedOnly = false,
   });
 
   @override
+  State<_JuzGroup> createState() => _JuzGroupState();
+}
+
+class _JuzGroupState extends State<_JuzGroup> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final surahs = widget.surahs;
+    final memorizedSet = widget.memorizedSet;
     final memorizedHere = surahs.where(memorizedSet.contains).length;
     final total = surahs.length;
     final isComplete = memorizedHere == total && total > 0;
+    final shown = widget.memorizedOnly
+        ? surahs.where(memorizedSet.contains).toList()
+        : surahs;
+    // The "memorized only" filter forces the list open; otherwise honor the tap.
+    final isOpen = _expanded || widget.memorizedOnly;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+      decoration: BoxDecoration(
+        color: isComplete ? _C.goldBg : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isComplete ? _C.gold.withValues(alpha: 0.5) : _C.border,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _C.teal700.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8, top: 4),
-            child: Row(
+          // Tappable header — toggles the surah list.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.memorizedOnly
+                ? null
+                : () {
+                    SoundService.play(Sfx.tap);
+                    setState(() => _expanded = !_expanded);
+                  },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 4,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: isComplete ? _C.gold : _C.teal700,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _juzLabel(juz),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: _C.text1,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isComplete ? _C.goldBg : _C.teal50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$memorizedHere / $total',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: isComplete ? _C.goldDark : _C.teal700,
+                Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: isComplete ? _C.gold : _C.teal700,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _juzLabel(widget.juz),
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: _C.text1,
+                      ),
+                    ),
+                    if (isComplete) ...[
+                      const SizedBox(width: 6),
+                      const Icon(Icons.verified_rounded,
+                          size: 16, color: _C.gold),
+                    ],
+                    const Spacer(),
+                    Text(
+                      '$memorizedHere / $total',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: isComplete ? _C.goldDark : _C.teal700,
+                      ),
+                    ),
+                    if (!widget.memorizedOnly) ...[
+                      const SizedBox(width: 4),
+                      AnimatedRotation(
+                        turns: isOpen ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 20, color: _C.text3),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: LinearProgressIndicator(
+                    value: total == 0 ? 0 : memorizedHere / total,
+                    minHeight: 6,
+                    backgroundColor:
+                        isComplete ? _C.gold.withValues(alpha: 0.2) : _C.teal50,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        isComplete ? _C.gold : _C.teal700),
                   ),
                 ),
-                if (isComplete) ...[
-                  const SizedBox(width: 6),
-                  const Text('✨', style: TextStyle(fontSize: 14)),
-                ],
               ],
             ),
           ),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: surahs.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.4,
-            ),
-            itemBuilder: (_, index) {
-              final surahNum = surahs[index];
-              return _SurahBadge(
-                number: surahNum,
-                name: surahNames[surahNum - 1],
-                memorized: memorizedSet.contains(surahNum),
-              );
-            },
+          // Collapsible surah grid.
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: isOpen
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: shown.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 160,
+                        mainAxisExtent: 44,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemBuilder: (_, index) {
+                        final surahNum = shown[index];
+                        return _SurahBadge(
+                          number: surahNum,
+                          name: surahNames[surahNum - 1],
+                          memorized: memorizedSet.contains(surahNum),
+                        );
+                      },
+                    ),
+                  )
+                : const SizedBox(width: double.infinity, height: 0),
           ),
         ],
       ),
@@ -1753,75 +1926,66 @@ class _SurahBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
         gradient: memorized
-            ? LinearGradient(
-                colors: [
-                  _C.gold.withValues(alpha: 0.15),
-                  _C.gold.withValues(alpha: 0.05),
-                ],
+            ? const LinearGradient(
+                colors: [Color(0xFFE3B45F), _C.gold],
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
               )
             : null,
-        color: memorized ? null : Colors.white,
+        color: memorized ? null : _C.bg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: memorized ? _C.gold.withValues(alpha: 0.7) : _C.border,
-          width: memorized ? 1.5 : 1,
-        ),
+        border: memorized ? null : Border.all(color: _C.border),
         boxShadow: memorized
             ? [
                 BoxShadow(
-                  color: _C.gold.withValues(alpha: 0.18),
+                  color: _C.gold.withValues(alpha: 0.3),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 )
               ]
-            : [],
+            : null,
       ),
-      child: Stack(
+      child: Row(
         children: [
-          if (memorized)
-            Positioned(
-              top: 3,
-              left: 3,
-              child: Icon(
-                Icons.check_circle,
-                size: 12,
-                color: _C.gold.withValues(alpha: 0.8),
-              ),
+          // Surah number bubble
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: memorized ? Colors.white.withValues(alpha: 0.28) : Colors.white,
+              shape: BoxShape.circle,
+              border: memorized ? null : Border.all(color: _C.border),
             ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$number',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: memorized ? _C.goldDark : _C.text3,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: memorized ? FontWeight.w800 : FontWeight.w500,
-                      color: memorized ? _C.teal800 : _C.text2,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+            child: Text(
+              '$number',
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                color: memorized ? Colors.white : _C.text3,
               ),
             ),
           ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: memorized ? FontWeight.w800 : FontWeight.w600,
+                color: memorized ? Colors.white : _C.text2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (memorized) ...[
+            const SizedBox(width: 2),
+            const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+          ],
         ],
       ),
     );
