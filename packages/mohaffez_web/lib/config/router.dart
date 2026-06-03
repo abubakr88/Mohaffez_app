@@ -34,6 +34,7 @@ import '../features/admin/promos/admin_promos_page.dart';
 import '../features/admin/config/admin_config_page.dart';
 import '../features/admin/reports/admin_reports_page.dart';
 import '../features/admin/broadcast/admin_broadcast_page.dart';
+import '../features/admin/slot_locks/admin_slot_locks_page.dart';
 import '../features/admin/payment_events/admin_payment_events_page.dart';
 import '../features/admin/audit/admin_audit_log_page.dart';
 
@@ -133,6 +134,7 @@ final webRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/admin/config',    builder: (_, __) => const AdminConfigPage()),
           GoRoute(path: '/admin/reports',         builder: (_, __) => const AdminReportsPage()),
           GoRoute(path: '/admin/broadcast',       builder: (_, __) => const AdminBroadcastPage()),
+          GoRoute(path: '/admin/slot-locks',      builder: (_, __) => const AdminSlotLocksPage()),
           GoRoute(path: '/admin/payment-events',  builder: (_, __) => const AdminPaymentEventsPage()),
           GoRoute(path: '/admin/audit-log',       builder: (_, __) => const AdminAuditLogPage()),
         ],
