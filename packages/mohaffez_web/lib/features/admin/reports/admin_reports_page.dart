@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import '../../../design_system/design_system.dart';
+import '../../../platform/web_download.dart';
 
 class AdminReportsPage extends ConsumerWidget {
   const AdminReportsPage({super.key});
@@ -16,9 +17,19 @@ class AdminReportsPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PageHeader(
-            title: 'التقارير',
-            subtitle: 'تحليلات الإيرادات والجلسات والمستخدمين',
+          Row(
+            children: [
+              const Expanded(
+                child: PageHeader(
+                  title: 'التقارير',
+                  subtitle: 'تحليلات الإيرادات والجلسات والمستخدمين',
+                ),
+              ),
+              metricsAsync.maybeWhen(
+                data: (m) => _ExportMenu(metrics: m),
+                orElse: () => const SizedBox.shrink(),
+              ),
+            ],
           ),
           const SizedBox(height: DSSpacing.xxl),
           metricsAsync.when(
@@ -34,6 +45,11 @@ class AdminReportsPage extends ConsumerWidget {
                     style: DSText.caption(context, color: DSColors.text3),
                   ),
                 const SizedBox(height: DSSpacing.md),
+
+                // Period comparison KPIs ─────────────────────────────────
+                _ComparisonRow(metrics: m),
+                const SizedBox(height: DSSpacing.xxl),
+
                 DSGrid(
                   mobileColumns: 1,
                   tabletColumns: 2,
@@ -54,6 +70,143 @@ class AdminReportsPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+// ── Export ────────────────────────────────────────────────────────────────
+class _ExportMenu extends StatelessWidget {
+  const _ExportMenu({required this.metrics});
+  final AdminMetrics metrics;
+
+  String get _stamp => DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  void _exportMonthly() {
+    final csv = buildCsv(
+      ['الشهر', 'الإيراد (ج.م)'],
+      metrics.revenue.last12Months
+          .map((m) => [m.month, m.total.round()])
+          .toList(),
+    );
+    downloadCsv('mohafezy-revenue-$_stamp.csv', csv);
+  }
+
+  void _exportSummary() {
+    final r = metrics.revenue;
+    final c = metrics.commissions;
+    final s = metrics.sessions;
+    final sub = metrics.subscriptions;
+    final u = metrics.users;
+    final csv = buildCsv(
+      ['المؤشر', 'القيمة'],
+      [
+        ['إيرادات هذا الشهر', r.thisMonth.round()],
+        ['إيرادات الشهر السابق', r.lastMonth.round()],
+        ['إيرادات السنة', r.ytd.round()],
+        ['عمولات مستحقة', c.outstanding.round()],
+        ['عمولات متأخرة', c.overdue.round()],
+        ['بانتظار التأكيد', c.pendingVerification.round()],
+        ['مدفوع هذا الشهر', c.paidThisMonth.round()],
+        ['جلسات منجزة (الشهر)', s.completedThisMonth],
+        ['جلسات منجزة (الشهر السابق)', s.completedLastMonth],
+        ['جلسات ملغاة (الشهر)', s.cancelledThisMonth],
+        ['جلسات قيد الانتظار', s.pendingNow],
+        ['اشتراكات نشطة', sub.active],
+        ['اشتراكات ملغاة (الشهر)', sub.cancelledThisMonth],
+        ['إجمالي الطلاب', u.totalStudents],
+        ['إجمالي المحفظين', u.totalTeachers],
+        ['محفظون نشطون (30 يوم)', u.activeTeachers30d],
+        ['تسجيلات جديدة (الشهر)', u.newSignupsThisMonth],
+        ['طلبات محفظ معلقة', u.pendingTeacherApprovals],
+      ],
+    );
+    downloadCsv('mohafezy-summary-$_stamp.csv', csv);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DSDropdownMenu(
+      items: [
+        DSDropdownItem(
+          label: 'ملخص شامل (CSV)',
+          icon: Icons.summarize_outlined,
+          onTap: _exportSummary,
+        ),
+        DSDropdownItem(
+          label: 'الإيرادات الشهرية (CSV)',
+          icon: Icons.show_chart_rounded,
+          onTap: _exportMonthly,
+        ),
+      ],
+      child: DSButton(
+        label: 'تصدير',
+        size: DSButtonSize.sm,
+        variant: DSButtonVariant.secondary,
+        leading: const Icon(Icons.download_rounded, size: 16),
+        onPressed: () {},
+      ),
+    );
+  }
+}
+
+// ── Comparison KPIs ─────────────────────────────────────────────────────────
+class _ComparisonRow extends StatelessWidget {
+  const _ComparisonRow({required this.metrics});
+  final AdminMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = metrics.revenue;
+    final s = metrics.sessions;
+    return DSGrid(
+      mobileColumns: 1,
+      tabletColumns: 2,
+      desktopColumns: 4,
+      children: [
+        DSStatCard(
+          label: 'إيرادات هذا الشهر',
+          value: _money(r.thisMonth),
+          trend: _delta(r.thisMonth, r.lastMonth),
+          trendPositive: r.thisMonth >= r.lastMonth,
+          icon: Icons.trending_up_rounded,
+          iconColor: DSColors.success,
+        ),
+        DSStatCard(
+          label: 'إيرادات السنة',
+          value: _money(r.ytd),
+          icon: Icons.calendar_today_rounded,
+          iconColor: DSColors.primary,
+        ),
+        DSStatCard(
+          label: 'جلسات منجزة (الشهر)',
+          value: '${s.completedThisMonth}',
+          trend: _intDelta(s.completedThisMonth, s.completedLastMonth),
+          trendPositive: s.completedThisMonth >= s.completedLastMonth,
+          icon: Icons.event_available_rounded,
+          iconColor: DSColors.success,
+        ),
+        DSStatCard(
+          label: 'اشتراكات نشطة',
+          value: '${metrics.subscriptions.active}',
+          icon: Icons.card_membership_outlined,
+          iconColor: DSColors.secondary,
+        ),
+      ],
+    );
+  }
+
+  static String _money(double v) =>
+      '${NumberFormat.decimalPattern('ar').format(v.round())} ج.م';
+
+  static String _delta(double current, double previous) {
+    if (previous == 0) return current > 0 ? 'بداية جديدة' : '—';
+    final pct = ((current - previous) / previous * 100).round();
+    return pct >= 0 ? '▲ $pct% عن السابق' : '▼ ${pct.abs()}% عن السابق';
+  }
+
+  static String _intDelta(int current, int previous) {
+    if (previous == 0) return current > 0 ? 'بداية جديدة' : '—';
+    final diff = current - previous;
+    return diff >= 0 ? '+$diff عن السابق' : '$diff عن السابق';
   }
 }
 
@@ -188,8 +341,7 @@ class _Row extends StatelessWidget {
         children: [
           Text(label,
               style: DSText.body(context, color: color ?? DSColors.text2)),
-          Text(value,
-              style: DSText.bodyMedium(context, color: color)),
+          Text(value, style: DSText.bodyMedium(context, color: color)),
         ],
       ),
     );
