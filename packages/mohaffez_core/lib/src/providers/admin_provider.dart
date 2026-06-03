@@ -125,6 +125,72 @@ final auditLogProvider =
           .toList());
 });
 
+/// Admin-scoped sessions stream.
+///
+/// [statusFilter] — null = all recent (ordered by sessionDate DESC, limit 100)
+/// any other string — filtered by status, client-sorted by sessionDate DESC.
+/// 'live' is a synthetic filter meaning pending+accepted.
+final adminSessionsProvider = StreamProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String?>((ref, statusFilter) {
+  final col = FirebaseFirestore.instance.collection('hafizSessions');
+
+  // 'live' = all non-terminal statuses
+  if (statusFilter == 'live') {
+    return col
+        .where('status', whereIn: ['pending', 'accepted'])
+        .limit(100)
+        .snapshots()
+        .map((s) {
+          final docs = s.docs
+              .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+              .toList();
+          docs.sort((a, b) => _compareTs(a['slotStart'], b['slotStart']));
+          return docs;
+        });
+  }
+
+  if (statusFilter != null) {
+    return col
+        .where('status', isEqualTo: statusFilter)
+        .limit(100)
+        .snapshots()
+        .map((s) {
+          final docs = s.docs
+              .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+              .toList();
+          docs.sort((a, b) => _compareTs(b['sessionDate'], a['sessionDate']));
+          return docs;
+        });
+  }
+
+  // null → most recent 100 across all statuses
+  return col
+      .orderBy('sessionDate', descending: true)
+      .limit(100)
+      .snapshots()
+      .map((s) =>
+          s.docs.map((d) => <String, dynamic>{'id': d.id, ...d.data()}).toList());
+});
+
+int _compareTs(dynamic a, dynamic b) {
+  DateTime? toDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    try {
+      return (v as dynamic).toDate() as DateTime;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  final da = toDate(a);
+  final db = toDate(b);
+  if (da == null && db == null) return 0;
+  if (da == null) return 1;
+  if (db == null) return -1;
+  return da.compareTo(db);
+}
+
 /// Recent broadcast notifications (most recent first).
 final broadcastHistoryProvider =
     StreamProvider.autoDispose<List<BroadcastModel>>((ref) {
