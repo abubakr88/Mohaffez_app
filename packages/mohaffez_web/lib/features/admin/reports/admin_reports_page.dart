@@ -63,6 +63,8 @@ class AdminReportsPage extends ConsumerWidget {
                 const SizedBox(height: DSSpacing.xxl),
                 _RevenueLineCard(months: m.revenue.last12Months),
                 const SizedBox(height: DSSpacing.xxl),
+                const _TopTeachersCard(),
+                const SizedBox(height: DSSpacing.xxl),
                 _CommissionsSummaryCard(c: m.commissions),
               ],
             ),
@@ -460,6 +462,203 @@ class _RevenueLineCard extends StatelessWidget {
     ];
     if (m < 1 || m > 12) return '';
     return names[m - 1];
+  }
+}
+
+class _TopTeachersCard extends ConsumerStatefulWidget {
+  const _TopTeachersCard();
+
+  @override
+  ConsumerState<_TopTeachersCard> createState() => _TopTeachersCardState();
+}
+
+class _TopTeachersCardState extends ConsumerState<_TopTeachersCard> {
+  int _days = 30;
+
+  void _export(List<TeacherRanking> rows) {
+    final csv = buildCsv(
+      ['#', 'المحفظ', 'المعرّف', 'جلسات منجزة', 'الإيراد (ج.م)'],
+      [
+        for (var i = 0; i < rows.length; i++)
+          [i + 1, rows[i].name, rows[i].mohaffezId, rows[i].sessionCount, rows[i].revenue.round()],
+      ],
+    );
+    downloadCsv(
+        'mohafezy-top-teachers-${_days}d-${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv',
+        csv);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(topTeachersProvider(_days));
+
+    return DSCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: SectionHeader(title: 'أفضل المحفظين')),
+              _PeriodToggle(
+                value: _days,
+                onChanged: (d) => setState(() => _days = d),
+              ),
+            ],
+          ),
+          const SizedBox(height: DSSpacing.lg),
+          async.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(DSSpacing.xl),
+              child: Center(
+                  child: CircularProgressIndicator(color: DSColors.primary)),
+            ),
+            error: (e, _) =>
+                DSBanner(message: '$e', variant: DSBannerVariant.error),
+            data: (rows) {
+              if (rows.isEmpty) {
+                return const DSEmptyState(
+                  title: 'لا توجد جلسات منجزة في هذه الفترة',
+                  icon: Icons.emoji_events_outlined,
+                );
+              }
+              final maxCount = rows.first.sessionCount;
+              return Column(
+                children: [
+                  ...rows.asMap().entries.map((e) => _TeacherRow(
+                        rank: e.key + 1,
+                        ranking: e.value,
+                        maxCount: maxCount,
+                      )),
+                  const SizedBox(height: DSSpacing.md),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: DSButton(
+                      label: 'تصدير CSV',
+                      size: DSButtonSize.sm,
+                      variant: DSButtonVariant.ghost,
+                      leading: const Icon(Icons.download_rounded, size: 16),
+                      onPressed: () => _export(rows),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PeriodToggle extends StatelessWidget {
+  const _PeriodToggle({required this.value, required this.onChanged});
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  static const _options = {30: '٣٠ يوم', 90: '٩٠ يوم', 365: 'سنة'};
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: const BoxDecoration(
+        color: DSColors.surfaceMuted,
+        borderRadius: DSRadius.fullAll,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: _options.entries.map((e) {
+          final selected = e.key == value;
+          return GestureDetector(
+            onTap: () => onChanged(e.key),
+            child: AnimatedContainer(
+              duration: DSDuration.fast,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: DSSpacing.md, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected ? DSColors.surface : Colors.transparent,
+                borderRadius: DSRadius.fullAll,
+                boxShadow: selected ? DSElevation.sm : null,
+              ),
+              child: Text(
+                e.value,
+                style: DSText.caption(
+                  context,
+                  color: selected ? DSColors.primary : DSColors.text3,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _TeacherRow extends StatelessWidget {
+  const _TeacherRow({
+    required this.rank,
+    required this.ranking,
+    required this.maxCount,
+  });
+  final int rank;
+  final TeacherRanking ranking;
+  final int maxCount;
+
+  static String _money(double v) =>
+      '${NumberFormat.decimalPattern('ar').format(v.round())} ج.م';
+
+  Color get _rankColor => switch (rank) {
+        1 => const Color(0xFFD4A44A),
+        2 => const Color(0xFF9AA0A6),
+        3 => const Color(0xFFB08D57),
+        _ => DSColors.text3,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = maxCount == 0 ? 0.0 : ranking.sessionCount / maxCount;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DSSpacing.md),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text(
+              '$rank',
+              textAlign: TextAlign.center,
+              style: DSText.bodyMedium(context, color: _rankColor),
+            ),
+          ),
+          const SizedBox(width: DSSpacing.sm),
+          DSAvatar(name: ranking.name, size: 32),
+          const SizedBox(width: DSSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(ranking.name,
+                    style: DSText.bodyMedium(context),
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                DSProgressBar(value: pct, color: DSColors.primary),
+              ],
+            ),
+          ),
+          const SizedBox(width: DSSpacing.lg),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${ranking.sessionCount} جلسة',
+                  style: DSText.bodyMedium(context)),
+              if (ranking.revenue > 0)
+                Text(_money(ranking.revenue),
+                    style: DSText.caption(context, color: DSColors.text3)),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

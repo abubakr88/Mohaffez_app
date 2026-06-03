@@ -148,6 +148,64 @@ final broadcastAudienceCountProvider =
   return (data?['count'] as num?)?.toInt() ?? 0;
 });
 
+/// One row in the top-teachers leaderboard.
+class TeacherRanking {
+  final String mohaffezId;
+  final String name;
+  final int sessionCount;
+  final double revenue;
+
+  const TeacherRanking({
+    required this.mohaffezId,
+    required this.name,
+    required this.sessionCount,
+    required this.revenue,
+  });
+}
+
+/// Top teachers by completed-session count over the last [days] days.
+/// Aggregates `hafizSessions` client-side using the denormalized
+/// `mohaffezName` / `sessionPrice` fields (no user join needed).
+final topTeachersProvider =
+    FutureProvider.autoDispose.family<List<TeacherRanking>, int>((ref, days) async {
+  final cutoff = DateTime.now().subtract(Duration(days: days));
+  final snap = await FirebaseFirestore.instance
+      .collection('hafizSessions')
+      .where('status', isEqualTo: 'completed')
+      .where('completedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
+      .get();
+
+  final counts = <String, int>{};
+  final revenue = <String, double>{};
+  final names = <String, String>{};
+
+  for (final doc in snap.docs) {
+    final d = doc.data();
+    final id = d['mohaffezId'] as String?;
+    if (id == null || id.isEmpty) continue;
+    counts[id] = (counts[id] ?? 0) + 1;
+    revenue[id] = (revenue[id] ?? 0) + ((d['sessionPrice'] as num?)?.toDouble() ?? 0);
+    final name = d['mohaffezName'] as String?;
+    if (name != null && name.isNotEmpty) names[id] = name;
+  }
+
+  final rankings = counts.entries
+      .map((e) => TeacherRanking(
+            mohaffezId: e.key,
+            name: names[e.key] ?? e.key,
+            sessionCount: e.value,
+            revenue: revenue[e.key] ?? 0,
+          ))
+      .toList()
+    ..sort((a, b) {
+      final byCount = b.sessionCount.compareTo(a.sessionCount);
+      return byCount != 0 ? byCount : b.revenue.compareTo(a.revenue);
+    });
+
+  return rankings.take(10).toList();
+});
+
 class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
   final AdminRepository _repository;
   final FirebaseFunctions _functions;
