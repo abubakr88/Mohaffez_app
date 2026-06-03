@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/broadcast_model.dart';
 import '../repositories/admin_repository.dart';
 
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {
@@ -122,6 +123,29 @@ final auditLogProvider =
       .map((snap) => snap.docs
           .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
           .toList());
+});
+
+/// Recent broadcast notifications (most recent first).
+final broadcastHistoryProvider =
+    StreamProvider.autoDispose<List<BroadcastModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('broadcastHistory')
+      .orderBy('sentAt', descending: true)
+      .limit(50)
+      .snapshots()
+      .map((snap) => snap.docs.map(BroadcastModel.fromFirestore).toList());
+});
+
+/// Live count of users who would receive a broadcast for [targetRole]
+/// ('all' | 'student' | 'mohaffez'). Backed by the getBroadcastAudienceCount
+/// callable, which counts users that have an FCM token.
+final broadcastAudienceCountProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, targetRole) async {
+  final callable = FirebaseFunctions.instance
+      .httpsCallable('getBroadcastAudienceCount');
+  final res = await callable.call(<String, dynamic>{'targetRole': targetRole});
+  final data = res.data as Map?;
+  return (data?['count'] as num?)?.toInt() ?? 0;
 });
 
 class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
