@@ -27,9 +27,12 @@ import '../features/teacher/profile/teacher_profile_page.dart';
 // Admin pages
 import '../features/admin/dashboard/admin_dashboard_page.dart';
 import '../features/admin/users/admin_users_page.dart';
+import '../features/admin/users/admin_user_detail_page.dart';
 import '../features/admin/approvals/admin_approvals_page.dart';
 import '../features/admin/sessions/admin_sessions_page.dart';
 import '../features/admin/payments/admin_payments_page.dart';
+import '../features/admin/payouts/admin_payouts_page.dart';
+import '../features/admin/topups/admin_topups_page.dart';
 import '../features/admin/promos/admin_promos_page.dart';
 import '../features/admin/config/admin_config_page.dart';
 import '../features/admin/reports/admin_reports_page.dart';
@@ -127,9 +130,16 @@ final webRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/admin',           builder: (_, __) => const AdminDashboardPage()),
           GoRoute(path: '/admin/users',     builder: (_, __) => const AdminUsersPage()),
+          GoRoute(
+            path: '/admin/users/:id',
+            builder: (_, s) =>
+                AdminUserDetailPage(userId: s.pathParameters['id']!),
+          ),
           GoRoute(path: '/admin/approvals', builder: (_, __) => const AdminApprovalsPage()),
           GoRoute(path: '/admin/sessions',  builder: (_, __) => const AdminSessionsPage()),
           GoRoute(path: '/admin/payments',  builder: (_, __) => const AdminPaymentsPage()),
+          GoRoute(path: '/admin/payouts',   builder: (_, __) => const AdminPayoutsPage()),
+          GoRoute(path: '/admin/topups',    builder: (_, __) => const AdminTopUpsPage()),
           GoRoute(path: '/admin/promos',    builder: (_, __) => const AdminPromosPage()),
           GoRoute(path: '/admin/config',    builder: (_, __) => const AdminConfigPage()),
           GoRoute(path: '/admin/reports',         builder: (_, __) => const AdminReportsPage()),

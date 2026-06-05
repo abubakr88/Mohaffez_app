@@ -13,6 +13,8 @@ class AdminShell extends StatelessWidget {
     SidebarItem(icon: Icons.verified_user_outlined,  label: 'طلبات التحقق', path: '/admin/approvals'),
     SidebarItem(icon: Icons.video_call_outlined,     label: 'الجلسات',       path: '/admin/sessions'),
     SidebarItem(icon: Icons.payments_outlined,       label: 'المدفوعات',     path: '/admin/payments'),
+    SidebarItem(icon: Icons.account_balance_wallet_outlined, label: 'طلبات السحب', path: '/admin/payouts'),
+    SidebarItem(icon: Icons.add_card_outlined,       label: 'طلبات الشحن',   path: '/admin/topups'),
     SidebarItem(icon: Icons.discount_outlined,       label: 'أكواد الخصم',   path: '/admin/promos'),
     SidebarItem(icon: Icons.tune_rounded,            label: 'إعدادات النظام', path: '/admin/config'),
     SidebarItem(icon: Icons.bar_chart_rounded,       label: 'التقارير',      path: '/admin/reports'),

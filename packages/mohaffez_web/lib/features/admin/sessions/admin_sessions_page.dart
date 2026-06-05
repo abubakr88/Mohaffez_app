@@ -294,6 +294,12 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
                           );
                         },
                       ),
+                      DSColumnDef(
+                        key: 'actions',
+                        label: '',
+                        width: 120,
+                        cellBuilder: (ctx, s) => _RefundCell(session: s),
+                      ),
                     ],
                     rows: rows,
                   ),
@@ -330,6 +336,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
         'accepted'  => 'مقبولة',
         'completed' => 'منجزة',
         'cancelled' => 'ملغاة',
+        'refunded'  => 'مُرجعة',
         _           => s,
       };
 
@@ -338,6 +345,7 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
         'accepted'  => DSBadgeVariant.primary,
         'completed' => DSBadgeVariant.success,
         'cancelled' => DSBadgeVariant.error,
+        'refunded'  => DSBadgeVariant.neutral,
         _           => DSBadgeVariant.neutral,
       };
 
@@ -354,6 +362,102 @@ class _AdminSessionsPageState extends ConsumerState<AdminSessionsPage> {
         'home'   => DSBadgeVariant.neutral,
         _        => DSBadgeVariant.neutral,
       };
+}
+
+// ── Refund cell ──────────────────────────────────────────────────────────────
+// Shows an استرداد button for wallet-paid sessions that haven't been refunded.
+// Already-refunded sessions show a muted "مُرجعة" label; anything else (cash /
+// not yet paid) shows nothing.
+class _RefundCell extends ConsumerWidget {
+  const _RefundCell({required this.session});
+  final Map<String, dynamic> session;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = session['status'] as String? ?? '';
+    final paymentType = session['paymentType'] as String? ?? '';
+    final alreadyRefunded =
+        status == 'refunded' || session['refundedAt'] != null;
+
+    if (alreadyRefunded) {
+      return Text('مُرجعة',
+          style: DSText.caption(context, color: DSColors.text3));
+    }
+
+    // Only wallet payments can be reversed automatically, and only while the
+    // session is live or completed (not pending/cancelled).
+    final refundable = paymentType == 'wallet' &&
+        (status == 'accepted' || status == 'completed') &&
+        ((session['sessionPrice'] as num?)?.toDouble() ?? 0) > 0;
+    if (!refundable) return const SizedBox.shrink();
+
+    return DSButton(
+      label: 'استرداد',
+      size: DSButtonSize.sm,
+      variant: DSButtonVariant.ghost,
+      onPressed: () => _confirm(context, ref),
+    );
+  }
+
+  Future<void> _confirm(BuildContext context, WidgetRef ref) async {
+    final id = session['id'] as String? ?? session['sessionId'] as String? ?? '';
+    if (id.isEmpty) return;
+    final student = session['studentName'] as String? ?? 'الطالب';
+    final price = (session['sessionPrice'] as num?)?.toDouble() ?? 0;
+    final controller = TextEditingController();
+
+    final ok = await DSDialog.show<bool>(
+      context,
+      title: 'استرداد قيمة الجلسة',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'سيتم إرجاع ${NumberFormat.decimalPattern('ar').format(price.round())} ج.م '
+            'إلى محفظة "$student" وعكس نصيب المحفظ. هذا الإجراء لا يمكن التراجع عنه.',
+            style: DSText.body(context, color: DSColors.text2),
+          ),
+          const SizedBox(height: DSSpacing.md),
+          DSTextField(
+            controller: controller,
+            label: 'سبب الاسترداد',
+            hint: 'مثال: إلغاء بطلب الطالب، خطأ في الحجز',
+            maxLines: 2,
+            autofocus: true,
+          ),
+        ],
+      ),
+      actions: [
+        DSButton(
+            label: 'إلغاء',
+            variant: DSButtonVariant.ghost,
+            onPressed: () =>
+                Navigator.of(context, rootNavigator: true).pop(false)),
+        DSButton(
+            label: 'تأكيد الاسترداد',
+            variant: DSButtonVariant.destructive,
+            onPressed: () =>
+                Navigator.of(context, rootNavigator: true).pop(true)),
+      ],
+    );
+    if (ok != true || !context.mounted) return;
+
+    final reason = controller.text.trim();
+    if (reason.length < 3) {
+      DSToast.show(context, 'يجب إدخال سبب الاسترداد', type: DSToastType.error);
+      return;
+    }
+    await ref.read(adminActionsProvider.notifier).refundSession(id, reason);
+    if (!context.mounted) return;
+    ref.read(adminActionsProvider).when(
+          data: (_) =>
+              DSToast.show(context, 'تم الاسترداد', type: DSToastType.success),
+          loading: () {},
+          error: (e, _) => DSToast.show(context, 'فشل الاسترداد: $e',
+              type: DSToastType.error),
+        );
+  }
 }
 
 // ── Shared filter chip (mirrors the users page) ──────────────────────────────
