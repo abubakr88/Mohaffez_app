@@ -107,6 +107,33 @@ export async function sendFcmNotification(
   }
 }
 
+/**
+ * Fan a notification out to every admin user. Used for proactive payment/wallet
+ * alerts (failed payments, wallet integrity breaches, etc.) so the admin bell
+ * badges without anyone polling. Best-effort: a failed send for one admin does
+ * not block the others.
+ */
+export async function notifyAllAdmins(
+  params: Omit<CreateAndSendNotificationParams, 'userId'>
+): Promise<void> {
+  const adminSnap = await db.collection('users').where('role', '==', 'admin').get();
+  if (adminSnap.empty) {
+    functions.logger.warn('notifyAllAdmins: no admin users found', { type: params.type });
+    return;
+  }
+  await Promise.all(
+    adminSnap.docs.map((doc) =>
+      createAndSendNotification({ ...params, userId: doc.id }).catch((err) =>
+        functions.logger.warn('notifyAllAdmins: send failed', {
+          adminId: doc.id,
+          type: params.type,
+          err,
+        }),
+      ),
+    ),
+  );
+}
+
 export async function createAndSendNotification(
   params: CreateAndSendNotificationParams
 ): Promise<void> {
