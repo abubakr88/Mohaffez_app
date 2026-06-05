@@ -14,7 +14,7 @@ set REPO_ROOT=%~dp0
 REM Switch to the web admin package
 cd /d "%REPO_ROOT%packages\mohaffez_web"
 
-echo [1/3] Getting dependencies...
+echo [1/4] Getting dependencies...
 call flutter pub get
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] flutter pub get failed.
@@ -23,7 +23,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo [2/3] Building release web admin...
+echo [2/4] Building release web admin...
 
 REM Pass .env if it exists (for optional SENTRY_DSN etc.) — not strictly required
 if exist "%REPO_ROOT%.env" (
@@ -39,7 +39,16 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo [3/3] Done!
+echo [3/4] Cache-busting entry bundle (content-hashed main.dart.js)...
+call node tool\cache_bust.js
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Cache-bust step failed. Is Node.js installed and on PATH?
+    pause
+    exit /b 1
+)
+
+echo.
+echo [4/4] Done!
 echo.
 echo ============================================================
 echo   Output: packages\mohaffez_web\build\web\
