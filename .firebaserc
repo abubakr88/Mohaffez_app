@@ -12,6 +12,9 @@
         ],
         "marketing": [
           "mohaffez-marketing"
+        ],
+        "admin": [
+          "mohaffez-admin"
         ]
       }
     },

@@ -109,6 +109,56 @@ class AdminRepository {
             .toList());
   }
 
+  /// Teachers awaiting account verification.
+  /// A verification request is a `users` doc with role 'mohaffez' and
+  /// status 'pending_approval' (set on setup completion by the mobile app).
+  /// Ordered by submission time (oldest first) using the deployed
+  /// [role + status + approvalSubmittedAt] composite index.
+  Stream<List<Map<String, dynamic>>> watchPendingTeachers() {
+    return _firestore
+        .collection('users')
+        .where('role', isEqualTo: 'mohaffez')
+        .where('status', isEqualTo: 'pending_approval')
+        .orderBy('approvalSubmittedAt')
+        .limit(100)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+            .toList());
+  }
+
+  /// Single user document by id (for the admin profile/detail page).
+  Future<Map<String, dynamic>?> getUserById(String userId) async {
+    final doc = await _firestore.collection('users').doc(userId).get();
+    if (!doc.exists) return null;
+    return <String, dynamic>{'id': doc.id, ...?doc.data()};
+  }
+
+  /// All sessions for a teacher, for profile statistics (aggregated client-side).
+  /// Single equality filter on `mohaffezId` uses the automatic single-field index.
+  Future<List<Map<String, dynamic>>> getTeacherSessions(String teacherId) async {
+    final snap = await _firestore
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: teacherId)
+        .limit(1000)
+        .get();
+    return snap.docs
+        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+        .toList();
+  }
+
+  /// One-shot read of a single user's submitted credentials (for review).
+  Future<List<Map<String, dynamic>>> getUserCredentials(String userId) async {
+    final snap = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('credentials')
+        .get();
+    return snap.docs
+        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+        .toList();
+  }
+
   Future<void> approveCredential(String userId, String credentialId) {
     return _firestore
         .collection('users')

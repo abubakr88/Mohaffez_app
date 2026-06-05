@@ -10,12 +10,18 @@ class DSColumnDef<T> {
     required this.cellBuilder,
     this.width,
     this.sortable = false,
+    this.sortValue,
   });
   final String key;
   final String label;
   final Widget Function(BuildContext context, T row) cellBuilder;
   final double? width;
   final bool sortable;
+
+  /// Returns the comparable value used when sorting by this column.
+  /// Required for a column to actually sort (the header arrow is cosmetic
+  /// without it).
+  final Comparable<dynamic> Function(T row)? sortValue;
 }
 
 class DSDataTable<T> extends StatefulWidget {
@@ -26,6 +32,8 @@ class DSDataTable<T> extends StatefulWidget {
     this.onRowTap,
     this.loading = false,
     this.emptyMessage = 'لا توجد بيانات',
+    this.initialSortKey,
+    this.initialSortAsc = true,
   });
 
   final List<DSColumnDef<T>> columns;
@@ -33,6 +41,8 @@ class DSDataTable<T> extends StatefulWidget {
   final void Function(T row)? onRowTap;
   final bool loading;
   final String emptyMessage;
+  final String? initialSortKey;
+  final bool initialSortAsc;
 
   @override
   State<DSDataTable<T>> createState() => _DSDataTableState<T>();
@@ -42,6 +52,32 @@ class _DSDataTableState<T> extends State<DSDataTable<T>> {
   String? _sortKey;
   bool _sortAsc = true;
   int? _hoveredRow;
+
+  @override
+  void initState() {
+    super.initState();
+    _sortKey = widget.initialSortKey;
+    _sortAsc = widget.initialSortAsc;
+  }
+
+  List<T> get _sortedRows {
+    if (_sortKey == null) return widget.rows;
+    DSColumnDef<T>? col;
+    for (final c in widget.columns) {
+      if (c.key == _sortKey) {
+        col = c;
+        break;
+      }
+    }
+    final getter = col?.sortValue;
+    if (getter == null) return widget.rows;
+    final rows = [...widget.rows];
+    rows.sort((a, b) {
+      final cmp = getter(a).compareTo(getter(b));
+      return _sortAsc ? cmp : -cmp;
+    });
+    return rows;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +104,7 @@ class _DSDataTableState<T> extends State<DSDataTable<T>> {
               child: Text(widget.emptyMessage, style: DSText.body(context, color: DSColors.text3)),
             )
           else
-            ...widget.rows.asMap().entries.map((e) => _buildRow(context, e.key, e.value)),
+            ..._sortedRows.asMap().entries.map((e) => _buildRow(context, e.key, e.value)),
         ],
       ),
     );

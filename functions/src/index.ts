@@ -39,6 +39,8 @@ export {
   triggerCleanupJobManually,
   approveCredential,
   rejectCredential,
+  approveTeacher,
+  rejectTeacher,
   getBroadcastAudienceCount,
 } from './admin/adminActions';
 export { checkAppVersion } from './admin/appVersionCheck';
@@ -88,3 +90,9 @@ export {
   completePayout,
   failPayout,
 } from './wallet/walletPayout';
+
+// Proactive admin alerts (badge the admin bell on critical payment events)
+export {
+  onPaymentFailedAlertAdmins,
+  onWalletNegativeAlertAdmins,
+} from './notifications/adminPaymentAlerts';

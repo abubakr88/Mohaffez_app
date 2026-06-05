@@ -459,6 +459,105 @@ export const rejectCredential = functions.https.onCall(async (data, context) => 
 });
 
 /**
+ * Approve a teacher whose account is awaiting verification.
+ * Flips users/{uid}.status 'pending_approval' → 'active' so the mobile RoleGuard
+ * lets them into the teacher home on next launch.
+ * input: { userId: string }
+ * output: { success: true }
+ */
+export const approveTeacher = functions.https.onCall(async (data, context) => {
+  const performedBy = await ensureAdmin(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+
+  if (!userId) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
+  }
+
+  const userRef = db.collection('users').doc(userId);
+  const snap = await userRef.get();
+  if (!snap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
+  if (snap.data()?.role !== 'mohaffez') {
+    throw new functions.https.HttpsError('failed-precondition', 'هذا الحساب ليس محفظًا');
+  }
+
+  await userRef.update({
+    status: 'active',
+    rejectionReason: FieldValue.delete(),
+    approvalReviewedAt: FieldValue.serverTimestamp(),
+    approvalReviewedBy: performedBy,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  const { createAndSendNotification } = await import('../utils/notificationHelpers');
+  await createAndSendNotification({
+    userId,
+    title: 'تم اعتماد حسابك',
+    body: 'تهانينا! تم قبول طلب التحقق ويمكنك الآن استقبال الطلاب ✅',
+    type: 'teacher_approved',
+  });
+
+  await writeAuditLog({
+    action: 'approveTeacher',
+    performedBy,
+    targetUserId: userId,
+  });
+
+  functions.logger.info('Admin approved teacher', { performedBy, userId });
+  return { success: true };
+});
+
+/**
+ * Reject a teacher's verification request.
+ * Flips users/{uid}.status → 'rejected'; the mobile RoleGuard routes them to
+ * /teacher-rejected with the stored reason.
+ * input: { userId: string, reason: string }
+ * output: { success: true }
+ */
+export const rejectTeacher = functions.https.onCall(async (data, context) => {
+  const performedBy = await ensureAdmin(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+  const reason = (data?.reason as string | undefined)?.trim();
+
+  if (!userId || !reason) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم وسبب الرفض مطلوبان');
+  }
+
+  const userRef = db.collection('users').doc(userId);
+  const snap = await userRef.get();
+  if (!snap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
+
+  await userRef.update({
+    status: 'rejected',
+    rejectionReason: reason,
+    approvalReviewedAt: FieldValue.serverTimestamp(),
+    approvalReviewedBy: performedBy,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  const { createAndSendNotification } = await import('../utils/notificationHelpers');
+  await createAndSendNotification({
+    userId,
+    title: 'تم رفض طلب التحقق',
+    body: reason,
+    type: 'teacher_rejected',
+  });
+
+  await writeAuditLog({
+    action: 'rejectTeacher',
+    performedBy,
+    targetUserId: userId,
+    data: { reason },
+  });
+
+  functions.logger.info('Admin rejected teacher', { performedBy, userId, reason });
+  return { success: true };
+});
+
+/**
  * input: { targetRole: 'all' | 'student' | 'mohaffez' }
  * output: { count: number }
  */

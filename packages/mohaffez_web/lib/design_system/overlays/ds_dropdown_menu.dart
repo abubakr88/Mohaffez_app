@@ -69,9 +69,11 @@ class _DSDropdownMenuState extends State<DSDropdownMenu>
   Widget _buildOverlay() {
     return Stack(
       children: [
-        GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: _close,
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _close,
+          ),
         ),
         CompositedTransformFollower(
           link: _link,
@@ -95,22 +97,25 @@ class _DSDropdownMenuState extends State<DSDropdownMenu>
     return Material(
       color: Colors.transparent,
       child: Container(
-        constraints: const BoxConstraints(minWidth: 180),
+        constraints: const BoxConstraints(minWidth: 180, maxWidth: 280),
         decoration: BoxDecoration(
           color: DSColors.surface,
           borderRadius: DSRadius.lgAll,
           border: const Border.fromBorderSide(BorderSide(color: DSColors.border)),
           boxShadow: DSElevation.md,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: widget.items.expand((item) {
-            return [
-              _buildItem(item),
-              if (item.dividerAfter)
-                const Divider(height: 1, color: DSColors.border),
-            ];
-          }).toList(),
+        child: IntrinsicWidth(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: widget.items.expand((item) {
+              return [
+                _buildItem(item),
+                if (item.dividerAfter)
+                  const Divider(height: 1, color: DSColors.border),
+              ];
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -130,12 +135,13 @@ class _DSDropdownMenuState extends State<DSDropdownMenu>
             vertical: DSSpacing.md,
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               if (item.icon != null) ...[
                 Icon(item.icon, size: 16, color: DSColors.text2),
                 const SizedBox(width: DSSpacing.sm),
               ],
-              Text(item.label, style: DSText.body(context)),
+              Flexible(child: Text(item.label, style: DSText.body(context))),
             ],
           ),
         ),

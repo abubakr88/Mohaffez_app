@@ -40,6 +40,9 @@ dependencies:
   # Utils
   intl: ^0.20.0
 
+  # Browser APIs (CSV/file download)
+  web: ^1.1.1
+
   # Charts (admin metrics)
   fl_chart: ^0.69.0
 

@@ -11,16 +11,21 @@
   RewriteRule ^ index.html [QSA,L]
 </IfModule>
 
-# Prevent caching of HTML entry point and Flutter bootstrap scripts
+# Long-term immutable caching for versioned Flutter assets.
+# NOTE: this broad rule must come BEFORE the no-cache rule below so that the
+# entry/bootstrap files (which also match `.js`) get overridden back to
+# no-cache — Apache applies the LAST matching `Header set` for a given header.
+<FilesMatch "\.(wasm|js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|otf)$">
+  Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+
+# Prevent caching of the HTML entry point and Flutter bootstrap scripts.
+# Must stay AFTER the immutable rule above to win for main.dart.js /
+# flutter_bootstrap.js — otherwise stale app code is served for a year.
 <FilesMatch "^(index\.html|flutter_service_worker\.js|flutter_bootstrap\.js|main\.dart\.js)$">
   Header set Cache-Control "no-cache, no-store, must-revalidate"
   Header set Pragma "no-cache"
   Header set Expires "0"
-</FilesMatch>
-
-# Long-term immutable caching for versioned Flutter assets
-<FilesMatch "\.(wasm|js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|otf)$">
-  Header set Cache-Control "public, max-age=31536000, immutable"
 </FilesMatch>
 
 # Security headers
