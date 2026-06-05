@@ -9,7 +9,7 @@ class AdminApprovalsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(pendingCredentialsProvider);
+    final async = ref.watch(pendingTeachersProvider);
 
     return PageContainer(
       child: Column(
@@ -17,7 +17,7 @@ class AdminApprovalsPage extends ConsumerWidget {
         children: [
           const PageHeader(
             title: 'طلبات التحقق',
-            subtitle: 'مراجعة وثائق المحفظين المتقدمين',
+            subtitle: 'مراجعة حسابات المحفظين المتقدمين واعتمادها',
           ),
           const SizedBox(height: DSSpacing.xxl),
           async.when(
@@ -28,7 +28,7 @@ class AdminApprovalsPage extends ConsumerWidget {
               if (items.isEmpty) {
                 return const DSEmptyState(
                   title: 'لا توجد طلبات معلقة',
-                  subtitle: 'ستظهر طلبات المحفظين الجدد هنا للمراجعة',
+                  subtitle: 'ستظهر حسابات المحفظين الجدد هنا للمراجعة',
                   icon: Icons.verified_user_outlined,
                 );
               }
@@ -36,13 +36,13 @@ class AdminApprovalsPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${items.length} طلب بانتظار المراجعة',
+                    '${items.length} محفظ بانتظار المراجعة',
                     style: DSText.caption(context, color: DSColors.text3),
                   ),
                   const SizedBox(height: DSSpacing.md),
                   ...items.map((item) => Padding(
                         padding: const EdgeInsets.only(bottom: DSSpacing.lg),
-                        child: _CredentialCard(item: item),
+                        child: _TeacherCard(teacher: item),
                       )),
                 ],
               );
@@ -54,78 +54,57 @@ class AdminApprovalsPage extends ConsumerWidget {
   }
 }
 
-class _CredentialCard extends ConsumerWidget {
-  const _CredentialCard({required this.item});
-  final Map<String, dynamic> item;
+class _TeacherCard extends ConsumerWidget {
+  const _TeacherCard({required this.teacher});
+  final Map<String, dynamic> teacher;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userId = item['userId'] as String? ?? '';
-    final credentialId = item['id'] as String? ?? '';
-    final name = item['name'] as String? ??
-        item['mohaffezName'] as String? ??
-        'محفظ';
-    final title = item['title'] as String? ?? '—';
-    final org = item['organization'] as String? ?? '';
-    final type = item['type'] as String? ?? '';
-    final images = (item['imageUrls'] as List?)?.cast<String>() ?? const [];
+    final userId = teacher['id'] as String? ?? '';
+    final name = teacher['name'] as String? ?? 'محفظ';
+    final photo = teacher['photoUrl'] as String?;
+    final specialization = teacher['specialization'] as String? ?? '';
+    final bio = teacher['bio'] as String? ?? '';
+    final videoUrl = teacher['youtubeVideoUrl'] as String? ?? '';
 
     return DSCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: teacher + type badge
+          // Header: teacher + status badge
           Row(
             children: [
-              DSAvatar(name: name, size: 40),
+              DSAvatar(name: name, imageUrl: photo, size: 40),
               const SizedBox(width: DSSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(name, style: DSText.bodyMedium(context)),
-                    Text('تاريخ التقديم: ${_date(item['uploadedAt'] ?? item['createdAt'])}',
+                    Text(
+                        'تاريخ التقديم: ${_date(teacher['approvalSubmittedAt'] ?? teacher['createdAt'])}',
                         style: DSText.caption(context, color: DSColors.text3)),
                   ],
                 ),
               ),
-              if (type.isNotEmpty)
-                DSBadge(label: _typeLabel(type), variant: DSBadgeVariant.primary),
+              const DSBadge(
+                  label: 'بانتظار المراجعة', variant: DSBadgeVariant.warning),
             ],
           ),
           const SizedBox(height: DSSpacing.lg),
           const Divider(height: 1, color: DSColors.border),
           const SizedBox(height: DSSpacing.lg),
 
-          // Details
-          _DetailRow(label: 'اسم الوثيقة', value: title),
-          if (org.isNotEmpty) _DetailRow(label: 'الجهة المانحة', value: org),
-          _DetailRow(label: 'تاريخ الإصدار', value: _date(item['issueDate'])),
-          if (item['expiryDate'] != null)
-            _DetailRow(
-                label: 'تاريخ الانتهاء', value: _date(item['expiryDate'])),
+          // Profile details
+          if (specialization.isNotEmpty)
+            _DetailRow(label: 'التخصص', value: specialization),
+          if (bio.isNotEmpty) _DetailRow(label: 'نبذة', value: bio),
+          if (videoUrl.isNotEmpty)
+            _DetailRow(label: 'فيديو تعريفي', value: videoUrl),
 
-          // Document images
-          if (images.isNotEmpty) ...[
-            const SizedBox(height: DSSpacing.lg),
-            Text('المستندات (${images.length})',
-                style: DSText.caption(context, color: DSColors.text2)),
-            const SizedBox(height: DSSpacing.sm),
-            Wrap(
-              spacing: DSSpacing.sm,
-              runSpacing: DSSpacing.sm,
-              children: images
-                  .map((url) => _Thumbnail(
-                        url: url,
-                        onTap: () => _openViewer(context, images, url),
-                      ))
-                  .toList(),
-            ),
-          ] else ...[
-            const SizedBox(height: DSSpacing.lg),
-            Text('لم يُرفق أي مستند',
-                style: DSText.caption(context, color: DSColors.text3)),
-          ],
+          // Submitted credentials
+          const SizedBox(height: DSSpacing.lg),
+          _CredentialsSection(userId: userId),
 
           const SizedBox(height: DSSpacing.lg),
           // Actions
@@ -136,15 +115,13 @@ class _CredentialCard extends ConsumerWidget {
                 label: 'رفض',
                 size: DSButtonSize.sm,
                 variant: DSButtonVariant.destructive,
-                onPressed: () =>
-                    _reject(context, ref, userId, credentialId, name),
+                onPressed: () => _reject(context, ref, userId, name),
               ),
               const SizedBox(width: DSSpacing.sm),
               DSButton(
-                label: 'قبول',
+                label: 'اعتماد الحساب',
                 size: DSButtonSize.sm,
-                onPressed: () =>
-                    _approve(context, ref, userId, credentialId, name),
+                onPressed: () => _approve(context, ref, userId, name),
               ),
             ],
           ),
@@ -153,28 +130,27 @@ class _CredentialCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _approve(BuildContext context, WidgetRef ref, String userId,
-      String credentialId, String name) async {
+  Future<void> _approve(
+      BuildContext context, WidgetRef ref, String userId, String name) async {
     final ok = await DSDialog.confirm(
       context,
-      title: 'قبول الوثيقة',
-      message: 'اعتماد وثيقة "$name"؟ سيتم إشعار المحفظ بالقبول.',
-      confirmLabel: 'قبول',
+      title: 'اعتماد الحساب',
+      message:
+          'اعتماد حساب "$name"؟ سيتمكّن من استقبال الطلاب وسيتم إشعاره بالقبول.',
+      confirmLabel: 'اعتماد',
     );
     if (!ok || !context.mounted) return;
-    await ref
-        .read(adminActionsProvider.notifier)
-        .approveCredential(userId, credentialId);
+    await ref.read(adminActionsProvider.notifier).approveTeacher(userId);
     if (!context.mounted) return;
-    _toastResult(context, ref, 'تم اعتماد الوثيقة');
+    _toastResult(context, ref, 'تم اعتماد الحساب');
   }
 
-  Future<void> _reject(BuildContext context, WidgetRef ref, String userId,
-      String credentialId, String name) async {
+  Future<void> _reject(
+      BuildContext context, WidgetRef ref, String userId, String name) async {
     final controller = TextEditingController();
     final ok = await DSDialog.show<bool>(
       context,
-      title: 'رفض الوثيقة',
+      title: 'رفض الطلب',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +161,7 @@ class _CredentialCard extends ConsumerWidget {
           DSTextField(
             controller: controller,
             label: 'سبب الرفض',
-            hint: 'مثال: الصورة غير واضحة، الوثيقة منتهية…',
+            hint: 'مثال: الوثائق غير واضحة، البيانات غير مكتملة…',
             maxLines: 3,
             autofocus: true,
           ),
@@ -206,13 +182,11 @@ class _CredentialCard extends ConsumerWidget {
     );
     if (ok != true || !context.mounted) return;
     final reason = controller.text.trim().isEmpty
-        ? 'لم تستوفِ الوثيقة المتطلبات'
+        ? 'لم يستوفِ الطلب متطلبات التحقق'
         : controller.text.trim();
-    await ref
-        .read(adminActionsProvider.notifier)
-        .rejectCredential(userId, credentialId, reason);
+    await ref.read(adminActionsProvider.notifier).rejectTeacher(userId, reason);
     if (!context.mounted) return;
-    _toastResult(context, ref, 'تم رفض الوثيقة');
+    _toastResult(context, ref, 'تم رفض الطلب');
   }
 
   void _toastResult(BuildContext context, WidgetRef ref, String successMsg) {
@@ -225,14 +199,6 @@ class _CredentialCard extends ConsumerWidget {
     );
   }
 
-  void _openViewer(BuildContext context, List<String> images, String current) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.85),
-      builder: (_) => _ImageViewer(images: images, initial: current),
-    );
-  }
-
   static String _date(dynamic v) {
     if (v == null) return '—';
     try {
@@ -242,14 +208,79 @@ class _CredentialCard extends ConsumerWidget {
       return '—';
     }
   }
+}
 
-  static String _typeLabel(String type) => switch (type) {
-        'certificate' => 'شهادة',
-        'ijazah' => 'إجازة',
-        'diploma' => 'دبلوم',
-        'degree' => 'مؤهل علمي',
-        _ => type,
-      };
+/// Lists a pending teacher's submitted credentials with thumbnails.
+class _CredentialsSection extends ConsumerWidget {
+  const _CredentialsSection({required this.userId});
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(teacherCredentialsProvider(userId));
+    return async.when(
+      loading: () => Text('جارٍ تحميل الوثائق…',
+          style: DSText.caption(context, color: DSColors.text3)),
+      error: (e, _) => Text('تعذّر تحميل الوثائق',
+          style: DSText.caption(context, color: DSColors.text3)),
+      data: (creds) {
+        final images = <String>[
+          for (final c in creds)
+            ...((c['imageUrls'] as List?)?.cast<String>() ?? const []),
+        ];
+        if (creds.isEmpty) {
+          return Text('لم يُرفق أي وثيقة',
+              style: DSText.caption(context, color: DSColors.text3));
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('الوثائق المقدّمة (${creds.length})',
+                style: DSText.caption(context, color: DSColors.text2)),
+            const SizedBox(height: DSSpacing.sm),
+            ...creds.map((c) {
+              final title = c['title'] as String? ?? '—';
+              final org = c['organization'] as String? ?? '';
+              final imgs =
+                  (c['imageUrls'] as List?)?.cast<String>() ?? const [];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: DSSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(org.isEmpty ? title : '$title — $org',
+                        style: DSText.body(context, color: DSColors.text2)),
+                    if (imgs.isNotEmpty) ...[
+                      const SizedBox(height: DSSpacing.xs),
+                      Wrap(
+                        spacing: DSSpacing.sm,
+                        runSpacing: DSSpacing.sm,
+                        children: imgs
+                            .map((url) => _Thumbnail(
+                                  url: url,
+                                  onTap: () =>
+                                      _openViewer(context, images, url),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openViewer(BuildContext context, List<String> images, String current) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (_) => _ImageViewer(images: images, initial: current),
+    );
+  }
 }
 
 class _DetailRow extends StatelessWidget {

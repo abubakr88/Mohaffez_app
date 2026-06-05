@@ -25,7 +25,7 @@ const _sentinel = _Sentinel();
 class UserFilterState {
   final String searchQuery;
   final String? roleFilter; // null | 'student' | 'mohaffez' | 'admin'
-  final String? statusFilter; // null | 'active' | 'suspended'
+  final String? statusFilter; // null | 'active' | 'suspended' | 'pending_approval' | 'rejected'
 
   const UserFilterState({
     this.searchQuery = '',
@@ -99,10 +99,107 @@ final pendingCredentialsProvider =
   return ref.watch(adminRepositoryProvider).watchPendingCredentials();
 });
 
+/// Teachers awaiting account verification (status == 'pending_approval').
+/// This is the real "طلبات التحقق" queue.
+final pendingTeachersProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+  return ref.watch(adminRepositoryProvider).watchPendingTeachers();
+});
+
+/// A single pending teacher's submitted credentials (for the review card).
+final teacherCredentialsProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getUserCredentials(userId);
+});
+
+/// A single user document by id (admin profile/detail page).
+final adminUserProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>?, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getUserById(userId);
+});
+
+/// Aggregated teaching statistics for one mohaffez, computed from hafizSessions.
+class TeacherStats {
+  final int total;
+  final int completed;
+  final int upcoming; // pending + accepted
+  final int cancelled;
+  final int studentCount; // distinct students
+  final double revenue; // sum of sessionPrice over completed sessions
+  final double? avgRating; // mean teacherRating over rated sessions
+  final int ratingCount;
+  final List<Map<String, dynamic>> recentSessions; // newest first
+
+  const TeacherStats({
+    required this.total,
+    required this.completed,
+    required this.upcoming,
+    required this.cancelled,
+    required this.studentCount,
+    required this.revenue,
+    required this.avgRating,
+    required this.ratingCount,
+    required this.recentSessions,
+  });
+}
+
+/// Teaching statistics for a mohaffez, for the admin profile page.
+final teacherStatsProvider =
+    FutureProvider.autoDispose.family<TeacherStats, String>((ref, teacherId) async {
+  final sessions =
+      await ref.watch(adminRepositoryProvider).getTeacherSessions(teacherId);
+
+  var completed = 0, upcoming = 0, cancelled = 0, ratingCount = 0;
+  var revenue = 0.0, ratingSum = 0.0;
+  final students = <String>{};
+
+  for (final s in sessions) {
+    final status = (s['status'] as String? ?? '').toLowerCase();
+    final sid = s['studentId'] as String?;
+    if (sid != null && sid.isNotEmpty) students.add(sid);
+
+    if (status == 'completed') {
+      completed++;
+      revenue += (s['sessionPrice'] as num?)?.toDouble() ?? 0;
+    } else if (status == 'pending' || status == 'accepted') {
+      upcoming++;
+    } else if (status.contains('cancel') || status.contains('no_show') ||
+        status.contains('noshow')) {
+      cancelled++;
+    }
+
+    final r = (s['teacherRating'] as num?)?.toDouble();
+    if (r != null && r > 0) {
+      ratingSum += r;
+      ratingCount++;
+    }
+  }
+
+  final recent = [...sessions]
+    ..sort((a, b) => _compareTs(b['sessionDate'] ?? b['slotStart'],
+        a['sessionDate'] ?? a['slotStart']));
+
+  return TeacherStats(
+    total: sessions.length,
+    completed: completed,
+    upcoming: upcoming,
+    cancelled: cancelled,
+    studentCount: students.length,
+    revenue: revenue,
+    avgRating: ratingCount > 0 ? ratingSum / ratingCount : null,
+    ratingCount: ratingCount,
+    recentSessions: recent.take(10).toList(),
+  );
+});
+
 final failedOperationsProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
   return ref.watch(adminRepositoryProvider).watchFailedOperations();
 });
+
+// Admin payout queue + notifications reuse the existing typed wallet/notification
+// providers (activePayoutsProvider, notificationsFirstPageProvider,
+// unreadNotificationsCountProvider, notificationActionsProvider).
 
 final allPromoCodesProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   return ref.watch(adminRepositoryProvider).watchAllPromoCodes();
@@ -338,9 +435,90 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
+  /// Approve a teacher's verification request: status pending_approval → active.
+  Future<void> approveTeacher(String userId) async {
+    await _callFunction('approveTeacher', {'userId': userId});
+  }
+
+  /// Reject a teacher's verification request: status → rejected.
+  Future<void> rejectTeacher(String userId, String reason) async {
+    await _callFunction('rejectTeacher', {
+      'userId': userId,
+      'reason': reason,
+    });
+  }
+
   Future<void> dismissFailedOperation(String operationId) async {
     await _runAction(() async {
       await _repository.dismissFailedOperation(operationId);
+    });
+  }
+
+  // ── Payouts ────────────────────────────────────────────────────────────
+  /// requested → processing (debits teacher wallet, then send the bank transfer).
+  Future<void> startPayout(String payoutRequestId) async {
+    await _callFunction('startPayout', {'payoutRequestId': payoutRequestId});
+  }
+
+  /// processing → completed (confirm the bank transfer succeeded).
+  Future<void> completePayout(String payoutRequestId,
+      {String? bankReference}) async {
+    await _callFunction('completePayout', {
+      'payoutRequestId': payoutRequestId,
+      if (bankReference != null && bankReference.isNotEmpty)
+        'bankReference': bankReference,
+    });
+  }
+
+  /// processing → failed (reverses the ledger, refunds the teacher's wallet).
+  Future<void> failPayout(String payoutRequestId, String reason) async {
+    await _callFunction('failPayout', {
+      'payoutRequestId': payoutRequestId,
+      'reason': reason,
+    });
+  }
+
+  // ── Wallet top-ups + manual credit ──────────────────────────────────────
+  /// Approve a manual top-up request; credits the user's wallet.
+  /// [paidAmountEgp] overrides the requested amount when the admin verified a
+  /// different figure on the transfer proof.
+  Future<void> verifyTopUp(String topUpRequestId,
+      {double? paidAmountEgp}) async {
+    await _callFunction('verifyWalletTopUp', {
+      'topUpRequestId': topUpRequestId,
+      if (paidAmountEgp != null) 'paidAmountEgp': paidAmountEgp,
+    });
+  }
+
+  Future<void> rejectTopUp(String topUpRequestId, String reason) async {
+    await _callFunction('rejectWalletTopUp', {
+      'topUpRequestId': topUpRequestId,
+      'reason': reason,
+    });
+  }
+
+  /// Manually credit a user's wallet (e.g. goodwill / correction).
+  Future<void> creditWallet({
+    required String userId,
+    required String ownerType, // 'student' | 'mohaffez'
+    required double amountEgp,
+    required String reason,
+  }) async {
+    await _callFunction('adminCreditWallet', {
+      'userId': userId,
+      'ownerType': ownerType,
+      'amountEgp': amountEgp,
+      'reason': reason,
+    });
+  }
+
+  // ── Refunds ─────────────────────────────────────────────────────────────
+  /// Refund a wallet-paid session. Reverses the original ledger legs and marks
+  /// the session `refunded`. Admin-only; [reason] is required (≥ 3 chars).
+  Future<void> refundSession(String sessionId, String reason) async {
+    await _callFunction('refundSessionPayment', {
+      'sessionId': sessionId,
+      'reason': reason,
     });
   }
 

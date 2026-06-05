@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import '../../../design_system/design_system.dart';
 
@@ -74,6 +75,15 @@ class AdminUsersPage extends ConsumerWidget {
                             : 'active'),
                   ),
                   _FilterChip(
+                    label: 'بانتظار المراجعة',
+                    selected: filter.statusFilter == 'pending_approval',
+                    onTap: () => ref
+                        .read(userFilterProvider.notifier)
+                        .setStatus(filter.statusFilter == 'pending_approval'
+                            ? null
+                            : 'pending_approval'),
+                  ),
+                  _FilterChip(
                     label: 'معلّق',
                     selected: filter.statusFilter == 'suspended',
                     onTap: () => ref
@@ -138,18 +148,34 @@ class AdminUsersPage extends ConsumerWidget {
                         cellBuilder: (ctx, u) {
                           final name = u['name'] as String? ?? '—';
                           final photo = u['photoUrl'] as String?;
-                          return Row(
+                          final id = u['id'] as String? ?? '';
+                          // Teachers are clickable → open their profile + stats.
+                          final isTeacher =
+                              (u['role'] as String?) == 'mohaffez' &&
+                                  id.isNotEmpty;
+                          final row = Row(
                             children: [
                               DSAvatar(name: name, imageUrl: photo, size: 32),
                               const SizedBox(width: DSSpacing.sm),
                               Flexible(
                                 child: Text(
                                   name,
-                                  style: DSText.bodyMedium(ctx),
+                                  style: DSText.bodyMedium(
+                                    ctx,
+                                    color: isTeacher ? DSColors.primary : null,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
+                          );
+                          if (!isTeacher) return row;
+                          return MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () => ctx.go('/admin/users/$id'),
+                              child: row,
+                            ),
                           );
                         },
                       ),
@@ -184,10 +210,8 @@ class AdminUsersPage extends ConsumerWidget {
                         cellBuilder: (ctx, u) {
                           final status = u['status'] as String? ?? 'active';
                           return DSBadge(
-                            label: status == 'active' ? 'نشط' : 'معلّق',
-                            variant: status == 'active'
-                                ? DSBadgeVariant.success
-                                : DSBadgeVariant.warning,
+                            label: _statusLabel(status),
+                            variant: _statusVariant(status),
                             dot: true,
                           );
                         },
@@ -235,6 +259,22 @@ class AdminUsersPage extends ConsumerWidget {
       return null;
     }
   }
+
+  static String _statusLabel(String status) => switch (status) {
+        'active' => 'نشط',
+        'pending_approval' => 'بانتظار المراجعة',
+        'rejected' => 'مرفوض',
+        'suspended' => 'معلّق',
+        _ => 'معلّق',
+      };
+
+  static DSBadgeVariant _statusVariant(String status) => switch (status) {
+        'active' => DSBadgeVariant.success,
+        'pending_approval' => DSBadgeVariant.info,
+        'rejected' => DSBadgeVariant.error,
+        'suspended' => DSBadgeVariant.warning,
+        _ => DSBadgeVariant.warning,
+      };
 }
 
 // ── Row actions menu ──────────────────────────────────────────────────────
