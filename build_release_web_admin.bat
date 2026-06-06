@@ -48,29 +48,35 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo.
-echo [4/4] Done!
+echo [4/4] Deploying to Firebase Hosting (admin target)...
+
+REM firebase.json lives in the repo root, so deploy from there.
+cd /d "%REPO_ROOT%"
+call firebase use prod
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Could not select the 'prod' Firebase project.
+    echo         Are you logged in? Run: firebase login
+    pause
+    exit /b 1
+)
+call firebase deploy --only hosting:admin
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Firebase deploy failed. Check the output above.
+    echo         Ensure the Firebase CLI is installed and you are logged in.
+    pause
+    exit /b 1
+)
+
 echo.
 echo ============================================================
-echo   Output: packages\mohaffez_web\build\web\
+echo   Done! Deployed to Firebase Hosting (admin).
 echo.
-echo   Deploy to admin.mohafezy.com on Hostinger:
+echo   Live URL  : https://mohaffez-admin.web.app
+echo   Custom    : https://admin.mohafezy.com
 echo.
-echo   1. In hPanel, go to Domains ^> Subdomains
-echo      - Make sure admin.mohafezy.com exists and points to
-echo        a directory like /public_html/admin (or its own root)
-echo.
-echo   2. Open File Manager (or connect via FTP/SFTP)
-echo      - Navigate to the subdomain root folder
-echo      - Upload ALL contents of packages\mohaffez_web\build\web\
-echo        (including hidden .htaccess — check "show hidden files")
-echo.
-echo   3. Verify the .htaccess file is uploaded:
-echo      - Required for SPA deep-link routing
-echo      - Without it, refreshing any page other than / returns 404
-echo.
-echo   4. Add admin.mohafezy.com to Firebase Auth authorized domains:
-echo      Firebase Console ^> Authentication ^> Settings ^> Authorized domains
-echo.
+echo   Reminder: admin.mohafezy.com must be listed under
+echo   Firebase Auth authorized domains:
+echo     Firebase Console ^> Authentication ^> Settings ^> Authorized domains
 echo ============================================================
 echo.
 pause
