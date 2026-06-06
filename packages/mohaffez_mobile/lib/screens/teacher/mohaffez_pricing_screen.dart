@@ -66,8 +66,8 @@ class MohaffezPricingScreen extends ConsumerWidget {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(
-        body: Center(child: Text('${ArabicLabels.error}: $e')),
+      error: (_, __) => const Scaffold(
+        body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
       ),
     );
   }

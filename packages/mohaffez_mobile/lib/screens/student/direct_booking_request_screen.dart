@@ -154,19 +154,31 @@ class _DirectBookingRequestScreenState
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text(e.message ?? e.code),
+          content: Text(_functionsErrorMessage(e)),
           backgroundColor: AppThemeConstants.error,
         ),
       );
     } on Exception catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('$e'), backgroundColor: AppThemeConstants.error),
+        SnackBar(
+          content: Text(ErrorHandler.getErrorMessage(e)),
+          backgroundColor: AppThemeConstants.error,
+        ),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
+
+  String _functionsErrorMessage(FirebaseFunctionsException e) => switch (e.code) {
+        'unavailable' => 'الخدمة غير متاحة حالياً. يرجى المحاولة لاحقاً',
+        'permission-denied' => 'ليس لديك صلاحية لإجراء هذه العملية',
+        'not-found' => 'لم يتم العثور على البيانات المطلوبة',
+        'deadline-exceeded' => 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى',
+        'resource-exhausted' => 'تم تجاوز الحد المسموح. يرجى المحاولة لاحقاً',
+        _ => 'حدث خطأ. يرجى المحاولة مرة أخرى',
+      };
 
   // Build
   @override

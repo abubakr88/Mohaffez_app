@@ -144,8 +144,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       debugPrint('navigateToPayment error: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ: $e'),
+          const SnackBar(
+            content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
             backgroundColor: AppThemeConstants.error,
           ),
         );
@@ -610,8 +610,8 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في الإلغاء: $e'),
+          const SnackBar(
+            content: Text('تعذّر إلغاء الطلب. يرجى المحاولة مرة أخرى'),
             backgroundColor: AppThemeConstants.error,
           ),
         );

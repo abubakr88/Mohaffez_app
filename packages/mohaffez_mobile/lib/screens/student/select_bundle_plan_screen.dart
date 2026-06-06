@@ -110,7 +110,7 @@ class _SelectBundlePlanScreenState
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'فشل تحميل الباقات: $e';
+          _error = 'حدث خطأ أثناء تحميل الباقات. يرجى المحاولة مرة أخرى';
           _loadingPlans = false;
         });
       }
@@ -215,7 +215,7 @@ class _SelectBundlePlanScreenState
       if (mounted) {
         setState(() {
           _submitting = false;
-          _error = e.message ?? 'حدث خطأ أثناء إرسال الطلب';
+          _error = 'حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى';
         });
       }
     } on Exception catch (e) {
@@ -223,7 +223,7 @@ class _SelectBundlePlanScreenState
       if (mounted) {
         setState(() {
           _submitting = false;
-          _error = 'حدث خطأ: $e';
+          _error = 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى';
         });
       }
     } catch (e, stack) {

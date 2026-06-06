@@ -96,14 +96,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           'photoUrl': error.photoUrl,
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error.toString()),
-            backgroundColor: const Color(0xFFDC2626),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
+        ErrorHandler.showError(context, error);
       }
     }
   }
@@ -123,14 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (!mounted) return;
     final state = ref.read(authNotifierProvider);
     if (state.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.error.toString()),
-          backgroundColor: const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      ErrorHandler.showError(context, state.error);
     }
   }
 

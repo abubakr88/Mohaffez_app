@@ -326,12 +326,10 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       }
 
       final msg = switch (e.code) {
-        'resource-exhausted' => e.message != null && e.message!.isNotEmpty
-            ? e.message!
-            : 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات',
+        'resource-exhausted' => 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات',
         'permission-denied' => 'ليس لديك صلاحية تأكيد هذه المدفوعة',
         'not-found' => 'لم يتم العثور على طلب الدفع',
-        _ => e.message ?? 'حدث خطأ أثناء التأكيد',
+        _ => 'حدث خطأ أثناء التأكيد. يرجى المحاولة مرة أخرى',
       };
       messenger.showSnackBar(
         SnackBar(
@@ -343,8 +341,10 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
       debugPrint('❌ [BUNDLE_FLOW] Step5_Confirm_ERROR: '
           'paymentId=${widget.payment.id}, error=$e');
       messenger.showSnackBar(
-        SnackBar(
-            content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error),
+        const SnackBar(
+          content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
+          backgroundColor: AppThemeConstants.error,
+        ),
       );
     } catch (e, stack) {
       // FIX: Catches Dart Errors (TypeError, StateError, AssertionError, …)
@@ -362,8 +362,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
           'paymentId=${widget.payment.id}, error=$e');
       debugPrintStack(stackTrace: stack);
       messenger.showSnackBar(
-        SnackBar(
-          content: Text('خطأ غير متوقع — يرجى المحاولة مجدداً: $e'),
+        const SnackBar(
+          content: Text('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );
@@ -427,17 +427,18 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         ),
       );
     } on Exception catch (e) {
-      messenger.showSnackBar(SnackBar(
-          content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error));
+      debugPrint('❌ [BUNDLE_FLOW] Reject_ERROR: paymentId=${widget.payment.id}, error=$e');
+      messenger.showSnackBar(const SnackBar(
+          content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
+          backgroundColor: AppThemeConstants.error));
     } catch (e, stack) {
-      // Same safety net for the reject path.
       debugPrint('❌ [BUNDLE_FLOW] Reject_UNHANDLED_ERROR: '
           'paymentId=${widget.payment.id}, error=$e');
       debugPrintStack(stackTrace: stack);
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(
-          content: Text('خطأ غير متوقع: $e'),
+        const SnackBar(
+          content: Text('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );

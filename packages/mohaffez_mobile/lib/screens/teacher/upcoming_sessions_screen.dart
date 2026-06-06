@@ -495,7 +495,7 @@ class SessionCard extends ConsumerWidget {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e')),
+        const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
       );
     }
   }
@@ -701,16 +701,16 @@ class SessionCard extends ConsumerWidget {
     } catch (e) {
       dismissLoading();
       messenger.showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.error_outline, color: AppThemeConstants.white),
-              const SizedBox(width: 12),
-              Expanded(child: Text('فشل إلغاء الجلسة: ${e.toString()}')),
+              Icon(Icons.error_outline, color: AppThemeConstants.white),
+              SizedBox(width: 12),
+              Expanded(child: Text('تعذّر إلغاء الجلسة. يرجى المحاولة مرة أخرى')),
             ],
           ),
           backgroundColor: AppThemeConstants.error,
-          duration: const Duration(seconds: 4),
+          duration: Duration(seconds: 4),
         ),
       );
     }

@@ -164,12 +164,9 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     } catch (e, stack) {
       if (kDebugMode) debugPrint('❌ [createFreeSession] Unexpected error: $e');
       if (kDebugMode) debugPrintStack(stackTrace: stack);
-      state = state.copyWith(
-        isSubmitting: false,
-        isSuccess: false,
-        error: e.toString(),
-      );
-      return BookingResult.failure(e.toString());
+      const msg = 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى';
+      state = state.copyWith(isSubmitting: false, isSuccess: false, error: msg);
+      return BookingResult.failure(msg);
     }
   }
 
@@ -263,12 +260,9 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         debugPrint('❌ [createSessionRequest] Unexpected error: $e');
         debugPrintStack(stackTrace: stack);
       }
-      state = state.copyWith(
-        isSubmitting: false,
-        isSuccess: false,
-        error: e.toString(),
-      );
-      return BookingResult.failure(e.toString());
+      const msg = 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى';
+      state = state.copyWith(isSubmitting: false, isSuccess: false, error: msg);
+      return BookingResult.failure(msg);
     }
   }
 }
@@ -458,16 +452,16 @@ class BookingService {
           errorMessage = 'كود الخصم غير صحيح';
           break;
         case 'failed-precondition':
-          errorMessage = e.message ?? 'لا يمكن إتمام العملية';
+          errorMessage = 'لا يمكن إتمام العملية في الوقت الحالي';
           break;
         case 'deadline-exceeded':
-          errorMessage = 'انتهت مهلة الطلب. حاول مرة أخرى';
+          errorMessage = 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى';
           break;
         case 'unavailable':
-          errorMessage = 'الخدمة غير متاحة حالياً. حاول لاحقاً';
+          errorMessage = 'الخدمة غير متاحة حالياً. يرجى المحاولة لاحقاً';
           break;
         default:
-          errorMessage = e.message ?? 'حدث خطأ في النظام';
+          errorMessage = 'حدث خطأ. يرجى المحاولة مرة أخرى';
       }
 
       return BookingResult.failure(errorMessage);
@@ -476,7 +470,7 @@ class BookingService {
         debugPrint('❌ [FREE SESSION] Unexpected error: $e');
         debugPrintStack(stackTrace: stackTrace);
       }
-      return BookingResult.failure('حدث خطأ غير متوقع: ${e.toString()}');
+      return BookingResult.failure('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى');
     }
   }
 
@@ -634,28 +628,25 @@ class BookingService {
           errorMessage = 'يجب تسجيل الدخول أولاً';
           break;
         case 'invalid-argument':
-          errorMessage = e.message ?? 'بيانات غير مكتملة';
+          errorMessage = 'بيانات غير مكتملة';
           break;
         case 'not-found':
           errorMessage = 'الطلب غير موجود';
           break;
         case 'failed-precondition':
-          errorMessage =
-              e.message ?? 'لا يمكن إتمام الحجز. الرجاء المحاولة مرة أخرى';
+          errorMessage = 'لا يمكن إتمام الحجز. يرجى المحاولة مرة أخرى';
           break;
         case 'resource-exhausted':
-          errorMessage = (e.message != null && e.message!.isNotEmpty)
-              ? e.message!
-              : 'هذا الموعد محجوز بالفعل. الرجاء اختيار موعد آخر';
+          errorMessage = 'هذا الموعد محجوز بالفعل. يرجى اختيار موعد آخر';
           break;
         case 'deadline-exceeded':
-          errorMessage = 'انتهت مهلة الطلب. حاول مرة أخرى';
+          errorMessage = 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى';
           break;
         case 'unavailable':
-          errorMessage = 'الخدمة غير متاحة حالياً. حاول لاحقاً';
+          errorMessage = 'الخدمة غير متاحة حالياً. يرجى المحاولة لاحقاً';
           break;
         default:
-          errorMessage = e.message ?? 'حدث خطأ في النظام';
+          errorMessage = 'حدث خطأ. يرجى المحاولة مرة أخرى';
       }
 
       return BookingResult.failure(errorMessage);
@@ -674,7 +665,7 @@ class BookingService {
         });
       }
 
-      return BookingResult.failure(e.toString());
+      return BookingResult.failure('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى');
     }
   }
 
@@ -847,7 +838,7 @@ class BookingService {
         debugPrint('❌ [cancelSessionRequest] Error: $e');
         debugPrintStack(stackTrace: stack);
       }
-      return BookingResult.failure(e.toString());
+      return BookingResult.failure('حدث خطأ. يرجى المحاولة مرة أخرى');
     }
   }
 

@@ -306,7 +306,7 @@ class _TeacherCertificatesScreenState
 
       if (mounted) context.go('/teacher-pending');
     } catch (e) {
-      if (mounted) _snack('حدث خطأ: $e');
+      if (mounted) _snack('تعذّر رفع الشهادة. يرجى المحاولة مرة أخرى');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

@@ -183,7 +183,7 @@ class _ConfirmBundleSessionScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _subscriptionError = 'حدث خطأ أثناء تحميل الباقة: $e';
+        _subscriptionError = 'حدث خطأ أثناء تحميل الباقة. يرجى المحاولة مرة أخرى';
         _loadingSubscription = false;
       });
     }

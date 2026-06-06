@@ -93,8 +93,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       } else if (mounted) {
         _showSnackBar('لا يمكن فتح تطبيق الهاتف');
       }
-    } catch (e) {
-      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    } catch (_) {
+      if (mounted) _showSnackBar('تعذّر فتح تطبيق الهاتف');
     }
   }
 
@@ -106,8 +106,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       } else if (mounted) {
         _showSnackBar('لا يمكن فتح تطبيق البريد');
       }
-    } catch (e) {
-      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    } catch (_) {
+      if (mounted) _showSnackBar('تعذّر فتح تطبيق البريد الإلكتروني');
     }
   }
 
@@ -259,10 +259,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final croppedPath = await _runCropper(image.path);
       if (croppedPath == null) return;
       await _uploadCroppedPhoto(userId, croppedPath);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop();
-      _showSnackBar('${ArabicLabels.error}: $e');
+      _showSnackBar('تعذّر رفع الصورة. يرجى المحاولة مرة أخرى');
     } finally {
       if (mounted) setState(() => _isUploadingPhoto = false);
     }
@@ -293,10 +293,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final croppedPath = await _runCropper(tempFile.path);
       if (croppedPath == null) return;
       await _uploadCroppedPhoto(userId, croppedPath);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop();
-      _showSnackBar('${ArabicLabels.error}: $e');
+      _showSnackBar('تعذّر رفع الصورة. يرجى المحاولة مرة أخرى');
     } finally {
       if (mounted) setState(() => _isUploadingPhoto = false);
     }
@@ -310,8 +310,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.invalidate(currentUserProvider);
       setState(() => _isEditingBio = false);
       if (mounted) _showSnackBar('تم حفظ النبذة بنجاح', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    } catch (_) {
+      if (mounted) _showSnackBar('تعذّر حفظ النبذة. يرجى المحاولة مرة أخرى');
     }
   }
 
@@ -329,7 +329,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.invalidate(currentUserProvider);
       if (mounted) _showSnackBar('تم حفظ رابط الفيديو بنجاح', isSuccess: true);
     } catch (e) {
-      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+      if (mounted) _showSnackBar(e is Exception && e.toString().contains('YouTube') ? e.toString().replaceFirst('Exception: ', '') : 'تعذّر حفظ رابط الفيديو. يرجى المحاولة مرة أخرى');
     }
   }
 
@@ -345,8 +345,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await repository.updateUser(userId, {'name': trimmed});
       ref.invalidate(currentUserProvider);
       if (mounted) _showSnackBar('تم حفظ الاسم بنجاح', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    } catch (_) {
+      if (mounted) _showSnackBar('تعذّر حفظ الاسم. يرجى المحاولة مرة أخرى');
     }
   }
 
@@ -366,8 +366,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       });
       ref.invalidate(currentUserProvider);
       if (mounted) _showSnackBar('تم حفظ رقم الهاتف بنجاح', isSuccess: true);
-    } catch (e) {
-      if (mounted) _showSnackBar('${ArabicLabels.error}: $e');
+    } catch (_) {
+      if (mounted) _showSnackBar('تعذّر حفظ رقم الهاتف. يرجى المحاولة مرة أخرى');
     }
   }
 
@@ -910,9 +910,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
       },
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(
+      error: (_, __) => Scaffold(
         body: ErrorDisplay(
-          message: '${ArabicLabels.error}: $e',
+          message: 'تعذّر تحميل الملف الشخصي. يرجى المحاولة مرة أخرى',
           onRetry: () => ref.invalidate(currentUserProvider),
         ),
       ),

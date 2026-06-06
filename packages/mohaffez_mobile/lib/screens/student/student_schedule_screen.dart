@@ -140,7 +140,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('حدث خطأ: $e')),
+          error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         ),
       ),
     );

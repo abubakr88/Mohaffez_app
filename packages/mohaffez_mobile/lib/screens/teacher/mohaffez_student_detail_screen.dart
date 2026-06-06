@@ -638,8 +638,8 @@ class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
+          const SnackBar(
+            content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
             backgroundColor: AppThemeConstants.error,
           ),
         );

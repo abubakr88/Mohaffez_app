@@ -426,11 +426,11 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           backgroundColor: AppThemeConstants.secondary,
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ: ${e.toString()}'),
+        const SnackBar(
+          content: Text('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );
@@ -500,11 +500,11 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           backgroundColor: AppThemeConstants.error,
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ: ${e.toString()}'),
+        const SnackBar(
+          content: Text('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );
@@ -598,12 +598,12 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
           ),
         );
       }
-    } on FirebaseFunctionsException catch (e) {
+    } on FirebaseFunctionsException catch (_) {
       dismissDialog();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message ?? 'خطأ في تأكيد الجلسة'),
+        const SnackBar(
+          content: Text('حدث خطأ أثناء تأكيد الجلسة. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );
@@ -611,8 +611,8 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
       dismissDialog();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ: ${e.toString()}'),
+        const SnackBar(
+          content: Text('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );

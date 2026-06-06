@@ -137,8 +137,8 @@ class _MohaffezScheduleScreenState
           loading: () => const SliverFillRemaining(
             child: Center(child: CircularProgressIndicator()),
           ),
-          error: (e, _) => SliverFillRemaining(
-            child: Center(child: Text(e.toString())),
+          error: (_, __) => const SliverFillRemaining(
+            child: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
           ),
         ),
       ),

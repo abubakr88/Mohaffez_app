@@ -76,10 +76,11 @@ class _CustomQuestionsGameState extends ConsumerState<CustomQuestionsGame> {
 
     return questionsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
+      error: (_, __) => const Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('خطأ: $e', style: const TextStyle(color: QuizDS.red)),
+          padding: EdgeInsets.all(24),
+          child: Text('تعذّر تحميل الأسئلة. يرجى المحاولة مرة أخرى',
+              style: TextStyle(color: QuizDS.red)),
         ),
       ),
       data: (all) {

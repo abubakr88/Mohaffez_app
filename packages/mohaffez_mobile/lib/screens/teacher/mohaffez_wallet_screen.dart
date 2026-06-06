@@ -32,7 +32,7 @@ class MohaffezWalletScreen extends ConsumerWidget {
     return userAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('حدث خطأ: $e'))),
+      error: (_, __) => const Scaffold(body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى'))),
       data: (user) {
         if (user == null) {
           WidgetsBinding.instance
@@ -652,8 +652,8 @@ class _PayoutsList extends ConsumerWidget {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Text('تعذر تحميل الطلبات: $e',
-          style: const TextStyle(color: AppThemeConstants.error)),
+      error: (_, __) => const Text('تعذّر تحميل طلبات السحب. يرجى المحاولة مرة أخرى',
+          style: TextStyle(color: AppThemeConstants.error)),
       data: (payouts) {
         if (payouts.isEmpty) {
           return _emptyBox('لم تقدّم أي طلب سحب بعد');
@@ -797,8 +797,8 @@ class _TxList extends ConsumerWidget {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Text('تعذر تحميل العمليات: $e',
-          style: const TextStyle(color: AppThemeConstants.error)),
+      error: (_, __) => const Text('تعذّر تحميل العمليات. يرجى المحاولة مرة أخرى',
+          style: TextStyle(color: AppThemeConstants.error)),
       data: (txs) {
         if (txs.isEmpty) {
           return _emptyBox('لا توجد عمليات بعد');

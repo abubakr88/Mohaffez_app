@@ -73,8 +73,8 @@ class _RateSessionScreenState extends ConsumerState<RateSessionScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تعذّر الإبلاغ: ${e.toString()}'),
+          const SnackBar(
+            content: Text('تعذّر إرسال الإبلاغ. يرجى المحاولة مرة أخرى'),
             backgroundColor: AppThemeConstants.error,
           ),
         );
