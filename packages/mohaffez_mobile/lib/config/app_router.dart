@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../screens/shared/home_shell.dart';
 import '../screens/shared/login_screen.dart';
 import '../screens/shared/register_screen.dart';
+import '../screens/shared/forgot_password_screen.dart';
 import '../screens/shared/google_role_selection_screen.dart';
 import '../screens/shared/splash_screen.dart';
 import '../screens/shared/maintenance_screen.dart';
@@ -149,6 +150,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/google-role-selection',
