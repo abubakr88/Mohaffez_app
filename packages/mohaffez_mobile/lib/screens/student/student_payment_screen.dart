@@ -340,7 +340,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('${ArabicLabels.error}: $e')),
+          error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         ),
         bottomNavigationBar: selectedPlan == null
             ? null
@@ -1384,10 +1384,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       debugPrint('Free session error: $e');
       debugPrintStack(stackTrace: stack);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString()),
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
-          duration: const Duration(seconds: 5)));
+          duration: Duration(seconds: 5)));
     } finally {
       if (mounted) setState(() => isProcessingPayment = false);
     }
@@ -1478,7 +1478,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       if (!context.mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${ArabicLabels.error}: $e')));
+          .showSnackBar(const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')));
     } finally {
       if (mounted) setState(() => isProcessingPayment = false);
     }

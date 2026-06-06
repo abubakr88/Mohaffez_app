@@ -59,9 +59,9 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           backgroundColor: AppThemeConstants.error,
-          content: Text('تعذر إرسال الطلب: $e'),
+          content: Text('تعذّر إرسال طلب السحب. يرجى المحاولة مرة أخرى'),
         ),
       );
     } finally {
@@ -75,7 +75,7 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
     return userAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('حدث خطأ: $e'))),
+      error: (_, __) => const Scaffold(body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى'))),
       data: (user) {
         if (user == null) return const SizedBox.shrink();
         final walletAsync = ref.watch(walletProvider((
@@ -97,8 +97,8 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
             ),
             body: walletAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Center(child: Text('تعذر تحميل الرصيد: $e')),
+              error: (_, __) =>
+                  const Center(child: Text('تعذّر تحميل الرصيد. يرجى المحاولة مرة أخرى')),
               data: (w) {
                 final balance = w.balanceEgp;
                 return SingleChildScrollView(

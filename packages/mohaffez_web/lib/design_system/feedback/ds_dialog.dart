@@ -27,6 +27,12 @@ class DSDialog extends StatelessWidget {
   }) {
     return showDialog<T>(
       context: context,
+      // The admin/teacher/student pages live inside a go_router ShellRoute,
+      // which owns a nested Navigator. The dialog's action buttons pop via the
+      // caller's page context (nested navigator), so the dialog must be pushed
+      // on that SAME navigator — otherwise pop() dismisses the page route
+      // instead of the dialog, unmounting the page and dropping the result.
+      useRootNavigator: false,
       barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (_) => DSDialog(
         title: title,

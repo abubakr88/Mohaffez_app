@@ -28,10 +28,10 @@ class ExamResultScreen extends ConsumerWidget {
       child: Scaffold(
         body: configAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('حدث خطأ: $e')),
+          error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
           data: (config) => userAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('حدث خطأ: $e')),
+            error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
             data: (user) => _buildResultContent(context, ref, config, user),
           ),
         ),

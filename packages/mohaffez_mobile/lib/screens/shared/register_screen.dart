@@ -48,13 +48,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     if (state.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.error.toString()),
-          backgroundColor: AppThemeConstants.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ErrorHandler.showError(context, state.error);
     }
   }
 
@@ -76,13 +70,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
     final state = ref.read(authNotifierProvider);
     if (state.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.error.toString()),
-          backgroundColor: AppThemeConstants.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ErrorHandler.showError(context, state.error);
     } else if (state.hasValue) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

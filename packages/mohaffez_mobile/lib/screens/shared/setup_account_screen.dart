@@ -229,7 +229,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
+          const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         );
       }
     } finally {
@@ -299,7 +299,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       },
       error: (e, _) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('فشل تحميل الأسئلة: $e')),
+          const SnackBar(content: Text('تعذّر تحميل الأسئلة. يرجى المحاولة مرة أخرى')),
         );
       },
     );
@@ -400,7 +400,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
+          const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         );
       }
     } finally {

@@ -243,8 +243,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     } catch (e) {
       dismissLoading();
       messenger.showSnackBar(
-        SnackBar(
-          content: Text('تعذّر الإبلاغ: ${e.toString()}'),
+        const SnackBar(
+          content: Text('تعذّر إرسال الإبلاغ. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );
@@ -441,11 +441,11 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
           backgroundColor: AppThemeConstants.success,
         ),
       );
-    } catch (e) {
+    } catch (_) {
       dismissLoading();
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
+        const SnackBar(
+          content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error,
         ),
       );
@@ -1644,12 +1644,12 @@ class _AdminRefundCardState extends ConsumerState<_AdminRefundCard> {
           content: Text('تم الاسترداد بنجاح'),
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           backgroundColor: AppThemeConstants.error,
-          content: Text('تعذر الاسترداد: $e'),
+          content: Text('تعذّر الاسترداد. يرجى المحاولة مرة أخرى'),
         ),
       );
     } finally {

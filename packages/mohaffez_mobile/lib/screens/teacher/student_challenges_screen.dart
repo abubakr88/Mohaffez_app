@@ -83,9 +83,9 @@ class StudentChallengesScreen extends ConsumerWidget {
           data: (questions) => _buildBody(context, ref, questions, params),
           loading: () =>
               const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Text('تعذّر التحميل: $e',
-                style: const TextStyle(color: AppThemeConstants.error)),
+          error: (_, __) => const Center(
+            child: Text('تعذّر التحميل. يرجى المحاولة مرة أخرى',
+                style: TextStyle(color: AppThemeConstants.error)),
           ),
         ),
       ),
@@ -586,8 +586,8 @@ class _QuestionSheetState extends State<_QuestionSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
+          const SnackBar(
+            content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
             backgroundColor: AppThemeConstants.error,
           ),
         );

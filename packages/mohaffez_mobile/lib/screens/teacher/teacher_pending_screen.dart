@@ -36,7 +36,7 @@ class TeacherPendingScreen extends ConsumerWidget {
             body: userAsync.when(
               loading: () =>
                   const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('خطأ: $e')),
+              error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
               data: (user) => SafeArea(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(

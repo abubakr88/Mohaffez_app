@@ -113,7 +113,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        locationError = e.toString();
+        locationError = 'تعذّر تحديد موقعك. تحقق من إذن الموقع وحاول مجدداً';
         isLoadingLocation = false;
       });
     }

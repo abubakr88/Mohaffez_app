@@ -429,7 +429,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: error=$e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
       );
     } finally {
       if (mounted) setState(() => submitting = false);

@@ -126,7 +126,7 @@ class _StudentPaymentConfirmationScreenState
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('خطأ: $e')),
+          error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         ),
         bottomNavigationBar: selectedPlan == null
             ? null
@@ -316,7 +316,7 @@ class _StudentPaymentConfirmationScreenState
       if (!context.mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${ArabicLabels.error}: $e')));
+          .showSnackBar(const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')));
     }
   }
 }

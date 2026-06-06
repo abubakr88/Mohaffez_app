@@ -290,8 +290,8 @@ class _LocationSettingsScreenState
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(
-        body: Center(child: Text('خطأ: $e')),
+      error: (_, __) => const Scaffold(
+        body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
       ),
     );
   }
@@ -326,11 +326,11 @@ class _LocationSettingsScreenState
           ),
         );
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
+          const SnackBar(
+            content: Text('تعذّر تحديث الموقع. يرجى المحاولة مرة أخرى'),
             backgroundColor: AppThemeConstants.error,
           ),
         );

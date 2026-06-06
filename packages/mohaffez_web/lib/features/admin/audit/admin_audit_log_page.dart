@@ -44,13 +44,15 @@ class _AdminAuditLogPageState extends ConsumerState<AdminAuditLogPage> {
                 final filtered = rows.where((r) {
                   if (_query.isEmpty) return true;
                   final q = _query.toLowerCase();
+                  final target = (r['targetUserId'] ?? r['targetId'] ?? r['userId'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  final actor = (r['performedBy'] ?? r['adminId'] ?? r['adminName'] ?? '')
+                      .toString()
+                      .toLowerCase();
                   return (r['action'] as String? ?? '').toLowerCase().contains(q) ||
-                      (r['targetId'] as String? ?? '')
-                          .toLowerCase()
-                          .contains(q) ||
-                      (r['adminId'] as String? ?? '')
-                          .toLowerCase()
-                          .contains(q);
+                      target.contains(q) ||
+                      actor.contains(q);
                 }).toList();
                 if (filtered.isEmpty) {
                   return const DSCard(
@@ -76,7 +78,8 @@ class _AdminAuditLogPageState extends ConsumerState<AdminAuditLogPage> {
                         key: 'targetId',
                         label: 'الهدف',
                         cellBuilder: (ctx, r) => Text(
-                          r['targetId'] as String? ?? r['userId'] as String? ?? '—',
+                          (r['targetUserId'] ?? r['targetId'] ?? r['userId'] ?? '—')
+                              .toString(),
                           style: DSText.body(ctx, color: DSColors.text2),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -85,7 +88,8 @@ class _AdminAuditLogPageState extends ConsumerState<AdminAuditLogPage> {
                         key: 'adminId',
                         label: 'بواسطة',
                         cellBuilder: (ctx, r) => Text(
-                          r['adminId'] as String? ?? r['adminName'] as String? ?? '—',
+                          (r['performedBy'] ?? r['adminId'] ?? r['adminName'] ?? '—')
+                              .toString(),
                           style: DSText.body(ctx, color: DSColors.text2),
                           overflow: TextOverflow.ellipsis,
                         ),

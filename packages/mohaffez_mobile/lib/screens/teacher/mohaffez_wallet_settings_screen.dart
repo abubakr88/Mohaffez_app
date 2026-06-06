@@ -69,7 +69,7 @@ class _MohaffezWalletSettingsScreenState
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ: $e'), backgroundColor: AppThemeConstants.error),
+        const SnackBar(content: Text('تعذّر حفظ الإعدادات. يرجى المحاولة مرة أخرى'), backgroundColor: AppThemeConstants.error),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

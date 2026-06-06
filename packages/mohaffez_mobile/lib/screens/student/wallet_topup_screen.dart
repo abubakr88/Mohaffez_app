@@ -67,9 +67,9 @@ class _WalletTopupScreenState extends ConsumerState<WalletTopupScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           backgroundColor: AppThemeConstants.error,
-          content: Text('تعذر إرسال الطلب: $e'),
+          content: Text('تعذّر إرسال طلب الشحن. يرجى المحاولة مرة أخرى'),
         ),
       );
     } finally {

@@ -24,6 +24,7 @@ class AuthGuard implements RouteGuard {
     splashPath,
     loginPath,
     '/register',
+    '/forgot-password',
     '/maintenance',
   };
 

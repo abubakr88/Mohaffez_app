@@ -18,8 +18,8 @@ class StudentWalletScreen extends ConsumerWidget {
     return userAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(
-        body: Center(child: Text('حدث خطأ: $e')),
+      error: (_, __) => const Scaffold(
+        body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
       ),
       data: (user) {
         if (user == null) {
@@ -206,10 +206,10 @@ class _TransactionsList extends ConsumerWidget {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text('تعذر تحميل العمليات: $e',
-            style: const TextStyle(color: AppThemeConstants.error)),
+      error: (_, __) => const Padding(
+        padding: EdgeInsets.all(24),
+        child: Text('تعذّر تحميل العمليات. يرجى المحاولة مرة أخرى',
+            style: TextStyle(color: AppThemeConstants.error)),
       ),
       data: (txs) {
         if (txs.isEmpty) {

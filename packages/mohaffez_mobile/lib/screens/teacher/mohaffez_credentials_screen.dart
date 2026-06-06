@@ -62,7 +62,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('فشل الحذف: $e')),
+            const SnackBar(content: Text('تعذّر حذف المستند. يرجى المحاولة مرة أخرى')),
           );
         }
       }
@@ -754,7 +754,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          const SnackBar(content: Text('تعذّر اختيار الصور. يرجى المحاولة مرة أخرى')),
         );
       }
     }
@@ -814,7 +814,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('فشلت الإضافة: $e')),
+          const SnackBar(content: Text('تعذّر رفع المستند. يرجى المحاولة مرة أخرى')),
         );
       }
     } finally {

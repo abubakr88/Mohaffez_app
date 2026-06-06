@@ -61,21 +61,30 @@ class ErrorHandler {
   static String _getAuthErrorMessage(String code) {
     switch (code) {
       case 'user-not-found':
-        return 'لا يوجد حساب بهذا البريد الإلكتروني';
+      case 'invalid-credential':
+        return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
       case 'wrong-password':
         return 'كلمة المرور غير صحيحة';
       case 'email-already-in-use':
-        return 'هذا البريد الإلكتروني مستخدم بالفعل';
+        return 'البريد الإلكتروني مستخدم بالفعل';
       case 'weak-password':
-        return 'كلمة المرور ضعيفة جداً';
+        return 'كلمة المرور ضعيفة جداً، استخدم 6 أحرف على الأقل';
       case 'invalid-email':
         return 'البريد الإلكتروني غير صحيح';
       case 'user-disabled':
-        return 'هذا الحساب معطل';
+        return 'هذا الحساب موقوف. يرجى التواصل مع الدعم';
       case 'network-request-failed':
-        return 'تحقق من اتصالك بالإنترنت';
+        return 'تحقق من اتصالك بالإنترنت وحاول مجدداً';
+      case 'too-many-requests':
+        return 'محاولات كثيرة. يرجى الانتظار قليلاً والمحاولة مجدداً';
+      case 'requires-recent-login':
+        return 'يرجى تسجيل الخروج وإعادة الدخول ثم المحاولة مجدداً';
+      case 'operation-not-allowed':
+        return 'هذه العملية غير مسموح بها. يرجى التواصل مع الدعم';
+      case 'credential-already-in-use':
+        return 'هذا الحساب مرتبط بمستخدم آخر بالفعل';
       default:
-        return 'حدث خطأ في المصادقة: $code';
+        return 'حدث خطأ. يرجى المحاولة مرة أخرى';
     }
   }
 
@@ -91,12 +100,10 @@ class ErrorHandler {
         return 'هذا العنصر موجود بالفعل';
       case 'cancelled':
         return 'تم إلغاء العملية';
-      case 'data-loss':
-        return 'فقدان البيانات';
       case 'deadline-exceeded':
-        return 'انتهت مهلة العملية';
+        return 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى';
       default:
-        return 'حدث خطأ في قاعدة البيانات: $code';
+        return 'حدث خطأ. يرجى المحاولة مرة أخرى';
     }
   }
 }

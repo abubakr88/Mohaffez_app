@@ -205,12 +205,7 @@ class SettingsScreen extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         Navigator.of(context).pop(); // dismiss loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تعذر حذف الحساب: $e'),
-            backgroundColor: AppThemeConstants.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -287,8 +282,8 @@ class SettingsScreen extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ: $e'),
+          const SnackBar(
+            content: Text('تعذّر فتح رابط سياسة الخصوصية'),
             backgroundColor: AppThemeConstants.error,
           ),
         );
@@ -411,12 +406,7 @@ class SettingsScreen extends ConsumerWidget {
                   }
                 } on FirebaseAuthException catch (e) {
                   if (context.mounted) {
-                    final msg = e.code == 'wrong-password'
-                        ? 'كلمة المرور الحالية غير صحيحة'
-                        : 'حدث خطأ: ${e.message}';
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(msg), backgroundColor: AppThemeConstants.error),
-                    );
+                    ErrorHandler.showError(context, e);
                   }
                 }
               },
