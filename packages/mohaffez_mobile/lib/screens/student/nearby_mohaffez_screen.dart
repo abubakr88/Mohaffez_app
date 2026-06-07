@@ -778,7 +778,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
         if (userLng != null) 'lng': userLng!.toString(),
       },
     );
-    context.go(uri.toString());
+    context.push(uri.toString());
   }
 
   void _updateFilter(SortType newFilter) {

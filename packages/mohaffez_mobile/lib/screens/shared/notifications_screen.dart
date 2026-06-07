@@ -377,7 +377,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
       case 'assignment_updated':
         // Navigate to student assignments
-        context.go('/assignments');
+        context.push('/assignments');
         break;
 
       // BUG-10 FIX: Handle subscription_created notification
