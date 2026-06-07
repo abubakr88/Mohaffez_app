@@ -86,10 +86,16 @@ flutter {
     source = "../.."
 }
 
+// Exclude SafetyNet — deprecated and replaced by Play Integrity API (used by firebase-appcheck-playintegrity).
+// Prevents the "critical note" warning in Google Play Console.
+configurations.all {
+    exclude(group = "com.google.android.gms", module = "play-services-safetynet")
+}
+
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-    
+
     // Firebase App Check providers
     implementation("com.google.firebase:firebase-appcheck-playintegrity:17.0.1")
     debugImplementation("com.google.firebase:firebase-appcheck-debug:18.0.0")
