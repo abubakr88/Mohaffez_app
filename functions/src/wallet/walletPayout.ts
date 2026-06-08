@@ -23,6 +23,7 @@ import {
   SYSTEM_WALLETS,
   requireAdmin,
 } from './walletUtils';
+import { writeAdminAuditLog } from '../utils/auditLog';
 
 const MIN_PAYOUT_EGP = 50;
 
@@ -165,7 +166,7 @@ export const startPayout = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'payoutRequestId required');
   }
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const payoutRef = db.collection('payoutRequests').doc(payoutRequestId);
     const payoutSnap = await tx.get(payoutRef);
     if (!payoutSnap.exists) {
@@ -209,6 +210,17 @@ export const startPayout = functions.https.onCall(async (data, context) => {
 
     return { success: true, groupId: result.groupId };
   });
+
+  await writeAdminAuditLog({
+    action: 'startPayout',
+    actorId: adminUid,
+    targetId: payoutRequestId,
+    targetType: 'payout_request',
+    data: { groupId: result.groupId },
+    context,
+  });
+
+  return result;
 });
 
 export const completePayout = functions.https.onCall(async (data, context) => {
@@ -221,7 +233,7 @@ export const completePayout = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'payoutRequestId required');
   }
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const payoutRef = db.collection('payoutRequests').doc(payoutRequestId);
     const payoutSnap = await tx.get(payoutRef);
     if (!payoutSnap.exists) {
@@ -262,6 +274,17 @@ export const completePayout = functions.https.onCall(async (data, context) => {
 
     return { success: true };
   });
+
+  await writeAdminAuditLog({
+    action: 'completePayout',
+    actorId: adminUid,
+    targetId: payoutRequestId,
+    targetType: 'payout_request',
+    data: { bankReference: bankReference ?? null, result },
+    context,
+  });
+
+  return result;
 });
 
 export const failPayout = functions.https.onCall(async (data, context) => {
@@ -274,7 +297,7 @@ export const failPayout = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'payoutRequestId + reason required');
   }
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const payoutRef = db.collection('payoutRequests').doc(payoutRequestId);
     const payoutSnap = await tx.get(payoutRef);
     if (!payoutSnap.exists) {
@@ -335,4 +358,16 @@ export const failPayout = functions.https.onCall(async (data, context) => {
 
     return { success: true };
   });
+
+  await writeAdminAuditLog({
+    action: 'failPayout',
+    actorId: adminUid,
+    targetId: payoutRequestId,
+    targetType: 'payout_request',
+    reason,
+    data: { reason, result },
+    context,
+  });
+
+  return result;
 });

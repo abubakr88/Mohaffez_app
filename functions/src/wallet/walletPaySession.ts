@@ -16,6 +16,7 @@ import {
   walletIdForUser,
   SYSTEM_WALLETS,
 } from './walletUtils';
+import { writeAdminAuditLog } from '../utils/auditLog';
 interface PayFromWalletRequest {
   sessionRequestId: string;
   /** Required when the sessionRequest doc has no paymentAmount yet
@@ -293,7 +294,7 @@ export const refundSessionPayment = functions.https.onCall(async (data, context)
     throw new functions.https.HttpsError('invalid-argument', 'sessionId and reason required');
   }
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const sessionRef = db.collection('hafizSessions').doc(sessionId);
     const sessionSnap = await tx.get(sessionRef);
     if (!sessionSnap.exists) {
@@ -360,4 +361,16 @@ export const refundSessionPayment = functions.https.onCall(async (data, context)
 
     return { success: true, groupId: result.groupId };
   });
+
+  await writeAdminAuditLog({
+    action: 'refundSessionPayment',
+    actorId: adminUid,
+    targetId: sessionId,
+    targetType: 'hafiz_session',
+    reason: reason.trim(),
+    data: { groupId: result.groupId },
+    context,
+  });
+
+  return result;
 });

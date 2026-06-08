@@ -558,8 +558,11 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
     await _callFunction('unsuspendUser', {'userId': userId});
   }
 
-  Future<void> deleteUserData(String userId) async {
-    await _callFunction('deleteUserAccount', {'userId': userId});
+  Future<void> deleteUserData(String userId, String reason) async {
+    await _callFunction('deleteUserAccount', {
+      'userId': userId,
+      'reason': reason,
+    });
   }
 
   Future<void> updateUserRole(String userId, String newRole) async {

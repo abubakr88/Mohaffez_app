@@ -103,6 +103,15 @@ class AdminUsersPage extends ConsumerWidget {
                             ? null
                             : 'suspended'),
                   ),
+                  _FilterChip(
+                    label: 'محذوف',
+                    selected: filter.statusFilter == 'deleted',
+                    onTap: () => ref
+                        .read(userFilterProvider.notifier)
+                        .setStatus(filter.statusFilter == 'deleted'
+                            ? null
+                            : 'deleted'),
+                  ),
                 ],
               );
 
@@ -399,6 +408,7 @@ class AdminUsersPage extends ConsumerWidget {
         'pending_approval' => 'بانتظار المراجعة',
         'rejected' => 'مرفوض',
         'suspended' => 'معلّق',
+        'deleted' => 'محذوف',
         _ => 'معلّق',
       };
 
@@ -407,6 +417,7 @@ class AdminUsersPage extends ConsumerWidget {
         'pending_approval' => DSBadgeVariant.info,
         'rejected' => DSBadgeVariant.error,
         'suspended' => DSBadgeVariant.warning,
+        'deleted' => DSBadgeVariant.error,
         _ => DSBadgeVariant.warning,
       };
 }
@@ -432,15 +443,17 @@ class _UserActionsMenu extends ConsumerWidget {
         : ref.watch(web_auth.authProvider).user?.uid;
     final isCurrentAdmin = id.isNotEmpty && id == currentUid;
     final suspended = status == 'suspended';
+    final deleted = status == 'deleted' || user['isDeleted'] == true;
     final canManageUsers = adminAccess.can(AdminPermission.manageUsers);
     final canManageRoles = adminAccess.can(AdminPermission.manageUserRoles);
     final canDeleteUsers = adminAccess.can(AdminPermission.deleteUsers);
     final canManageAdminAccess = adminAccess.isSuperAdmin;
-    final canSuspend = !isCurrentAdmin && canManageUsers;
-    final canChangeRole = role != 'admin' && !isCurrentAdmin && canManageRoles;
+    final canSuspend = !deleted && !isCurrentAdmin && canManageUsers;
+    final canChangeRole =
+        !deleted && role != 'admin' && !isCurrentAdmin && canManageRoles;
     final canEditAdminAccess =
-        role == 'admin' && !isCurrentAdmin && canManageAdminAccess;
-    final canDelete = !isCurrentAdmin && canDeleteUsers;
+        !deleted && role == 'admin' && !isCurrentAdmin && canManageAdminAccess;
+    final canDelete = !deleted && !isCurrentAdmin && canDeleteUsers;
     final hasMoreActions =
         canSuspend || canChangeRole || canEditAdminAccess || canDelete;
 
@@ -570,13 +583,13 @@ class _UserActionsMenu extends ConsumerWidget {
 
   Future<void> _delete(
       BuildContext context, WidgetRef ref, String id, String name) async {
-    final ok = await _showDeleteDialog(context, name);
-    if (!ok || !context.mounted) return;
+    final reason = await _showDeleteDialog(context, name);
+    if (reason == null || !context.mounted) return;
     await _run(
       context,
       ref,
-      () => ref.read(adminActionsProvider.notifier).deleteUserData(id),
-      'تم حذف الحساب',
+      () => ref.read(adminActionsProvider.notifier).deleteUserData(id, reason),
+      'تم تعطيل الحساب وحذفه مبدئيًا',
     );
   }
 
@@ -666,29 +679,40 @@ class _UserActionsMenu extends ConsumerWidget {
     }
   }
 
-  Future<bool> _showDeleteDialog(BuildContext context, String name) async {
-    final controller = TextEditingController();
+  Future<String?> _showDeleteDialog(BuildContext context, String name) async {
+    final confirmController = TextEditingController();
+    final reasonController = TextEditingController();
 
     try {
-      final result = await DSDialog.show<bool>(
+      final result = await DSDialog.show<String>(
         context,
-        title: 'حذف الحساب',
+        title: 'حذف مبدئي للحساب',
         width: 520,
         child: StatefulBuilder(
           builder: (context, setState) {
-            final canDelete = controller.text.trim() == 'DELETE';
+            final reason = reasonController.text.trim();
+            final canDelete =
+                confirmController.text.trim() == 'DELETE' && reason.length >= 3;
 
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'سيتم حذف حساب "$name" نهائيًا وإلغاء طلباته الحيّة. لا يمكن التراجع عن هذا الإجراء.',
+                  'سيتم تعطيل دخول "$name" وإلغاء طلباته الحيّة مع الاحتفاظ بالسجلات التاريخية والمالية للمراجعة.',
                   style: DSText.body(context, color: DSColors.text2),
                 ),
                 const SizedBox(height: DSSpacing.lg),
                 DSTextField(
-                  controller: controller,
+                  controller: reasonController,
+                  label: 'سبب الحذف',
+                  hint: 'مثال: طلب من المستخدم، إساءة استخدام، حساب مكرر',
+                  maxLines: 3,
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: DSSpacing.md),
+                DSTextField(
+                  controller: confirmController,
                   label: 'اكتب DELETE للتأكيد',
                   hint: 'DELETE',
                   onChanged: (_) => setState(() {}),
@@ -700,14 +724,14 @@ class _UserActionsMenu extends ConsumerWidget {
                     DSButton(
                       label: 'إلغاء',
                       variant: DSButtonVariant.ghost,
-                      onPressed: () => Navigator.of(context).pop(false),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                     const SizedBox(width: DSSpacing.sm),
                     DSButton(
-                      label: 'حذف نهائي',
+                      label: 'حذف مبدئي',
                       variant: DSButtonVariant.destructive,
                       onPressed: canDelete
-                          ? () => Navigator.of(context).pop(true)
+                          ? () => Navigator.of(context).pop(reason)
                           : null,
                     ),
                   ],
@@ -717,9 +741,10 @@ class _UserActionsMenu extends ConsumerWidget {
           },
         ),
       );
-      return result ?? false;
+      return result;
     } finally {
-      controller.dispose();
+      confirmController.dispose();
+      reasonController.dispose();
     }
   }
 

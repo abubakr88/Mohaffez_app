@@ -6,6 +6,16 @@ import {
   sanitizePermissionInput,
   SUPER_ADMIN_PERMISSIONS,
 } from './utils/adminPermissions';
+import { writeAdminAuditLog } from './utils/auditLog';
+
+function adminAccessState(data: FirebaseFirestore.DocumentData | undefined) {
+  if (data == null) return null;
+  return {
+    role: data.role ?? null,
+    adminRole: data.adminRole ?? null,
+    adminPermissions: data.adminPermissions ?? null,
+  };
+}
 
 export const setAdminClaim = functions.https.onCall(async (data, context) => {
   const caller = await requireSuperAdminAccess(context);
@@ -28,6 +38,8 @@ export const setAdminClaim = functions.https.onCall(async (data, context) => {
     adminRole === 'super_admin'
       ? {}
       : sanitizePermissionInput(data?.permissions);
+  const targetRef = db.collection('users').doc(targetUid);
+  const targetSnap = await targetRef.get();
 
   await auth.setCustomUserClaims(targetUid, {
     admin: true,
@@ -37,7 +49,7 @@ export const setAdminClaim = functions.https.onCall(async (data, context) => {
       adminRole === 'super_admin' ? SUPER_ADMIN_PERMISSIONS : permissions,
   });
 
-  await db.collection('users').doc(targetUid).update({
+  await targetRef.update({
     role: 'admin',
     adminRole,
     adminPermissions: permissions,
@@ -46,13 +58,15 @@ export const setAdminClaim = functions.https.onCall(async (data, context) => {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  // WHY: Keep immutable traceability for privilege changes.
-  await db.collection('adminAuditLog').add({
+  await writeAdminAuditLog({
     action: 'set_admin_claim',
-    targetUid,
-    performedBy: caller.uid,
+    actorId: caller.uid,
+    targetUserId: targetUid,
+    targetType: 'admin_user',
+    before: adminAccessState(targetSnap.data()),
+    after: { role: 'admin', adminRole, adminPermissions: permissions },
     data: { adminRole, permissions },
-    timestamp: FieldValue.serverTimestamp(),
+    context,
   });
 
   return { success: true };
