@@ -29,6 +29,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   SortType selectedFilter = SortType.distance;
+  TeacherAvailabilityFilter availabilityFilter =
+      TeacherAvailabilityFilter.availableOnly;
   double? userLat;
   double? userLng;
   bool isLoadingLocation = true;
@@ -131,6 +133,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       sortBy: selectedFilter,
       searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
       specialization: selectedSpecialization,
+      availabilityFilter: availabilityFilter,
     );
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
 
@@ -631,6 +634,36 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                   onTap: () => _updateFilter(SortType.followers),
                 ),
                 const SizedBox(width: 8),
+                _MapChip(
+                  label: 'المتاحون',
+                  icon: Icons.event_available_rounded,
+                  isSelected: availabilityFilter ==
+                      TeacherAvailabilityFilter.availableOnly,
+                  onTap: () => _updateAvailabilityFilter(
+                    TeacherAvailabilityFilter.availableOnly,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _MapChip(
+                  label: 'الكل',
+                  icon: Icons.groups_rounded,
+                  isSelected:
+                      availabilityFilter == TeacherAvailabilityFilter.all,
+                  onTap: () => _updateAvailabilityFilter(
+                    TeacherAvailabilityFilter.all,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _MapChip(
+                  label: 'بدون مواعيد',
+                  icon: Icons.event_busy_rounded,
+                  isSelected: availabilityFilter ==
+                      TeacherAvailabilityFilter.unavailableOnly,
+                  onTap: () => _updateAvailabilityFilter(
+                    TeacherAvailabilityFilter.unavailableOnly,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 ...SpecializationConstants.specializations.map(
                   (spec) => Padding(
                     padding: const EdgeInsets.only(left: 8),
@@ -785,6 +818,16 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     if (selectedFilter != newFilter) {
       setState(() {
         selectedFilter = newFilter;
+        _selectedTeacher = null;
+        _hasFitInitialBounds = false;
+      });
+    }
+  }
+
+  void _updateAvailabilityFilter(TeacherAvailabilityFilter newFilter) {
+    if (availabilityFilter != newFilter) {
+      setState(() {
+        availabilityFilter = newFilter;
         _selectedTeacher = null;
         _hasFitInitialBounds = false;
       });

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/mohaffez_model.dart';
+import 'server_clock_provider.dart';
 
 // Provider للحصول على قائمة المحفظين
 final nearbyMohaffezProvider = FutureProvider.autoDispose
@@ -21,15 +22,15 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
     List<MohaffezModel> mohaffezList = snapshot.docs
         .map((doc) => MohaffezModel.fromFirestore(doc))
         .where((mohaffez) {
-          // تصفية المحفظين الذين لديهم إحداثيات صحيحة
-          return mohaffez.addressLat != null && mohaffez.addressLng != null;
-        })
-        .toList();
+      // تصفية المحفظين الذين لديهم إحداثيات صحيحة
+      return mohaffez.addressLat != null && mohaffez.addressLng != null;
+    }).toList();
 
     // تصفية حسب نطاق المسافة إذا كان موقع المستخدم متاحاً
     if (params.userLat != null && params.userLng != null) {
       mohaffezList = mohaffezList.where((mohaffez) {
-        final distance = mohaffez.getDistanceFrom(params.userLat, params.userLng);
+        final distance =
+            mohaffez.getDistanceFrom(params.userLat, params.userLng);
         return distance != null && distance <= params.radiusKm;
       }).toList();
     }
@@ -51,12 +52,37 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
     }
 
     // ترتيب حسب نوع الفلتر
+    if (params.availabilityFilter != TeacherAvailabilityFilter.all) {
+      final now = serverNowFromRef(ref);
+      final availabilityEntries = await Future.wait(
+        mohaffezList.map((mohaffez) async {
+          final hasAvailableSlot = await _hasUpcomingAvailableSlot(
+            firestore,
+            mohaffez.id,
+            now,
+          );
+          return MapEntry(mohaffez.id, hasAvailableSlot);
+        }),
+      );
+      final availabilityById = Map.fromEntries(availabilityEntries);
+
+      mohaffezList = mohaffezList.where((mohaffez) {
+        final hasAvailableSlot = availabilityById[mohaffez.id] ?? false;
+        return params.availabilityFilter ==
+                TeacherAvailabilityFilter.availableOnly
+            ? hasAvailableSlot
+            : !hasAvailableSlot;
+      }).toList();
+    }
+
     switch (params.sortBy) {
       case SortType.distance:
         if (params.userLat != null && params.userLng != null) {
           mohaffezList.sort((a, b) {
-            final distA = a.getDistanceFrom(params.userLat, params.userLng) ?? double.infinity;
-            final distB = b.getDistanceFrom(params.userLat, params.userLng) ?? double.infinity;
+            final distA = a.getDistanceFrom(params.userLat, params.userLng) ??
+                double.infinity;
+            final distB = b.getDistanceFrom(params.userLat, params.userLng) ??
+                double.infinity;
             return distA.compareTo(distB);
           });
         }
@@ -76,6 +102,67 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
 });
 
 // معاملات البحث
+Future<bool> _hasUpcomingAvailableSlot(
+  FirebaseFirestore firestore,
+  String mohaffezId,
+  DateTime now,
+) async {
+  final today = DateTime(now.year, now.month, now.day);
+  final currentDayOfWeek = today.weekday;
+
+  final snapshot = await firestore
+      .collection('users')
+      .doc(mohaffezId)
+      .collection('availability')
+      .get()
+      .timeout(const Duration(seconds: 10));
+
+  for (final doc in snapshot.docs) {
+    final data = doc.data();
+    final dayOfWeek = _normalizeDayOfWeek(data['dayOfWeek']);
+    if (dayOfWeek == null) continue;
+
+    var daysUntil = dayOfWeek - currentDayOfWeek;
+    if (daysUntil < 0) daysUntil += 7;
+    final isToday = daysUntil == 0;
+
+    final timeSlots = List<Map<String, dynamic>>.from(
+      data['timeSlots'] ?? const [],
+    );
+
+    for (final slot in timeSlots) {
+      if (slot['enabled'] != true) continue;
+      if (!isToday) return true;
+
+      final startTime = slot['startTime'] as String?;
+      if (startTime == null) continue;
+      final parts = startTime.split(':');
+      final hour = int.tryParse(parts.elementAtOrNull(0) ?? '');
+      final minute = int.tryParse(parts.elementAtOrNull(1) ?? '');
+      if (hour == null || minute == null) continue;
+
+      final slotStart = DateTime(
+        today.year,
+        today.month,
+        today.day,
+        hour,
+        minute,
+      );
+      if (slotStart.isAfter(now)) return true;
+    }
+  }
+
+  return false;
+}
+
+int? _normalizeDayOfWeek(Object? value) {
+  final day = value is num ? value.toInt() : null;
+  if (day == null) return null;
+  if (day >= DateTime.monday && day <= DateTime.sunday) return day;
+  if (day >= 0 && day <= 6) return day + 1;
+  return null;
+}
+
 class NearbyParams {
   final double? userLat;
   final double? userLng;
@@ -83,6 +170,7 @@ class NearbyParams {
   final SortType sortBy;
   final String? searchQuery;
   final String? specialization;
+  final TeacherAvailabilityFilter availabilityFilter;
 
   NearbyParams({
     this.userLat,
@@ -91,6 +179,7 @@ class NearbyParams {
     this.sortBy = SortType.distance,
     this.searchQuery,
     this.specialization,
+    this.availabilityFilter = TeacherAvailabilityFilter.availableOnly,
   });
 
   @override
@@ -103,14 +192,24 @@ class NearbyParams {
           radiusKm == other.radiusKm &&
           sortBy == other.sortBy &&
           searchQuery == other.searchQuery &&
-          specialization == other.specialization;
+          specialization == other.specialization &&
+          availabilityFilter == other.availabilityFilter;
 
   @override
   int get hashCode => Object.hash(
-      userLat, userLng, radiusKm, sortBy, searchQuery, specialization);
+        userLat,
+        userLng,
+        radiusKm,
+        sortBy,
+        searchQuery,
+        specialization,
+        availabilityFilter,
+      );
 }
 
 enum SortType { distance, rating, followers }
+
+enum TeacherAvailabilityFilter { availableOnly, all, unavailableOnly }
 
 /// Provider for mohaffez session counts (for search results)
 final mohaffezSessionCountProvider = FutureProvider.family<int, String>(

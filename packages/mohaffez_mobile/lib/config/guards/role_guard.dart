@@ -1,4 +1,4 @@
-﻿// FILE: lib/config/guards/role_guard.dart
+// FILE: lib/config/guards/role_guard.dart
 // CHANGES:
 // - Made types explicit (AsyncValue<UserModel?>) for better null-safety/readability.
 // - Improved route matching: checks by path prefix, plus explicit shared routes bypass.
@@ -31,10 +31,13 @@ class RoleGuard implements RouteGuard {
     '/profile',
     '/student-rewards',
     '/session', // session details
+    '/mohaffez/requests',
+  ];
+
+  static const List<String> teacherRegistrationRoutePrefixes = <String>[
+    '/teacher-certificates',
     '/teacher-pending',
     '/teacher-rejected',
-    '/teacher-certificates',
-    '/mohaffez/requests',
   ];
 
   // Mohaffez-only routes.
@@ -74,15 +77,29 @@ class RoleGuard implements RouteGuard {
     // Tour mode supplies a synthetic user via overrides — treat as authenticated.
     if (authState.value == null && !inTour) return null;
 
-    // WHY: teacher-pending must be checked before sharedRoutePrefixes so that
-    // status changes (pending_approval → active/rejected) trigger a redirect
-    // without racing against an imperative context.go() in the screen.
-    if (currentPath == '/teacher-pending') {
+    if (_startsWithAny(currentPath, teacherRegistrationRoutePrefixes)) {
       if (userState.isLoading) return null;
       final user = userState.value;
       if (user == null) return null;
-      if (user.status == 'active') return mohaffezHomePath;
-      if (user.status == 'rejected') return '/teacher-rejected';
+
+      final role = user.role.trim().toLowerCase();
+      final status = user.status.trim().toLowerCase();
+
+      if (role != 'mohaffez') {
+        return _homeForUser(role, status) ?? studentHomePath;
+      }
+
+      if (status == 'active' &&
+          (currentPath == '/teacher-pending' ||
+              currentPath == '/teacher-rejected')) {
+        return mohaffezHomePath;
+      }
+      if (status == 'pending_approval' && currentPath != '/teacher-pending') {
+        return '/teacher-pending';
+      }
+      if (status == 'rejected' && currentPath != '/teacher-rejected') {
+        return '/teacher-rejected';
+      }
       return null;
     }
 
@@ -162,11 +179,12 @@ class RoleGuard implements RouteGuard {
 
   static String? _homeForUser(String role, String status) {
     final normalized = role.trim().toLowerCase();
+    final normalizedStatus = status.trim().toLowerCase();
     if (normalized == 'admin') return adminHomePath;
     if (normalized == 'student') return studentHomePath;
     if (normalized == 'mohaffez') {
-      if (status == 'pending_approval') return '/teacher-pending';
-      if (status == 'rejected') return '/teacher-rejected';
+      if (normalizedStatus == 'pending_approval') return '/teacher-pending';
+      if (normalizedStatus == 'rejected') return '/teacher-rejected';
       return mohaffezHomePath;
     }
     return null;
