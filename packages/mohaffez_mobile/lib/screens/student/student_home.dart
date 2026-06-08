@@ -246,7 +246,7 @@ class StudentHomeContent extends ConsumerWidget {
                       if (awaitingPaymentCount > 0) ...[
                         _PaymentAlertBanner(
                           count: awaitingPaymentCount,
-                          onTap: () => context.go('/requests'),
+                          onTap: () => context.push('/requests'),
                         ),
                         const SizedBox(height: 20),
                       ],
@@ -563,7 +563,7 @@ class _StatsRow extends StatelessWidget {
         color: _DS.amber,
         bg: _DS.amberBg,
         isAlert: activeRequests > 0,
-        onTap: () => context.go('/requests'),
+        onTap: () => context.push('/requests'),
       ),
     ];
 
@@ -704,17 +704,17 @@ class _ActionsSection extends StatelessWidget {
       // ── Row 1: Daily actions ──
       _ActionData(icon: Icons.calendar_month_rounded, label: 'احجز جلسة',
           color: _DS.teal500, bg: _DS.teal50,
-          onTap: () => context.go('/nearby')),
+          onTap: () => context.push('/nearby')),
       _ActionData(icon: Icons.local_library_rounded, label: 'جلساتي',
           color: _DS.green, bg: _DS.greenBg,
-          onTap: () => context.go('/my-sessions')),
+          onTap: () => context.push('/my-sessions')),
       _ActionData(icon: Icons.task_alt_rounded, label: 'واجباتي',
           color: _DS.amber, bg: _DS.amberBg,
-          onTap: () => context.go('/assignments')),
+          onTap: () => context.push('/assignments')),
       // ── Row 2: Occasional ──
       _ActionData(icon: Icons.event_note_rounded, label: 'جدولي',
           color: _DS.darkTeal, bg: _DS.darkTealBg,
-          onTap: () => context.go('/my-schedule')),
+          onTap: () => context.push('/my-schedule')),
       _ActionData(icon: Icons.wallet_rounded, label: 'اشتراكاتي',
           color: _DS.gold, bg: _DS.goldBg,
           onTap: () => context.push('/active-subscriptions')),
@@ -992,7 +992,7 @@ class _AssignmentsSection extends ConsumerWidget {
           title: 'آخر الواجبات',
           subtitle: subtitle,
           trailing: TextButton.icon(
-            onPressed: () => context.go('/assignments'),
+            onPressed: () => context.push('/assignments'),
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 11),
             label: const Text('عرض الكل'),
             style: TextButton.styleFrom(
@@ -1039,7 +1039,7 @@ class _AssignmentsSection extends ConsumerWidget {
                     muraja: muraja,
                     sessionDate: sessionDate,
                     colorIndex: i,
-                    onTap: () => context.go('/assignments'),
+                    onTap: () => context.push('/assignments'),
                   ),
                 );
               }),

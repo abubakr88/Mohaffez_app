@@ -2,20 +2,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "mohaffez_mobile (dev)",
-            "cwd": "packages/mohaffez_mobile",
-            "request": "launch",
-            "type": "dart",
-            "program": "lib/main_dev.dart",
-            "toolArgs": ["--flavor", "dev", "--dart-define-from-file", "../../.env"]
-        },
-        {
             "name": "mohaffez_mobile (prod)",
             "cwd": "packages/mohaffez_mobile",
             "request": "launch",
             "type": "dart",
             "program": "lib/main.dart",
             "toolArgs": ["--flavor", "prod", "--dart-define-from-file", "../../.env"]
+        },
+        {
+            "name": "mohaffez_mobile (dev)",
+            "cwd": "packages/mohaffez_mobile",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main_dev.dart",
+            "toolArgs": ["--flavor", "dev", "--dart-define-from-file", "../../.env"]
         },
         {
             "name": "mohaffez_mobile (prod — profile)",

@@ -7,14 +7,14 @@
   "targets": {
     "mohaffez-ba2ec": {
       "hosting": {
-        "app": [
-          "mohaffez-app"
-        ],
         "marketing": [
           "mohaffez-marketing"
         ],
         "admin": [
           "mohaffez-admin"
+        ],
+        "app": [
+          "mohaffez-ba2ec"
         ]
       }
     },

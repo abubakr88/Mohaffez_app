@@ -706,13 +706,13 @@ class _ActionsSection extends StatelessWidget {
       // ── Row 1: Daily core ──
       _ActionData(icon: Icons.calendar_month_rounded, label: 'الجدول',
           color: _DS.teal500, bg: _DS.teal50,
-          onTap: () => context.go('/teacher-schedule')),
+          onTap: () => context.push('/teacher-schedule')),
       _ActionData(icon: Icons.event_note_rounded, label: 'القادمة',
           color: _DS.green, bg: _DS.greenBg,
           onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId')),
       _ActionData(icon: Icons.groups_rounded, label: 'طلابي',
           color: _DS.darkTeal, bg: _DS.darkTealBg,
-          onTap: () => context.go('/my-students')),
+          onTap: () => context.push('/my-students')),
       // ── Row 2: Action items ──
       _ActionData(icon: Icons.pending_actions_rounded, label: 'الطلبات',
           color: _DS.amber, bg: _DS.amberBg,
