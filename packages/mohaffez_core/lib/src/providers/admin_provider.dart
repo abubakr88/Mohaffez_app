@@ -285,6 +285,24 @@ final adminUserProvider = FutureProvider.autoDispose
   return ref.watch(adminRepositoryProvider).getUserById(userId);
 });
 
+/// Recent sessions where this user is either student or teacher.
+final adminUserSessionsProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getUserSessions(userId);
+});
+
+/// Payment events touching this user for finance review.
+final adminUserPaymentEventsProvider = StreamProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).watchUserPaymentEvents(userId);
+});
+
+/// Recent notifications sent to a user for support review.
+final adminUserNotificationsProvider = StreamProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).watchUserNotifications(userId);
+});
+
 /// Aggregated teaching statistics for one mohaffez, computed from hafizSessions.
 class TeacherStats {
   final int total;

@@ -162,6 +162,60 @@ class AdminRepository {
         .toList();
   }
 
+  /// Recent sessions for any user, whether they are the student or teacher.
+  Future<List<Map<String, dynamic>>> getUserSessions(String userId) async {
+    final studentSnap = await _firestore
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: userId)
+        .limit(500)
+        .get();
+    final teacherSnap = await _firestore
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: userId)
+        .limit(500)
+        .get();
+
+    final byId = <String, Map<String, dynamic>>{};
+    for (final doc in [...studentSnap.docs, ...teacherSnap.docs]) {
+      byId[doc.id] = <String, dynamic>{'id': doc.id, ...doc.data()};
+    }
+
+    final sessions = byId.values.toList()
+      ..sort((a, b) => _compareTs(
+            b['sessionDate'] ?? b['slotStart'] ?? b['createdAt'],
+            a['sessionDate'] ?? a['slotStart'] ?? a['createdAt'],
+          ));
+    return sessions.take(100).toList();
+  }
+
+  /// Recent payment events touching this user. Payment documents remain
+  /// server-owned; this reads the admin-facing event log instead.
+  Stream<List<Map<String, dynamic>>> watchUserPaymentEvents(String userId) {
+    return _firestore
+        .collection('paymentEvents')
+        .orderBy('timestamp', descending: true)
+        .limit(300)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+            .where((event) => _eventTouchesUser(event, userId))
+            .take(50)
+            .toList());
+  }
+
+  /// Recent notifications sent to this user for admin support review.
+  Stream<List<Map<String, dynamic>>> watchUserNotifications(String userId) {
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+            .toList());
+  }
+
   /// One-shot read of a single user's submitted credentials (for review).
   Future<List<Map<String, dynamic>>> getUserCredentials(String userId) async {
     final snap = await _firestore
@@ -336,6 +390,35 @@ bool _isFlaggedUser(Map<String, dynamic> user) {
     'paymentReviewRequired',
   ]) {
     if (user[key] == true) return true;
+  }
+
+  return false;
+}
+
+bool _eventTouchesUser(Map<String, dynamic> event, String userId) {
+  for (final key in const [
+    'userId',
+    'studentId',
+    'mohaffezId',
+    'teacherId',
+    'ownerId',
+    'payerId',
+  ]) {
+    if (event[key] == userId) return true;
+  }
+
+  final data = event['data'];
+  if (data is Map) {
+    for (final key in const [
+      'userId',
+      'studentId',
+      'mohaffezId',
+      'teacherId',
+      'ownerId',
+      'payerId',
+    ]) {
+      if (data[key] == userId) return true;
+    }
   }
 
   return false;
