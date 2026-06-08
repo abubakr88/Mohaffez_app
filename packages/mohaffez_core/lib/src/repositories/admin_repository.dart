@@ -136,7 +136,8 @@ class AdminRepository {
 
   /// All sessions for a teacher, for profile statistics (aggregated client-side).
   /// Single equality filter on `mohaffezId` uses the automatic single-field index.
-  Future<List<Map<String, dynamic>>> getTeacherSessions(String teacherId) async {
+  Future<List<Map<String, dynamic>>> getTeacherSessions(
+      String teacherId) async {
     final snap = await _firestore
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: teacherId)
@@ -157,6 +158,40 @@ class AdminRepository {
     return snap.docs
         .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
         .toList();
+  }
+
+  /// One-shot read of a teacher's pricing plans for the admin review screen.
+  Future<List<Map<String, dynamic>>> getTeacherPricingPlans(
+      String userId) async {
+    final snap = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('pricingPlans')
+        .get();
+    final plans = snap.docs
+        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+        .toList();
+    plans.sort((a, b) => _compareTs(b['createdAt'], a['createdAt']));
+    return plans;
+  }
+
+  /// One-shot read of a teacher's weekly availability for admin review.
+  Future<List<Map<String, dynamic>>> getTeacherAvailability(
+      String userId) async {
+    final snap = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('availability')
+        .get();
+    final availability = snap.docs
+        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+        .toList();
+    availability.sort((a, b) {
+      final aDay = (a['dayOfWeek'] as num?)?.toInt() ?? 99;
+      final bDay = (b['dayOfWeek'] as num?)?.toInt() ?? 99;
+      return aDay.compareTo(bDay);
+    });
+    return availability;
   }
 
   Future<void> approveCredential(String userId, String credentialId) {
@@ -206,10 +241,10 @@ class AdminRepository {
   }
 
   Stream<List<Map<String, dynamic>>> watchAllPromoCodes() {
-    return _firestore.collection('promoCodes').limit(200).snapshots().map((snap) => snap
-        .docs
-        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
-        .toList());
+    return _firestore.collection('promoCodes').limit(200).snapshots().map(
+        (snap) => snap.docs
+            .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+            .toList());
   }
 
   Future<void> createPromoCode(Map<String, dynamic> data) {
@@ -249,4 +284,23 @@ class AdminRepository {
             .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
             .toList());
   }
+}
+
+int _compareTs(dynamic a, dynamic b) {
+  DateTime? toDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    try {
+      return (v as dynamic).toDate() as DateTime;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  final da = toDate(a);
+  final db = toDate(b);
+  if (da == null && db == null) return 0;
+  if (da == null) return 1;
+  if (db == null) return -1;
+  return da.compareTo(db);
 }

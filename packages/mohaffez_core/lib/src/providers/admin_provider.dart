@@ -261,6 +261,18 @@ final teacherCredentialsProvider = FutureProvider.autoDispose
   return ref.watch(adminRepositoryProvider).getUserCredentials(userId);
 });
 
+/// A pending teacher's pricing plans, including inactive ones, for review.
+final teacherReviewPricingPlansProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getTeacherPricingPlans(userId);
+});
+
+/// A pending teacher's weekly availability, for review.
+final teacherReviewAvailabilityProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getTeacherAvailability(userId);
+});
+
 /// A single user document by id (admin profile/detail page).
 final adminUserProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>?, String>((ref, userId) {
