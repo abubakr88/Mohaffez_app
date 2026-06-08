@@ -75,12 +75,19 @@ class RoleGuard implements RouteGuard {
 
     // Only process if authenticated (AuthGuard handles unauth).
     // Tour mode supplies a synthetic user via overrides — treat as authenticated.
-    if (authState.value == null && !inTour) return null;
+    if (authState.value == null &&
+        !inTour &&
+        !_startsWithAny(currentPath, teacherRegistrationRoutePrefixes)) {
+      return null;
+    }
 
     if (_startsWithAny(currentPath, teacherRegistrationRoutePrefixes)) {
-      if (userState.isLoading) return null;
+      if (authState.isLoading) return splashPath;
+      if (authState.value == null && !inTour) return loginPath;
+      if (userState.isLoading || userState.hasError) return splashPath;
+
       final user = userState.value;
-      if (user == null) return null;
+      if (user == null) return loginPath;
 
       final role = user.role.trim().toLowerCase();
       final status = user.status.trim().toLowerCase();

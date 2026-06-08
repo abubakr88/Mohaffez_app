@@ -51,10 +51,10 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       }).toList();
     }
 
-    // ترتيب حسب نوع الفلتر
+    // تصفية حسب قابلية الحجز: وقت قادم مفعّل + خطة سعر نشطة
     if (params.availabilityFilter != TeacherAvailabilityFilter.all) {
       final now = serverNowFromRef(ref);
-      final availabilityEntries = await Future.wait(
+      final slotEntries = await Future.wait(
         mohaffezList.map((mohaffez) async {
           final hasAvailableSlot = await _hasUpcomingAvailableSlot(
             firestore,
@@ -64,14 +64,28 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
           return MapEntry(mohaffez.id, hasAvailableSlot);
         }),
       );
-      final availabilityById = Map.fromEntries(availabilityEntries);
+      final slotById = Map.fromEntries(slotEntries);
+
+      final planEntries = await Future.wait(
+        mohaffezList
+            .where((mohaffez) => slotById[mohaffez.id] == true)
+            .map((mohaffez) async {
+          final hasActivePlan = await _hasActivePricingPlan(
+            firestore,
+            mohaffez.id,
+          );
+          return MapEntry(mohaffez.id, hasActivePlan);
+        }),
+      );
+      final activePlanById = Map.fromEntries(planEntries);
 
       mohaffezList = mohaffezList.where((mohaffez) {
-        final hasAvailableSlot = availabilityById[mohaffez.id] ?? false;
+        final isBookable = (slotById[mohaffez.id] ?? false) &&
+            (activePlanById[mohaffez.id] ?? false);
         return params.availabilityFilter ==
                 TeacherAvailabilityFilter.availableOnly
-            ? hasAvailableSlot
-            : !hasAvailableSlot;
+            ? isBookable
+            : !isBookable;
       }).toList();
     }
 
@@ -153,6 +167,22 @@ Future<bool> _hasUpcomingAvailableSlot(
   }
 
   return false;
+}
+
+Future<bool> _hasActivePricingPlan(
+  FirebaseFirestore firestore,
+  String mohaffezId,
+) async {
+  final snapshot = await firestore
+      .collection('users')
+      .doc(mohaffezId)
+      .collection('pricingPlans')
+      .where('isActive', isEqualTo: true)
+      .limit(1)
+      .get()
+      .timeout(const Duration(seconds: 10));
+
+  return snapshot.docs.isNotEmpty;
 }
 
 int? _normalizeDayOfWeek(Object? value) {

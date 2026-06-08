@@ -199,6 +199,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   }
 
   Widget _buildMapPane(List<MohaffezModel> teachers) {
+    final selectedTeacher = _selectedTeacher;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: ClipRRect(
@@ -278,6 +280,19 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                 radiusKm: radiusKm.round(),
               ),
             ),
+            if (selectedTeacher != null)
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 82,
+                child: _MapTeacherPreviewCard(
+                  teacher: selectedTeacher,
+                  distance: _distanceFor(selectedTeacher),
+                  pulseValue: _pulseController.value,
+                  onClose: () => setState(() => _selectedTeacher = null),
+                  onOpenProfile: () => _openTeacherProfile(selectedTeacher),
+                ),
+              ),
           ],
         ),
       ),
@@ -418,19 +433,17 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
 
     final markers = teachers.where(_hasLocation).map((teacher) {
       final isSelected = _selectedTeacher?.id == teacher.id;
-      final initials = teacher.name.trim().isEmpty
-          ? 'م'
-          : teacher.name.trim().characters.take(2).toString();
       return Marker(
         point: LatLng(teacher.addressLat!, teacher.addressLng!),
-        width: isSelected ? 64 : 52,
-        height: isSelected ? 64 : 52,
-        alignment: Alignment.topCenter,
+        width: isSelected ? 64 : 54,
+        height: isSelected ? 64 : 54,
+        alignment: Alignment.bottomCenter,
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => _selectTeacher(teacher),
           child: Opacity(
             opacity: isSelected ? pulse : 0.96,
-            child: _TeacherPin(initials: initials, selected: isSelected),
+            child: _TeacherPin(selected: isSelected),
           ),
         ),
       );
@@ -608,83 +621,87 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _MapChip(
-                  label: 'الأقرب',
-                  icon: Icons.near_me_rounded,
-                  isSelected: selectedFilter == SortType.distance,
-                  onTap: () => _updateFilter(SortType.distance),
-                ),
-                const SizedBox(width: 8),
-                _MapChip(
-                  label: 'الأعلى تقييماً',
-                  icon: Icons.star_rounded,
-                  isSelected: selectedFilter == SortType.rating,
-                  onTap: () => _updateFilter(SortType.rating),
-                ),
-                const SizedBox(width: 8),
-                _MapChip(
-                  label: 'الأكثر متابعة',
-                  icon: Icons.people_alt_rounded,
-                  isSelected: selectedFilter == SortType.followers,
-                  onTap: () => _updateFilter(SortType.followers),
-                ),
-                const SizedBox(width: 8),
-                _MapChip(
-                  label: 'المتاحون',
-                  icon: Icons.event_available_rounded,
-                  isSelected: availabilityFilter ==
-                      TeacherAvailabilityFilter.availableOnly,
-                  onTap: () => _updateAvailabilityFilter(
-                    TeacherAvailabilityFilter.availableOnly,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _MapChip(
-                  label: 'الكل',
-                  icon: Icons.groups_rounded,
-                  isSelected:
-                      availabilityFilter == TeacherAvailabilityFilter.all,
-                  onTap: () => _updateAvailabilityFilter(
-                    TeacherAvailabilityFilter.all,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _MapChip(
-                  label: 'بدون مواعيد',
-                  icon: Icons.event_busy_rounded,
-                  isSelected: availabilityFilter ==
-                      TeacherAvailabilityFilter.unavailableOnly,
-                  onTap: () => _updateAvailabilityFilter(
-                    TeacherAvailabilityFilter.unavailableOnly,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ...SpecializationConstants.specializations.map(
-                  (spec) => Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: _MapChip(
-                      label: spec,
-                      icon: Icons.auto_awesome_rounded,
-                      isSelected: selectedSpecialization == spec,
-                      onTap: () {
-                        setState(() {
-                          selectedSpecialization =
-                              selectedSpecialization == spec ? null : spec;
-                          _selectedTeacher = null;
-                          _hasFitInitialBounds = false;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MapChip(
+                label: 'الأقرب',
+                icon: Icons.near_me_rounded,
+                isSelected: selectedFilter == SortType.distance,
+                onTap: () => _updateFilter(SortType.distance),
+              ),
+              _MapChip(
+                label: 'الأعلى تقييماً',
+                icon: Icons.star_rounded,
+                isSelected: selectedFilter == SortType.rating,
+                onTap: () => _updateFilter(SortType.rating),
+              ),
+              _MapChip(
+                label: 'الأكثر متابعة',
+                icon: Icons.people_alt_rounded,
+                isSelected: selectedFilter == SortType.followers,
+                onTap: () => _updateFilter(SortType.followers),
+              ),
+            ],
           ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MapChip(
+                label: 'المتاحون',
+                icon: Icons.event_available_rounded,
+                isSelected: availabilityFilter ==
+                    TeacherAvailabilityFilter.availableOnly,
+                onTap: () => _updateAvailabilityFilter(
+                  TeacherAvailabilityFilter.availableOnly,
+                ),
+              ),
+              _MapChip(
+                label: 'الكل',
+                icon: Icons.groups_rounded,
+                isSelected: availabilityFilter == TeacherAvailabilityFilter.all,
+                onTap: () => _updateAvailabilityFilter(
+                  TeacherAvailabilityFilter.all,
+                ),
+              ),
+              _MapChip(
+                label: 'غير المتاحين',
+                icon: Icons.event_busy_rounded,
+                isSelected: availabilityFilter ==
+                    TeacherAvailabilityFilter.unavailableOnly,
+                onTap: () => _updateAvailabilityFilter(
+                  TeacherAvailabilityFilter.unavailableOnly,
+                ),
+              ),
+            ],
+          ),
+          if (SpecializationConstants.specializations.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: SpecializationConstants.specializations.map((spec) {
+                return _MapChip(
+                  label: spec,
+                  icon: Icons.auto_awesome_rounded,
+                  isSelected: selectedSpecialization == spec,
+                  onTap: () {
+                    setState(() {
+                      selectedSpecialization =
+                          selectedSpecialization == spec ? null : spec;
+                      _selectedTeacher = null;
+                      _hasFitInitialBounds = false;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
@@ -847,50 +864,52 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
 // ─── Map pins ───────────────────────────────────────────────────────────────
 
 class _TeacherPin extends StatelessWidget {
-  final String initials;
   final bool selected;
 
-  const _TeacherPin({required this.initials, required this.selected});
+  const _TeacherPin({required this.selected});
 
   @override
   Widget build(BuildContext context) {
-    final size = selected ? 56.0 : 44.0;
-    return Container(
+    final size = selected ? 58.0 : 48.0;
+    return SizedBox(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0B7A75), Color(0xFF14B8A6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: selected
-              ? AppThemeConstants.secondary
-              : AppThemeConstants.white.withValues(alpha: 0.92),
-          width: selected ? 3 : 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (selected
-                    ? AppThemeConstants.secondary
-                    : AppThemeConstants.primaryVariant)
-                .withValues(alpha: 0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            bottom: 2,
+            child: Container(
+              width: selected ? 28 : 22,
+              height: selected ? 8 : 6,
+              decoration: BoxDecoration(
+                color: AppThemeConstants.black.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.location_on_rounded,
+            size: size,
+            color: selected
+                ? AppThemeConstants.secondary
+                : AppThemeConstants.primary,
+            shadows: [
+              Shadow(
+                color: AppThemeConstants.black.withValues(alpha: 0.24),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+              Shadow(
+                color: selected
+                    ? AppThemeConstants.secondary.withValues(alpha: 0.38)
+                    : AppThemeConstants.primaryVariant.withValues(alpha: 0.32),
+                blurRadius: selected ? 20 : 12,
+              ),
+            ],
           ),
         ],
-      ),
-      child: Center(
-        child: Text(
-          initials,
-          style: TextStyle(
-            color: AppThemeConstants.white,
-            fontSize: selected ? 16 : 13,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
       ),
     );
   }
@@ -973,6 +992,161 @@ class _ViewToggleButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MapTeacherPreviewCard extends StatelessWidget {
+  final MohaffezModel teacher;
+  final double? distance;
+  final double pulseValue;
+  final VoidCallback onClose;
+  final VoidCallback onOpenProfile;
+
+  const _MapTeacherPreviewCard({
+    required this.teacher,
+    required this.distance,
+    required this.pulseValue,
+    required this.onClose,
+    required this.onOpenProfile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bio = teacher.bio?.trim();
+    final glow = 0.10 + (pulseValue * 0.14);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppThemeConstants.primaryVariant.withValues(alpha: 0.28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppThemeConstants.primary.withValues(alpha: glow),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: AppThemeConstants.black.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CachedAvatar(
+                imageUrl: teacher.photoUrl,
+                radius: 28,
+                semanticLabel: teacher.name,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      teacher.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppThemeConstants.textPrimary,
+                      ),
+                    ),
+                    if (teacher.specialization?.isNotEmpty ?? false) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        teacher.specialization!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onClose,
+                icon: const Icon(Icons.close_rounded),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'إغلاق',
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MetricPill(
+                icon: Icons.star_rounded,
+                label: teacher.rating.toStringAsFixed(1),
+                color: AppThemeConstants.secondary,
+              ),
+              _MetricPill(
+                icon: Icons.people_alt_rounded,
+                label: '${teacher.followerCount} متابع',
+                color: AppThemeConstants.success,
+              ),
+              if (distance != null)
+                _MetricPill(
+                  icon: Icons.near_me_rounded,
+                  label: distance! < 1
+                      ? '${(distance! * 1000).round()} م'
+                      : '${distance!.toStringAsFixed(1)} كم',
+                  color: AppThemeConstants.info,
+                ),
+            ],
+          ),
+          if (bio != null && bio.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              bio,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: AppThemeConstants.textSecondary,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: onOpenProfile,
+              icon: const Icon(Icons.person_rounded, size: 18),
+              label: const Text(
+                'عرض الملف الكامل',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
