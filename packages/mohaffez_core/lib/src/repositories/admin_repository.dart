@@ -127,6 +127,20 @@ class AdminRepository {
             .toList());
   }
 
+  /// Users marked by any known review/risk flag.
+  ///
+  /// This intentionally filters client-side because older documents do not use
+  /// a single flag field yet. The dashboard queue remains read-only and links
+  /// admins to the users page for manual review.
+  Stream<List<Map<String, dynamic>>> watchFlaggedUsers() {
+    return _firestore.collection('users').limit(500).snapshots().map((snap) {
+      return snap.docs
+          .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+          .where(_isFlaggedUser)
+          .toList();
+    });
+  }
+
   /// Single user document by id (for the admin profile/detail page).
   Future<Map<String, dynamic>?> getUserById(String userId) async {
     final doc = await _firestore.collection('users').doc(userId).get();
@@ -303,4 +317,26 @@ int _compareTs(dynamic a, dynamic b) {
   if (da == null) return 1;
   if (db == null) return -1;
   return da.compareTo(db);
+}
+
+bool _isFlaggedUser(Map<String, dynamic> user) {
+  final status = (user['status'] as String? ?? '').toLowerCase();
+  if (status == 'flagged' ||
+      status == 'suspicious' ||
+      status == 'under_review' ||
+      status == 'security_review') {
+    return true;
+  }
+
+  for (final key in const [
+    'isSuspicious',
+    'riskFlag',
+    'needsAdminReview',
+    'adminReviewRequired',
+    'paymentReviewRequired',
+  ]) {
+    if (user[key] == true) return true;
+  }
+
+  return false;
 }

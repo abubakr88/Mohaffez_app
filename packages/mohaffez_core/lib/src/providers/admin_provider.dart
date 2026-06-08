@@ -255,6 +255,12 @@ final pendingTeachersProvider =
   return ref.watch(adminRepositoryProvider).watchPendingTeachers();
 });
 
+/// Users carrying any known review/risk flag for the admin dashboard queue.
+final flaggedUsersProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+  return ref.watch(adminRepositoryProvider).watchFlaggedUsers();
+});
+
 /// A single pending teacher's submitted credentials (for the review card).
 final teacherCredentialsProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>((ref, userId) {
