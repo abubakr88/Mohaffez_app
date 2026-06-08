@@ -29,6 +29,41 @@ service cloud.firestore {
       );
     }
 
+    // Existing admin tokens that predate adminRole are treated as super admin
+    // until their access is explicitly lowered by a super admin.
+    function isSuperAdmin() {
+      return isAdmin() && request.auth.token.adminRole != 'admin';
+    }
+
+    function hasAdminPermission(permission) {
+      return isSuperAdmin() ||
+             (
+               isAdmin() &&
+               request.auth.token.adminPermissions is map &&
+               request.auth.token.adminPermissions[permission] == true
+             );
+    }
+
+    function canManageUsers() {
+      return hasAdminPermission('manageUsers');
+    }
+
+    function canReviewTeachers() {
+      return hasAdminPermission('reviewTeachers');
+    }
+
+    function canManageFinance() {
+      return hasAdminPermission('manageFinance');
+    }
+
+    function canSendBroadcasts() {
+      return hasAdminPermission('sendBroadcasts');
+    }
+
+    function canRunMaintenance() {
+      return hasAdminPermission('runMaintenance');
+    }
+
     function isSuspended() {
       return isAuthenticated() &&
              exists(/databases/$(database)/documents/userSuspensions/$(request.auth.uid));
@@ -84,24 +119,27 @@ service cloud.firestore {
             'approvalSubmittedAt', 'updatedAt'
           ]);
 
-      // Admin can update any user doc (approve/reject, suspend, etc.)
-      allow update: if isAdmin();
+      // Admin user-management writes are permission-scoped. Cloud Functions
+      // still bypass rules via Admin SDK for privileged workflows.
+      allow update: if canManageUsers() ||
+                    canReviewTeachers() ||
+                    hasAdminPermission('manageUserRoles');
 
       allow delete: if isOwner(userId);
 
       // ── Credentials subcollection ──
       match /credentials/{credentialId} {
         // get: allow owner to read their own (even non-existent docs), or approved docs for anyone
-        allow get: if isAdmin() || isOwner(userId) || (isAuthenticated() && resource.data.status == 'approved');
+        allow get: if canReviewTeachers() || isOwner(userId) || (isAuthenticated() && resource.data.status == 'approved');
         // list: resource is null for query operations — allow authenticated users and rely on client query filter
-        allow list: if isAdmin() || isOwner(userId) || isAuthenticated();
+        allow list: if canReviewTeachers() || isOwner(userId) || isAuthenticated();
 
         allow create: if isOwner(userId) &&
                       request.resource.data.userId == userId &&
                       request.resource.data.status == 'pending';
 
         allow update: if isOwner(userId) ||
-                      (isAdmin() && onlyUpdating(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason']));
+                      (canReviewTeachers() && onlyUpdating(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason']));
 
         allow delete: if isOwner(userId);
       }
@@ -152,7 +190,7 @@ service cloud.firestore {
 
       // ── Exam results (setup account — one-time skill evaluation) ──
       match /examResults/{resultId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId) || canReviewTeachers() || canManageUsers();
         allow create: if isOwner(userId);
         allow update: if false;
         allow delete: if false;
@@ -187,9 +225,9 @@ service cloud.firestore {
     // ============================================
 
     match /{path=**}/credentials/{credentialId} {
-      allow get: if isAdmin() || (isAuthenticated() && (resource.data.status == 'approved' || request.auth.uid == resource.data.userId));
+      allow get: if canReviewTeachers() || (isAuthenticated() && (resource.data.status == 'approved' || request.auth.uid == resource.data.userId));
       // list: resource is null for query operations — allow authenticated users and rely on client query filter
-      allow list: if isAdmin() || isAuthenticated();
+      allow list: if canReviewTeachers() || isAuthenticated();
     }
 
     // ============================================
@@ -200,9 +238,9 @@ service cloud.firestore {
       // Any authenticated user can read (needed during setup wizard)
       allow read: if isAuthenticated();
       // Only admin can manage questions
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
     }
 
     // ============================================
@@ -289,7 +327,7 @@ service cloud.firestore {
     // ============================================
 
     match /hafizSessions/{sessionId} {
-      allow read: if isAdmin() || (isAuthenticated() && (
+      allow read: if (canManageUsers() || canManageFinance()) || (isAuthenticated() && (
         resource == null ||
         request.auth.uid == resource.data.studentId ||
         request.auth.uid == resource.data.mohaffezId
@@ -426,14 +464,14 @@ service cloud.firestore {
     // ============================================
 
     match /weeklyCommissionSummaries/{id} {
-      allow read: if isAdmin() || (isAuthenticated() && (
+      allow read: if canManageFinance() || (isAuthenticated() && (
         resource == null || request.auth.uid == resource.data.mohaffezId
       ));
       allow write: if false;
     }
 
     match /commissions/{id} {
-      allow read: if isAdmin() || (isAuthenticated() && (
+      allow read: if canManageFinance() || (isAuthenticated() && (
         resource == null || request.auth.uid == resource.data.mohaffezId
       ));
       allow write: if false;
@@ -441,7 +479,7 @@ service cloud.firestore {
 
     // weeklyCommissions — legacy/alternate commission collection used by directPayment handler
     match /weeklyCommissions/{id} {
-      allow read: if isAdmin() || (isAuthenticated() && (
+      allow read: if canManageFinance() || (isAuthenticated() && (
         resource == null || request.auth.uid == resource.data.mohaffezId
       ));
       allow write: if false;
@@ -452,19 +490,19 @@ service cloud.firestore {
     // ============================================
 
     match /paymentEvents/{eventId} {
-      allow read: if isAdmin() || (isAuthenticated() && (
+      allow read: if canManageFinance() || (isAuthenticated() && (
         resource == null || request.auth.uid == resource.data.userId
       ));
       allow write: if false;
     }
 
     match /sessionEvents/{eventId} {
-      allow read: if isAdmin();
+      allow read: if canManageFinance() || canRunMaintenance();
       allow write: if false;
     }
 
     match /paymentAnalytics/{analyticsId} {
-      allow read: if isAdmin();
+      allow read: if canManageFinance();
       allow write: if false;
     }
 
@@ -484,12 +522,12 @@ service cloud.firestore {
       // Only the locker, the mohaffez holding the slot, or admin can
       // update/release a lock. Prevents other authenticated users from
       // overwriting or deleting foreign locks.
-      allow update: if isAdmin() ||
+      allow update: if canRunMaintenance() ||
                     (isAuthenticated() &&
                      (resource.data.lockedBy == request.auth.uid ||
                       resource.data.mohaffezId == request.auth.uid));
 
-      allow delete: if isAdmin() ||
+      allow delete: if canRunMaintenance() ||
                     (isAuthenticated() &&
                      (resource.data.lockedBy == request.auth.uid ||
                       resource.data.mohaffezId == request.auth.uid));
@@ -501,18 +539,20 @@ service cloud.firestore {
 
     match /promocodes/{promoCode} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if canManageFinance();
       allow update: if isAuthenticated() &&
-                    onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']);
-      allow delete: if isAdmin();
+                    (canManageFinance() ||
+                     onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']));
+      allow delete: if canManageFinance();
     }
 
     match /promoCodes/{promoCode} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if canManageFinance();
       allow update: if isAuthenticated() &&
-                    onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']);
-      allow delete: if isAdmin();
+                    (canManageFinance() ||
+                     onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']));
+      allow delete: if canManageFinance();
     }
 
     // ============================================
@@ -622,7 +662,7 @@ service cloud.firestore {
     // ============================================
 
     match /failedOperations/{operationId} {
-      allow read: if isAdmin();
+      allow read: if canRunMaintenance();
 
       // Clients enqueue retry records when a best-effort side-effect (e.g. a
       // post-booking notification) fails. Constrain initial state so the queue
@@ -635,40 +675,40 @@ service cloud.firestore {
                     request.resource.data.retryCount == 0 &&
                     request.resource.data.timestamp == request.time;
 
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update: if canRunMaintenance();
+      allow delete: if canRunMaintenance();
     }
 
     match /systemConfig/{configId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read: if configId != 'adminMetrics' || isAdmin();
+      allow write: if isSuperAdmin();
     }
 
     match /userSuspensions/{suspensionId} {
-      allow read: if isAdmin() || isOwner(suspensionId);
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow read: if canManageUsers() || isOwner(suspensionId);
+      allow create: if canManageUsers();
+      allow update: if canManageUsers();
+      allow delete: if canManageUsers();
     }
 
     match /broadcastHistory/{id} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read: if canSendBroadcasts();
+      allow write: if canSendBroadcasts();
     }
 
     match /devLogs/{logId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read: if canRunMaintenance();
+      allow write: if canRunMaintenance();
     }
 
     match /adminAuditLog/{logId} {
-      allow read: if isAdmin();
+      allow read: if isSuperAdmin();
       allow write: if false;  // Only Cloud Functions (Admin SDK) write audit logs
     }
 
     match /appVersions/{versionId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isSuperAdmin();
     }
 
     // ============================================
@@ -681,28 +721,28 @@ service cloud.firestore {
     match /wallets/{walletId} {
       // A user can read their own wallet. Admin can read any wallet.
       // System wallets (system_*) are admin-only.
-      allow read: if isAdmin() ||
+      allow read: if canManageFinance() ||
                      (isAuthenticated() && walletId == request.auth.uid);
       allow write: if false; // server-only
     }
 
     match /walletTransactions/{txId} {
       // A user can read transactions on their own wallet. Admin reads all.
-      allow read: if isAdmin() ||
+      allow read: if canManageFinance() ||
                      (isAuthenticated() && resource.data.walletId == request.auth.uid);
       allow write: if false; // server-only
     }
 
     match /walletTransactionGroups/{groupId} {
       // Group markers are an internal idempotency mechanism. Admin-only.
-      allow read: if isAdmin();
+      allow read: if canManageFinance();
       allow write: if false; // server-only
     }
 
     match /topUpRequests/{requestId} {
       // User creates their own pending top-up request (with proof).
       // The Cloud Function verifies it. Listing own requests = read by owner.
-      allow read: if isAdmin() ||
+      allow read: if canManageFinance() ||
                      (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
@@ -714,7 +754,7 @@ service cloud.firestore {
 
     match /payoutRequests/{requestId} {
       // Teacher reads their own. Admin reads all.
-      allow read: if isAdmin() ||
+      allow read: if canManageFinance() ||
                      (isAuthenticated() && resource.data.mohaffezId == request.auth.uid);
       allow write: if false; // server-only (requestPayout / startPayout / completePayout / failPayout)
     }

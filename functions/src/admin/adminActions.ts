@@ -2,27 +2,15 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { auth, db, FieldValue, messaging } from '../utils/admin';
 import { releaseExpiredSlotLocksNow } from '../cleanup/releaseExpiredSlotLocks';
+import {
+  AdminRole,
+  requireAdminAccess,
+  requireSuperAdminAccess,
+  sanitizePermissionInput,
+  SUPER_ADMIN_PERMISSIONS,
+} from '../utils/adminPermissions';
 
 type TargetRole = 'all' | 'student' | 'mohaffez';
-
-async function isAdminCaller(context: functions.https.CallableContext): Promise<boolean> {
-  // Single source of truth: the `admin` custom claim (set only via the
-  // setAdminClaim function). We deliberately do NOT fall back to the Firestore
-  // `users/{uid}.role` field — that decouples admin privilege from any Firestore
-  // write path, so a future rules change can never accidentally grant it.
-  return (context.auth?.token as { admin?: boolean } | undefined)?.admin === true;
-}
-
-async function ensureAdmin(context: functions.https.CallableContext): Promise<string> {
-  if (!context.auth?.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
-  }
-  const ok = await isAdminCaller(context);
-  if (!ok) {
-    throw new functions.https.HttpsError('permission-denied', 'غير مصرح');
-  }
-  return context.auth.uid;
-}
 
 async function writeAuditLog(params: {
   action: string;
@@ -44,7 +32,7 @@ async function writeAuditLog(params: {
  * output: { success: true }
  */
 export const setUserRole = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'manageUserRoles')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const newRole = (data?.newRole as string | undefined)?.trim();
 
@@ -72,11 +60,87 @@ export const setUserRole = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * input: {
+ *   userId: string,
+ *   adminRole: 'super_admin' | 'admin',
+ *   permissions?: Record<string, boolean>
+ * }
+ * output: { success: true }
+ */
+export const updateAdminAccess = functions.https.onCall(async (data, context) => {
+  const caller = await requireSuperAdminAccess(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+  const requestedRole = (data?.adminRole as string | undefined)?.trim();
+
+  if (!userId) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
+  }
+  if (requestedRole !== 'super_admin' && requestedRole !== 'admin') {
+    throw new functions.https.HttpsError('invalid-argument', 'نوع صلاحية الأدمن غير صحيح');
+  }
+  if (userId === caller.uid && requestedRole !== 'super_admin') {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'لا يمكن تقليل صلاحيات حسابك الحالي',
+    );
+  }
+
+  await auth.getUser(userId);
+  const userRef = db.collection('users').doc(userId);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
+  if (userSnap.data()?.role !== 'admin') {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'إدارة صلاحيات الأدمن متاحة لحسابات admin فقط',
+    );
+  }
+
+  const adminRole = requestedRole as AdminRole;
+  const permissions =
+    adminRole === 'super_admin'
+      ? {}
+      : sanitizePermissionInput(data?.permissions);
+
+  await userRef.update({
+    adminRole,
+    adminPermissions: permissions,
+    adminAccessUpdatedAt: FieldValue.serverTimestamp(),
+    adminAccessUpdatedBy: caller.uid,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  await auth.setCustomUserClaims(userId, {
+    admin: true,
+    role: 'admin',
+    adminRole,
+    adminPermissions:
+      adminRole === 'super_admin' ? SUPER_ADMIN_PERMISSIONS : permissions,
+  });
+
+  await writeAuditLog({
+    action: 'updateAdminAccess',
+    performedBy: caller.uid,
+    targetUserId: userId,
+    data: { adminRole, permissions },
+  });
+
+  functions.logger.info('Admin access updated', {
+    performedBy: caller.uid,
+    userId,
+    adminRole,
+  });
+  return { success: true };
+});
+
+/**
  * input: { userId: string, reason: string, expiresAt?: string | null }
  * output: { success: true }
  */
 export const suspendUser = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'manageUsers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const reason = (data?.reason as string | undefined)?.trim() ?? '';
   const expiresAtRaw = data?.expiresAt as string | null | undefined;
@@ -138,7 +202,7 @@ export const suspendUser = functions.https.onCall(async (data, context) => {
  * output: { success: true }
  */
 export const unsuspendUser = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'manageUsers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
 
   if (!userId) {
@@ -231,7 +295,7 @@ async function performAccountDeletion(
 }
 
 export const deleteUserAccount = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'deleteUsers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
 
   if (!userId) {
@@ -282,7 +346,7 @@ export const deleteMyAccount = functions.https.onCall(async (_data, context) => 
  * output: { recipientCount: number }
  */
 export const sendBroadcastNotification = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'sendBroadcasts')).uid;
   const title = data?.title as string | undefined;
   const body = data?.body as string | undefined;
   const targetRole = (data?.targetRole as TargetRole | undefined) ?? 'all';
@@ -367,7 +431,7 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
  * output: { released: number }
  */
 export const triggerCleanupJobManually = functions.https.onCall(async (_, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'runMaintenance')).uid;
   const released = await releaseExpiredSlotLocksNow();
 
   await writeAuditLog({
@@ -385,7 +449,7 @@ export const triggerCleanupJobManually = functions.https.onCall(async (_, contex
  * output: { success: true }
  */
 export const approveCredential = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const credentialId = (data?.credentialId as string | undefined)?.trim();
 
@@ -423,7 +487,7 @@ export const approveCredential = functions.https.onCall(async (data, context) =>
  * output: { success: true }
  */
 export const rejectCredential = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const credentialId = (data?.credentialId as string | undefined)?.trim();
   const reason = (data?.reason as string | undefined)?.trim();
@@ -466,7 +530,7 @@ export const rejectCredential = functions.https.onCall(async (data, context) => 
  * output: { success: true }
  */
 export const approveTeacher = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
 
   if (!userId) {
@@ -516,7 +580,7 @@ export const approveTeacher = functions.https.onCall(async (data, context) => {
  * output: { success: true }
  */
 export const rejectTeacher = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const reason = (data?.reason as string | undefined)?.trim();
 
@@ -562,7 +626,7 @@ export const rejectTeacher = functions.https.onCall(async (data, context) => {
  * output: { count: number }
  */
 export const getBroadcastAudienceCount = functions.https.onCall(async (data, context) => {
-  await ensureAdmin(context);
+  await requireAdminAccess(context, 'sendBroadcasts');
   const targetRole = ((data?.targetRole as TargetRole | undefined) ?? 'all');
 
   let query: FirebaseFirestore.Query = db.collection('users');

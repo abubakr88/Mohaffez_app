@@ -61,7 +61,16 @@ class _Profile extends ConsumerWidget {
     final photo = user['photoUrl'] as String?;
     final spec = user['specialization'] as String? ?? '';
     final bio = user['bio'] as String? ?? '';
+    final email = user['email'] as String? ?? '';
+    final phone = user['phoneNumber'] as String? ?? '';
+    final city = user['city'] as String? ?? '';
     final isTeacher = role == 'mohaffez';
+    final access = ref.watch(currentAdminAccessProvider).valueOrNull ??
+        AdminAccessState.none();
+    final canViewTeacherStats = access.can(AdminPermission.manageUsers) ||
+        access.can(AdminPermission.manageFinance);
+    final canReviewTeacherDocs = access.can(AdminPermission.reviewTeachers);
+    final canViewFinance = access.can(AdminPermission.manageFinance);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,6 +115,9 @@ class _Profile extends ConsumerWidget {
                       const SizedBox(height: DSSpacing.md),
                       _Field(label: 'التخصص', value: spec),
                     ],
+                    if (email.isNotEmpty) _Field(label: 'البريد', value: email),
+                    if (phone.isNotEmpty) _Field(label: 'الهاتف', value: phone),
+                    if (city.isNotEmpty) _Field(label: 'المدينة', value: city),
                     if (bio.isNotEmpty) _Field(label: 'نبذة', value: bio),
                   ],
                 ),
@@ -122,24 +134,35 @@ class _Profile extends ConsumerWidget {
           ),
         ] else ...[
           const SizedBox(height: DSSpacing.xl),
-          _StatsSection(userId: userId),
-          const SizedBox(height: DSSpacing.xl),
-          Row(
-            children: [
-              Expanded(child: Text('المحفظة', style: DSText.h3(context))),
-              _CreditWalletButton(userId: userId, name: name),
-            ],
-          ),
-          const SizedBox(height: DSSpacing.md),
-          _WalletSection(userId: userId),
-          const SizedBox(height: DSSpacing.xl),
-          Text('الشهادات والوثائق', style: DSText.h3(context)),
-          const SizedBox(height: DSSpacing.md),
-          _CredentialsSection(userId: userId),
-          const SizedBox(height: DSSpacing.xl),
-          Text('أحدث الجلسات', style: DSText.h3(context)),
-          const SizedBox(height: DSSpacing.md),
-          _RecentSessionsSection(userId: userId),
+          if (canViewTeacherStats) ...[
+            _StatsSection(userId: userId, showFinancials: canViewFinance),
+            const SizedBox(height: DSSpacing.xl),
+          ],
+          if (canViewFinance) ...[
+            Row(
+              children: [
+                Expanded(child: Text('المحفظة', style: DSText.h3(context))),
+                _CreditWalletButton(userId: userId, name: name),
+              ],
+            ),
+            const SizedBox(height: DSSpacing.md),
+            _WalletSection(userId: userId),
+            const SizedBox(height: DSSpacing.xl),
+          ],
+          if (canReviewTeacherDocs) ...[
+            Text('الشهادات والوثائق', style: DSText.h3(context)),
+            const SizedBox(height: DSSpacing.md),
+            _CredentialsSection(userId: userId),
+            const SizedBox(height: DSSpacing.xl),
+          ],
+          if (canViewTeacherStats) ...[
+            Text('أحدث الجلسات', style: DSText.h3(context)),
+            const SizedBox(height: DSSpacing.md),
+            _RecentSessionsSection(
+              userId: userId,
+              showFinancials: canViewFinance,
+            ),
+          ],
         ],
       ],
     );
@@ -147,30 +170,35 @@ class _Profile extends ConsumerWidget {
 }
 
 class _StatsSection extends ConsumerWidget {
-  const _StatsSection({required this.userId});
+  const _StatsSection({
+    required this.userId,
+    required this.showFinancials,
+  });
+
   final String userId;
+  final bool showFinancials;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(teacherStatsProvider(userId));
     return async.when(
       loading: () => const DSSkeletonCard(),
-      error: (e, _) =>
-          DSBanner(message: '$e', variant: DSBannerVariant.error),
+      error: (e, _) => DSBanner(message: '$e', variant: DSBannerVariant.error),
       data: (s) {
         final cards = <Widget>[
           _stat('إجمالي الجلسات', '${s.total}', Icons.event_note_outlined,
               DSColors.primary),
           _stat('مكتملة', '${s.completed}', Icons.check_circle_outline,
               DSColors.success),
-          _stat('قادمة', '${s.upcoming}', Icons.schedule_rounded,
-              DSColors.info),
-          _stat('ملغاة', '${s.cancelled}', Icons.cancel_outlined,
-              DSColors.error),
+          _stat(
+              'قادمة', '${s.upcoming}', Icons.schedule_rounded, DSColors.info),
+          _stat(
+              'ملغاة', '${s.cancelled}', Icons.cancel_outlined, DSColors.error),
           _stat('عدد الطلاب', '${s.studentCount}', Icons.people_outline_rounded,
               DSColors.primary),
-          _stat('قيمة الجلسات المكتملة', _money(s.revenue),
-              Icons.payments_outlined, DSColors.secondary),
+          if (showFinancials)
+            _stat('قيمة الجلسات المكتملة', _money(s.revenue),
+                Icons.payments_outlined, DSColors.secondary),
           _stat(
               'التقييم',
               s.avgRating == null
@@ -182,9 +210,7 @@ class _StatsSection extends ConsumerWidget {
         return Wrap(
           spacing: DSSpacing.md,
           runSpacing: DSSpacing.md,
-          children: cards
-              .map((c) => SizedBox(width: 220, child: c))
-              .toList(),
+          children: cards.map((c) => SizedBox(width: 220, child: c)).toList(),
         );
       },
     );
@@ -279,9 +305,9 @@ class _CredentialsSection extends ConsumerWidget {
                                 child: IconButton(
                                   icon: const Icon(Icons.close_rounded,
                                       color: Colors.white),
-                                  onPressed: () => Navigator.of(context,
-                                          rootNavigator: true)
-                                      .pop(),
+                                  onPressed: () =>
+                                      Navigator.of(context, rootNavigator: true)
+                                          .pop(),
                                 ),
                               ),
                             ],
@@ -298,16 +324,20 @@ class _CredentialsSection extends ConsumerWidget {
 }
 
 class _RecentSessionsSection extends ConsumerWidget {
-  const _RecentSessionsSection({required this.userId});
+  const _RecentSessionsSection({
+    required this.userId,
+    required this.showFinancials,
+  });
+
   final String userId;
+  final bool showFinancials;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(teacherStatsProvider(userId));
     return async.when(
       loading: () => const DSSkeletonCard(),
-      error: (e, _) =>
-          DSBanner(message: '$e', variant: DSBannerVariant.error),
+      error: (e, _) => DSBanner(message: '$e', variant: DSBannerVariant.error),
       data: (s) {
         if (s.recentSessions.isEmpty) {
           return Text('لا توجد جلسات بعد',
@@ -332,8 +362,7 @@ class _RecentSessionsSection extends ConsumerWidget {
             DSColumnDef(
               key: 'student',
               label: 'الطالب',
-              cellBuilder: (ctx, r) => Text(
-                  r['studentName'] as String? ?? '—',
+              cellBuilder: (ctx, r) => Text(r['studentName'] as String? ?? '—',
                   style: DSText.body(ctx)),
             ),
             DSColumnDef(
@@ -348,14 +377,15 @@ class _RecentSessionsSection extends ConsumerWidget {
                 );
               },
             ),
-            DSColumnDef(
-              key: 'price',
-              label: 'السعر',
-              width: 110,
-              cellBuilder: (ctx, r) => Text(
-                  _money((r['sessionPrice'] as num?)?.toDouble() ?? 0),
-                  style: DSText.body(ctx, color: DSColors.text2)),
-            ),
+            if (showFinancials)
+              DSColumnDef(
+                key: 'price',
+                label: 'السعر',
+                width: 110,
+                cellBuilder: (ctx, r) => Text(
+                    _money((r['sessionPrice'] as num?)?.toDouble() ?? 0),
+                    style: DSText.body(ctx, color: DSColors.text2)),
+              ),
           ],
           rows: s.recentSessions,
         );
@@ -370,8 +400,8 @@ class _WalletSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final walletAsync = ref.watch(walletProvider(
-        (userId: userId, ownerType: WalletOwnerType.mohaffez)));
+    final walletAsync = ref.watch(
+        walletProvider((userId: userId, ownerType: WalletOwnerType.mohaffez)));
     final txAsync = ref.watch(walletTransactionsProvider(userId));
 
     return Column(
@@ -528,8 +558,8 @@ class _CreditWalletButton extends ConsumerWidget {
         );
     if (!context.mounted) return;
     ref.read(adminActionsProvider).when(
-          data: (_) =>
-              DSToast.show(context, 'تم شحن المحفظة', type: DSToastType.success),
+          data: (_) => DSToast.show(context, 'تم شحن المحفظة',
+              type: DSToastType.success),
           loading: () {},
           error: (e, _) =>
               DSToast.show(context, 'فشل العملية: $e', type: DSToastType.error),
@@ -579,7 +609,8 @@ class _Thumb extends StatelessWidget {
             width: 72,
             height: 72,
             color: DSColors.surfaceMuted,
-            child: Image.network(url, fit: BoxFit.cover,
+            child: Image.network(url,
+                fit: BoxFit.cover,
                 errorBuilder: (ctx, _, __) => const Icon(
                     Icons.broken_image_outlined,
                     color: DSColors.text3)),
