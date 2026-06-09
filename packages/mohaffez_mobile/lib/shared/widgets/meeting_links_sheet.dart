@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -52,13 +53,58 @@ const meetingProviders = <MeetingProviderSpec>[
 ];
 
 bool _hostMatches(String url, String hostMatch) {
-  final uri = Uri.tryParse(url.trim());
+  final normalized = _normalizeMeetingUrl(url);
+  if (normalized.isEmpty || RegExp(r'\s').hasMatch(normalized)) return false;
+  final uri = Uri.tryParse(normalized);
   if (uri == null || !uri.hasScheme || !uri.hasAuthority) return false;
+  if (uri.scheme != 'https' && uri.scheme != 'http') return false;
   final host = uri.host.toLowerCase();
   if (hostMatch == 'teams.microsoft.com') {
-    return host.contains('teams.microsoft.com') || host.contains('teams.live.com');
+    return host.contains('teams.microsoft.com') ||
+        host.contains('teams.live.com');
   }
   return host.contains(hostMatch);
+}
+
+String _normalizeMeetingUrl(String value) {
+  var url = value.trim();
+  if (url.isEmpty) return '';
+
+  url = url
+      .replaceFirst(RegExp(r'^https//', caseSensitive: false), 'https://')
+      .replaceFirst(RegExp(r'^http//', caseSensitive: false), 'http://');
+  url = url
+      .replaceFirstMapped(
+        RegExp(r'^https:/([^/])', caseSensitive: false),
+        (match) => 'https://${match.group(1)}',
+      )
+      .replaceFirstMapped(
+        RegExp(r'^http:/([^/])', caseSensitive: false),
+        (match) => 'http://${match.group(1)}',
+      );
+
+  final hasScheme =
+      RegExp(r'^[a-z][a-z0-9+.-]*://', caseSensitive: false).hasMatch(url);
+  if (!hasScheme) {
+    url = 'https://$url';
+  } else if (url.toLowerCase().startsWith('http://')) {
+    url = 'https://${url.substring(7)}';
+  }
+
+  return url;
+}
+
+String _invalidLinkMessage(MeetingProviderSpec provider) {
+  return 'رابط ${provider.label} غير صحيح. '
+      'الصق رابط ${provider.label}، ويمكن كتابته بدون https://';
+}
+
+String _saveErrorMessage(Object error) {
+  if (error is FirebaseException && error.code == 'permission-denied') {
+    return 'لا يمكن حفظ الروابط الآن بسبب صلاحيات الحساب. '
+        'يرجى تحديث التطبيق أو التواصل مع الدعم.';
+  }
+  return 'تعذّر حفظ روابط الاجتماعات. يرجى المحاولة مرة أخرى.';
 }
 
 class MeetingLinksSheet extends ConsumerStatefulWidget {
@@ -105,12 +151,12 @@ class _MeetingLinksSheetState extends ConsumerState<MeetingLinksSheet> {
     if (_saving) return;
     final newMap = <String, String>{};
     for (final p in meetingProviders) {
-      final v = _controllers[p.id]!.text.trim();
+      final v = _normalizeMeetingUrl(_controllers[p.id]!.text);
       if (v.isEmpty) continue;
       if (!_hostMatches(v, p.hostMatch)) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('رابط ${p.label} غير صالح'),
+            content: Text(_invalidLinkMessage(p)),
             backgroundColor: AppThemeConstants.error,
           ),
         );
@@ -137,7 +183,7 @@ class _MeetingLinksSheetState extends ConsumerState<MeetingLinksSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('فشل الحفظ: $e'),
+            content: Text(_saveErrorMessage(e)),
             backgroundColor: AppThemeConstants.error,
           ),
         );

@@ -19,9 +19,20 @@ class AdminUsersPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PageHeader(
+          PageHeader(
             title: 'المستخدمون',
             subtitle: 'إدارة جميع مستخدمي المنصة',
+            actions: [
+              if (adminAccess.isSuperAdmin)
+                DSButton(
+                  label: 'إضافة أدمن',
+                  leading: const Icon(
+                    Icons.admin_panel_settings_rounded,
+                    size: 18,
+                  ),
+                  onPressed: () => _addAdmin(context, ref),
+                ),
+            ],
           ),
           const SizedBox(height: DSSpacing.xl),
 
@@ -420,6 +431,200 @@ class AdminUsersPage extends ConsumerWidget {
         'deleted' => DSBadgeVariant.error,
         _ => DSBadgeVariant.warning,
       };
+
+  Future<void> _addAdmin(BuildContext context, WidgetRef ref) async {
+    final input = await _showAddAdminDialog(context);
+    if (input == null || !context.mounted) return;
+
+    await ref.read(adminActionsProvider.notifier).grantAdminAccessByEmail(
+          email: input.email,
+          adminRole: input.adminRole,
+          permissions: input.permissions,
+        );
+    if (!context.mounted) return;
+
+    final state = ref.read(adminActionsProvider);
+    state.when(
+      data: (_) {
+        DSToast.show(
+          context,
+          'تمت إضافة الأدمن وتحديث صلاحياته',
+          type: DSToastType.success,
+        );
+        ref.invalidate(filteredUsersProvider);
+      },
+      loading: () {},
+      error: (e, _) =>
+          DSToast.show(context, 'فشل العملية: $e', type: DSToastType.error),
+    );
+  }
+
+  Future<_AddAdminInput?> _showAddAdminDialog(BuildContext context) async {
+    final emailController = TextEditingController();
+    var selectedRole = 'admin';
+    final permissions = {
+      for (final permission in _assignableAdminPermissions)
+        permission: defaultAdminPermissions[permission] ?? false,
+    };
+
+    try {
+      return DSDialog.show<_AddAdminInput>(
+        context,
+        title: 'إضافة أدمن',
+        width: 620,
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            final isLimitedAdmin = selectedRole == 'admin';
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DSTextField(
+                  controller: emailController,
+                  label: 'البريد الإلكتروني',
+                  hint: 'admin@example.com',
+                  keyboardType: TextInputType.emailAddress,
+                  autofocus: true,
+                  leading: const Icon(Icons.email_outlined, size: 18),
+                ),
+                const SizedBox(height: DSSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AdminRoleOption(
+                        label: 'Super Admin',
+                        icon: Icons.workspace_premium_rounded,
+                        selected: selectedRole == 'super_admin',
+                        onTap: () =>
+                            setState(() => selectedRole = 'super_admin'),
+                      ),
+                    ),
+                    const SizedBox(width: DSSpacing.sm),
+                    Expanded(
+                      child: _AdminRoleOption(
+                        label: 'Admin',
+                        icon: Icons.admin_panel_settings_rounded,
+                        selected: isLimitedAdmin,
+                        onTap: () => setState(() => selectedRole = 'admin'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DSSpacing.lg),
+                AnimatedSwitcher(
+                  duration: DSDuration.fast,
+                  child: isLimitedAdmin
+                      ? ConstrainedBox(
+                          key: const ValueKey('new-admin-permissions'),
+                          constraints: const BoxConstraints(maxHeight: 360),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                for (final permission
+                                    in _assignableAdminPermissions)
+                                  CheckboxListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    dense: true,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    title: Text(
+                                      permission.label,
+                                      style: DSText.body(
+                                        context,
+                                        color: DSColors.text1,
+                                      ),
+                                    ),
+                                    value: permissions[permission] == true,
+                                    onChanged: (value) => setState(
+                                      () => permissions[permission] =
+                                          value ?? false,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : Container(
+                          key: const ValueKey('new-super-admin-note'),
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(DSSpacing.lg),
+                          decoration: BoxDecoration(
+                            color: DSColors.errorBg,
+                            borderRadius: DSRadius.mdAll,
+                            border: Border.all(
+                              color: DSColors.error.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.verified_user_rounded,
+                                color: DSColors.error,
+                                size: 20,
+                              ),
+                              const SizedBox(width: DSSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'صلاحية كاملة لكل أدوات الإدارة.',
+                                  style: DSText.body(
+                                    context,
+                                    color: DSColors.text1,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+                const SizedBox(height: DSSpacing.xl),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    DSButton(
+                      label: 'إلغاء',
+                      variant: DSButtonVariant.ghost,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: DSSpacing.sm),
+                    DSButton(
+                      label: 'إضافة الأدمن',
+                      onPressed: () {
+                        final email = emailController.text.trim();
+                        if (!email.contains('@')) {
+                          DSToast.show(
+                            context,
+                            'يرجى إدخال بريد إلكتروني صحيح',
+                            type: DSToastType.error,
+                          );
+                          return;
+                        }
+                        Navigator.of(context).pop(
+                          _AddAdminInput(
+                            email: email,
+                            adminRole: selectedRole,
+                            permissions: selectedRole == 'admin'
+                                ? Map<AdminPermission, bool>.from(permissions)
+                                : {
+                                    for (final permission
+                                        in AdminPermission.values)
+                                      permission: true,
+                                  },
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      emailController.dispose();
+    }
+  }
 }
 
 // ── Row actions menu ──────────────────────────────────────────────────────
@@ -946,6 +1151,18 @@ class _AdminAccessInput {
     required this.permissions,
   });
 
+  final String adminRole;
+  final Map<AdminPermission, bool> permissions;
+}
+
+class _AddAdminInput {
+  const _AddAdminInput({
+    required this.email,
+    required this.adminRole,
+    required this.permissions,
+  });
+
+  final String email;
   final String adminRole;
   final Map<AdminPermission, bool> permissions;
 }

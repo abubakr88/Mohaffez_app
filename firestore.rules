@@ -95,7 +95,7 @@ service cloud.firestore {
             'fcmTokenUpdatedAt', 'photoUrl', 'bio',
             'phoneNumber', 'addressText', 'addressLat',
             'addressLng', 'specialization', 'name',
-            'youtubeVideoUrl', 'meetingLink',
+            'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──

@@ -87,3 +87,6 @@ packages/*/packages/
 
 # Claude Code local app data
 .claude/
+
+# Local marketing drafts and content banks
+marketing/

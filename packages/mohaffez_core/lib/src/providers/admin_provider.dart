@@ -622,6 +622,20 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
+  Future<void> grantAdminAccessByEmail({
+    required String email,
+    required String adminRole,
+    required Map<AdminPermission, bool> permissions,
+  }) async {
+    await _callFunction('setAdminClaim', {
+      'targetEmail': email,
+      'adminRole': adminRole,
+      'permissions': {
+        for (final entry in permissions.entries) entry.key.key: entry.value,
+      },
+    });
+  }
+
   Future<void> approveCredential(String userId, String credentialId) async {
     await _callFunction('approveCredential', {
       'userId': userId,

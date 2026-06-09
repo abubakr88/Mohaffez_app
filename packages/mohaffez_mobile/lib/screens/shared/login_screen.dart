@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+﻿import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,7 +19,7 @@ class _LoginTheme {
   static const Color softGold = Color(0xFFD4A44A);
   static const Color textPrimary = Color(0xFF1E2933);
   static const Color textMuted = Color(0xFF9CA3AF);
-
+  
   static const List<Color> tealGradient = [
     deepTeal,
     midTeal,
@@ -169,8 +169,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         'مرحباً بعودتك 👋',
                         style: TextStyle(
                           fontSize: 16,
-                          color: AppThemeConstants.onPrimary
-                              .withValues(alpha: 0.7),
+                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -303,7 +302,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               },
             ),
             const SizedBox(height: 20),
-
+            
             // ── Password Input ────────────────────────────
             _buildTextField(
               controller: _passwordController,
@@ -333,7 +332,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 return null;
               },
             ),
-
+            
             // ── Forgot Password ───────────────────────────
             Align(
               alignment: Alignment.centerLeft,
@@ -353,7 +352,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ),
             ),
             const SizedBox(height: 8),
-
+            
             // ── Primary Button ────────────────────────────
             SizedBox(
               height: 68,
@@ -410,9 +409,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ),
             ),
-
+            
             const SizedBox(height: 24),
-
+            
             // ── Divider ────────────────────────────────────
             Row(
               children: [
@@ -455,7 +454,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ],
             ),
-
+            
             const SizedBox(height: 24),
 
             // ── Secondary Button ──────────────────────────
@@ -530,7 +529,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
-      textDirection: keyboardType == TextInputType.emailAddress || obscureText
+      textDirection: keyboardType == TextInputType.emailAddress
           ? TextDirection.ltr
           : TextDirection.rtl,
       style: const TextStyle(
