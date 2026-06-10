@@ -13,6 +13,7 @@ class MohaffezModel {
   final int followerCount;
   final String? bio;
   final String? phoneNumber;
+  final String? gender;
 
   MohaffezModel({
     required this.id,
@@ -26,6 +27,7 @@ class MohaffezModel {
     this.followerCount = 0,
     this.bio,
     this.phoneNumber,
+    this.gender,
   });
 
   factory MohaffezModel.fromFirestore(DocumentSnapshot doc) {
@@ -46,19 +48,24 @@ class MohaffezModel {
       followerCount: data['followerCount'] as int? ?? 0,
       bio: data['bio'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
+      gender: data['gender'] as String?,
     );
   }
 
   // Calculate distance from user location
   double? getDistanceFrom(double? userLat, double? userLng) {
-    if (userLat == null || userLng == null || addressLat == null || addressLng == null) {
+    if (userLat == null ||
+        userLng == null ||
+        addressLat == null ||
+        addressLng == null) {
       return null;
     }
     return _calculateDistance(userLat, userLng, addressLat!, addressLng!);
   }
 
   // Haversine formula - ✅ استخدام الدوال من dart:math
-  static double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  static double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371; // km
     final dLat = _toRadians(lat2 - lat1);
     final dLon = _toRadians(lon2 - lon1);

@@ -171,7 +171,8 @@ class _DirectBookingRequestScreenState
     }
   }
 
-  String _functionsErrorMessage(FirebaseFunctionsException e) => switch (e.code) {
+  String _functionsErrorMessage(FirebaseFunctionsException e) =>
+      switch (e.code) {
         'unavailable' => 'الخدمة غير متاحة حالياً. يرجى المحاولة لاحقاً',
         'permission-denied' => 'ليس لديك صلاحية لإجراء هذه العملية',
         'not-found' => 'لم يتم العثور على البيانات المطلوبة',
@@ -285,13 +286,12 @@ class _DirectBookingRequestScreenState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed:
-                      (_submitting ||
-                              !_acknowledged ||
-                              (slotContext.sessionType == 'online' &&
-                                  _selectedProvider == null))
-                          ? null
-                          : sendRequest,
+                  onPressed: (_submitting ||
+                          !_acknowledged ||
+                          (slotContext.sessionType == 'online' &&
+                              _selectedProvider == null))
+                      ? null
+                      : sendRequest,
                   icon: _submitting
                       ? const SizedBox(
                           width: 20,

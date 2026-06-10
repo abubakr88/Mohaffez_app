@@ -38,8 +38,11 @@ class UserModel with _$UserModel {
     @TimestampConverter() DateTime? examNextRetryAt,
     String? gender,
     // ── Commission Penalty & Warnings ───────────────────────
-    @Default(0.0) double commissionPenaltyPercent, // teacher: highest penalty this cycle (resets each cycle)
-    @Default(0) int cancellationWarnings,          // total warnings issued (admin visibility)
+    @Default(0.0)
+    double
+        commissionPenaltyPercent, // teacher: highest penalty this cycle (resets each cycle)
+    @Default(0)
+    int cancellationWarnings, // total warnings issued (admin visibility)
     // ─────────────────────────────────────────────────────────
   }) = _UserModel;
 
@@ -48,9 +51,26 @@ class UserModel with _$UserModel {
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final name = (data['name'] ?? data['displayName'] ?? '').toString().trim();
+    final email = (data['email'] ?? '').toString().trim();
+    final role = (data['role'] ?? data['userType'] ?? 'student')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final rawMeetingLinks = data['meetingLinks'];
+    final meetingLinks = rawMeetingLinks is Map
+        ? rawMeetingLinks.map(
+            (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+          )
+        : <String, String>{};
+
     return UserModel.fromJson({
       ...data,
       'uid': doc.id,
+      'name': name.isNotEmpty ? name : email,
+      'email': email,
+      'role': role.isNotEmpty ? role : 'student',
+      'meetingLinks': meetingLinks,
     });
   }
 }

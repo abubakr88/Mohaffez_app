@@ -31,12 +31,12 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   SortType selectedFilter = SortType.distance;
   TeacherAvailabilityFilter availabilityFilter =
       TeacherAvailabilityFilter.availableOnly;
+  TeacherGenderFilter genderFilter = TeacherGenderFilter.all;
   double? userLat;
   double? userLng;
   bool isLoadingLocation = true;
   String? locationError;
   double radiusKm = 50.0;
-  double _displayRadius = 50.0;
   String searchQuery = '';
   String? selectedSpecialization;
   MohaffezModel? _selectedTeacher;
@@ -134,6 +134,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
       specialization: selectedSpecialization,
       availabilityFilter: availabilityFilter,
+      genderFilter: genderFilter,
     );
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
 
@@ -623,144 +624,370 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Row(
             children: [
-              _MapChip(
-                label: 'الأقرب',
-                icon: Icons.near_me_rounded,
-                isSelected: selectedFilter == SortType.distance,
-                onTap: () => _updateFilter(SortType.distance),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _MapChip(
+                        label: 'الأقرب',
+                        icon: Icons.near_me_rounded,
+                        isSelected: selectedFilter == SortType.distance,
+                        onTap: () => _updateFilter(SortType.distance),
+                      ),
+                      const SizedBox(width: 8),
+                      _MapChip(
+                        label: 'الأعلى تقييماً',
+                        icon: Icons.star_rounded,
+                        isSelected: selectedFilter == SortType.rating,
+                        onTap: () => _updateFilter(SortType.rating),
+                      ),
+                      const SizedBox(width: 8),
+                      _MapChip(
+                        label: 'الأكثر متابعة',
+                        icon: Icons.people_alt_rounded,
+                        isSelected: selectedFilter == SortType.followers,
+                        onTap: () => _updateFilter(SortType.followers),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              _MapChip(
-                label: 'الأعلى تقييماً',
-                icon: Icons.star_rounded,
-                isSelected: selectedFilter == SortType.rating,
-                onTap: () => _updateFilter(SortType.rating),
-              ),
-              _MapChip(
-                label: 'الأكثر متابعة',
-                icon: Icons.people_alt_rounded,
-                isSelected: selectedFilter == SortType.followers,
-                onTap: () => _updateFilter(SortType.followers),
+              const SizedBox(width: 8),
+              _FilterSheetButton(
+                activeCount: _activeFilterCount,
+                onTap: _openFiltersSheet,
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _MapChip(
-                label: 'المتاحون',
-                icon: Icons.event_available_rounded,
-                isSelected: availabilityFilter ==
-                    TeacherAvailabilityFilter.availableOnly,
-                onTap: () => _updateAvailabilityFilter(
-                  TeacherAvailabilityFilter.availableOnly,
-                ),
-              ),
-              _MapChip(
-                label: 'الكل',
-                icon: Icons.groups_rounded,
-                isSelected: availabilityFilter == TeacherAvailabilityFilter.all,
-                onTap: () => _updateAvailabilityFilter(
-                  TeacherAvailabilityFilter.all,
-                ),
-              ),
-              _MapChip(
-                label: 'غير المتاحين',
-                icon: Icons.event_busy_rounded,
-                isSelected: availabilityFilter ==
-                    TeacherAvailabilityFilter.unavailableOnly,
-                onTap: () => _updateAvailabilityFilter(
-                  TeacherAvailabilityFilter.unavailableOnly,
-                ),
-              ),
-            ],
-          ),
-          if (SpecializationConstants.specializations.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: SpecializationConstants.specializations.map((spec) {
-                return _MapChip(
-                  label: spec,
-                  icon: Icons.auto_awesome_rounded,
-                  isSelected: selectedSpecialization == spec,
-                  onTap: () {
-                    setState(() {
-                      selectedSpecialization =
-                          selectedSpecialization == spec ? null : spec;
-                      _selectedTeacher = null;
-                      _hasFitInitialBounds = false;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-          ],
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF062B3F).withValues(alpha: 0.84),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppThemeConstants.primaryVariant.withValues(alpha: 0.22),
-              ),
-            ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                Text(
-                  '${_displayRadius.round()} كم',
-                  style: const TextStyle(
-                    color: AppThemeConstants.secondary,
-                    fontWeight: FontWeight.w800,
-                  ),
+                _ActiveFilterPill(
+                  icon: Icons.event_available_rounded,
+                  label: _availabilityLabel(availabilityFilter),
                 ),
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: AppThemeConstants.secondary,
-                      inactiveTrackColor:
-                          AppThemeConstants.white.withValues(alpha: 0.18),
-                      thumbColor: AppThemeConstants.secondary,
-                      overlayColor:
-                          AppThemeConstants.secondary.withValues(alpha: 0.2),
-                    ),
-                    child: Slider(
-                      value: _displayRadius,
-                      min: 5,
-                      max: 100,
-                      divisions: 19,
-                      label: '${_displayRadius.round()} كم',
-                      onChanged: (value) {
-                        setState(() => _displayRadius = value);
-                      },
-                      onChangeEnd: (value) {
-                        setState(() {
-                          _displayRadius = value;
-                          radiusKm = value;
-                          _selectedTeacher = null;
-                          _hasFitInitialBounds = false;
-                        });
-                      },
-                    ),
+                if (genderFilter != TeacherGenderFilter.all) ...[
+                  const SizedBox(width: 8),
+                  _ActiveFilterPill(
+                    icon: genderFilter == TeacherGenderFilter.male
+                        ? Icons.male_rounded
+                        : Icons.female_rounded,
+                    label: _genderLabel(genderFilter),
                   ),
-                ),
-                const Icon(
-                  Icons.radar_rounded,
-                  color: AppThemeConstants.primaryVariant,
-                  size: 20,
+                ],
+                if (selectedSpecialization != null) ...[
+                  const SizedBox(width: 8),
+                  _ActiveFilterPill(
+                    icon: Icons.auto_awesome_rounded,
+                    label: selectedSpecialization!,
+                  ),
+                ],
+                const SizedBox(width: 8),
+                _ActiveFilterPill(
+                  icon: Icons.radar_rounded,
+                  label: '${radiusKm.round()} كم',
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _openFiltersSheet() {
+    var tempAvailabilityFilter = availabilityFilter;
+    var tempGenderFilter = genderFilter;
+    var tempSpecialization = selectedSpecialization;
+    var tempRadius = radiusKm;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              top: false,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+                ),
+                decoration: const BoxDecoration(
+                  color: AppThemeConstants.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 12, bottom: 10),
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.outline.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.of(sheetContext).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                            tooltip: 'إغلاق',
+                          ),
+                          const Spacer(),
+                          const Text(
+                            'فلترة المحفظين',
+                            style: TextStyle(
+                              color: AppThemeConstants.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const _SheetSectionTitle(
+                              icon: Icons.event_available_rounded,
+                              title: 'التوفر',
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _FilterOptionChip(
+                                  label: 'المتاحون',
+                                  icon: Icons.event_available_rounded,
+                                  isSelected: tempAvailabilityFilter ==
+                                      TeacherAvailabilityFilter.availableOnly,
+                                  onTap: () => setSheetState(() {
+                                    tempAvailabilityFilter =
+                                        TeacherAvailabilityFilter.availableOnly;
+                                  }),
+                                ),
+                                _FilterOptionChip(
+                                  label: 'الكل',
+                                  icon: Icons.groups_rounded,
+                                  isSelected: tempAvailabilityFilter ==
+                                      TeacherAvailabilityFilter.all,
+                                  onTap: () => setSheetState(() {
+                                    tempAvailabilityFilter =
+                                        TeacherAvailabilityFilter.all;
+                                  }),
+                                ),
+                                _FilterOptionChip(
+                                  label: 'غير المتاحين',
+                                  icon: Icons.event_busy_rounded,
+                                  isSelected: tempAvailabilityFilter ==
+                                      TeacherAvailabilityFilter.unavailableOnly,
+                                  onTap: () => setSheetState(() {
+                                    tempAvailabilityFilter =
+                                        TeacherAvailabilityFilter
+                                            .unavailableOnly;
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            const _SheetSectionTitle(
+                              icon: Icons.person_search_rounded,
+                              title: 'نوع المحفظ',
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _FilterOptionChip(
+                                  label: 'الكل',
+                                  icon: Icons.groups_rounded,
+                                  isSelected: tempGenderFilter ==
+                                      TeacherGenderFilter.all,
+                                  onTap: () => setSheetState(() {
+                                    tempGenderFilter = TeacherGenderFilter.all;
+                                  }),
+                                ),
+                                _FilterOptionChip(
+                                  label: 'معلم',
+                                  icon: Icons.male_rounded,
+                                  isSelected: tempGenderFilter ==
+                                      TeacherGenderFilter.male,
+                                  onTap: () => setSheetState(() {
+                                    tempGenderFilter = TeacherGenderFilter.male;
+                                  }),
+                                ),
+                                _FilterOptionChip(
+                                  label: 'معلمة',
+                                  icon: Icons.female_rounded,
+                                  isSelected: tempGenderFilter ==
+                                      TeacherGenderFilter.female,
+                                  onTap: () => setSheetState(() {
+                                    tempGenderFilter =
+                                        TeacherGenderFilter.female;
+                                  }),
+                                ),
+                              ],
+                            ),
+                            if (SpecializationConstants
+                                .specializations.isNotEmpty) ...[
+                              const SizedBox(height: 18),
+                              const _SheetSectionTitle(
+                                icon: Icons.auto_awesome_rounded,
+                                title: 'التخصص',
+                              ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _FilterOptionChip(
+                                    label: 'كل التخصصات',
+                                    icon: Icons.apps_rounded,
+                                    isSelected: tempSpecialization == null,
+                                    onTap: () => setSheetState(() {
+                                      tempSpecialization = null;
+                                    }),
+                                  ),
+                                  ...SpecializationConstants.specializations
+                                      .map(
+                                    (spec) => _FilterOptionChip(
+                                      label: spec,
+                                      icon: Icons.auto_awesome_rounded,
+                                      isSelected: tempSpecialization == spec,
+                                      onTap: () => setSheetState(() {
+                                        tempSpecialization =
+                                            tempSpecialization == spec
+                                                ? null
+                                                : spec;
+                                      }),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            const _SheetSectionTitle(
+                              icon: Icons.radar_rounded,
+                              title: 'نطاق البحث',
+                            ),
+                            Container(
+                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                              decoration: BoxDecoration(
+                                color: AppThemeConstants.infoLight,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: AppThemeConstants.primaryVariant
+                                      .withValues(alpha: 0.22),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '${tempRadius.round()} كم',
+                                    style: const TextStyle(
+                                      color: AppThemeConstants.primary,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Slider(
+                                      value: tempRadius,
+                                      min: 5,
+                                      max: 100,
+                                      divisions: 19,
+                                      label: '${tempRadius.round()} كم',
+                                      activeColor: AppThemeConstants.secondary,
+                                      inactiveColor: AppThemeConstants.outline,
+                                      onChanged: (value) {
+                                        setSheetState(() {
+                                          tempRadius = value;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                      decoration: BoxDecoration(
+                        color: AppThemeConstants.white,
+                        border: Border(
+                          top: BorderSide(
+                            color: AppThemeConstants.outline
+                                .withValues(alpha: 0.75),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => setSheetState(() {
+                              tempAvailabilityFilter =
+                                  TeacherAvailabilityFilter.availableOnly;
+                              tempGenderFilter = TeacherGenderFilter.all;
+                              tempSpecialization = null;
+                              tempRadius = 50;
+                            }),
+                            icon: const Icon(Icons.restart_alt_rounded),
+                            label: const Text('إعادة ضبط'),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                _applyDetailedFilters(
+                                  availability: tempAvailabilityFilter,
+                                  gender: tempGenderFilter,
+                                  specialization: tempSpecialization,
+                                  radius: tempRadius,
+                                );
+                                Navigator.of(sheetContext).pop();
+                              },
+                              icon: const Icon(Icons.check_rounded),
+                              label: const Text('تطبيق الفلترة'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppThemeConstants.primary,
+                                foregroundColor: AppThemeConstants.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -841,14 +1068,53 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     }
   }
 
-  void _updateAvailabilityFilter(TeacherAvailabilityFilter newFilter) {
-    if (availabilityFilter != newFilter) {
-      setState(() {
-        availabilityFilter = newFilter;
-        _selectedTeacher = null;
-        _hasFitInitialBounds = false;
-      });
+  int get _activeFilterCount {
+    var count = 0;
+    if (availabilityFilter != TeacherAvailabilityFilter.availableOnly) count++;
+    if (genderFilter != TeacherGenderFilter.all) count++;
+    if (selectedSpecialization != null) count++;
+    if (radiusKm.round() != 50) count++;
+    return count;
+  }
+
+  String _availabilityLabel(TeacherAvailabilityFilter filter) {
+    switch (filter) {
+      case TeacherAvailabilityFilter.availableOnly:
+        return 'المتاحون';
+      case TeacherAvailabilityFilter.all:
+        return 'الكل';
+      case TeacherAvailabilityFilter.unavailableOnly:
+        return 'غير المتاحين';
     }
+  }
+
+  String _genderLabel(TeacherGenderFilter filter) {
+    switch (filter) {
+      case TeacherGenderFilter.all:
+        return 'كل المحفظين';
+      case TeacherGenderFilter.male:
+        return 'معلم';
+      case TeacherGenderFilter.female:
+        return 'معلمة';
+    }
+  }
+
+  void _applyDetailedFilters({
+    required TeacherAvailabilityFilter availability,
+    required TeacherGenderFilter gender,
+    required String? specialization,
+    required double radius,
+  }) {
+    final normalizedRadius = radius.clamp(5.0, 100.0).toDouble();
+
+    setState(() {
+      availabilityFilter = availability;
+      genderFilter = gender;
+      selectedSpecialization = specialization;
+      radiusKm = normalizedRadius;
+      _selectedTeacher = null;
+      _hasFitInitialBounds = false;
+    });
   }
 
   void _clearSearch() {
@@ -1531,6 +1797,202 @@ class _MapCounterBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterSheetButton extends StatelessWidget {
+  final int activeCount;
+  final VoidCallback onTap;
+
+  const _FilterSheetButton({
+    required this.activeCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'فلترة النتائج',
+      child: Material(
+        color: AppThemeConstants.primary,
+        elevation: 7,
+        shadowColor: AppThemeConstants.primary.withValues(alpha: 0.24),
+        borderRadius: BorderRadius.circular(13),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(13),
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.tune_rounded,
+                  color: AppThemeConstants.white,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'فلترة',
+                  style: TextStyle(
+                    color: AppThemeConstants.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (activeCount > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 20,
+                    height: 20,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppThemeConstants.secondary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$activeCount',
+                      style: const TextStyle(
+                        color: AppThemeConstants.deepTeal,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveFilterPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _ActiveFilterPill({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.infoLight,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppThemeConstants.primaryVariant.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppThemeConstants.primary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppThemeConstants.textPrimary,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetSectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+
+  const _SheetSectionTitle({
+    required this.icon,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppThemeConstants.primary),
+          const SizedBox(width: 7),
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppThemeConstants.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterOptionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterOptionChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground =
+        isSelected ? AppThemeConstants.deepTeal : AppThemeConstants.textPrimary;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppThemeConstants.secondary
+              : AppThemeConstants.white,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: isSelected
+                ? AppThemeConstants.secondary
+                : AppThemeConstants.outline,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: foreground),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: foreground,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

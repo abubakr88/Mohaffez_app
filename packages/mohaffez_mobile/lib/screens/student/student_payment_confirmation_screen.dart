@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../services/payment_service.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/empty_state.dart';
 
@@ -126,7 +127,8 @@ class _StudentPaymentConfirmationScreenState
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
+          error: (_, __) =>
+              const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         ),
         bottomNavigationBar: selectedPlan == null
             ? null
@@ -234,10 +236,25 @@ class _StudentPaymentConfirmationScreenState
       return;
     }
 
+    var loadingDialogOpen = true;
+    BuildContext? loadingDialogContext;
+
+    void closeLoadingDialog() {
+      if (!loadingDialogOpen) return;
+      final dialogContext = loadingDialogContext;
+      if (dialogContext != null && dialogContext.mounted) {
+        Navigator.of(dialogContext).pop();
+      }
+      loadingDialogOpen = false;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (dialogContext) {
+        loadingDialogContext = dialogContext;
+        return const Center(child: CircularProgressIndicator());
+      },
     );
 
     try {
@@ -248,7 +265,7 @@ class _StudentPaymentConfirmationScreenState
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
         mohaffezName: widget.mohaffezName,
-        planId: selectedPlan!.id!,
+        planId: selectedPlan!.id ?? '',
         planTitle: selectedPlan!.title,
         amount: selectedPlan!.priceEGP,
         method: PaymentMethod.card,
@@ -278,15 +295,62 @@ class _StudentPaymentConfirmationScreenState
           );
 
       if (!context.mounted) return;
-      Navigator.pop(context);
 
       if (result == null) {
+        closeLoadingDialog();
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('فشل بدء عملية الدفع')));
         return;
       }
 
-      if (result.paymentUrl.isEmpty) {
+      var paymentUrl = result.paymentUrl;
+      if (paymentUrl.isEmpty && selectedPlan!.priceEGP > 0.01) {
+        final studentPhone = user.phoneNumber?.trim();
+        final studentName = user.name.trim();
+        final paymobResult =
+            await ref.read(paymentServiceProvider).initiatePayment(
+                  paymentId: result.paymentId,
+                  amount: selectedPlan!.priceEGP,
+                  studentEmail: user.email,
+                  studentPhone: studentPhone != null && studentPhone.isNotEmpty
+                      ? studentPhone
+                      : '01000000000',
+                  studentName: studentName.isNotEmpty ? studentName : 'Student',
+                );
+
+        if (!context.mounted) return;
+        if (paymobResult['success'] != true) {
+          debugPrint('Paymob initiatePayment failed: ${paymobResult['error']}');
+          closeLoadingDialog();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('فشل تجهيز الدفع الإلكتروني. يرجى المحاولة مرة أخرى'),
+              backgroundColor: AppThemeConstants.error,
+            ),
+          );
+          return;
+        }
+
+        paymentUrl = paymobResult['paymentUrl']?.toString() ?? '';
+        if (paymentUrl.isEmpty) {
+          throw Exception('Paymob returned an empty payment URL');
+        }
+
+        try {
+          await ref.read(paymentRepositoryProvider).updatePaymentGatewayInfo(
+                result.paymentId,
+                orderId: paymobResult['orderId']?.toString(),
+              );
+        } catch (e) {
+          debugPrint('Paymob gateway order update failed: $e');
+        }
+      }
+
+      if (!context.mounted) return;
+      closeLoadingDialog();
+
+      if (paymentUrl.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('تم تأكيد الجلسة المجانية بنجاح!'),
@@ -300,7 +364,7 @@ class _StudentPaymentConfirmationScreenState
       final success = await context.push<bool>(
         '/payment-webview',
         extra: {
-          'paymentUrl': result.paymentUrl,
+          'paymentUrl': paymentUrl,
           'paymentId': result.paymentId,
           'plan': selectedPlan!,
         },
@@ -313,10 +377,11 @@ class _StudentPaymentConfirmationScreenState
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
+      debugPrint('Paymob payment error: $e');
       if (!context.mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')));
+      closeLoadingDialog();
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')));
     }
   }
 }

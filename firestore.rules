@@ -35,6 +35,21 @@ service cloud.firestore {
       return isAdmin() && request.auth.token.adminRole != 'admin';
     }
 
+    function hasSuperAdminUserDoc() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.adminRole != 'admin';
+    }
+
+    function isPaymobToggleWrite(configId) {
+      return configId == 'global' &&
+             hasSuperAdminUserDoc() &&
+             request.resource.data.paymobEnabled is bool &&
+             request.resource.data.updatedBy == request.auth.uid &&
+             request.resource.data.updatedAt == request.time;
+    }
+
     function hasAdminPermission(permission) {
       return isSuperAdmin() ||
              (
@@ -683,6 +698,13 @@ service cloud.firestore {
     match /systemConfig/{configId} {
       allow read: if configId != 'adminMetrics' || isAdmin();
       allow write: if isSuperAdmin();
+      allow create: if isPaymobToggleWrite(configId) &&
+                    request.resource.data.keys().hasOnly([
+                      'paymobEnabled', 'updatedAt', 'updatedBy'
+                    ]);
+      allow update: if isPaymobToggleWrite(configId) &&
+                    request.resource.data.diff(resource.data).affectedKeys()
+                      .hasOnly(['paymobEnabled', 'updatedAt', 'updatedBy']);
     }
 
     match /userSuspensions/{suspensionId} {

@@ -1,4 +1,4 @@
-﻿// FILE: lib/config/app_router.dart
+// FILE: lib/config/app_router.dart
 import 'package:flutter/foundation.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
@@ -120,7 +120,6 @@ class GoRouterNotifier extends ChangeNotifier {
     return GuardManager.checkGuards(ref, state);
   }
 }
-
 
 // Main GoRouter Provider
 final goRouterProvider = Provider<GoRouter>((ref) {
@@ -308,7 +307,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'rate-session',
             builder: (context, state) {
               final sessionId = state.pathParameters['sessionId'] ?? '';
-              final mohaffezName = state.uri.queryParameters['mohaffezName'] ?? 'المحفظ';
+              final mohaffezName =
+                  state.uri.queryParameters['mohaffezName'] ?? 'المحفظ';
               return RateSessionScreen(
                 sessionId: sessionId,
                 mohaffezName: mohaffezName,
@@ -319,7 +319,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/mushaf/:pageNumber',
             name: 'mushaf-viewer',
             builder: (context, state) {
-              final pageNumber = int.tryParse(state.pathParameters['pageNumber'] ?? '') ?? 1;
+              final pageNumber =
+                  int.tryParse(state.pathParameters['pageNumber'] ?? '') ?? 1;
               final extra = state.extra as Map<String, dynamic>?;
               final mistakes = extra?['mistakes'] as List<QuranMistake>?;
               return Directionality(
@@ -358,7 +359,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'booking-select-bundle-plan',
             builder: (context, state) => const SelectBundlePlanScreen(),
           ),
-                    GoRoute(
+          GoRoute(
             path: '/booking/confirm-bundle-session',
             name: 'booking-confirm-bundle-session',
             builder: (context, state) => const ConfirmBundleSessionScreen(),
@@ -425,7 +426,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const DirectBookingRequestScreen(),
           ),
 
-                    // ============================================
+          // ============================================
           // SHARED ROUTES (Both Student & Mohaffez)
           // ============================================
           GoRoute(
@@ -493,19 +494,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'payment',
             builder: (context, state) {
               final mohaffezId = state.pathParameters['mohaffezId']!;
-              final mohaffezName =
-                  state.uri.queryParameters['name'] ?? '';
               final requestId = state.uri.queryParameters['requestId'];
 
               final extra = state.extra as Map<String, dynamic>?;
               final lockedRequest =
                   extra?['lockedRequest'] as Map<String, dynamic>?;
+              final mohaffezName = state.uri.queryParameters['name'] ??
+                  lockedRequest?['mohaffezName'] as String? ??
+                  '';
 
-              final sessionType =
-                  state.uri.queryParameters['sessionType'];
+              final sessionType = state.uri.queryParameters['sessionType'];
               final timeSlot = state.uri.queryParameters['timeSlot'];
-              final sessionDateStr =
-                  state.uri.queryParameters['sessionDate'];
+              final sessionDateStr = state.uri.queryParameters['sessionDate'];
               final location = state.uri.queryParameters['location'];
               final latStr = state.uri.queryParameters['lat'];
               final lngStr = state.uri.queryParameters['lng'];
@@ -581,8 +581,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/completed-sessions',
             name: 'completed-sessions',
             builder: (context, state) {
-              final mohaffezId =
-                  state.uri.queryParameters['mohaffezId'];
+              final mohaffezId = state.uri.queryParameters['mohaffezId'];
               if (mohaffezId == null || mohaffezId.isEmpty) {
                 return ErrorScreen(
                   error: 'معرف المحفظ مطلوب',
@@ -596,8 +595,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/upcoming-sessions',
             name: 'upcoming-sessions',
             builder: (context, state) {
-              final mohaffezId =
-                  state.uri.queryParameters['mohaffezId'];
+              final mohaffezId = state.uri.queryParameters['mohaffezId'];
               if (mohaffezId == null || mohaffezId.isEmpty) {
                 return ErrorScreen(
                   error: 'معرف المحفظ مطلوب',
@@ -626,8 +624,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/availability',
             name: 'availability',
-            builder: (context, state) =>
-                const AvailabilityManagementScreen(),
+            builder: (context, state) => const AvailabilityManagementScreen(),
           ),
           GoRoute(
             path: '/my-students',
@@ -671,7 +668,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 previousMuraja: extra?['previousMuraja'],
                 previousHifzFromAyah: extra?['previousHifzFromAyah'] as String?,
                 previousHifzToAyah: extra?['previousHifzToAyah'] as String?,
-                previousMurajaFromAyah: extra?['previousMurajaFromAyah'] as String?,
+                previousMurajaFromAyah:
+                    extra?['previousMurajaFromAyah'] as String?,
                 previousMurajaToAyah: extra?['previousMurajaToAyah'] as String?,
                 isLateCompletion: extra?['isLateCompletion'] == true,
                 sessionType: extra?['sessionType'] as String?,
@@ -748,8 +746,7 @@ class ErrorScreen extends StatelessWidget {
       child: Scaffold(
         body: Center(
           child: Padding(
-            padding:
-                const EdgeInsets.all(AppThemeConstants.spaceLg),
+            padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
