@@ -40,6 +40,7 @@ class StudentRequestsScreen extends ConsumerStatefulWidget {
 class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   final searchController = TextEditingController();
   String searchQuery = '';
+  final Set<String> _recentlyPaidRequestIds = {};
 
   Future<void> _refreshRequests(String studentId) async {
     ref.invalidate(studentRequestsFirstPageProvider(studentId));
@@ -53,6 +54,11 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   /// the student already sent the payment, so no "Pay Now" button is needed.
   /// FIX: Subscription-credit requests NEVER require student payment action
   bool _requiresPayment(Map<String, dynamic> request) {
+    final requestId = _requestIdOf(request);
+    if (requestId != null && _recentlyPaidRequestIds.contains(requestId)) {
+      return false;
+    }
+
     final status = (request['status'] as String? ?? '').toLowerCase();
     final selectedPaymentMethod =
         request['selectedPaymentMethod'] as String? ?? '';
@@ -65,11 +71,13 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         status == 'awaitingdirectpayment';
   }
 
+  String? _requestIdOf(Map<String, dynamic> request) =>
+      request['id'] as String? ?? request['requestId'] as String?;
+
   // ── Navigate to payment ──────────────────────────────────────────────────
   Future<void> _navigateToPayment(Map<String, dynamic> request) async {
     try {
-      final requestId =
-          request['id'] as String? ?? request['requestId'] as String?;
+      final requestId = _requestIdOf(request);
       final mohaffezId = request['mohaffezId'] as String?;
 
       if (requestId == null || mohaffezId == null) {
@@ -114,12 +122,20 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           if (mohaffezName.isNotEmpty) 'name': mohaffezName,
         },
       ).query;
-      context.push(
+      final paid = await context.push<bool>(
         '/payment/$mohaffezId?$qs',
         extra: {
           'lockedRequest': lockedRequest,
         },
       );
+
+      if (paid == true && mounted) {
+        setState(() => _recentlyPaidRequestIds.add(requestId));
+        final studentId = ref.read(currentUserProvider).value?.uid;
+        if (studentId != null) {
+          await _refreshRequests(studentId);
+        }
+      }
     } catch (e, st) {
       debugPrint('navigateToPayment error: $e\n$st');
       if (mounted) {
@@ -411,11 +427,19 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final request = filteredRequests[index];
+                final requestId = _requestIdOf(request);
+                final displayRequest = requestId != null &&
+                        _recentlyPaidRequestIds.contains(requestId)
+                    ? {
+                        ...request,
+                        'status': 'paymentprocessing',
+                      }
+                    : request;
                 return _RequestCard(
-                  request: request,
-                  onCancel: () => _handleCancel(context, ref, request),
-                  onPayNow: _requiresPayment(request)
-                      ? () => _navigateToPayment(request)
+                  request: displayRequest,
+                  onCancel: () => _handleCancel(context, ref, displayRequest),
+                  onPayNow: _requiresPayment(displayRequest)
+                      ? () => _navigateToPayment(displayRequest)
                       : null,
                 );
               },
@@ -844,6 +868,12 @@ class _RequestCard extends StatelessWidget {
         return ('في انتظار الدفع', AppThemeConstants.primary, Icons.payment);
       case 'awaitingdirectpayment':
         return ('في انتظار الدفع', AppThemeConstants.primary, Icons.payment);
+      case 'paymentprocessing':
+        return (
+          'جاري تأكيد الدفع',
+          AppThemeConstants.success,
+          Icons.hourglass_top
+        );
       case 'awaitingdirectpaymentconfirmation':
       case 'awaiting_direct_payment_confirmation':
         return (

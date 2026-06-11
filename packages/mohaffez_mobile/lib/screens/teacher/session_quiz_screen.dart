@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+// ignore_for_file: deprecated_member_use
+
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -306,7 +308,7 @@ class _SessionQuizScreenState extends ConsumerState<SessionQuizScreen>
                           streak: session.streak,
                         )
                       else
-                        _ScorePill(label: '⭐ 0 / 0'),
+                        const _ScorePill(label: '⭐ 0 / 0'),
                     ],
                   ),
                   const SizedBox(height: 14),

@@ -36,7 +36,8 @@ class MeetingProviderPicker extends ConsumerWidget {
 
         // Legacy fallback: if teacher only has the old single meetingLink,
         // treat its host as one provider so booking still works during migration.
-        if (available.isEmpty && (teacher.meetingLink?.trim().isNotEmpty ?? false)) {
+        if (available.isEmpty &&
+            (teacher.meetingLink?.trim().isNotEmpty ?? false)) {
           final legacy = teacher.meetingLink!.trim();
           final match = meetingProviders
               .where((p) => legacy.toLowerCase().contains(p.hostMatch))
@@ -65,12 +66,12 @@ class MeetingProviderPicker extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
-                  const Icon(Icons.videocam_rounded,
+                  Icon(Icons.videocam_rounded,
                       size: 20, color: AppThemeConstants.primary),
-                  const SizedBox(width: 8),
-                  const Text(
+                  SizedBox(width: 8),
+                  Text(
                     'اختر منصة الاجتماع',
                     style: TextStyle(
                       fontSize: 14,
@@ -198,8 +199,8 @@ class _ErrorCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppThemeConstants.error.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: AppThemeConstants.error.withValues(alpha: 0.3)),
+          border:
+              Border.all(color: AppThemeConstants.error.withValues(alpha: 0.3)),
         ),
         child: const Text(
           'تعذّر تحميل منصات الاجتماع المتاحة',

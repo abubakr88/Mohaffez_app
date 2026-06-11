@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -265,7 +264,8 @@ class _MeetingLinksSheetState extends ConsumerState<MeetingLinksSheet> {
                         : const Icon(Icons.check_rounded, size: 18),
                     label: const Text(
                       'حفظ',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppThemeConstants.primary,
@@ -331,7 +331,8 @@ class _ProviderField extends StatelessWidget {
           autocorrect: false,
           decoration: InputDecoration(
             hintText: spec.hint,
-            hintStyle: const TextStyle(fontSize: 12, color: AppThemeConstants.grey400),
+            hintStyle:
+                const TextStyle(fontSize: 12, color: AppThemeConstants.grey400),
             isDense: true,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             contentPadding:
