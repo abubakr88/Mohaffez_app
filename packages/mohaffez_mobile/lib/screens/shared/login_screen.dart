@@ -80,6 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.dispose();
   }
 
+  // ignore: unused_element
   Future<void> _signInWithGoogle() async {
     final notifier = ref.read(authNotifierProvider.notifier);
     await notifier.signInWithGoogle();
@@ -530,7 +531,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
-      textDirection: keyboardType == TextInputType.emailAddress || obscureText
+      textDirection: keyboardType == TextInputType.emailAddress
           ? TextDirection.ltr
           : TextDirection.rtl,
       style: const TextStyle(

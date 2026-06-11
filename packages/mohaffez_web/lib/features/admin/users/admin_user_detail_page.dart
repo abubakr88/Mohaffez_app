@@ -3,13 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
+
 import '../../../design_system/design_system.dart';
 
-/// Admin profile page for a single user. For a mohaffez it shows full teaching
-/// statistics (sessions, students, revenue, rating), submitted credentials, and
-/// a recent-sessions table. Reached from the users table by clicking a teacher.
 class AdminUserDetailPage extends ConsumerWidget {
   const AdminUserDetailPage({super.key, required this.userId});
+
   final String userId;
 
   @override
@@ -24,6 +23,7 @@ class AdminUserDetailPage extends ConsumerWidget {
             label: 'عودة إلى المستخدمين',
             variant: DSButtonVariant.ghost,
             size: DSButtonSize.sm,
+            leading: const Icon(Icons.arrow_back_rounded, size: 16),
             onPressed: () => context.go('/admin/users'),
           ),
           const SizedBox(height: DSSpacing.md),
@@ -35,11 +35,11 @@ class AdminUserDetailPage extends ConsumerWidget {
               if (user == null) {
                 return const DSEmptyState(
                   title: 'المستخدم غير موجود',
-                  subtitle: 'ربما تم حذف هذا الحساب',
+                  subtitle: 'ربما تم حذف هذا الحساب أو تغيّر معرّفه',
                   icon: Icons.person_off_outlined,
                 );
               }
-              return _Profile(userId: userId, user: user);
+              return _UserProfile(userId: userId, user: user);
             },
           ),
         ],
@@ -48,28 +48,129 @@ class AdminUserDetailPage extends ConsumerWidget {
   }
 }
 
-class _Profile extends ConsumerWidget {
-  const _Profile({required this.userId, required this.user});
+enum _DetailTab {
+  account('الحساب', Icons.badge_outlined),
+  sessions('الجلسات', Icons.event_note_outlined),
+  wallet('المحفظة', Icons.account_balance_wallet_outlined),
+  review('مراجعة المحفظ', Icons.verified_user_outlined),
+  support('الدعم', Icons.support_agent_outlined),
+  notifications('الإشعارات والأجهزة', Icons.notifications_none_rounded);
+
+  const _DetailTab(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+class _UserProfile extends ConsumerStatefulWidget {
+  const _UserProfile({required this.userId, required this.user});
+
   final String userId;
   final Map<String, dynamic> user;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final name = user['name'] as String? ?? '—';
-    final role = user['role'] as String? ?? 'student';
-    final status = user['status'] as String? ?? 'active';
-    final photo = user['photoUrl'] as String?;
-    final spec = user['specialization'] as String? ?? '';
-    final bio = user['bio'] as String? ?? '';
-    final isTeacher = role == 'mohaffez';
+  ConsumerState<_UserProfile> createState() => _UserProfileState();
+}
+
+class _UserProfileState extends ConsumerState<_UserProfile> {
+  _DetailTab _selected = _DetailTab.account;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.user;
+    final userId = widget.userId;
+    final role = _text(user, const ['role'], 'student');
+    final status = _text(user, const ['status'], 'active');
+    final name = _text(user, const ['name', 'displayName'], 'مستخدم');
+    final photo = _nullableText(user, const ['photoUrl', 'profileImageUrl']);
+    final access = ref.watch(currentAdminAccessProvider).valueOrNull ??
+        AdminAccessState.none();
+    final tabs = _tabsFor(role, access);
+
+    if (!tabs.contains(_selected)) _selected = tabs.first;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Profile header ───────────────────────────────────────────────
-        DSCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        _ProfileHeader(
+          userId: userId,
+          user: user,
+          name: name,
+          role: role,
+          status: status,
+          photo: photo,
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        _TabStrip(
+          tabs: tabs,
+          selected: _selected,
+          onSelected: (tab) => setState(() => _selected = tab),
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        AnimatedSwitcher(
+          duration: DSDuration.fast,
+          child: switch (_selected) {
+            _DetailTab.account => _AccountTab(user: user),
+            _DetailTab.sessions => _SessionsTab(userId: userId),
+            _DetailTab.wallet => _WalletTab(userId: userId, user: user),
+            _DetailTab.review => _TeacherReviewTab(userId: userId),
+            _DetailTab.support => _SupportTab(user: user),
+            _DetailTab.notifications => _NotificationsAndDevicesTab(
+                userId: userId,
+                user: user,
+              ),
+          },
+        ),
+      ],
+    );
+  }
+
+  List<_DetailTab> _tabsFor(String role, AdminAccessState access) {
+    final canOpenUsers = access.isSuperAdmin ||
+        access.can(AdminPermission.manageUsers) ||
+        access.can(AdminPermission.manageUserRoles) ||
+        access.can(AdminPermission.deleteUsers);
+    final canViewSessions = access.can(AdminPermission.manageUsers) ||
+        access.can(AdminPermission.manageFinance);
+    final canViewWallet = access.can(AdminPermission.manageFinance) &&
+        (role == 'student' || role == 'mohaffez');
+
+    return [
+      _DetailTab.account,
+      if (canViewSessions) _DetailTab.sessions,
+      if (canViewWallet) _DetailTab.wallet,
+      if (role == 'mohaffez' && access.can(AdminPermission.reviewTeachers))
+        _DetailTab.review,
+      if (canOpenUsers) _DetailTab.support,
+      if (canOpenUsers) _DetailTab.notifications,
+    ];
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.userId,
+    required this.user,
+    required this.name,
+    required this.role,
+    required this.status,
+    required this.photo,
+  });
+
+  final String userId;
+  final Map<String, dynamic> user;
+  final String name;
+  final String role;
+  final String status;
+  final String? photo;
+
+  @override
+  Widget build(BuildContext context) {
+    return DSCard(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 720;
+          final identity = Row(
             children: [
               DSAvatar(name: name, imageUrl: photo, size: 64),
               const SizedBox(width: DSSpacing.lg),
@@ -86,366 +187,585 @@ class _Profile extends ConsumerWidget {
                       children: [
                         DSBadge(
                           label: _roleLabel(role),
-                          variant: role == 'mohaffez'
-                              ? DSBadgeVariant.primary
-                              : role == 'admin'
-                                  ? DSBadgeVariant.warning
-                                  : DSBadgeVariant.neutral,
+                          variant: _roleVariant(role),
                         ),
                         DSBadge(
                           label: _statusLabel(status),
                           variant: _statusVariant(status),
                           dot: true,
                         ),
-                        Text('انضم في ${_date(user['createdAt'])}',
-                            style:
-                                DSText.caption(context, color: DSColors.text3)),
+                        if (_adminRole(user) != null)
+                          DSBadge(
+                            label: _adminRole(user)!,
+                            variant: _adminRole(user) == 'Super Admin'
+                                ? DSBadgeVariant.error
+                                : DSBadgeVariant.info,
+                          ),
                       ],
                     ),
-                    if (spec.isNotEmpty) ...[
-                      const SizedBox(height: DSSpacing.md),
-                      _Field(label: 'التخصص', value: spec),
-                    ],
-                    if (bio.isNotEmpty) _Field(label: 'نبذة', value: bio),
+                    const SizedBox(height: DSSpacing.sm),
+                    SelectableText(
+                      userId,
+                      style: DSText.caption(context, color: DSColors.text3),
+                    ),
                   ],
                 ),
               ),
             ],
-          ),
-        ),
+          );
 
-        if (!isTeacher) ...[
-          const SizedBox(height: DSSpacing.lg),
-          const DSBanner(
-            message: 'الإحصائيات التفصيلية متاحة لحسابات المحفظين فقط.',
-            variant: DSBannerVariant.info,
-          ),
-        ] else ...[
-          const SizedBox(height: DSSpacing.xl),
-          _StatsSection(userId: userId),
-          const SizedBox(height: DSSpacing.xl),
-          Row(
+          final summary = Wrap(
+            spacing: DSSpacing.md,
+            runSpacing: DSSpacing.md,
             children: [
-              Expanded(child: Text('المحفظة', style: DSText.h3(context))),
-              _CreditWalletButton(userId: userId, name: name),
+              _HeaderFact(
+                label: 'انضم',
+                value: _date(user['createdAt']),
+                icon: Icons.person_add_alt_1_outlined,
+              ),
+              _HeaderFact(
+                label: 'آخر تحديث',
+                value: _date(user['updatedAt']),
+                icon: Icons.update_rounded,
+              ),
+              _HeaderFact(
+                label: 'آخر نشاط',
+                value: _date(user['lastActiveAt'] ?? user['lastLoginAt']),
+                icon: Icons.access_time_rounded,
+              ),
             ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                identity,
+                const SizedBox(height: DSSpacing.lg),
+                summary,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: identity),
+              const SizedBox(width: DSSpacing.xl),
+              summary,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HeaderFact extends StatelessWidget {
+  const _HeaderFact({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(DSSpacing.md),
+      decoration: BoxDecoration(
+        color: DSColors.surfaceMuted,
+        borderRadius: DSRadius.mdAll,
+        border: Border.all(color: DSColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: DSColors.primary),
+          const SizedBox(width: DSSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: DSText.caption(context, color: DSColors.text3)),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: DSText.bodyMedium(context),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: DSSpacing.md),
-          _WalletSection(userId: userId),
-          const SizedBox(height: DSSpacing.xl),
-          Text('الشهادات والوثائق', style: DSText.h3(context)),
-          const SizedBox(height: DSSpacing.md),
-          _CredentialsSection(userId: userId),
-          const SizedBox(height: DSSpacing.xl),
-          Text('أحدث الجلسات', style: DSText.h3(context)),
-          const SizedBox(height: DSSpacing.md),
-          _RecentSessionsSection(userId: userId),
         ],
+      ),
+    );
+  }
+}
+
+class _TabStrip extends StatelessWidget {
+  const _TabStrip({
+    required this.tabs,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<_DetailTab> tabs;
+  final _DetailTab selected;
+  final ValueChanged<_DetailTab> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: DSSpacing.sm,
+      runSpacing: DSSpacing.sm,
+      children: [
+        for (final tab in tabs)
+          _TabButton(
+            tab: tab,
+            selected: tab == selected,
+            onTap: () => onSelected(tab),
+          ),
       ],
     );
   }
 }
 
-class _StatsSection extends ConsumerWidget {
-  const _StatsSection({required this.userId});
-  final String userId;
+class _TabButton extends StatelessWidget {
+  const _TabButton({
+    required this.tab,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _DetailTab tab;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(teacherStatsProvider(userId));
-    return async.when(
-      loading: () => const DSSkeletonCard(),
-      error: (e, _) =>
-          DSBanner(message: '$e', variant: DSBannerVariant.error),
-      data: (s) {
-        final cards = <Widget>[
-          _stat('إجمالي الجلسات', '${s.total}', Icons.event_note_outlined,
-              DSColors.primary),
-          _stat('مكتملة', '${s.completed}', Icons.check_circle_outline,
-              DSColors.success),
-          _stat('قادمة', '${s.upcoming}', Icons.schedule_rounded,
-              DSColors.info),
-          _stat('ملغاة', '${s.cancelled}', Icons.cancel_outlined,
-              DSColors.error),
-          _stat('عدد الطلاب', '${s.studentCount}', Icons.people_outline_rounded,
-              DSColors.primary),
-          _stat('قيمة الجلسات المكتملة', _money(s.revenue),
-              Icons.payments_outlined, DSColors.secondary),
-          _stat(
-              'التقييم',
-              s.avgRating == null
-                  ? '—'
-                  : '${s.avgRating!.toStringAsFixed(1)} (${s.ratingCount})',
-              Icons.star_outline_rounded,
-              DSColors.secondary),
-        ];
-        return Wrap(
-          spacing: DSSpacing.md,
-          runSpacing: DSSpacing.md,
-          children: cards
-              .map((c) => SizedBox(width: 220, child: c))
-              .toList(),
-        );
-      },
-    );
-  }
-
-  Widget _stat(String label, String value, IconData icon, Color color) =>
-      DSStatCard(label: label, value: value, icon: icon, iconColor: color);
-}
-
-class _CredentialsSection extends ConsumerWidget {
-  const _CredentialsSection({required this.userId});
-  final String userId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(teacherCredentialsProvider(userId));
-    return async.when(
-      loading: () => Text('جارٍ تحميل الوثائق…',
-          style: DSText.caption(context, color: DSColors.text3)),
-      error: (e, _) => Text('تعذّر تحميل الوثائق',
-          style: DSText.caption(context, color: DSColors.text3)),
-      data: (creds) {
-        if (creds.isEmpty) {
-          return Text('لم يرفع المحفظ أي وثائق',
-              style: DSText.caption(context, color: DSColors.text3));
-        }
-        return DSCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) {
+    final fg = selected ? Colors.white : DSColors.text2;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: DSDuration.fast,
+          padding: const EdgeInsets.symmetric(
+            horizontal: DSSpacing.lg,
+            vertical: DSSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? DSColors.primary : DSColors.surface,
+            borderRadius: DSRadius.fullAll,
+            border: Border.all(
+              color: selected ? DSColors.primary : DSColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              for (var i = 0; i < creds.length; i++) ...[
-                if (i > 0) const Divider(height: DSSpacing.lg),
-                _credentialRow(context, creds[i]),
-              ],
+              Icon(tab.icon, size: 16, color: fg),
+              const SizedBox(width: DSSpacing.xs),
+              Text(tab.label, style: DSText.caption(context, color: fg)),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
+}
 
-  Widget _credentialRow(BuildContext context, Map<String, dynamic> c) {
-    final title = c['title'] as String? ?? '—';
-    final org = c['organization'] as String? ?? '';
-    final cStatus = c['status'] as String? ?? 'pending';
-    final imgs = (c['imageUrls'] as List?)?.cast<String>() ?? const [];
+class _AccountTab extends StatelessWidget {
+  const _AccountTab({required this.user});
+
+  final Map<String, dynamic> user;
+
+  @override
+  Widget build(BuildContext context) {
+    final adminPermissions = _adminPermissionsLabel(user);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'بيانات الحساب'),
+        const SizedBox(height: DSSpacing.md),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 3,
+          children: [
+            _InfoCard(
+              label: 'الاسم',
+              value: _text(user, const ['name', 'displayName']),
+              icon: Icons.person_outline_rounded,
+            ),
+            _InfoCard(
+              label: 'الدور',
+              value: _roleLabel(_text(user, const ['role'], 'student')),
+              icon: Icons.admin_panel_settings_outlined,
+            ),
+            _InfoCard(
+              label: 'الحالة',
+              value: _statusLabel(_text(user, const ['status'], 'active')),
+              icon: Icons.verified_outlined,
+            ),
+            _InfoCard(
+              label: 'البريد الإلكتروني',
+              value: _nullableText(user, const ['email']) ?? '—',
+              icon: Icons.email_outlined,
+            ),
+            _InfoCard(
+              label: 'الهاتف',
+              value: _nullableText(user, const ['phoneNumber', 'phone']) ?? '—',
+              icon: Icons.phone_outlined,
+            ),
+            _InfoCard(
+              label: 'المدينة',
+              value: _nullableText(user, const ['city', 'governorate']) ?? '—',
+              icon: Icons.location_city_outlined,
+            ),
+            _InfoCard(
+              label: 'التخصص',
+              value: _nullableText(user, const ['specialization']) ?? '—',
+              icon: Icons.school_outlined,
+            ),
+            _InfoCard(
+              label: 'العنوان',
+              value: _nullableText(
+                    user,
+                    const ['addressText', 'address', 'locationAddress'],
+                  ) ??
+                  '—',
+              icon: Icons.location_on_outlined,
+            ),
+            _InfoCard(
+              label: 'إحداثيات الموقع',
+              value: _coordinatesLabel(user) ?? '—',
+              icon: Icons.map_outlined,
+            ),
+            _InfoCard(
+              label: 'تاريخ التسجيل',
+              value: _date(user['createdAt']),
+              icon: Icons.calendar_today_outlined,
+            ),
+            _InfoCard(
+              label: 'آخر نشاط',
+              value: _date(user['lastActiveAt'] ?? user['lastLoginAt']),
+              icon: Icons.access_time_outlined,
+            ),
+            _InfoCard(
+              label: 'حالة التحقق',
+              value: _verificationLabel(user),
+              icon: Icons.fact_check_outlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 780;
+            final notes = [
+              _TextPanel(
+                title: 'نبذة',
+                value: _nullableText(user, const ['bio', 'about']) ?? '—',
+              ),
+              _TextPanel(
+                title: 'ملاحظات/أسباب إدارية',
+                value: _nullableText(
+                      user,
+                      const [
+                        'suspensionReason',
+                        'deleteReason',
+                        'rejectionReason',
+                        'lastRejectionReason',
+                      ],
+                    ) ??
+                    '—',
+              ),
+              if (adminPermissions != null)
+                _TextPanel(
+                  title: 'صلاحيات الأدمن',
+                  value: adminPermissions,
+                ),
+            ];
+
+            if (!wide) {
+              return Column(
+                children: [
+                  for (final panel in notes) ...[
+                    panel,
+                    const SizedBox(height: DSSpacing.md),
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: notes
+                  .map(
+                    (panel) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: DSSpacing.md,
+                        ),
+                        child: panel,
+                      ),
+                    ),
+                  )
+                  .toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _SessionsTab extends ConsumerWidget {
+  const _SessionsTab({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(adminUserSessionsProvider(userId));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'الجلسات'),
+        const SizedBox(height: DSSpacing.md),
+        async.when(
+          loading: () => const DSSkeletonCard(),
+          error: (e, _) =>
+              DSBanner(message: '$e', variant: DSBannerVariant.error),
+          data: (sessions) {
+            if (sessions.isEmpty) {
+              return const DSCard(
+                child: DSEmptyState(
+                  title: 'لا توجد جلسات',
+                  icon: Icons.event_busy_outlined,
+                ),
+              );
+            }
+            return DSDataTable<Map<String, dynamic>>(
+              initialSortKey: 'date',
+              initialSortAsc: false,
+              columns: [
+                DSColumnDef(
+                  key: 'date',
+                  label: 'التاريخ',
+                  width: 140,
+                  sortable: true,
+                  sortValue: (r) =>
+                      _toDate(r['sessionDate'] ??
+                              r['slotStart'] ??
+                              r['createdAt'])
+                          ?.millisecondsSinceEpoch ??
+                      0,
+                  cellBuilder: (ctx, r) => Text(
+                    _date(r['sessionDate'] ?? r['slotStart'] ?? r['createdAt']),
+                    style: DSText.body(ctx, color: DSColors.text2),
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'student',
+                  label: 'الطالب',
+                  cellBuilder: (ctx, r) => Text(
+                    _text(r, const ['studentName', 'studentId']),
+                    overflow: TextOverflow.ellipsis,
+                    style: DSText.body(ctx),
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'teacher',
+                  label: 'المحفظ',
+                  cellBuilder: (ctx, r) => Text(
+                    _text(
+                        r, const ['mohaffezName', 'teacherName', 'mohaffezId']),
+                    overflow: TextOverflow.ellipsis,
+                    style: DSText.body(ctx),
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'status',
+                  label: 'الحالة',
+                  width: 130,
+                  cellBuilder: (ctx, r) {
+                    final status = _text(r, const ['status'], '').toLowerCase();
+                    return DSBadge(
+                      label: _sessionStatusLabel(status),
+                      variant: _sessionStatusVariant(status),
+                    );
+                  },
+                ),
+                DSColumnDef(
+                  key: 'price',
+                  label: 'السعر',
+                  width: 110,
+                  cellBuilder: (ctx, r) => Text(
+                    _money((r['sessionPrice'] as num?)?.toDouble() ?? 0),
+                    style: DSText.body(ctx, color: DSColors.text2),
+                  ),
+                ),
+              ],
+              rows: sessions,
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _WalletTab extends ConsumerWidget {
+  const _WalletTab({required this.userId, required this.user});
+
+  final String userId;
+  final Map<String, dynamic> user;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = _text(user, const ['role'], 'student');
+    final ownerType =
+        role == 'mohaffez' ? WalletOwnerType.mohaffez : WalletOwnerType.student;
+    final walletAsync =
+        ref.watch(walletProvider((userId: userId, ownerType: ownerType)));
+    final txAsync = ref.watch(walletTransactionsProvider(userId));
+    final eventsAsync = ref.watch(adminUserPaymentEventsProvider(userId));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(
-              child: Text(org.isEmpty ? title : '$title — $org',
-                  style: DSText.body(context)),
-            ),
-            DSBadge(
-              label: _credStatusLabel(cStatus),
-              variant: cStatus == 'approved'
-                  ? DSBadgeVariant.success
-                  : cStatus == 'rejected'
-                      ? DSBadgeVariant.error
-                      : DSBadgeVariant.warning,
+            const Expanded(child: SectionHeader(title: 'المحفظة والمدفوعات')),
+            _CreditWalletButton(
+              userId: userId,
+              name: _text(user, const ['name'], 'مستخدم'),
+              ownerType: ownerType,
             ),
           ],
         ),
-        if (imgs.isNotEmpty) ...[
-          const SizedBox(height: DSSpacing.sm),
-          Wrap(
-            spacing: DSSpacing.sm,
-            runSpacing: DSSpacing.sm,
-            children: imgs
-                .map((url) => _Thumb(
-                      url: url,
-                      onTap: () => showDialog<void>(
-                        context: context,
-                        barrierColor: Colors.black.withValues(alpha: 0.85),
-                        builder: (_) => Dialog(
-                          backgroundColor: Colors.transparent,
-                          insetPadding: const EdgeInsets.all(DSSpacing.xxl),
-                          child: Stack(
-                            children: [
-                              Center(
-                                child: InteractiveViewer(
-                                  maxScale: 4,
-                                  child:
-                                      Image.network(url, fit: BoxFit.contain),
-                                ),
-                              ),
-                              Positioned(
-                                top: 0,
-                                right: 0,
-                                child: IconButton(
-                                  icon: const Icon(Icons.close_rounded,
-                                      color: Colors.white),
-                                  onPressed: () => Navigator.of(context,
-                                          rootNavigator: true)
-                                      .pop(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ))
-                .toList(),
+        const SizedBox(height: DSSpacing.md),
+        walletAsync.when(
+          loading: () => const DSSkeletonCard(),
+          error: (e, _) =>
+              DSBanner(message: '$e', variant: DSBannerVariant.error),
+          data: (wallet) => DSGrid(
+            mobileColumns: 1,
+            tabletColumns: 2,
+            desktopColumns: 4,
+            children: [
+              DSStatCard(
+                label: 'الرصيد المتاح',
+                value: _money(wallet.balanceEgp),
+                icon: Icons.account_balance_wallet_outlined,
+                iconColor: DSColors.primary,
+              ),
+              DSStatCard(
+                label: 'رصيد قيد التسوية',
+                value: _money(wallet.pendingCycleEgp),
+                icon: Icons.schedule_rounded,
+                iconColor: DSColors.info,
+              ),
+              DSStatCard(
+                label: 'عمولة مستحقة',
+                value: _money(wallet.directCommissionOwedEgp),
+                icon: Icons.trending_down_rounded,
+                iconColor:
+                    wallet.hasDuesOwed ? DSColors.error : DSColors.success,
+              ),
+              DSStatCard(
+                label: 'آخر تسوية',
+                value: _date(wallet.lastSettledAt),
+                icon: Icons.fact_check_outlined,
+                iconColor: DSColors.secondary,
+              ),
+            ],
           ),
-        ],
+        ),
+        const SizedBox(height: DSSpacing.xl),
+        _WalletTransactionsTable(async: txAsync),
+        const SizedBox(height: DSSpacing.xl),
+        _PaymentEventsTable(async: eventsAsync),
       ],
     );
   }
 }
 
-class _RecentSessionsSection extends ConsumerWidget {
-  const _RecentSessionsSection({required this.userId});
-  final String userId;
+class _WalletTransactionsTable extends StatelessWidget {
+  const _WalletTransactionsTable({required this.async});
+
+  final AsyncValue<List<WalletTransactionModel>> async;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(teacherStatsProvider(userId));
-    return async.when(
-      loading: () => const DSSkeletonCard(),
-      error: (e, _) =>
-          DSBanner(message: '$e', variant: DSBannerVariant.error),
-      data: (s) {
-        if (s.recentSessions.isEmpty) {
-          return Text('لا توجد جلسات بعد',
-              style: DSText.caption(context, color: DSColors.text3));
-        }
-        return DSDataTable<Map<String, dynamic>>(
-          initialSortKey: 'date',
-          columns: [
-            DSColumnDef(
-              key: 'date',
-              label: 'التاريخ',
-              width: 140,
-              sortable: true,
-              sortValue: (r) =>
-                  _toDate(r['sessionDate'] ?? r['slotStart'])
-                      ?.millisecondsSinceEpoch ??
-                  0,
-              cellBuilder: (ctx, r) => Text(
-                  _date(r['sessionDate'] ?? r['slotStart']),
-                  style: DSText.body(ctx, color: DSColors.text2)),
-            ),
-            DSColumnDef(
-              key: 'student',
-              label: 'الطالب',
-              cellBuilder: (ctx, r) => Text(
-                  r['studentName'] as String? ?? '—',
-                  style: DSText.body(ctx)),
-            ),
-            DSColumnDef(
-              key: 'status',
-              label: 'الحالة',
-              width: 130,
-              cellBuilder: (ctx, r) {
-                final st = (r['status'] as String? ?? '').toLowerCase();
-                return DSBadge(
-                  label: _sessionStatusLabel(st),
-                  variant: _sessionStatusVariant(st),
-                );
-              },
-            ),
-            DSColumnDef(
-              key: 'price',
-              label: 'السعر',
-              width: 110,
-              cellBuilder: (ctx, r) => Text(
-                  _money((r['sessionPrice'] as num?)?.toDouble() ?? 0),
-                  style: DSText.body(ctx, color: DSColors.text2)),
-            ),
-          ],
-          rows: s.recentSessions,
-        );
-      },
-    );
-  }
-}
-
-class _WalletSection extends ConsumerWidget {
-  const _WalletSection({required this.userId});
-  final String userId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final walletAsync = ref.watch(walletProvider(
-        (userId: userId, ownerType: WalletOwnerType.mohaffez)));
-    final txAsync = ref.watch(walletTransactionsProvider(userId));
-
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        walletAsync.when(
-          loading: () => const DSSkeletonCard(),
-          error: (e, _) =>
-              DSBanner(message: '$e', variant: DSBannerVariant.error),
-          data: (w) => Wrap(
-            spacing: DSSpacing.md,
-            runSpacing: DSSpacing.md,
-            children: [
-              SizedBox(
-                  width: 220,
-                  child: DSStatCard(
-                      label: 'الرصيد المتاح',
-                      value: _money(w.balanceEgp),
-                      icon: Icons.account_balance_wallet_outlined,
-                      iconColor: DSColors.primary)),
-              SizedBox(
-                  width: 220,
-                  child: DSStatCard(
-                      label: 'رصيد معلّق',
-                      value: _money(w.pendingCycleEgp),
-                      icon: Icons.schedule_rounded,
-                      iconColor: DSColors.info)),
-              SizedBox(
-                  width: 220,
-                  child: DSStatCard(
-                      label: 'عمولة مستحقة',
-                      value: _money(w.directCommissionOwedEgp),
-                      icon: Icons.trending_down_rounded,
-                      iconColor: DSColors.error)),
-            ],
-          ),
-        ),
-        const SizedBox(height: DSSpacing.lg),
-        txAsync.when(
+        const SectionHeader(title: 'حركات المحفظة'),
+        const SizedBox(height: DSSpacing.md),
+        async.when(
           loading: () => const DSSkeletonCard(),
           error: (e, _) =>
               DSBanner(message: '$e', variant: DSBannerVariant.error),
           data: (txs) {
             if (txs.isEmpty) {
-              return Text('لا توجد حركات على المحفظة',
-                  style: DSText.caption(context, color: DSColors.text3));
+              return const DSCard(
+                child: DSEmptyState(
+                  title: 'لا توجد حركات على المحفظة',
+                  icon: Icons.receipt_long_outlined,
+                ),
+              );
             }
+
             return DSDataTable<WalletTransactionModel>(
               columns: [
                 DSColumnDef(
                   key: 'date',
                   label: 'التاريخ',
                   width: 140,
-                  cellBuilder: (ctx, t) => Text(_date(t.createdAt),
-                      style: DSText.body(ctx, color: DSColors.text2)),
+                  cellBuilder: (ctx, tx) => Text(
+                    _date(tx.createdAt),
+                    style: DSText.body(ctx, color: DSColors.text2),
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'type',
+                  label: 'النوع',
+                  width: 160,
+                  cellBuilder: (ctx, tx) => DSBadge(
+                    label: _walletTxTypeLabel(tx.type),
+                    variant: tx.isCredit
+                        ? DSBadgeVariant.success
+                        : DSBadgeVariant.warning,
+                  ),
                 ),
                 DSColumnDef(
                   key: 'reason',
                   label: 'البيان',
-                  cellBuilder: (ctx, t) =>
-                      Text(t.reason, style: DSText.body(ctx)),
+                  cellBuilder: (ctx, tx) => Text(
+                    tx.reason,
+                    overflow: TextOverflow.ellipsis,
+                    style: DSText.body(ctx),
+                  ),
                 ),
                 DSColumnDef(
                   key: 'amount',
                   label: 'المبلغ',
                   width: 120,
-                  cellBuilder: (ctx, t) {
-                    final positive = t.amountPiastres >= 0;
-                    return Text(
-                      '${positive ? '+' : '−'}${_money(t.absAmountEgp)}',
-                      style: DSText.bodyMedium(ctx,
-                          color: positive ? DSColors.success : DSColors.error),
-                    );
-                  },
+                  cellBuilder: (ctx, tx) => Text(
+                    '${tx.isCredit ? '+' : '-'}${_money(tx.absAmountEgp)}',
+                    style: DSText.bodyMedium(
+                      ctx,
+                      color: tx.isCredit ? DSColors.success : DSColors.error,
+                    ),
+                  ),
                 ),
               ],
               rows: txs,
@@ -457,137 +777,816 @@ class _WalletSection extends ConsumerWidget {
   }
 }
 
+class _PaymentEventsTable extends StatelessWidget {
+  const _PaymentEventsTable({required this.async});
+
+  final AsyncValue<List<Map<String, dynamic>>> async;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'أحداث الدفع المرتبطة'),
+        const SizedBox(height: DSSpacing.md),
+        async.when(
+          loading: () => const DSSkeletonCard(),
+          error: (e, _) =>
+              DSBanner(message: '$e', variant: DSBannerVariant.error),
+          data: (events) {
+            if (events.isEmpty) {
+              return const DSCard(
+                child: DSEmptyState(
+                  title: 'لا توجد أحداث دفع مرتبطة',
+                  icon: Icons.payments_outlined,
+                ),
+              );
+            }
+
+            return DSDataTable<Map<String, dynamic>>(
+              columns: [
+                DSColumnDef(
+                  key: 'type',
+                  label: 'النوع',
+                  width: 150,
+                  cellBuilder: (ctx, event) => DSBadge(
+                    label: _paymentEventLabel(_text(event, const ['type'])),
+                    variant: _paymentEventVariant(_text(event, const ['type'])),
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'paymentId',
+                  label: 'Payment ID',
+                  cellBuilder: (ctx, event) => Text(
+                    _text(event, const ['paymentId', 'id']),
+                    overflow: TextOverflow.ellipsis,
+                    style: DSText.body(ctx),
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'amount',
+                  label: 'المبلغ',
+                  width: 120,
+                  cellBuilder: (ctx, event) {
+                    final amount = (event['amount'] as num?)?.toDouble();
+                    return Text(
+                      amount == null ? '—' : _money(amount),
+                      style: DSText.body(ctx, color: DSColors.text2),
+                    );
+                  },
+                ),
+                DSColumnDef(
+                  key: 'date',
+                  label: 'التاريخ',
+                  width: 140,
+                  cellBuilder: (ctx, event) => Text(
+                    _date(event['timestamp'] ?? event['createdAt']),
+                    style: DSText.body(ctx, color: DSColors.text2),
+                  ),
+                ),
+              ],
+              rows: events,
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _TeacherReviewTab extends ConsumerWidget {
+  const _TeacherReviewTab({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'ملف مراجعة المحفظ'),
+        const SizedBox(height: DSSpacing.md),
+        _StatsSection(userId: userId),
+        const SizedBox(height: DSSpacing.xl),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 880;
+            final sections = [
+              _CredentialsSection(userId: userId),
+              _PricingPlansSection(userId: userId),
+              _AvailabilitySection(userId: userId),
+            ];
+
+            if (!wide) {
+              return Column(
+                children: [
+                  for (final section in sections) ...[
+                    section,
+                    const SizedBox(height: DSSpacing.lg),
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < sections.length; i++) ...[
+                  Expanded(child: sections[i]),
+                  if (i < sections.length - 1)
+                    const SizedBox(width: DSSpacing.lg),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _StatsSection extends ConsumerWidget {
+  const _StatsSection({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(teacherStatsProvider(userId));
+    return async.when(
+      loading: () => const DSSkeletonCard(),
+      error: (e, _) => DSBanner(message: '$e', variant: DSBannerVariant.error),
+      data: (stats) => DSGrid(
+        mobileColumns: 1,
+        tabletColumns: 2,
+        desktopColumns: 4,
+        children: [
+          DSStatCard(
+            label: 'إجمالي الجلسات',
+            value: '${stats.total}',
+            icon: Icons.event_note_outlined,
+            iconColor: DSColors.primary,
+          ),
+          DSStatCard(
+            label: 'مكتملة',
+            value: '${stats.completed}',
+            icon: Icons.check_circle_outline,
+            iconColor: DSColors.success,
+          ),
+          DSStatCard(
+            label: 'طلاب',
+            value: '${stats.studentCount}',
+            icon: Icons.people_outline_rounded,
+            iconColor: DSColors.primary,
+          ),
+          DSStatCard(
+            label: 'التقييم',
+            value: stats.avgRating == null
+                ? '—'
+                : '${stats.avgRating!.toStringAsFixed(1)} (${stats.ratingCount})',
+            icon: Icons.star_outline_rounded,
+            iconColor: DSColors.secondary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CredentialsSection extends ConsumerWidget {
+  const _CredentialsSection({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(teacherCredentialsProvider(userId));
+    return _ReviewPanel(
+      title: 'الشهادات والوثائق',
+      child: async.when(
+        loading: () => _miniLoading(context),
+        error: (e, _) => Text(
+          'تعذر تحميل الوثائق',
+          style: DSText.caption(context, color: DSColors.error),
+        ),
+        data: (items) {
+          if (items.isEmpty) {
+            return Text(
+              'لا توجد وثائق',
+              style: DSText.caption(context, color: DSColors.text3),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final item in items) ...[
+                _ReviewLine(
+                  title: _text(item, const ['title', 'name'], 'وثيقة'),
+                  subtitle: _nullableText(
+                    item,
+                    const ['organization', 'issuer', 'status'],
+                  ),
+                  badge: _text(item, const ['status'], 'pending'),
+                ),
+                const SizedBox(height: DSSpacing.sm),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PricingPlansSection extends ConsumerWidget {
+  const _PricingPlansSection({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(teacherReviewPricingPlansProvider(userId));
+    return _ReviewPanel(
+      title: 'الخطط السعرية',
+      child: async.when(
+        loading: () => _miniLoading(context),
+        error: (e, _) => Text(
+          'تعذر تحميل الخطط',
+          style: DSText.caption(context, color: DSColors.error),
+        ),
+        data: (items) {
+          if (items.isEmpty) {
+            return Text(
+              'لا توجد خطط سعرية',
+              style: DSText.caption(context, color: DSColors.text3),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final item in items.take(6)) ...[
+                _ReviewLine(
+                  title: _text(item, const ['title', 'name'], 'خطة'),
+                  subtitle: '${_money(_number(item, const [
+                        'priceEGP',
+                        'price'
+                      ]))} - ${_text(item, const ['type'], 'single')}',
+                  badge: item['isActive'] == false ? 'inactive' : 'active',
+                ),
+                const SizedBox(height: DSSpacing.sm),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AvailabilitySection extends ConsumerWidget {
+  const _AvailabilitySection({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(teacherReviewAvailabilityProvider(userId));
+    return _ReviewPanel(
+      title: 'التوفر',
+      child: async.when(
+        loading: () => _miniLoading(context),
+        error: (e, _) => Text(
+          'تعذر تحميل المواعيد',
+          style: DSText.caption(context, color: DSColors.error),
+        ),
+        data: (items) {
+          final active = items.where(_hasActiveSlots).toList();
+          if (active.isEmpty) {
+            return Text(
+              'لا توجد مواعيد نشطة',
+              style: DSText.caption(context, color: DSColors.text3),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final item in active.take(7)) ...[
+                _ReviewLine(
+                  title: _dayLabel(item['dayOfWeek']),
+                  subtitle:
+                      '${_enabledSlots(item).length} موعد - ${_nullableText(item, const [
+                                'startTime'
+                              ]) ?? '—'} / ${_nullableText(item, const ['endTime']) ?? '—'}',
+                ),
+                const SizedBox(height: DSSpacing.sm),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SupportTab extends StatelessWidget {
+  const _SupportTab({required this.user});
+
+  final Map<String, dynamic> user;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'الشكاوى والدعم'),
+        const SizedBox(height: DSSpacing.md),
+        const DSCard(
+          child: DSEmptyState(
+            title: 'لا توجد تذاكر دعم مفعّلة بعد',
+            subtitle:
+                'هذه المساحة جاهزة للربط مع نظام التذاكر عند إضافة collection مخصصة للدعم.',
+            icon: Icons.support_agent_outlined,
+          ),
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        _TextPanel(
+          title: 'ملاحظات مرتبطة بالحساب',
+          value: _nullableText(
+                user,
+                const [
+                  'supportNotes',
+                  'adminNotes',
+                  'suspensionReason',
+                  'rejectionReason',
+                ],
+              ) ??
+              '—',
+        ),
+      ],
+    );
+  }
+}
+
+class _NotificationsAndDevicesTab extends ConsumerWidget {
+  const _NotificationsAndDevicesTab({
+    required this.userId,
+    required this.user,
+  });
+
+  final String userId;
+  final Map<String, dynamic> user;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifications = ref.watch(adminUserNotificationsProvider(userId));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'الأجهزة و FCM'),
+        const SizedBox(height: DSSpacing.md),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 3,
+          children: [
+            _InfoCard(
+              label: 'FCM Token',
+              value: _shortToken(_nullableText(user, const ['fcmToken'])),
+              icon: Icons.vpn_key_outlined,
+            ),
+            _InfoCard(
+              label: 'آخر تحديث للتوكن',
+              value: _date(user['fcmTokenUpdatedAt']),
+              icon: Icons.update_rounded,
+            ),
+            _InfoCard(
+              label: 'عدد التوكنات',
+              value: '${_tokenCount(user)}',
+              icon: Icons.devices_outlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: DSSpacing.xl),
+        const SectionHeader(title: 'آخر الإشعارات'),
+        const SizedBox(height: DSSpacing.md),
+        notifications.when(
+          loading: () => const DSSkeletonCard(),
+          error: (e, _) =>
+              DSBanner(message: '$e', variant: DSBannerVariant.error),
+          data: (items) {
+            if (items.isEmpty) {
+              return const DSCard(
+                child: DSEmptyState(
+                  title: 'لا توجد إشعارات',
+                  icon: Icons.notifications_off_outlined,
+                ),
+              );
+            }
+
+            return DSDataTable<Map<String, dynamic>>(
+              columns: [
+                DSColumnDef(
+                  key: 'type',
+                  label: 'النوع',
+                  width: 140,
+                  cellBuilder: (ctx, item) => DSBadge(
+                    label: _text(item, const ['type'], 'system'),
+                    variant: item['isRead'] == true
+                        ? DSBadgeVariant.neutral
+                        : DSBadgeVariant.info,
+                    dot: item['isRead'] != true,
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'title',
+                  label: 'العنوان',
+                  cellBuilder: (ctx, item) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _text(item, const ['title'], 'إشعار'),
+                        overflow: TextOverflow.ellipsis,
+                        style: DSText.bodyMedium(ctx),
+                      ),
+                      Text(
+                        _text(item, const ['body'], ''),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: DSText.caption(ctx, color: DSColors.text3),
+                      ),
+                    ],
+                  ),
+                ),
+                DSColumnDef(
+                  key: 'date',
+                  label: 'التاريخ',
+                  width: 140,
+                  cellBuilder: (ctx, item) => Text(
+                    _date(item['createdAt']),
+                    style: DSText.body(ctx, color: DSColors.text2),
+                  ),
+                ),
+              ],
+              rows: items,
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _CreditWalletButton extends ConsumerWidget {
-  const _CreditWalletButton({required this.userId, required this.name});
+  const _CreditWalletButton({
+    required this.userId,
+    required this.name,
+    required this.ownerType,
+  });
+
   final String userId;
   final String name;
+  final WalletOwnerType ownerType;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DSButton(
       label: 'شحن يدوي',
       size: DSButtonSize.sm,
-      variant: DSButtonVariant.ghost,
+      variant: DSButtonVariant.secondary,
+      leading: const Icon(Icons.add_rounded, size: 16),
       onPressed: () => _credit(context, ref),
     );
   }
 
   Future<void> _credit(BuildContext context, WidgetRef ref) async {
-    final amountCtrl = TextEditingController();
-    final reasonCtrl = TextEditingController();
-    final ok = await DSDialog.show<bool>(
-      context,
-      title: 'شحن يدوي للمحفظة',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('إضافة رصيد إلى محفظة "$name".',
-              style: DSText.body(context, color: DSColors.text2)),
-          const SizedBox(height: DSSpacing.md),
-          DSTextField(
-            controller: amountCtrl,
-            label: 'المبلغ (ج.م)',
-            keyboardType: TextInputType.number,
-            autofocus: true,
-          ),
-          const SizedBox(height: DSSpacing.sm),
-          DSTextField(
-            controller: reasonCtrl,
-            label: 'السبب',
-            hint: 'مثال: تعويض، تصحيح رصيد',
-            maxLines: 2,
-          ),
-        ],
-      ),
-      actions: [
-        DSButton(
-            label: 'إلغاء',
-            variant: DSButtonVariant.ghost,
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(false)),
-        DSButton(
-            label: 'شحن',
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(true)),
-      ],
-    );
-    if (ok != true || !context.mounted) return;
-    final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
-    final reason = reasonCtrl.text.trim();
-    if (amount <= 0 || reason.length < 3) {
-      DSToast.show(context, 'أدخل مبلغًا صحيحًا وسببًا واضحًا',
-          type: DSToastType.error);
-      return;
+    final amountController = TextEditingController();
+    final reasonController = TextEditingController();
+    try {
+      final input = await DSDialog.show<_WalletCreditInput>(
+        context,
+        title: 'شحن يدوي للمحفظة',
+        width: 520,
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            final amount = double.tryParse(amountController.text.trim()) ?? 0;
+            final reason = reasonController.text.trim();
+            final canSubmit = amount > 0 && reason.length >= 3;
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'إضافة رصيد إلى محفظة "$name". السبب مطلوب لأنه يظهر في سجل العمليات.',
+                  style: DSText.body(context, color: DSColors.text2),
+                ),
+                const SizedBox(height: DSSpacing.lg),
+                DSTextField(
+                  controller: amountController,
+                  label: 'المبلغ (ج.م)',
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: DSSpacing.md),
+                DSTextField(
+                  controller: reasonController,
+                  label: 'السبب',
+                  hint: 'مثال: تعويض، تصحيح رصيد، رصيد ترويجي',
+                  maxLines: 2,
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: DSSpacing.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    DSButton(
+                      label: 'إلغاء',
+                      variant: DSButtonVariant.ghost,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: DSSpacing.sm),
+                    DSButton(
+                      label: 'شحن',
+                      onPressed: canSubmit
+                          ? () => Navigator.of(context).pop(
+                                _WalletCreditInput(
+                                  amount: amount,
+                                  reason: reason,
+                                ),
+                              )
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (input == null || !context.mounted) return;
+
+      await ref.read(adminActionsProvider.notifier).creditWallet(
+            userId: userId,
+            ownerType:
+                ownerType == WalletOwnerType.mohaffez ? 'mohaffez' : 'student',
+            amountEgp: input.amount,
+            reason: input.reason,
+          );
+      if (!context.mounted) return;
+      ref.read(adminActionsProvider).when(
+            data: (_) => DSToast.show(
+              context,
+              'تم شحن المحفظة',
+              type: DSToastType.success,
+            ),
+            loading: () {},
+            error: (e, _) => DSToast.show(
+              context,
+              'فشل العملية: $e',
+              type: DSToastType.error,
+            ),
+          );
+    } finally {
+      amountController.dispose();
+      reasonController.dispose();
     }
-    await ref.read(adminActionsProvider.notifier).creditWallet(
-          userId: userId,
-          ownerType: 'mohaffez',
-          amountEgp: amount,
-          reason: reason,
-        );
-    if (!context.mounted) return;
-    ref.read(adminActionsProvider).when(
-          data: (_) =>
-              DSToast.show(context, 'تم شحن المحفظة', type: DSToastType.success),
-          loading: () {},
-          error: (e, _) =>
-              DSToast.show(context, 'فشل العملية: $e', type: DSToastType.error),
-        );
   }
 }
 
-// ── Small helpers ──────────────────────────────────────────────────────────
-class _Field extends StatelessWidget {
-  const _Field({required this.label, required this.value});
+class _WalletCreditInput {
+  const _WalletCreditInput({required this.amount, required this.reason});
+
+  final double amount;
+  final String reason;
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
   final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(DSSpacing.lg),
+      decoration: BoxDecoration(
+        color: DSColors.surface,
+        borderRadius: DSRadius.lgAll,
+        border: Border.all(color: DSColors.border),
+        boxShadow: DSElevation.sm,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(DSSpacing.sm),
+            decoration: BoxDecoration(
+              color: DSColors.primary.withValues(alpha: 0.08),
+              borderRadius: DSRadius.mdAll,
+            ),
+            child: Icon(icon, size: 18, color: DSColors.primary),
+          ),
+          const SizedBox(width: DSSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: DSText.caption(context, color: DSColors.text3)),
+                SelectableText(
+                  value,
+                  maxLines: 2,
+                  style: DSText.bodyMedium(context, color: DSColors.text1),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TextPanel extends StatelessWidget {
+  const _TextPanel({required this.title, required this.value});
+
+  final String title;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: DSSpacing.xs),
-      child: Row(
+    return DSCard(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 70,
-            child: Text(label,
-                style: DSText.caption(context, color: DSColors.text3)),
+          Text(title, style: DSText.h3(context)),
+          const SizedBox(height: DSSpacing.sm),
+          SelectableText(
+            value,
+            style: DSText.body(context, color: DSColors.text2),
           ),
-          Expanded(child: Text(value, style: DSText.body(context))),
         ],
       ),
     );
   }
 }
 
-class _Thumb extends StatelessWidget {
-  const _Thumb({required this.url, required this.onTap});
-  final String url;
-  final VoidCallback onTap;
+class _ReviewPanel extends StatelessWidget {
+  const _ReviewPanel({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: ClipRRect(
-          borderRadius: DSRadius.mdAll,
-          child: Container(
-            width: 72,
-            height: 72,
-            color: DSColors.surfaceMuted,
-            child: Image.network(url, fit: BoxFit.cover,
-                errorBuilder: (ctx, _, __) => const Icon(
-                    Icons.broken_image_outlined,
-                    color: DSColors.text3)),
-          ),
-        ),
+    return DSCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: DSText.h3(context)),
+          const SizedBox(height: DSSpacing.md),
+          child,
+        ],
       ),
     );
   }
+}
+
+class _ReviewLine extends StatelessWidget {
+  const _ReviewLine({
+    required this.title,
+    this.subtitle,
+    this.badge,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(DSSpacing.md),
+      decoration: BoxDecoration(
+        color: DSColors.surfaceMuted,
+        borderRadius: DSRadius.mdAll,
+        border: Border.all(color: DSColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: DSText.bodyMedium(context)),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: DSText.caption(context, color: DSColors.text3),
+                  ),
+              ],
+            ),
+          ),
+          if (badge != null)
+            DSBadge(
+              label: _compactBadgeLabel(badge!),
+              variant: _compactBadgeVariant(badge!),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _miniLoading(BuildContext context) {
+  return Row(
+    children: [
+      const SizedBox.square(
+        dimension: 16,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: DSColors.primary,
+        ),
+      ),
+      const SizedBox(width: DSSpacing.sm),
+      Text('جاري التحميل...',
+          style: DSText.caption(context, color: DSColors.text3)),
+    ],
+  );
+}
+
+String _text(
+  Map<String, dynamic> data,
+  List<String> keys, [
+  String fallback = '—',
+]) {
+  return _nullableText(data, keys) ?? fallback;
+}
+
+String? _nullableText(Map<String, dynamic> data, List<String> keys) {
+  for (final key in keys) {
+    final value = data[key];
+    if (value == null) continue;
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    if (value is Iterable) {
+      final joined = value
+          .whereType<Object>()
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .join('، ');
+      if (joined.isNotEmpty) return joined;
+    }
+  }
+  return null;
+}
+
+double _number(Map<String, dynamic> data, List<String> keys) {
+  for (final key in keys) {
+    final value = data[key];
+    if (value is num) return value.toDouble();
+  }
+  return 0;
+}
+
+String? _coordinatesLabel(Map<String, dynamic> data) {
+  double? lat;
+  double? lng;
+
+  void readPair(dynamic source) {
+    if (source == null) return;
+    if (source is Map) {
+      lat ??= (source['latitude'] as num?)?.toDouble() ??
+          (source['lat'] as num?)?.toDouble();
+      lng ??= (source['longitude'] as num?)?.toDouble() ??
+          (source['lng'] as num?)?.toDouble();
+      return;
+    }
+    try {
+      lat ??= (source as dynamic).latitude as double?;
+      lng ??= (source as dynamic).longitude as double?;
+    } catch (_) {}
+  }
+
+  readPair(data['location']);
+  readPair(data['geoPoint']);
+  lat ??= (data['latitude'] as num?)?.toDouble() ??
+      (data['lat'] as num?)?.toDouble() ??
+      (data['addressLat'] as num?)?.toDouble();
+  lng ??= (data['longitude'] as num?)?.toDouble() ??
+      (data['lng'] as num?)?.toDouble() ??
+      (data['addressLng'] as num?)?.toDouble();
+
+  if (lat == null || lng == null) return null;
+  return '${lat!.toStringAsFixed(5)}, ${lng!.toStringAsFixed(5)}';
 }
 
 String _roleLabel(String role) => switch (role) {
@@ -596,12 +1595,20 @@ String _roleLabel(String role) => switch (role) {
       _ => 'طالب',
     };
 
+DSBadgeVariant _roleVariant(String role) => switch (role) {
+      'mohaffez' => DSBadgeVariant.primary,
+      'admin' => DSBadgeVariant.warning,
+      _ => DSBadgeVariant.neutral,
+    };
+
 String _statusLabel(String status) => switch (status) {
       'active' => 'نشط',
       'pending_approval' => 'بانتظار المراجعة',
       'rejected' => 'مرفوض',
       'suspended' => 'معلّق',
-      _ => 'معلّق',
+      'deleted' => 'محذوف',
+      'flagged' || 'suspicious' || 'under_review' => 'قيد المراجعة',
+      _ => status.isEmpty ? '—' : status,
     };
 
 DSBadgeVariant _statusVariant(String status) => switch (status) {
@@ -609,46 +1616,163 @@ DSBadgeVariant _statusVariant(String status) => switch (status) {
       'pending_approval' => DSBadgeVariant.info,
       'rejected' => DSBadgeVariant.error,
       'suspended' => DSBadgeVariant.warning,
-      _ => DSBadgeVariant.warning,
+      'deleted' => DSBadgeVariant.error,
+      'flagged' || 'suspicious' || 'under_review' => DSBadgeVariant.warning,
+      _ => DSBadgeVariant.neutral,
     };
 
-String _credStatusLabel(String s) => switch (s) {
-      'approved' => 'معتمدة',
-      'rejected' => 'مرفوضة',
-      _ => 'قيد المراجعة',
-    };
-
-String _sessionStatusLabel(String s) {
-  if (s == 'completed') return 'مكتملة';
-  if (s == 'accepted') return 'مقبولة';
-  if (s == 'pending') return 'قيد الانتظار';
-  if (s.contains('awaitingpayment') || s.contains('awaiting')) {
-    return 'بانتظار الدفع';
-  }
-  if (s.contains('cancel')) return 'ملغاة';
-  if (s.contains('no_show') || s.contains('noshow')) return 'لم يحضر';
-  return s.isEmpty ? '—' : s;
+String? _adminRole(Map<String, dynamic> user) {
+  if (user['role'] != 'admin') return null;
+  return user['adminRole'] == 'admin' ? 'Admin' : 'Super Admin';
 }
 
-DSBadgeVariant _sessionStatusVariant(String s) {
-  if (s == 'completed') return DSBadgeVariant.success;
-  if (s == 'accepted' || s == 'pending') return DSBadgeVariant.info;
-  if (s.contains('cancel') || s.contains('no')) return DSBadgeVariant.error;
+String? _adminPermissionsLabel(Map<String, dynamic> user) {
+  if (user['role'] != 'admin') return null;
+  if (user['adminRole'] != 'admin') return 'صلاحية كاملة';
+  final raw = user['adminPermissions'];
+  if (raw is! Map) return 'صلاحيات افتراضية';
+  final enabled = raw.entries
+      .where((entry) => entry.value == true)
+      .map((entry) => entry.key.toString())
+      .toList();
+  return enabled.isEmpty ? 'لا توجد صلاحيات مفعّلة' : enabled.join('، ');
+}
+
+String _verificationLabel(Map<String, dynamic> user) {
+  if (user['role'] != 'mohaffez') return 'غير مطلوب';
+  if (user['status'] == 'active') return 'معتمد';
+  if (user['status'] == 'pending_approval') return 'بانتظار المراجعة';
+  if (user['status'] == 'rejected') return 'مرفوض';
+  return 'غير مكتمل';
+}
+
+String _sessionStatusLabel(String status) {
+  if (status == 'completed') return 'مكتملة';
+  if (status == 'accepted') return 'مقبولة';
+  if (status == 'pending') return 'قيد الانتظار';
+  if (status.contains('awaitingpayment') || status.contains('awaiting')) {
+    return 'بانتظار الدفع';
+  }
+  if (status.contains('cancel')) return 'ملغاة';
+  if (status.contains('no_show') || status.contains('noshow')) {
+    return 'لم يحضر';
+  }
+  return status.isEmpty ? '—' : status;
+}
+
+DSBadgeVariant _sessionStatusVariant(String status) {
+  if (status == 'completed') return DSBadgeVariant.success;
+  if (status == 'accepted' || status == 'pending') return DSBadgeVariant.info;
+  if (status.contains('cancel') || status.contains('no')) {
+    return DSBadgeVariant.error;
+  }
   return DSBadgeVariant.neutral;
 }
 
-String _money(double v) => '${NumberFormat('#,##0', 'en').format(v)} ج.م';
+String _walletTxTypeLabel(WalletTxType type) => switch (type) {
+      WalletTxType.topup => 'شحن',
+      WalletTxType.sessionPayment => 'دفع جلسة',
+      WalletTxType.sessionRefund => 'استرداد',
+      WalletTxType.cycleSettlement => 'تسوية',
+      WalletTxType.payout => 'سحب',
+      WalletTxType.payoutReversal => 'عكس سحب',
+      WalletTxType.promoCredit => 'رصيد ترويجي',
+      WalletTxType.directSessionCommission => 'عمولة مباشرة',
+      WalletTxType.directSessionCommissionReversal => 'عكس عمولة',
+      WalletTxType.adjustment => 'تعديل',
+      WalletTxType.commissionRateChange => 'تغيير عمولة',
+      WalletTxType.penaltyApplied => 'غرامة',
+    };
 
-String _date(dynamic v) {
-  final dt = _toDate(v);
-  return dt == null ? '—' : DateFormat('dd/MM/yyyy', 'ar').format(dt);
+String _paymentEventLabel(String type) => switch (type.toLowerCase()) {
+      'paymentcompleted' => 'مكتمل',
+      'paymentfailed' => 'فشل',
+      'webhookreceived' => 'Webhook',
+      'bookingconfirmed' => 'حجز',
+      'subscriptioncreated' => 'اشتراك',
+      'paymentcreated' => 'جديد',
+      _ => type,
+    };
+
+DSBadgeVariant _paymentEventVariant(String type) {
+  final normalized = type.toLowerCase();
+  if (normalized == 'paymentcompleted' || normalized == 'bookingconfirmed') {
+    return DSBadgeVariant.success;
+  }
+  if (normalized == 'paymentfailed') return DSBadgeVariant.error;
+  if (normalized == 'webhookreceived') return DSBadgeVariant.primary;
+  return DSBadgeVariant.neutral;
 }
 
-DateTime? _toDate(dynamic v) {
-  if (v == null) return null;
-  if (v is DateTime) return v;
+String _compactBadgeLabel(String value) => switch (value.toLowerCase()) {
+      'approved' => 'معتمد',
+      'rejected' => 'مرفوض',
+      'pending' => 'معلق',
+      'active' => 'نشط',
+      'inactive' => 'غير نشط',
+      _ => value,
+    };
+
+DSBadgeVariant _compactBadgeVariant(String value) =>
+    switch (value.toLowerCase()) {
+      'approved' || 'active' => DSBadgeVariant.success,
+      'rejected' || 'inactive' => DSBadgeVariant.error,
+      'pending' => DSBadgeVariant.warning,
+      _ => DSBadgeVariant.neutral,
+    };
+
+bool _hasActiveSlots(Map<String, dynamic> day) {
+  return _enabledSlots(day).isNotEmpty ||
+      day['isActive'] == true ||
+      (_nullableText(day, const ['startTime']) != null &&
+          _nullableText(day, const ['endTime']) != null);
+}
+
+List<Map<String, dynamic>> _enabledSlots(Map<String, dynamic> day) {
+  final raw = day['timeSlots'];
+  if (raw is! Iterable) return const [];
+  return raw
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .where((slot) => slot['enabled'] != false)
+      .toList();
+}
+
+String _dayLabel(dynamic value) {
+  final day = (value as num?)?.toInt();
+  if (day != null && day >= 1 && day <= ScheduleConstants.arabicDays.length) {
+    return ScheduleConstants.arabicDays[day - 1];
+  }
+  return 'يوم غير محدد';
+}
+
+String _shortToken(String? token) {
+  if (token == null || token.isEmpty) return '—';
+  if (token.length <= 22) return token;
+  return '${token.substring(0, 10)}...${token.substring(token.length - 8)}';
+}
+
+int _tokenCount(Map<String, dynamic> user) {
+  final tokens = user['fcmTokens'];
+  if (tokens is Iterable) return tokens.length;
+  if (tokens is Map) return tokens.length;
+  return _nullableText(user, const ['fcmToken']) == null ? 0 : 1;
+}
+
+String _money(double value) {
+  return '${NumberFormat.decimalPattern('ar').format(value.round())} ج.م';
+}
+
+String _date(dynamic value) {
+  final date = _toDate(value);
+  return date == null ? '—' : DateFormat('dd/MM/yyyy', 'ar').format(date);
+}
+
+DateTime? _toDate(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
   try {
-    return (v as dynamic).toDate() as DateTime;
+    return (value as dynamic).toDate() as DateTime;
   } catch (_) {
     return null;
   }

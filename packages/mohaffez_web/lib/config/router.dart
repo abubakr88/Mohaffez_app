@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import '../features/auth/auth_provider.dart';
 import '../features/auth/pages/login_page.dart';
 import '../features/dev/component_gallery_page.dart';
@@ -49,14 +50,18 @@ import '../shell/admin_shell.dart';
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(this._ref) {
     _ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+    _ref.listen<AsyncValue<AdminAccessState>>(
+      currentAdminAccessProvider,
+      (_, __) => notifyListeners(),
+    );
   }
 
   final Ref _ref;
 
   String? redirect(BuildContext context, GoRouterState state) {
-    final auth     = _ref.read(authProvider);
+    final auth = _ref.read(authProvider);
     final location = state.uri.toString();
-    final isLogin  = location == '/login';
+    final isLogin = location == '/login';
 
     if (auth.step == AuthStep.loading) return null;
 
@@ -67,17 +72,74 @@ class _RouterNotifier extends ChangeNotifier {
     if (isLogin) {
       return switch (auth.role) {
         'mohaffez' => '/t',
-        'admin'    => '/admin',
-        _          => '/s',
+        'admin' => '/admin',
+        _ => '/s',
       };
     }
 
     final role = auth.role;
-    if (role == 'student' && (location.startsWith('/t') || location.startsWith('/admin'))) return '/s';
-    if (role == 'mohaffez' && (location.startsWith('/s') || location.startsWith('/admin'))) return '/t';
-    if (role == 'admin' && (location.startsWith('/s') || location.startsWith('/t'))) return '/admin';
+    if (role == 'student' &&
+        (location.startsWith('/t') || location.startsWith('/admin'))) {
+      return '/s';
+    }
+    if (role == 'mohaffez' &&
+        (location.startsWith('/s') || location.startsWith('/admin'))) {
+      return '/t';
+    }
+    if (role == 'admin' &&
+        (location.startsWith('/s') || location.startsWith('/t'))) {
+      return '/admin';
+    }
+    if (role == 'admin' && location.startsWith('/admin')) {
+      final access = _ref.read(currentAdminAccessProvider).valueOrNull;
+      if (access != null && !_canOpenAdminPath(location, access)) {
+        return '/admin';
+      }
+    }
 
     return null;
+  }
+
+  bool _canOpenAdminPath(String location, AdminAccessState access) {
+    if (location == '/admin') return true;
+
+    if (_matches(location, '/admin/users')) {
+      return access.isSuperAdmin ||
+          access.can(AdminPermission.manageUsers) ||
+          access.can(AdminPermission.manageUserRoles) ||
+          access.can(AdminPermission.deleteUsers);
+    }
+    if (_matches(location, '/admin/approvals')) {
+      return access.can(AdminPermission.reviewTeachers);
+    }
+    if (_matches(location, '/admin/sessions')) {
+      return access.can(AdminPermission.manageUsers) ||
+          access.can(AdminPermission.manageFinance);
+    }
+    if (_matches(location, '/admin/broadcast')) {
+      return access.can(AdminPermission.sendBroadcasts);
+    }
+    if (_matches(location, '/admin/slot-locks')) {
+      return access.can(AdminPermission.runMaintenance);
+    }
+    if (_matches(location, '/admin/payments') ||
+        _matches(location, '/admin/payouts') ||
+        _matches(location, '/admin/topups') ||
+        _matches(location, '/admin/promos') ||
+        _matches(location, '/admin/reports') ||
+        _matches(location, '/admin/payment-events')) {
+      return access.can(AdminPermission.manageFinance);
+    }
+    if (_matches(location, '/admin/config') ||
+        _matches(location, '/admin/audit-log')) {
+      return access.isSuperAdmin;
+    }
+
+    return access.isSuperAdmin;
+  }
+
+  bool _matches(String location, String path) {
+    return location == path || location.startsWith('$path/');
   }
 }
 
@@ -92,20 +154,34 @@ final webRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: notifier.redirect,
     routes: [
-      GoRoute(path: '/login',          builder: (_, __) => const LoginPage()),
-      GoRoute(path: '/dev/components', builder: (_, __) => const ComponentGalleryPage()),
+      GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+      GoRoute(
+          path: '/dev/components',
+          builder: (_, __) => const ComponentGalleryPage()),
 
       // ── Student shell ─────────────────────────────────────────────────────
       ShellRoute(
         builder: (_, __, child) => StudentShell(child: child),
         routes: [
-          GoRoute(path: '/s',               builder: (_, __) => const StudentDashboardPage()),
-          GoRoute(path: '/s/teachers',      builder: (_, __) => const StudentTeachersPage()),
-          GoRoute(path: '/s/sessions',      builder: (_, __) => const StudentSessionsPage()),
-          GoRoute(path: '/s/assignments',   builder: (_, __) => const StudentAssignmentsPage()),
-          GoRoute(path: '/s/subscriptions', builder: (_, __) => const StudentSubscriptionsPage()),
-          GoRoute(path: '/s/rewards',       builder: (_, __) => const StudentRewardsPage()),
-          GoRoute(path: '/s/profile',       builder: (_, __) => const StudentProfilePage()),
+          GoRoute(path: '/s', builder: (_, __) => const StudentDashboardPage()),
+          GoRoute(
+              path: '/s/teachers',
+              builder: (_, __) => const StudentTeachersPage()),
+          GoRoute(
+              path: '/s/sessions',
+              builder: (_, __) => const StudentSessionsPage()),
+          GoRoute(
+              path: '/s/assignments',
+              builder: (_, __) => const StudentAssignmentsPage()),
+          GoRoute(
+              path: '/s/subscriptions',
+              builder: (_, __) => const StudentSubscriptionsPage()),
+          GoRoute(
+              path: '/s/rewards',
+              builder: (_, __) => const StudentRewardsPage()),
+          GoRoute(
+              path: '/s/profile',
+              builder: (_, __) => const StudentProfilePage()),
         ],
       ),
 
@@ -113,14 +189,28 @@ final webRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (_, __, child) => TeacherShell(child: child),
         routes: [
-          GoRoute(path: '/t',               builder: (_, __) => const TeacherDashboardPage()),
-          GoRoute(path: '/t/students',      builder: (_, __) => const TeacherStudentsPage()),
-          GoRoute(path: '/t/schedule',      builder: (_, __) => const TeacherSchedulePage()),
-          GoRoute(path: '/t/sessions',      builder: (_, __) => const TeacherSessionsPage()),
-          GoRoute(path: '/t/pricing',       builder: (_, __) => const TeacherPricingPage()),
-          GoRoute(path: '/t/certificates',  builder: (_, __) => const TeacherCertificatesPage()),
-          GoRoute(path: '/t/earnings',      builder: (_, __) => const TeacherEarningsPage()),
-          GoRoute(path: '/t/profile',       builder: (_, __) => const TeacherProfilePage()),
+          GoRoute(path: '/t', builder: (_, __) => const TeacherDashboardPage()),
+          GoRoute(
+              path: '/t/students',
+              builder: (_, __) => const TeacherStudentsPage()),
+          GoRoute(
+              path: '/t/schedule',
+              builder: (_, __) => const TeacherSchedulePage()),
+          GoRoute(
+              path: '/t/sessions',
+              builder: (_, __) => const TeacherSessionsPage()),
+          GoRoute(
+              path: '/t/pricing',
+              builder: (_, __) => const TeacherPricingPage()),
+          GoRoute(
+              path: '/t/certificates',
+              builder: (_, __) => const TeacherCertificatesPage()),
+          GoRoute(
+              path: '/t/earnings',
+              builder: (_, __) => const TeacherEarningsPage()),
+          GoRoute(
+              path: '/t/profile',
+              builder: (_, __) => const TeacherProfilePage()),
         ],
       ),
 
@@ -128,25 +218,51 @@ final webRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (_, __, child) => AdminShell(child: child),
         routes: [
-          GoRoute(path: '/admin',           builder: (_, __) => const AdminDashboardPage()),
-          GoRoute(path: '/admin/users',     builder: (_, __) => const AdminUsersPage()),
+          GoRoute(
+              path: '/admin', builder: (_, __) => const AdminDashboardPage()),
+          GoRoute(
+              path: '/admin/users', builder: (_, __) => const AdminUsersPage()),
           GoRoute(
             path: '/admin/users/:id',
             builder: (_, s) =>
                 AdminUserDetailPage(userId: s.pathParameters['id']!),
           ),
-          GoRoute(path: '/admin/approvals', builder: (_, __) => const AdminApprovalsPage()),
-          GoRoute(path: '/admin/sessions',  builder: (_, __) => const AdminSessionsPage()),
-          GoRoute(path: '/admin/payments',  builder: (_, __) => const AdminPaymentsPage()),
-          GoRoute(path: '/admin/payouts',   builder: (_, __) => const AdminPayoutsPage()),
-          GoRoute(path: '/admin/topups',    builder: (_, __) => const AdminTopUpsPage()),
-          GoRoute(path: '/admin/promos',    builder: (_, __) => const AdminPromosPage()),
-          GoRoute(path: '/admin/config',    builder: (_, __) => const AdminConfigPage()),
-          GoRoute(path: '/admin/reports',         builder: (_, __) => const AdminReportsPage()),
-          GoRoute(path: '/admin/broadcast',       builder: (_, __) => const AdminBroadcastPage()),
-          GoRoute(path: '/admin/slot-locks',      builder: (_, __) => const AdminSlotLocksPage()),
-          GoRoute(path: '/admin/payment-events',  builder: (_, __) => const AdminPaymentEventsPage()),
-          GoRoute(path: '/admin/audit-log',       builder: (_, __) => const AdminAuditLogPage()),
+          GoRoute(
+              path: '/admin/approvals',
+              builder: (_, __) => const AdminApprovalsPage()),
+          GoRoute(
+              path: '/admin/sessions',
+              builder: (_, __) => const AdminSessionsPage()),
+          GoRoute(
+              path: '/admin/payments',
+              builder: (_, __) => const AdminPaymentsPage()),
+          GoRoute(
+              path: '/admin/payouts',
+              builder: (_, __) => const AdminPayoutsPage()),
+          GoRoute(
+              path: '/admin/topups',
+              builder: (_, __) => const AdminTopUpsPage()),
+          GoRoute(
+              path: '/admin/promos',
+              builder: (_, __) => const AdminPromosPage()),
+          GoRoute(
+              path: '/admin/config',
+              builder: (_, __) => const AdminConfigPage()),
+          GoRoute(
+              path: '/admin/reports',
+              builder: (_, __) => const AdminReportsPage()),
+          GoRoute(
+              path: '/admin/broadcast',
+              builder: (_, __) => const AdminBroadcastPage()),
+          GoRoute(
+              path: '/admin/slot-locks',
+              builder: (_, __) => const AdminSlotLocksPage()),
+          GoRoute(
+              path: '/admin/payment-events',
+              builder: (_, __) => const AdminPaymentEventsPage()),
+          GoRoute(
+              path: '/admin/audit-log',
+              builder: (_, __) => const AdminAuditLogPage()),
         ],
       ),
     ],

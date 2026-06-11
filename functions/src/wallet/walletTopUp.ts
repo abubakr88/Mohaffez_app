@@ -14,6 +14,7 @@ import {
   SYSTEM_WALLETS,
   requireAdmin,
 } from './walletUtils';
+import { writeAdminAuditLog } from '../utils/auditLog';
 
 interface VerifyTopUpRequest {
   topUpRequestId: string;     // the pending top-up doc the user submitted
@@ -35,7 +36,7 @@ export const verifyWalletTopUp = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError('invalid-argument', 'topUpRequestId required');
   }
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const reqRef = db.collection('topUpRequests').doc(topUpRequestId);
     const reqSnap = await tx.get(reqRef);
     if (!reqSnap.exists) {
@@ -124,6 +125,18 @@ export const verifyWalletTopUp = functions.https.onCall(async (data, context) =>
 
     return { success: true, groupId: result.groupId, idempotent: result.idempotent };
   });
+
+  await writeAdminAuditLog({
+    action: 'verifyWalletTopUp',
+    actorId: adminUid,
+    targetId: topUpRequestId,
+    targetType: 'top_up_request',
+    reason: adminNote ?? 'Manual transfer verified',
+    data: { paidAmountEgp: paidAmountEgp ?? null, result },
+    context,
+  });
+
+  return result;
 });
 
 /**
@@ -144,7 +157,7 @@ export const rejectWalletTopUp = functions.https.onCall(async (data, context) =>
     );
   }
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const reqRef = db.collection('topUpRequests').doc(topUpRequestId);
     const reqSnap = await tx.get(reqRef);
     if (!reqSnap.exists) {
@@ -184,6 +197,18 @@ export const rejectWalletTopUp = functions.https.onCall(async (data, context) =>
 
     return { success: true };
   });
+
+  await writeAdminAuditLog({
+    action: 'rejectWalletTopUp',
+    actorId: adminUid,
+    targetId: topUpRequestId,
+    targetType: 'top_up_request',
+    reason: reason.trim(),
+    data: { reason: reason.trim(), result },
+    context,
+  });
+
+  return result;
 });
 
 /**
@@ -209,7 +234,7 @@ export const adminCreditWallet = functions.https.onCall(async (data, context) =>
   const sourceWallet = type === 'promo_credit' ? SYSTEM_WALLETS.promos : SYSTEM_WALLETS.topups;
   const txType = type === 'promo_credit' ? 'promo_credit' : 'adjustment';
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const result = await postLedgerEntry(tx, {
       type: txType,
       legs: [
@@ -222,4 +247,21 @@ export const adminCreditWallet = functions.https.onCall(async (data, context) =>
     });
     return { success: true, groupId: result.groupId };
   });
+
+  await writeAdminAuditLog({
+    action: 'adminCreditWallet',
+    actorId: adminUid,
+    targetUserId: userId,
+    targetType: 'wallet',
+    reason: reason.trim(),
+    data: {
+      ownerType,
+      amountEgp,
+      type: txType,
+      groupId: result.groupId,
+    },
+    context,
+  });
+
+  return result;
 });

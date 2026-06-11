@@ -41,6 +41,7 @@ export {
   rejectCredential,
   approveTeacher,
   rejectTeacher,
+  updateAdminAccess,
   getBroadcastAudienceCount,
 } from './admin/adminActions';
 export { checkAppVersion } from './admin/appVersionCheck';

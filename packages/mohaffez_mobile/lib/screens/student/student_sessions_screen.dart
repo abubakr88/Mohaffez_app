@@ -208,7 +208,7 @@ class _StudentSessionsScreenState
       surfaceTintColor: AppThemeConstants.transparent,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: AppThemeConstants.tealGradient,
               begin: Alignment.topLeft,

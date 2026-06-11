@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import '../../../design_system/design_system.dart';
@@ -119,6 +120,8 @@ class _MetricsView extends StatelessWidget {
           ),
           const SizedBox(height: DSSpacing.md),
         ],
+        _ActionQueuesSection(metrics: metrics),
+        const SizedBox(height: DSSpacing.xxl),
 
         // Top KPIs ─────────────────────────────────────────────────────────
         DSGrid(
@@ -249,6 +252,280 @@ class _MetricsView extends StatelessWidget {
   }
 }
 
+class _ActionQueuesSection extends ConsumerWidget {
+  const _ActionQueuesSection({required this.metrics});
+
+  final AdminMetrics metrics;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final access = ref.watch(currentAdminAccessProvider).valueOrNull ??
+        AdminAccessState.none();
+    final canOpenUsers = access.isSuperAdmin ||
+        access.can(AdminPermission.manageUsers) ||
+        access.can(AdminPermission.manageUserRoles) ||
+        access.can(AdminPermission.deleteUsers);
+
+    final cards = <Widget>[];
+
+    if (access.can(AdminPermission.reviewTeachers)) {
+      final approvals = ref.watch(pendingTeachersProvider);
+      final count = _asyncCount(
+        approvals,
+        fallback: metrics.users.pendingTeacherApprovals,
+      );
+      cards.add(
+        _QueueTile(
+          title: 'محفظون بانتظار المراجعة',
+          count: count.label,
+          subtitle: count.hasError
+              ? 'تعذر تحميل صف المراجعة'
+              : count.value > 0
+                  ? 'راجع الشهادات والتوفر والخطط السعرية'
+                  : 'لا توجد طلبات معلقة',
+          icon: Icons.verified_user_outlined,
+          color: DSColors.warning,
+          path: '/admin/approvals',
+          active: count.value > 0,
+          error: count.hasError,
+        ),
+      );
+    }
+
+    if (access.can(AdminPermission.manageFinance)) {
+      final topUps = ref.watch(pendingTopUpsProvider);
+      final topUpCount = _asyncCount(topUps);
+      cards.add(
+        _QueueTile(
+          title: 'طلبات شحن معلقة',
+          count: topUpCount.label,
+          subtitle: topUpCount.hasError
+              ? 'تعذر تحميل طلبات الشحن'
+              : topUpCount.value > 0
+                  ? 'تحقق من إثباتات التحويل قبل الشحن'
+                  : 'لا توجد طلبات شحن',
+          icon: Icons.add_card_outlined,
+          color: DSColors.secondary,
+          path: '/admin/topups',
+          active: topUpCount.value > 0,
+          error: topUpCount.hasError,
+        ),
+      );
+
+      final payouts = ref.watch(activePayoutsProvider);
+      final payoutCount = _asyncCount(payouts);
+      final amount = payouts.when(
+        data: (items) => items.fold<double>(
+          0,
+          (sum, payout) => sum + payout.amountEgp,
+        ),
+        loading: () => null,
+        error: (_, __) => null,
+      );
+      cards.add(
+        _QueueTile(
+          title: 'طلبات سحب نشطة',
+          count: payoutCount.label,
+          subtitle: payoutCount.hasError
+              ? 'تعذر تحميل طلبات السحب'
+              : amount == null
+                  ? 'جاري تحميل المبالغ'
+                  : payoutCount.value > 0
+                      ? '${_queueMoney(amount)} قيد التنفيذ أو بانتظار البدء'
+                      : 'لا توجد طلبات سحب',
+          icon: Icons.account_balance_wallet_outlined,
+          color: DSColors.primary,
+          path: '/admin/payouts',
+          active: payoutCount.value > 0,
+          error: payoutCount.hasError,
+        ),
+      );
+    }
+
+    if (access.can(AdminPermission.runMaintenance) &&
+        access.can(AdminPermission.manageFinance)) {
+      final failed = ref.watch(failedOperationsProvider);
+      final count = _asyncCount(failed);
+      cards.add(
+        _QueueTile(
+          title: 'عمليات فاشلة',
+          count: count.label,
+          subtitle: count.hasError
+              ? 'تعذر تحميل العمليات الفاشلة'
+              : count.value > 0
+                  ? 'راجع السبب قبل إعادة المحاولة أو الإغلاق'
+                  : 'لا توجد عمليات فاشلة',
+          icon: Icons.error_outline_rounded,
+          color: DSColors.error,
+          path: '/admin/payments',
+          active: count.value > 0,
+          error: count.hasError,
+        ),
+      );
+    }
+
+    if (canOpenUsers) {
+      final flagged = ref.watch(flaggedUsersProvider);
+      final count = _asyncCount(flagged);
+      cards.add(
+        _QueueTile(
+          title: 'حسابات تحتاج مراجعة',
+          count: count.label,
+          subtitle: count.hasError
+              ? 'تعذر تحميل الحسابات المعلّمة'
+              : count.value > 0
+                  ? 'افتح قائمة المستخدمين لمراجعة العلامات'
+                  : 'لا توجد حسابات معلّمة',
+          icon: Icons.policy_outlined,
+          color: DSColors.info,
+          path: '/admin/users',
+          active: count.value > 0,
+          error: count.hasError,
+        ),
+      );
+    }
+
+    if (cards.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'صفوف العمل'),
+        const SizedBox(height: DSSpacing.md),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 4,
+          wideColumns: 4,
+          children: cards,
+        ),
+      ],
+    );
+  }
+}
+
+class _QueueTile extends StatelessWidget {
+  const _QueueTile({
+    required this.title,
+    required this.count,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.path,
+    required this.active,
+    required this.error,
+  });
+
+  final String title;
+  final String count;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final String? path;
+  final bool active;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveColor = error ? DSColors.error : color;
+    final child = Container(
+      constraints: const BoxConstraints(minHeight: 142),
+      padding: const EdgeInsets.all(DSSpacing.xl),
+      decoration: BoxDecoration(
+        color: DSColors.surface,
+        borderRadius: DSRadius.lgAll,
+        border: Border.all(
+          color: active || error
+              ? effectiveColor.withValues(alpha: 0.35)
+              : DSColors.border,
+        ),
+        boxShadow: DSElevation.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(DSSpacing.sm),
+                decoration: BoxDecoration(
+                  color: effectiveColor.withValues(alpha: 0.1),
+                  borderRadius: DSRadius.mdAll,
+                ),
+                child: Icon(icon, size: 20, color: effectiveColor),
+              ),
+              const Spacer(),
+              DSBadge(
+                label: error
+                    ? 'خطأ'
+                    : active
+                        ? 'مطلوب'
+                        : 'مستقر',
+                variant: error
+                    ? DSBadgeVariant.error
+                    : active
+                        ? DSBadgeVariant.warning
+                        : DSBadgeVariant.success,
+                dot: active || error,
+              ),
+            ],
+          ),
+          const SizedBox(height: DSSpacing.md),
+          Text(count, style: DSText.h1(context, color: DSColors.text1)),
+          const SizedBox(height: DSSpacing.xs),
+          Text(title, style: DSText.bodyMedium(context, color: DSColors.text1)),
+          const SizedBox(height: DSSpacing.xs),
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: DSText.caption(context, color: DSColors.text3),
+          ),
+        ],
+      ),
+    );
+
+    if (path == null) return child;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => context.go(path!),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _QueueCount {
+  const _QueueCount({
+    required this.value,
+    required this.label,
+    this.hasError = false,
+  });
+
+  final int value;
+  final String label;
+  final bool hasError;
+}
+
+_QueueCount _asyncCount<T>(
+  AsyncValue<List<T>> async, {
+  int? fallback,
+}) {
+  return async.when(
+    data: (items) => _QueueCount(value: items.length, label: '${items.length}'),
+    loading: () => fallback == null
+        ? const _QueueCount(value: 0, label: '...')
+        : _QueueCount(value: fallback, label: '$fallback'),
+    error: (_, __) => const _QueueCount(value: 0, label: '!', hasError: true),
+  );
+}
+
+String _queueMoney(double value) {
+  return '${NumberFormat.decimalPattern('ar').format(value.round())} ج.م';
+}
+
 class _RevenueChartCard extends StatelessWidget {
   final List<MonthlyRevenue> months;
   const _RevenueChartCard({required this.months});
@@ -282,8 +559,8 @@ class _RevenueBars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxValue = months.fold<double>(
-        0, (m, e) => e.total > m ? e.total : m);
+    final maxValue =
+        months.fold<double>(0, (m, e) => e.total > m ? e.total : m);
     final upper = maxValue == 0 ? 1.0 : maxValue * 1.2;
 
     return BarChart(
@@ -346,8 +623,7 @@ class _RevenueBars extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     _shortMonth(monthNumber),
-                    style:
-                        const TextStyle(fontSize: 10, color: DSColors.text3),
+                    style: const TextStyle(fontSize: 10, color: DSColors.text3),
                   ),
                 );
               },

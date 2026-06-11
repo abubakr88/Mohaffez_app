@@ -17,7 +17,6 @@
 
 import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
-import '../../shared/widgets/empty_state.dart';
 import '../../shared/utils/time_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -427,7 +426,8 @@ class _PaymentConfirmationCardState extends State<_PaymentConfirmationCard> {
         ),
       );
     } on Exception catch (e) {
-      debugPrint('❌ [BUNDLE_FLOW] Reject_ERROR: paymentId=${widget.payment.id}, error=$e');
+      debugPrint(
+          '❌ [BUNDLE_FLOW] Reject_ERROR: paymentId=${widget.payment.id}, error=$e');
       messenger.showSnackBar(const SnackBar(
           content: Text('حدث خطأ. يرجى المحاولة مرة أخرى'),
           backgroundColor: AppThemeConstants.error));

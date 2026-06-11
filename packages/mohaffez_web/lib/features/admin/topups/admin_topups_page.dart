@@ -60,6 +60,7 @@ class _TopUpCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final actionRunning = ref.watch(adminActionsProvider).isLoading;
     final id = topup['id'] as String? ?? '';
     final userId = topup['userId'] as String? ?? '';
     final amount = (topup['amountEgp'] as num?)?.toDouble() ?? 0;
@@ -102,8 +103,7 @@ class _TopUpCard extends ConsumerWidget {
                       ],
                     ),
                     Text('طُلب في ${_date(topup['createdAt'])}',
-                        style:
-                            DSText.caption(context, color: DSColors.text3)),
+                        style: DSText.caption(context, color: DSColors.text3)),
                   ],
                 ),
               ),
@@ -130,13 +130,19 @@ class _TopUpCard extends ConsumerWidget {
                 label: 'رفض',
                 size: DSButtonSize.sm,
                 variant: DSButtonVariant.destructive,
-                onPressed: () => _reject(context, ref, id, name),
+                loading: actionRunning,
+                onPressed: actionRunning
+                    ? null
+                    : () => _reject(context, ref, id, name),
               ),
               const SizedBox(width: DSSpacing.sm),
               DSButton(
                 label: 'اعتماد الشحن',
                 size: DSButtonSize.sm,
-                onPressed: () => _verify(context, ref, id, name, amount),
+                loading: actionRunning,
+                onPressed: actionRunning
+                    ? null
+                    : () => _verify(context, ref, id, name, amount),
               ),
             ],
           ),
@@ -171,19 +177,17 @@ class _TopUpCard extends ConsumerWidget {
         DSButton(
             label: 'إلغاء',
             variant: DSButtonVariant.ghost,
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(false)),
+            onPressed: () => Navigator.of(context).pop(false)),
         DSButton(
-            label: 'اعتماد',
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(true)),
+            label: 'اعتماد', onPressed: () => Navigator.of(context).pop(true)),
       ],
     );
     if (ok != true || !context.mounted) return;
     final entered = double.tryParse(controller.text.trim());
     // Only send an override when it differs from the requested amount.
-    final override =
-        (entered != null && entered > 0 && entered != requested) ? entered : null;
+    final override = (entered != null && entered > 0 && entered != requested)
+        ? entered
+        : null;
     await ref
         .read(adminActionsProvider.notifier)
         .verifyTopUp(id, paidAmountEgp: override);
@@ -217,13 +221,11 @@ class _TopUpCard extends ConsumerWidget {
         DSButton(
             label: 'إلغاء',
             variant: DSButtonVariant.ghost,
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(false)),
+            onPressed: () => Navigator.of(context).pop(false)),
         DSButton(
             label: 'رفض',
             variant: DSButtonVariant.destructive,
-            onPressed: () =>
-                Navigator.of(context, rootNavigator: true).pop(true)),
+            onPressed: () => Navigator.of(context).pop(true)),
       ],
     );
     if (ok != true || !context.mounted) return;
@@ -321,7 +323,8 @@ class _Proof extends StatelessWidget {
             width: 96,
             height: 96,
             color: DSColors.surfaceMuted,
-            child: Image.network(url, fit: BoxFit.cover,
+            child: Image.network(url,
+                fit: BoxFit.cover,
                 errorBuilder: (ctx, _, __) => const Icon(
                     Icons.broken_image_outlined,
                     color: DSColors.text3)),

@@ -10,7 +10,6 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../tour/tour_mode_state.dart';
-import 'direct_payment_screen.dart';
 
 // ============================================================================
 // FILTER ENUM AND PROVIDER
@@ -41,6 +40,7 @@ class StudentRequestsScreen extends ConsumerStatefulWidget {
 class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   final searchController = TextEditingController();
   String searchQuery = '';
+  final Set<String> _recentlyPaidRequestIds = {};
 
   Future<void> _refreshRequests(String studentId) async {
     ref.invalidate(studentRequestsFirstPageProvider(studentId));
@@ -54,6 +54,11 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   /// the student already sent the payment, so no "Pay Now" button is needed.
   /// FIX: Subscription-credit requests NEVER require student payment action
   bool _requiresPayment(Map<String, dynamic> request) {
+    final requestId = _requestIdOf(request);
+    if (requestId != null && _recentlyPaidRequestIds.contains(requestId)) {
+      return false;
+    }
+
     final status = (request['status'] as String? ?? '').toLowerCase();
     final selectedPaymentMethod =
         request['selectedPaymentMethod'] as String? ?? '';
@@ -66,11 +71,13 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         status == 'awaitingdirectpayment';
   }
 
+  String? _requestIdOf(Map<String, dynamic> request) =>
+      request['id'] as String? ?? request['requestId'] as String?;
+
   // ── Navigate to payment ──────────────────────────────────────────────────
   Future<void> _navigateToPayment(Map<String, dynamic> request) async {
     try {
-      final requestId =
-          request['id'] as String? ?? request['requestId'] as String?;
+      final requestId = _requestIdOf(request);
       final mohaffezId = request['mohaffezId'] as String?;
 
       if (requestId == null || mohaffezId == null) {
@@ -82,8 +89,6 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
         );
         return;
       }
-
-      final mohaffezName = request['mohaffezName'] as String? ?? '';
 
       // Fetch fresh Firestore data to get selectedPaymentMethod and latest
       // slot details written by the teacher on acceptance.
@@ -104,42 +109,33 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
       }
 
       if (!context.mounted) return;
-
-      // ── Route based on payment method + Paymob toggle ──────────────────
-      // Requests created via "Request First" flow (DirectBookingRequestScreen)
-      // carry selectedPaymentMethod = 'directpayment'. Normally they go to
-      // DirectPaymentScreen (wallet mark-as-paid).
-      //
-      // When admin has enabled Paymob globally, we route them instead to
-      // StudentPaymentScreen so the student can pick card OR direct at
-      // pay-time — direct_payment_screen has no Paymob option of its own.
-      final selectedPaymentMethod =
-          lockedRequest['selectedPaymentMethod'] as String?;
-      final paymobOn =
-          ref.read(systemConfigProvider).valueOrNull?.paymobEnabled ?? false;
-
-      if (selectedPaymentMethod == 'directpayment' && !paymobOn) {
-        _openDirectPaymentScreen(
-          requestId: requestId,
-          mohaffezId: mohaffezId,
-          mohaffezName: mohaffezName,
-          lockedRequest: lockedRequest,
-        );
-        return;
-      }
+      final mohaffezName = _resolveMohaffezName(request, lockedRequest);
 
       // ── Plan selection + Paymob/online gateway via toggle ──────────────
       // Pass requestId as a query param — the route reads it from there,
       // not from lockedRequest. Without it, StudentPaymentScreen treats
       // the visit as a fresh booking and the locked-request UI is skipped.
       if (!mounted) return;
-      final qs = Uri(queryParameters: {'requestId': requestId}).query;
-      context.push(
+      final qs = Uri(
+        queryParameters: {
+          'requestId': requestId,
+          if (mohaffezName.isNotEmpty) 'name': mohaffezName,
+        },
+      ).query;
+      final paid = await context.push<bool>(
         '/payment/$mohaffezId?$qs',
         extra: {
           'lockedRequest': lockedRequest,
         },
       );
+
+      if (paid == true && mounted) {
+        setState(() => _recentlyPaidRequestIds.add(requestId));
+        final studentId = ref.read(currentUserProvider).value?.uid;
+        if (studentId != null) {
+          await _refreshRequests(studentId);
+        }
+      }
     } catch (e, st) {
       debugPrint('navigateToPayment error: $e\n$st');
       if (mounted) {
@@ -153,45 +149,20 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
     }
   }
 
-  /// Routes to [DirectPaymentScreen] with all slot data extracted from the
-  /// accepted request.  Called only when selectedPaymentMethod = 'directpayment'.
-  void _openDirectPaymentScreen({
-    required String requestId,
-    required String mohaffezId,
-    required String mohaffezName,
-    required Map<String, dynamic> lockedRequest,
-  }) {
-    // Converts Firestore Timestamp or ISO String to DateTime
-    DateTime? toDate(dynamic raw) {
-      if (raw is Timestamp) return raw.toDate();
-      if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
-      return null;
+  String _resolveMohaffezName(
+    Map<String, dynamic> originalRequest,
+    Map<String, dynamic> lockedRequest,
+  ) {
+    for (final value in [
+      lockedRequest['mohaffezName'],
+      originalRequest['mohaffezName'],
+      lockedRequest['teacherName'],
+      originalRequest['teacherName'],
+    ]) {
+      final name = value?.toString().trim();
+      if (name != null && name.isNotEmpty) return name;
     }
-
-    context.push(
-      '/booking/direct-payment',
-      extra: {
-        'requestId': requestId,
-        'mohaffezId': mohaffezId,
-        'mohaffezName': mohaffezName,
-        'sessionType': lockedRequest['sessionType'] as String?,
-        'preferredTimeSlot': lockedRequest['preferredTimeSlot'] as String? ??
-            lockedRequest['timeSlot'] as String?,
-        'slotDate': toDate(lockedRequest['slotDate']),
-        'slotStart': toDate(lockedRequest['slotStart']),
-        'slotEnd': toDate(lockedRequest['slotEnd']),
-        'imamAddressText': lockedRequest['imamAddressText'] as String? ??
-            lockedRequest['location'] as String?,
-        'imamAddressLat': (lockedRequest['imamAddressLat'] as num?)?.toDouble(),
-        'imamAddressLng': (lockedRequest['imamAddressLng'] as num?)?.toDouble(),
-        'mohaffezPhone': lockedRequest['mohaffezPhone'] as String?,
-        'planType': lockedRequest['planType'] as String?,
-        'planId': lockedRequest['planId'] as String?,
-        'planTitle': lockedRequest['planTitle'] as String?,
-        'sessionsCount': lockedRequest['sessionsCount'] as int?,
-        'validityDays': lockedRequest['validityDays'] as int?,
-      },
-    );
+    return '';
   }
 
   @override
@@ -456,11 +427,19 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final request = filteredRequests[index];
+                final requestId = _requestIdOf(request);
+                final displayRequest = requestId != null &&
+                        _recentlyPaidRequestIds.contains(requestId)
+                    ? {
+                        ...request,
+                        'status': 'paymentprocessing',
+                      }
+                    : request;
                 return _RequestCard(
-                  request: request,
-                  onCancel: () => _handleCancel(context, ref, request),
-                  onPayNow: _requiresPayment(request)
-                      ? () => _navigateToPayment(request)
+                  request: displayRequest,
+                  onCancel: () => _handleCancel(context, ref, displayRequest),
+                  onPayNow: _requiresPayment(displayRequest)
+                      ? () => _navigateToPayment(displayRequest)
                       : null,
                 );
               },
@@ -889,6 +868,12 @@ class _RequestCard extends StatelessWidget {
         return ('في انتظار الدفع', AppThemeConstants.primary, Icons.payment);
       case 'awaitingdirectpayment':
         return ('في انتظار الدفع', AppThemeConstants.primary, Icons.payment);
+      case 'paymentprocessing':
+        return (
+          'جاري تأكيد الدفع',
+          AppThemeConstants.success,
+          Icons.hourglass_top
+        );
       case 'awaitingdirectpaymentconfirmation':
       case 'awaiting_direct_payment_confirmation':
         return (

@@ -2,41 +2,28 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { auth, db, FieldValue, messaging } from '../utils/admin';
 import { releaseExpiredSlotLocksNow } from '../cleanup/releaseExpiredSlotLocks';
+import {
+  AdminRole,
+  requireAdminAccess,
+  requireSuperAdminAccess,
+  sanitizePermissionInput,
+  SUPER_ADMIN_PERMISSIONS,
+} from '../utils/adminPermissions';
+import { writeAdminAuditLog } from '../utils/auditLog';
 
 type TargetRole = 'all' | 'student' | 'mohaffez';
 
-async function isAdminCaller(context: functions.https.CallableContext): Promise<boolean> {
-  // Single source of truth: the `admin` custom claim (set only via the
-  // setAdminClaim function). We deliberately do NOT fall back to the Firestore
-  // `users/{uid}.role` field — that decouples admin privilege from any Firestore
-  // write path, so a future rules change can never accidentally grant it.
-  return (context.auth?.token as { admin?: boolean } | undefined)?.admin === true;
-}
-
-async function ensureAdmin(context: functions.https.CallableContext): Promise<string> {
-  if (!context.auth?.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
-  }
-  const ok = await isAdminCaller(context);
-  if (!ok) {
-    throw new functions.https.HttpsError('permission-denied', 'غير مصرح');
-  }
-  return context.auth.uid;
-}
-
-async function writeAuditLog(params: {
-  action: string;
-  performedBy: string;
-  targetUserId?: string;
-  data?: Record<string, unknown>;
-}): Promise<void> {
-  await db.collection('adminAuditLog').add({
-    action: params.action,
-    performedBy: params.performedBy,
-    targetUserId: params.targetUserId ?? null,
-    data: params.data ?? null,
-    timestamp: FieldValue.serverTimestamp(),
-  });
+function userAuditState(data: FirebaseFirestore.DocumentData | undefined) {
+  if (data == null) return null;
+  return {
+    role: data.role ?? null,
+    status: data.status ?? null,
+    adminRole: data.adminRole ?? null,
+    adminPermissions: data.adminPermissions ?? null,
+    isDeleted: data.isDeleted ?? false,
+    deletedAt: data.deletedAt ?? null,
+    disabledAt: data.disabledAt ?? null,
+  };
 }
 
 /**
@@ -44,30 +31,129 @@ async function writeAuditLog(params: {
  * output: { success: true }
  */
 export const setUserRole = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'manageUserRoles')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const newRole = (data?.newRole as string | undefined)?.trim();
 
   if (!userId || !newRole) {
     throw new functions.https.HttpsError('invalid-argument', 'يرجى إدخال جميع الحقول المطلوبة');
   }
+  if (newRole !== 'student' && newRole !== 'mohaffez') {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'تغيير الدور من هنا متاح فقط بين طالب ومحفظ',
+    );
+  }
 
   await auth.getUser(userId);
+  const userRef = db.collection('users').doc(userId);
+  const beforeSnap = await userRef.get();
+  if (!beforeSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
 
-  await db.collection('users').doc(userId).update({
+  await userRef.update({
     role: newRole,
     roleUpdatedAt: FieldValue.serverTimestamp(),
     roleUpdatedBy: performedBy,
   });
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'setUserRole',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetType: 'user',
+    before: userAuditState(beforeSnap.data()),
+    after: { ...(userAuditState(beforeSnap.data()) ?? {}), role: newRole },
     data: { newRole },
+    context,
   });
 
   functions.logger.info('Admin set user role', { performedBy, userId, newRole });
+  return { success: true };
+});
+
+/**
+ * input: {
+ *   userId: string,
+ *   adminRole: 'super_admin' | 'admin',
+ *   permissions?: Record<string, boolean>
+ * }
+ * output: { success: true }
+ */
+export const updateAdminAccess = functions.https.onCall(async (data, context) => {
+  const caller = await requireSuperAdminAccess(context);
+  const userId = (data?.userId as string | undefined)?.trim();
+  const requestedRole = (data?.adminRole as string | undefined)?.trim();
+
+  if (!userId) {
+    throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
+  }
+  if (requestedRole !== 'super_admin' && requestedRole !== 'admin') {
+    throw new functions.https.HttpsError('invalid-argument', 'نوع صلاحية الأدمن غير صحيح');
+  }
+  if (userId === caller.uid && requestedRole !== 'super_admin') {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'لا يمكن تقليل صلاحيات حسابك الحالي',
+    );
+  }
+
+  await auth.getUser(userId);
+  const userRef = db.collection('users').doc(userId);
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
+  if (userSnap.data()?.role !== 'admin') {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'إدارة صلاحيات الأدمن متاحة لحسابات admin فقط',
+    );
+  }
+
+  const adminRole = requestedRole as AdminRole;
+  const permissions =
+    adminRole === 'super_admin'
+      ? {}
+      : sanitizePermissionInput(data?.permissions);
+
+  await userRef.update({
+    adminRole,
+    adminPermissions: permissions,
+    adminAccessUpdatedAt: FieldValue.serverTimestamp(),
+    adminAccessUpdatedBy: caller.uid,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  await auth.setCustomUserClaims(userId, {
+    admin: true,
+    role: 'admin',
+    adminRole,
+    adminPermissions:
+      adminRole === 'super_admin' ? SUPER_ADMIN_PERMISSIONS : permissions,
+  });
+
+  await writeAdminAuditLog({
+    action: 'updateAdminAccess',
+    actorId: caller.uid,
+    targetUserId: userId,
+    targetType: 'admin_user',
+    before: userAuditState(userSnap.data()),
+    after: {
+      ...(userAuditState(userSnap.data()) ?? {}),
+      adminRole,
+      adminPermissions: permissions,
+    },
+    data: { adminRole, permissions },
+    context,
+  });
+
+  functions.logger.info('Admin access updated', {
+    performedBy: caller.uid,
+    userId,
+    adminRole,
+  });
   return { success: true };
 });
 
@@ -76,7 +162,7 @@ export const setUserRole = functions.https.onCall(async (data, context) => {
  * output: { success: true }
  */
 export const suspendUser = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'manageUsers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const reason = (data?.reason as string | undefined)?.trim() ?? '';
   const expiresAtRaw = data?.expiresAt as string | null | undefined;
@@ -86,6 +172,10 @@ export const suspendUser = functions.https.onCall(async (data, context) => {
   }
 
   const userRecord = await auth.getUser(userId);
+  const beforeSnap = await db.collection('users').doc(userId).get();
+  if (!beforeSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
   const expiresAt = expiresAtRaw ? admin.firestore.Timestamp.fromDate(new Date(expiresAtRaw)) : null;
 
   const batch = db.batch();
@@ -122,11 +212,16 @@ export const suspendUser = functions.https.onCall(async (data, context) => {
     });
   }
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'suspendUser',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetType: 'user',
+    reason,
+    before: userAuditState(beforeSnap.data()),
+    after: { ...(userAuditState(beforeSnap.data()) ?? {}), status: 'suspended' },
     data: { reason, expiresAt: expiresAtRaw ?? null },
+    context,
   });
 
   functions.logger.info('Admin suspended user', { performedBy, userId });
@@ -138,7 +233,7 @@ export const suspendUser = functions.https.onCall(async (data, context) => {
  * output: { success: true }
  */
 export const unsuspendUser = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'manageUsers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
 
   if (!userId) {
@@ -146,6 +241,10 @@ export const unsuspendUser = functions.https.onCall(async (data, context) => {
   }
 
   await auth.getUser(userId);
+  const beforeSnap = await db.collection('users').doc(userId).get();
+  if (!beforeSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
 
   const batch = db.batch();
   batch.update(db.collection('users').doc(userId), {
@@ -156,10 +255,14 @@ export const unsuspendUser = functions.https.onCall(async (data, context) => {
   batch.delete(db.collection('userSuspensions').doc(userId));
   await batch.commit();
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'unsuspendUser',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetType: 'user',
+    before: userAuditState(beforeSnap.data()),
+    after: { ...(userAuditState(beforeSnap.data()) ?? {}), status: 'active' },
+    context,
   });
 
   functions.logger.info('Admin unsuspended user', { performedBy, userId });
@@ -231,23 +334,103 @@ async function performAccountDeletion(
 }
 
 export const deleteUserAccount = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const caller = await requireAdminAccess(context, 'deleteUsers');
+  const performedBy = caller.uid;
   const userId = (data?.userId as string | undefined)?.trim();
+  const reason = (data?.reason as string | undefined)?.trim();
 
   if (!userId) {
     throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم مطلوب');
   }
+  if (!reason || reason.length < 3) {
+    throw new functions.https.HttpsError('invalid-argument', 'سبب الحذف مطلوب');
+  }
+  if (userId === performedBy) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'لا يمكن حذف حسابك الحالي من لوحة التحكم',
+    );
+  }
 
-  await performAccountDeletion(userId, performedBy, 'admin_delete_user');
+  const userRef = db.collection('users').doc(userId);
+  const beforeSnap = await userRef.get();
+  if (!beforeSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'المستخدم غير موجود');
+  }
+  const before = beforeSnap.data();
+  if (before?.role === 'admin' && caller.role !== 'super_admin') {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'حذف حساب admin متاح للسوبر أدمن فقط',
+    );
+  }
 
-  await writeAuditLog({
+  if (before?.isDeleted === true || before?.status === 'deleted') {
+    return { success: true, softDeleted: true, alreadyDeleted: true };
+  }
+
+  const LIVE_STATUSES_FOR_DELETE = [
+    'pending',
+    'awaitingpayment',
+    'awaitingdirectpaymentconfirmation',
+    'accepted',
+  ];
+
+  const [studentLive, mohaffezLive] = await Promise.all([
+    db
+      .collection('sessionRequests')
+      .where('studentId', '==', userId)
+      .where('status', 'in', LIVE_STATUSES_FOR_DELETE)
+      .get(),
+    db
+      .collection('sessionRequests')
+      .where('mohaffezId', '==', userId)
+      .where('status', 'in', LIVE_STATUSES_FOR_DELETE)
+      .get(),
+  ]);
+
+  await auth.updateUser(userId, { disabled: true });
+  await auth.revokeRefreshTokens(userId);
+
+  const batch = db.batch();
+  for (const doc of [...studentLive.docs, ...mohaffezLive.docs]) {
+    batch.update(doc.ref, {
+      status: 'cancelled',
+      cancelledBy: performedBy,
+      cancellationReason: `account_soft_deleted: ${reason}`,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+  batch.set(userRef, {
+    status: 'deleted',
+    isDeleted: true,
+    deletedAt: FieldValue.serverTimestamp(),
+    deletedBy: performedBy,
+    deletionReason: reason,
+    disabledAt: FieldValue.serverTimestamp(),
+    disabledBy: performedBy,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await batch.commit();
+
+  await writeAdminAuditLog({
     action: 'deleteUserAccount',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetType: 'user',
+    reason,
+    before: userAuditState(before),
+    after: { ...(userAuditState(before) ?? {}), status: 'deleted', isDeleted: true },
+    data: {
+      softDeleted: true,
+      authDisabled: true,
+      cancelledLiveRequests: studentLive.size + mohaffezLive.size,
+    },
+    context,
   });
 
-  functions.logger.info('Admin deleted user account', { performedBy, userId });
-  return { success: true };
+  functions.logger.info('Admin soft-deleted user account', { performedBy, userId });
+  return { success: true, softDeleted: true };
 });
 
 /**
@@ -267,10 +450,13 @@ export const deleteMyAccount = functions.https.onCall(async (_data, context) => 
 
   await performAccountDeletion(uid, uid, 'user_self_delete');
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'deleteMyAccount',
-    performedBy: uid,
+    actorId: uid,
     targetUserId: uid,
+    targetType: 'user',
+    reason: 'user_self_delete',
+    context,
   });
 
   functions.logger.info('User self-deleted account', { uid });
@@ -282,7 +468,7 @@ export const deleteMyAccount = functions.https.onCall(async (_data, context) => 
  * output: { recipientCount: number }
  */
 export const sendBroadcastNotification = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'sendBroadcasts')).uid;
   const title = data?.title as string | undefined;
   const body = data?.body as string | undefined;
   const targetRole = (data?.targetRole as TargetRole | undefined) ?? 'all';
@@ -353,10 +539,12 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
     totalTokens: tokens.length,
   });
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'sendBroadcastNotification',
-    performedBy,
+    actorId: performedBy,
+    targetType: 'broadcast',
     data: { title, targetRole, recipientCount: successCount },
+    context,
   });
 
   return { recipientCount: successCount };
@@ -367,13 +555,15 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
  * output: { released: number }
  */
 export const triggerCleanupJobManually = functions.https.onCall(async (_, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'runMaintenance')).uid;
   const released = await releaseExpiredSlotLocksNow();
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'triggerCleanupJobManually',
-    performedBy,
+    actorId: performedBy,
+    targetType: 'maintenance',
     data: { released },
+    context,
   });
 
   functions.logger.info('Admin triggered cleanup job', { performedBy, released });
@@ -385,7 +575,7 @@ export const triggerCleanupJobManually = functions.https.onCall(async (_, contex
  * output: { success: true }
  */
 export const approveCredential = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const credentialId = (data?.credentialId as string | undefined)?.trim();
 
@@ -393,7 +583,13 @@ export const approveCredential = functions.https.onCall(async (data, context) =>
     throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم ومعرف الشهادة مطلوبان');
   }
 
-  await db.collection('users').doc(userId).collection('credentials').doc(credentialId).update({
+  const credRef = db.collection('users').doc(userId).collection('credentials').doc(credentialId);
+  const credSnap = await credRef.get();
+  if (!credSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'الشهادة غير موجودة');
+  }
+
+  await credRef.update({
     status: 'approved',
     reviewedAt: FieldValue.serverTimestamp(),
     reviewedBy: performedBy,
@@ -407,11 +603,19 @@ export const approveCredential = functions.https.onCall(async (data, context) =>
     type: 'credential_approved',
   });
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'approveCredential',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetId: credentialId,
+    targetType: 'credential',
+    before: {
+      status: credSnap.data()?.status ?? null,
+      rejectionReason: credSnap.data()?.rejectionReason ?? null,
+    },
+    after: { status: 'approved', rejectionReason: null },
     data: { credentialId },
+    context,
   });
 
   functions.logger.info('Admin approved credential', { performedBy, userId, credentialId });
@@ -423,7 +627,7 @@ export const approveCredential = functions.https.onCall(async (data, context) =>
  * output: { success: true }
  */
 export const rejectCredential = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const credentialId = (data?.credentialId as string | undefined)?.trim();
   const reason = (data?.reason as string | undefined)?.trim();
@@ -432,7 +636,13 @@ export const rejectCredential = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'معرف المستخدم ومعرف الشهادة وسبب الرفض مطلوبون');
   }
 
-  await db.collection('users').doc(userId).collection('credentials').doc(credentialId).update({
+  const credRef = db.collection('users').doc(userId).collection('credentials').doc(credentialId);
+  const credSnap = await credRef.get();
+  if (!credSnap.exists) {
+    throw new functions.https.HttpsError('not-found', 'الشهادة غير موجودة');
+  }
+
+  await credRef.update({
     status: 'rejected',
     rejectionReason: reason,
     reviewedAt: FieldValue.serverTimestamp(),
@@ -447,11 +657,20 @@ export const rejectCredential = functions.https.onCall(async (data, context) => 
     type: 'credential_rejected',
   });
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'rejectCredential',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetId: credentialId,
+    targetType: 'credential',
+    reason,
+    before: {
+      status: credSnap.data()?.status ?? null,
+      rejectionReason: credSnap.data()?.rejectionReason ?? null,
+    },
+    after: { status: 'rejected', rejectionReason: reason },
     data: { credentialId, reason },
+    context,
   });
 
   functions.logger.info('Admin rejected credential', { performedBy, userId, credentialId, reason });
@@ -466,7 +685,7 @@ export const rejectCredential = functions.https.onCall(async (data, context) => 
  * output: { success: true }
  */
 export const approveTeacher = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
 
   if (!userId) {
@@ -498,10 +717,14 @@ export const approveTeacher = functions.https.onCall(async (data, context) => {
     type: 'teacher_approved',
   });
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'approveTeacher',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetType: 'teacher_review',
+    before: userAuditState(snap.data()),
+    after: { ...(userAuditState(snap.data()) ?? {}), status: 'active' },
+    context,
   });
 
   functions.logger.info('Admin approved teacher', { performedBy, userId });
@@ -516,7 +739,7 @@ export const approveTeacher = functions.https.onCall(async (data, context) => {
  * output: { success: true }
  */
 export const rejectTeacher = functions.https.onCall(async (data, context) => {
-  const performedBy = await ensureAdmin(context);
+  const performedBy = (await requireAdminAccess(context, 'reviewTeachers')).uid;
   const userId = (data?.userId as string | undefined)?.trim();
   const reason = (data?.reason as string | undefined)?.trim();
 
@@ -546,11 +769,16 @@ export const rejectTeacher = functions.https.onCall(async (data, context) => {
     type: 'teacher_rejected',
   });
 
-  await writeAuditLog({
+  await writeAdminAuditLog({
     action: 'rejectTeacher',
-    performedBy,
+    actorId: performedBy,
     targetUserId: userId,
+    targetType: 'teacher_review',
+    reason,
+    before: userAuditState(snap.data()),
+    after: { ...(userAuditState(snap.data()) ?? {}), status: 'rejected' },
     data: { reason },
+    context,
   });
 
   functions.logger.info('Admin rejected teacher', { performedBy, userId, reason });
@@ -562,7 +790,7 @@ export const rejectTeacher = functions.https.onCall(async (data, context) => {
  * output: { count: number }
  */
 export const getBroadcastAudienceCount = functions.https.onCall(async (data, context) => {
-  await ensureAdmin(context);
+  await requireAdminAccess(context, 'sendBroadcasts');
   const targetRole = ((data?.targetRole as TargetRole | undefined) ?? 'all');
 
   let query: FirebaseFirestore.Query = db.collection('users');

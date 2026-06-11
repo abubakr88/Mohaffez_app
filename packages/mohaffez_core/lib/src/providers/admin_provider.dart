@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/broadcast_model.dart';
@@ -14,6 +15,104 @@ final allUsersProvider = FutureProvider.autoDispose
   return ref.watch(adminRepositoryProvider).getAllUsers(roleFilter: roleFilter);
 });
 
+const int adminUsersDefaultPageSize = 50;
+const int adminUsersPageStep = 50;
+
+enum AdminPermission {
+  manageUsers('manageUsers', 'إدارة المستخدمين'),
+  manageUserRoles('manageUserRoles', 'تغيير أدوار المستخدمين'),
+  deleteUsers('deleteUsers', 'حذف المستخدمين'),
+  manageAdminAccess('manageAdminAccess', 'إدارة صلاحيات الأدمنز'),
+  reviewTeachers('reviewTeachers', 'مراجعة المحفظين'),
+  manageFinance('manageFinance', 'العمليات المالية'),
+  sendBroadcasts('sendBroadcasts', 'الإشعارات الجماعية'),
+  runMaintenance('runMaintenance', 'تشغيل الصيانة');
+
+  const AdminPermission(this.key, this.label);
+
+  final String key;
+  final String label;
+}
+
+const Map<AdminPermission, bool> defaultAdminPermissions = {
+  AdminPermission.manageUsers: true,
+  AdminPermission.manageUserRoles: false,
+  AdminPermission.deleteUsers: false,
+  AdminPermission.manageAdminAccess: false,
+  AdminPermission.reviewTeachers: true,
+  AdminPermission.manageFinance: false,
+  AdminPermission.sendBroadcasts: true,
+  AdminPermission.runMaintenance: false,
+};
+
+class AdminAccessState {
+  final String uid;
+  final String adminRole;
+  final Map<AdminPermission, bool> permissions;
+
+  const AdminAccessState({
+    required this.uid,
+    required this.adminRole,
+    required this.permissions,
+  });
+
+  bool get isSuperAdmin => adminRole == 'super_admin';
+  bool can(AdminPermission permission) =>
+      permission == AdminPermission.manageAdminAccess
+          ? isSuperAdmin
+          : permissions[permission] == true;
+
+  static AdminAccessState none() => const AdminAccessState(
+        uid: '',
+        adminRole: 'none',
+        permissions: {},
+      );
+
+  factory AdminAccessState.fromUserDoc(String uid, Map<String, dynamic>? data) {
+    if (data?['role'] != 'admin') return AdminAccessState.none();
+
+    final role = data?['adminRole'] == 'admin' ? 'admin' : 'super_admin';
+    if (role == 'super_admin') {
+      return AdminAccessState(
+        uid: uid,
+        adminRole: role,
+        permissions: {
+          for (final permission in AdminPermission.values) permission: true,
+        },
+      );
+    }
+
+    final raw = data?['adminPermissions'];
+    final rawMap = raw is Map ? raw : const {};
+    return AdminAccessState(
+      uid: uid,
+      adminRole: role,
+      permissions: {
+        for (final permission in AdminPermission.values)
+          permission: rawMap[permission.key] is bool
+              ? permission == AdminPermission.manageAdminAccess
+                  ? false
+                  : rawMap[permission.key] as bool
+              : defaultAdminPermissions[permission] ?? false,
+      },
+    );
+  }
+}
+
+final currentAdminAccessProvider =
+    StreamProvider.autoDispose<AdminAccessState>((ref) {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return Stream.value(AdminAccessState.none());
+
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map(
+        (doc) => AdminAccessState.fromUserDoc(uid, doc.data()),
+      );
+});
+
 // Sentinel value for copyWith nullable fields
 class _Sentinel {
   const _Sentinel();
@@ -25,23 +124,30 @@ const _sentinel = _Sentinel();
 class UserFilterState {
   final String searchQuery;
   final String? roleFilter; // null | 'student' | 'mohaffez' | 'admin'
-  final String? statusFilter; // null | 'active' | 'suspended' | 'pending_approval' | 'rejected'
+  final String? statusFilter;
+  final int pageSize;
 
   const UserFilterState({
     this.searchQuery = '',
     this.roleFilter,
     this.statusFilter,
+    this.pageSize = adminUsersDefaultPageSize,
   });
 
   UserFilterState copyWith({
     String? searchQuery,
     Object? roleFilter = _sentinel,
     Object? statusFilter = _sentinel,
+    int? pageSize,
   }) {
     return UserFilterState(
       searchQuery: searchQuery ?? this.searchQuery,
-      roleFilter: roleFilter == _sentinel ? this.roleFilter : roleFilter as String?,
-      statusFilter: statusFilter == _sentinel ? this.statusFilter : statusFilter as String?,
+      roleFilter:
+          roleFilter == _sentinel ? this.roleFilter : roleFilter as String?,
+      statusFilter: statusFilter == _sentinel
+          ? this.statusFilter
+          : statusFilter as String?,
+      pageSize: pageSize ?? this.pageSize,
     );
   }
 }
@@ -50,22 +156,50 @@ class UserFilterState {
 class UserFilterNotifier extends StateNotifier<UserFilterState> {
   UserFilterNotifier() : super(const UserFilterState());
 
-  void setSearch(String q) => state = state.copyWith(searchQuery: q);
-  void setRole(String? role) => state = state.copyWith(roleFilter: role);
-  void setStatus(String? status) => state = state.copyWith(statusFilter: status);
+  void setSearch(String q) => state = state.copyWith(
+        searchQuery: q,
+        pageSize: adminUsersDefaultPageSize,
+      );
+
+  void setRole(String? role) => state = state.copyWith(
+        roleFilter: role,
+        pageSize: adminUsersDefaultPageSize,
+      );
+
+  void setStatus(String? status) => state = state.copyWith(
+        statusFilter: status,
+        pageSize: adminUsersDefaultPageSize,
+      );
+
+  void loadMore() => state = state.copyWith(
+        pageSize: state.pageSize + adminUsersPageStep,
+      );
+
   void reset() => state = const UserFilterState();
 }
 
 /// Provider for user filter state
-final userFilterProvider = StateNotifierProvider<UserFilterNotifier, UserFilterState>(
+final userFilterProvider =
+    StateNotifierProvider<UserFilterNotifier, UserFilterState>(
   (ref) => UserFilterNotifier(),
 );
 
+class AdminUsersListResult {
+  final List<Map<String, dynamic>> users;
+  final bool hasMore;
+  final int loadedCount;
+
+  const AdminUsersListResult({
+    required this.users,
+    required this.hasMore,
+    required this.loadedCount,
+  });
+}
+
 /// Server-side filtered stream — applies role/status filters via Firestore .where()
-/// Only text search (name/uid contains) is done client-side since Firestore
-/// doesn't support partial text search
-// FIXED: BUG-6
-final filteredUsersProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+/// Text search is applied to the loaded page across name, uid, email and phone.
+final filteredUsersProvider =
+    StreamProvider.autoDispose<AdminUsersListResult>((ref) {
   final filter = ref.watch(userFilterProvider);
 
   Query<Map<String, dynamic>> query =
@@ -78,19 +212,34 @@ final filteredUsersProvider = StreamProvider.autoDispose<List<Map<String, dynami
     query = query.where('status', isEqualTo: filter.statusFilter);
   }
 
-  return query.limit(200).snapshots().map((snap) {
-    var users = snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
-    // Apply text search on name + uid (case-insensitive) — client-side only
-    // because Firestore doesn't support partial text search
-    if (filter.searchQuery.isNotEmpty) {
-      final q = filter.searchQuery.toLowerCase();
+  return query.limit(filter.pageSize + 1).snapshots().map((snap) {
+    final docs = snap.docs;
+    final hasMore = docs.length > filter.pageSize;
+    var users = docs
+        .take(filter.pageSize)
+        .map((d) => {'id': d.id, ...d.data()})
+        .toList();
+
+    final queryText = filter.searchQuery.trim().toLowerCase();
+    if (queryText.isNotEmpty) {
       users = users.where((u) {
         final name = (u['name'] as String? ?? '').toLowerCase();
         final uid = (u['id'] as String? ?? '').toLowerCase();
-        return name.contains(q) || uid.contains(q);
+        final email = (u['email'] as String? ?? '').toLowerCase();
+        final phone = (u['phoneNumber'] as String? ?? '').toLowerCase();
+        return name.contains(queryText) ||
+            uid.contains(queryText) ||
+            email.contains(queryText) ||
+            phone.contains(queryText);
       }).toList();
     }
-    return users;
+
+    return AdminUsersListResult(
+      users: users,
+      hasMore: hasMore,
+      loadedCount:
+          docs.length > filter.pageSize ? filter.pageSize : docs.length,
+    );
   });
 });
 
@@ -106,16 +255,52 @@ final pendingTeachersProvider =
   return ref.watch(adminRepositoryProvider).watchPendingTeachers();
 });
 
+/// Users carrying any known review/risk flag for the admin dashboard queue.
+final flaggedUsersProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+  return ref.watch(adminRepositoryProvider).watchFlaggedUsers();
+});
+
 /// A single pending teacher's submitted credentials (for the review card).
 final teacherCredentialsProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>((ref, userId) {
   return ref.watch(adminRepositoryProvider).getUserCredentials(userId);
 });
 
+/// A pending teacher's pricing plans, including inactive ones, for review.
+final teacherReviewPricingPlansProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getTeacherPricingPlans(userId);
+});
+
+/// A pending teacher's weekly availability, for review.
+final teacherReviewAvailabilityProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getTeacherAvailability(userId);
+});
+
 /// A single user document by id (admin profile/detail page).
 final adminUserProvider = FutureProvider.autoDispose
     .family<Map<String, dynamic>?, String>((ref, userId) {
   return ref.watch(adminRepositoryProvider).getUserById(userId);
+});
+
+/// Recent sessions where this user is either student or teacher.
+final adminUserSessionsProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).getUserSessions(userId);
+});
+
+/// Payment events touching this user for finance review.
+final adminUserPaymentEventsProvider = StreamProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).watchUserPaymentEvents(userId);
+});
+
+/// Recent notifications sent to a user for support review.
+final adminUserNotificationsProvider = StreamProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, userId) {
+  return ref.watch(adminRepositoryProvider).watchUserNotifications(userId);
 });
 
 /// Aggregated teaching statistics for one mohaffez, computed from hafizSessions.
@@ -144,8 +329,8 @@ class TeacherStats {
 }
 
 /// Teaching statistics for a mohaffez, for the admin profile page.
-final teacherStatsProvider =
-    FutureProvider.autoDispose.family<TeacherStats, String>((ref, teacherId) async {
+final teacherStatsProvider = FutureProvider.autoDispose
+    .family<TeacherStats, String>((ref, teacherId) async {
   final sessions =
       await ref.watch(adminRepositoryProvider).getTeacherSessions(teacherId);
 
@@ -163,7 +348,8 @@ final teacherStatsProvider =
       revenue += (s['sessionPrice'] as num?)?.toDouble() ?? 0;
     } else if (status == 'pending' || status == 'accepted') {
       upcoming++;
-    } else if (status.contains('cancel') || status.contains('no_show') ||
+    } else if (status.contains('cancel') ||
+        status.contains('no_show') ||
         status.contains('noshow')) {
       cancelled++;
     }
@@ -175,9 +361,8 @@ final teacherStatsProvider =
     }
   }
 
-  final recent = [...sessions]
-    ..sort((a, b) => _compareTs(b['sessionDate'] ?? b['slotStart'],
-        a['sessionDate'] ?? a['slotStart']));
+  final recent = [...sessions]..sort((a, b) => _compareTs(
+      b['sessionDate'] ?? b['slotStart'], a['sessionDate'] ?? a['slotStart']));
 
   return TeacherStats(
     total: sessions.length,
@@ -252,12 +437,12 @@ final adminSessionsProvider = StreamProvider.autoDispose
         .limit(100)
         .snapshots()
         .map((s) {
-          final docs = s.docs
-              .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
-              .toList();
-          docs.sort((a, b) => _compareTs(b['sessionDate'], a['sessionDate']));
-          return docs;
-        });
+      final docs = s.docs
+          .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+          .toList();
+      docs.sort((a, b) => _compareTs(b['sessionDate'], a['sessionDate']));
+      return docs;
+    });
   }
 
   // null → most recent 100 across all statuses
@@ -265,8 +450,9 @@ final adminSessionsProvider = StreamProvider.autoDispose
       .orderBy('sessionDate', descending: true)
       .limit(100)
       .snapshots()
-      .map((s) =>
-          s.docs.map((d) => <String, dynamic>{'id': d.id, ...d.data()}).toList());
+      .map((s) => s.docs
+          .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+          .toList());
 });
 
 int _compareTs(dynamic a, dynamic b) {
@@ -304,8 +490,8 @@ final broadcastHistoryProvider =
 /// callable, which counts users that have an FCM token.
 final broadcastAudienceCountProvider =
     FutureProvider.autoDispose.family<int, String>((ref, targetRole) async {
-  final callable = FirebaseFunctions.instance
-      .httpsCallable('getBroadcastAudienceCount');
+  final callable =
+      FirebaseFunctions.instance.httpsCallable('getBroadcastAudienceCount');
   final res = await callable.call(<String, dynamic>{'targetRole': targetRole});
   final data = res.data as Map?;
   return (data?['count'] as num?)?.toInt() ?? 0;
@@ -329,14 +515,13 @@ class TeacherRanking {
 /// Top teachers by completed-session count over the last [days] days.
 /// Aggregates `hafizSessions` client-side using the denormalized
 /// `mohaffezName` / `sessionPrice` fields (no user join needed).
-final topTeachersProvider =
-    FutureProvider.autoDispose.family<List<TeacherRanking>, int>((ref, days) async {
+final topTeachersProvider = FutureProvider.autoDispose
+    .family<List<TeacherRanking>, int>((ref, days) async {
   final cutoff = DateTime.now().subtract(Duration(days: days));
   final snap = await FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('status', isEqualTo: 'completed')
-      .where('completedAt',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
+      .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
       .get();
 
   final counts = <String, int>{};
@@ -348,7 +533,8 @@ final topTeachersProvider =
     final id = d['mohaffezId'] as String?;
     if (id == null || id.isEmpty) continue;
     counts[id] = (counts[id] ?? 0) + 1;
-    revenue[id] = (revenue[id] ?? 0) + ((d['sessionPrice'] as num?)?.toDouble() ?? 0);
+    revenue[id] =
+        (revenue[id] ?? 0) + ((d['sessionPrice'] as num?)?.toDouble() ?? 0);
     final name = d['mohaffezName'] as String?;
     if (name != null && name.isNotEmpty) names[id] = name;
   }
@@ -408,14 +594,45 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
     await _callFunction('unsuspendUser', {'userId': userId});
   }
 
-  Future<void> deleteUserData(String userId) async {
-    await _callFunction('deleteUserAccount', {'userId': userId});
+  Future<void> deleteUserData(String userId, String reason) async {
+    await _callFunction('deleteUserAccount', {
+      'userId': userId,
+      'reason': reason,
+    });
   }
 
   Future<void> updateUserRole(String userId, String newRole) async {
     await _callFunction('setUserRole', {
       'userId': userId,
       'newRole': newRole,
+    });
+  }
+
+  Future<void> updateAdminAccess({
+    required String userId,
+    required String adminRole,
+    required Map<AdminPermission, bool> permissions,
+  }) async {
+    await _callFunction('updateAdminAccess', {
+      'userId': userId,
+      'adminRole': adminRole,
+      'permissions': {
+        for (final entry in permissions.entries) entry.key.key: entry.value,
+      },
+    });
+  }
+
+  Future<void> grantAdminAccessByEmail({
+    required String email,
+    required String adminRole,
+    required Map<AdminPermission, bool> permissions,
+  }) async {
+    await _callFunction('setAdminClaim', {
+      'targetEmail': email,
+      'adminRole': adminRole,
+      'permissions': {
+        for (final entry in permissions.entries) entry.key.key: entry.value,
+      },
     });
   }
 
@@ -539,7 +756,6 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
       await _repository.deletePromoCode(promoId);
     });
   }
-
 
   Future<void> triggerCleanupJob() async {
     await _callFunction('triggerCleanupJobManually', const {});

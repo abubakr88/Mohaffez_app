@@ -6,6 +6,10 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
+import {
+  AdminPermission,
+  requireAdminAccess,
+} from '../utils/adminPermissions';
 
 export type OwnerType = 'student' | 'mohaffez' | 'system';
 
@@ -372,14 +376,9 @@ export async function postWalletEvent(
  * can't read the data the callable produces. To make a user admin, call
  * the `setAdminClaim` Cloud Function.
  */
-export async function requireAdmin(context: functions.https.CallableContext): Promise<string> {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'login required');
-  }
-  const isAdminClaim =
-    context.auth.token.admin === true || context.auth.token.role === 'admin';
-  if (!isAdminClaim) {
-    throw new functions.https.HttpsError('permission-denied', 'admin only');
-  }
-  return context.auth.uid;
+export async function requireAdmin(
+  context: functions.https.CallableContext,
+  permission: AdminPermission = 'manageFinance',
+): Promise<string> {
+  return (await requireAdminAccess(context, permission)).uid;
 }
