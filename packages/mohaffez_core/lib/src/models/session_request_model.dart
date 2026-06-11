@@ -14,7 +14,8 @@ class SessionRequestModel {
   final String mohaffezId;
   final String mohaffezName;
   final String sessionType;
-  final String? preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (online only)
+  final String?
+      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (online only)
   final String preferredTimeSlot;
   final Timestamp? slotDate;
   final Timestamp? slotStart;
@@ -189,7 +190,8 @@ class SessionRequestModel {
         'requiresPaymentOnAcceptance': requiresPaymentOnAcceptance,
         if (slotLockId != null) 'slotLockId': slotLockId,
         if (sessionId != null) 'sessionId': sessionId,
-        if (cancellationReason != null) 'cancellationReason': cancellationReason,
+        if (cancellationReason != null)
+          'cancellationReason': cancellationReason,
         if (cancelledBy != null) 'cancelledBy': cancelledBy,
         if (paymentAmount != null) 'paymentAmount': paymentAmount,
         if (isPaid != null) 'isPaid': isPaid,

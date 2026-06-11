@@ -127,6 +127,20 @@ class AdminRepository {
             .toList());
   }
 
+  /// Users marked by any known review/risk flag.
+  ///
+  /// This intentionally filters client-side because older documents do not use
+  /// a single flag field yet. The dashboard queue remains read-only and links
+  /// admins to the users page for manual review.
+  Stream<List<Map<String, dynamic>>> watchFlaggedUsers() {
+    return _firestore.collection('users').limit(500).snapshots().map((snap) {
+      return snap.docs
+          .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+          .where(_isFlaggedUser)
+          .toList();
+    });
+  }
+
   /// Single user document by id (for the admin profile/detail page).
   Future<Map<String, dynamic>?> getUserById(String userId) async {
     final doc = await _firestore.collection('users').doc(userId).get();
@@ -136,7 +150,8 @@ class AdminRepository {
 
   /// All sessions for a teacher, for profile statistics (aggregated client-side).
   /// Single equality filter on `mohaffezId` uses the automatic single-field index.
-  Future<List<Map<String, dynamic>>> getTeacherSessions(String teacherId) async {
+  Future<List<Map<String, dynamic>>> getTeacherSessions(
+      String teacherId) async {
     final snap = await _firestore
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: teacherId)
@@ -145,6 +160,60 @@ class AdminRepository {
     return snap.docs
         .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
         .toList();
+  }
+
+  /// Recent sessions for any user, whether they are the student or teacher.
+  Future<List<Map<String, dynamic>>> getUserSessions(String userId) async {
+    final studentSnap = await _firestore
+        .collection('hafizSessions')
+        .where('studentId', isEqualTo: userId)
+        .limit(500)
+        .get();
+    final teacherSnap = await _firestore
+        .collection('hafizSessions')
+        .where('mohaffezId', isEqualTo: userId)
+        .limit(500)
+        .get();
+
+    final byId = <String, Map<String, dynamic>>{};
+    for (final doc in [...studentSnap.docs, ...teacherSnap.docs]) {
+      byId[doc.id] = <String, dynamic>{'id': doc.id, ...doc.data()};
+    }
+
+    final sessions = byId.values.toList()
+      ..sort((a, b) => _compareTs(
+            b['sessionDate'] ?? b['slotStart'] ?? b['createdAt'],
+            a['sessionDate'] ?? a['slotStart'] ?? a['createdAt'],
+          ));
+    return sessions.take(100).toList();
+  }
+
+  /// Recent payment events touching this user. Payment documents remain
+  /// server-owned; this reads the admin-facing event log instead.
+  Stream<List<Map<String, dynamic>>> watchUserPaymentEvents(String userId) {
+    return _firestore
+        .collection('paymentEvents')
+        .orderBy('timestamp', descending: true)
+        .limit(300)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+            .where((event) => _eventTouchesUser(event, userId))
+            .take(50)
+            .toList());
+  }
+
+  /// Recent notifications sent to this user for admin support review.
+  Stream<List<Map<String, dynamic>>> watchUserNotifications(String userId) {
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+            .toList());
   }
 
   /// One-shot read of a single user's submitted credentials (for review).
@@ -157,6 +226,40 @@ class AdminRepository {
     return snap.docs
         .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
         .toList();
+  }
+
+  /// One-shot read of a teacher's pricing plans for the admin review screen.
+  Future<List<Map<String, dynamic>>> getTeacherPricingPlans(
+      String userId) async {
+    final snap = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('pricingPlans')
+        .get();
+    final plans = snap.docs
+        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+        .toList();
+    plans.sort((a, b) => _compareTs(b['createdAt'], a['createdAt']));
+    return plans;
+  }
+
+  /// One-shot read of a teacher's weekly availability for admin review.
+  Future<List<Map<String, dynamic>>> getTeacherAvailability(
+      String userId) async {
+    final snap = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('availability')
+        .get();
+    final availability = snap.docs
+        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+        .toList();
+    availability.sort((a, b) {
+      final aDay = (a['dayOfWeek'] as num?)?.toInt() ?? 99;
+      final bDay = (b['dayOfWeek'] as num?)?.toInt() ?? 99;
+      return aDay.compareTo(bDay);
+    });
+    return availability;
   }
 
   Future<void> approveCredential(String userId, String credentialId) {
@@ -206,10 +309,10 @@ class AdminRepository {
   }
 
   Stream<List<Map<String, dynamic>>> watchAllPromoCodes() {
-    return _firestore.collection('promoCodes').limit(200).snapshots().map((snap) => snap
-        .docs
-        .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
-        .toList());
+    return _firestore.collection('promoCodes').limit(200).snapshots().map(
+        (snap) => snap.docs
+            .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+            .toList());
   }
 
   Future<void> createPromoCode(Map<String, dynamic> data) {
@@ -249,4 +352,74 @@ class AdminRepository {
             .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
             .toList());
   }
+}
+
+int _compareTs(dynamic a, dynamic b) {
+  DateTime? toDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    try {
+      return (v as dynamic).toDate() as DateTime;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  final da = toDate(a);
+  final db = toDate(b);
+  if (da == null && db == null) return 0;
+  if (da == null) return 1;
+  if (db == null) return -1;
+  return da.compareTo(db);
+}
+
+bool _isFlaggedUser(Map<String, dynamic> user) {
+  final status = (user['status'] as String? ?? '').toLowerCase();
+  if (status == 'flagged' ||
+      status == 'suspicious' ||
+      status == 'under_review' ||
+      status == 'security_review') {
+    return true;
+  }
+
+  for (final key in const [
+    'isSuspicious',
+    'riskFlag',
+    'needsAdminReview',
+    'adminReviewRequired',
+    'paymentReviewRequired',
+  ]) {
+    if (user[key] == true) return true;
+  }
+
+  return false;
+}
+
+bool _eventTouchesUser(Map<String, dynamic> event, String userId) {
+  for (final key in const [
+    'userId',
+    'studentId',
+    'mohaffezId',
+    'teacherId',
+    'ownerId',
+    'payerId',
+  ]) {
+    if (event[key] == userId) return true;
+  }
+
+  final data = event['data'];
+  if (data is Map) {
+    for (final key in const [
+      'userId',
+      'studentId',
+      'mohaffezId',
+      'teacherId',
+      'ownerId',
+      'payerId',
+    ]) {
+      if (data[key] == userId) return true;
+    }
+  }
+
+  return false;
 }

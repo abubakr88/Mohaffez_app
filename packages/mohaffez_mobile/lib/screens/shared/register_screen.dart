@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -31,6 +31,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
+  // ignore: unused_element
   Future<void> _signUpWithGoogle() async {
     final notifier = ref.read(authNotifierProvider.notifier);
     await notifier.signInWithGoogle();
@@ -249,7 +250,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           children: [
                             Expanded(
                               child: _GenderCard(
-                                title: _selectedRole == 'student' ? 'طالب' : 'معلم',
+                                icon: Icons.male,
+                                title: _selectedRole == 'student'
+                                    ? 'طالب'
+                                    : 'معلم',
                                 color: AppThemeConstants.primary,
                                 isSelected: _selectedGender == 'male',
                                 onTap: () {
@@ -265,7 +269,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             Expanded(
                               child: _GenderCard(
-                                title: _selectedRole == 'student' ? 'طالبة' : 'معلمة',
+                                icon: Icons.female,
+                                title: _selectedRole == 'student'
+                                    ? 'طالبة'
+                                    : 'معلمة',
                                 color: AppThemeConstants.secondary,
                                 isSelected: _selectedGender == 'female',
                                 onTap: () {
@@ -348,8 +355,9 @@ class _GenderCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
         decoration: BoxDecoration(
-          color:
-              isSelected ? color.withValues(alpha: 0.1) : AppThemeConstants.background,
+          color: isSelected
+              ? color.withValues(alpha: 0.1)
+              : AppThemeConstants.background,
           borderRadius: AppThemeConstants.borderRadiusMd,
           border: Border.all(
             color: isSelected ? color : AppThemeConstants.divider,
@@ -406,8 +414,9 @@ class _RoleCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
         decoration: BoxDecoration(
-          color:
-              isSelected ? color.withValues(alpha: 0.1) : AppThemeConstants.background,
+          color: isSelected
+              ? color.withValues(alpha: 0.1)
+              : AppThemeConstants.background,
           borderRadius: AppThemeConstants.borderRadiusMd,
           border: Border.all(
             color: isSelected ? color : AppThemeConstants.divider,

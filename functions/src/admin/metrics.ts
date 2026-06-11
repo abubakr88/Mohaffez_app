@@ -9,6 +9,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { db, FieldValue } from '../utils/admin';
+import { requireAdminAccess } from '../utils/adminPermissions';
 
 interface AdminMetrics {
   generatedAt: FirebaseFirestore.FieldValue;
@@ -254,13 +255,7 @@ async function writeMetricsCache(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getAdminMetrics = functions.https.onCall(async (_data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'يجب تسجيل الدخول');
-  }
-  const isAdmin = (context.auth.token as { admin?: boolean } | undefined)?.admin === true;
-  if (!isAdmin) {
-    throw new functions.https.HttpsError('permission-denied', 'للمسؤولين فقط');
-  }
+  await requireAdminAccess(context);
 
   const metrics = await computeAdminMetrics();
   await writeMetricsCache(metrics).catch((err) =>

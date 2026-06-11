@@ -3,6 +3,7 @@
 // User submits a top-up request after sending money via bank/wallet.
 // Admin verifies it server-side via verifyWalletTopUp; only then does the
 // balance change.
+// ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -129,8 +130,7 @@ class _WalletTopupScreenState extends ConsumerState<WalletTopupScreen> {
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'[0-9.]')),
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                         ],
                         decoration: const InputDecoration(
                           labelText: 'المبلغ (ج.م)',
@@ -153,10 +153,9 @@ class _WalletTopupScreenState extends ConsumerState<WalletTopupScreen> {
                           prefixIcon: Icon(Icons.confirmation_number),
                           border: OutlineInputBorder(),
                         ),
-                        validator: (v) =>
-                            (v == null || v.trim().length < 4)
-                                ? 'أدخل رقم العملية'
-                                : null,
+                        validator: (v) => (v == null || v.trim().length < 4)
+                            ? 'أدخل رقم العملية'
+                            : null,
                       ),
                     ],
                   ),
@@ -178,8 +177,7 @@ class _WalletTopupScreenState extends ConsumerState<WalletTopupScreen> {
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppThemeConstants.white),
+                                strokeWidth: 2, color: AppThemeConstants.white),
                           )
                         : const Text(
                             'إرسال طلب الشحن',

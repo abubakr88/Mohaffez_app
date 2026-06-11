@@ -3,6 +3,7 @@
 // Teacher requests a withdrawal from their wallet balance. Submitting creates
 // a payoutRequest doc (status: 'requested'). No money moves until admin
 // triggers startPayout.
+// ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -75,7 +76,8 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
     return userAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (_, __) => const Scaffold(body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى'))),
+      error: (_, __) => const Scaffold(
+          body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى'))),
       data: (user) {
         if (user == null) return const SizedBox.shrink();
         final walletAsync = ref.watch(walletProvider((
@@ -97,8 +99,8 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
             ),
             body: walletAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) =>
-                  const Center(child: Text('تعذّر تحميل الرصيد. يرجى المحاولة مرة أخرى')),
+              error: (_, __) => const Center(
+                  child: Text('تعذّر تحميل الرصيد. يرجى المحاولة مرة أخرى')),
               data: (w) {
                 final balance = w.balanceEgp;
                 return SingleChildScrollView(
@@ -114,9 +116,8 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
                           title: 'المبلغ',
                           child: TextFormField(
                             controller: _amountCtrl,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
-                                    decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(
                                   RegExp(r'[0-9.]')),
@@ -154,8 +155,7 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
                               return RadioListTile<PayoutMethod>(
                                 value: e.key,
                                 groupValue: _method,
-                                onChanged: (v) =>
-                                    setState(() => _method = v!),
+                                onChanged: (v) => setState(() => _method = v!),
                                 title: Text(e.value),
                                 activeColor: AppThemeConstants.primary,
                                 contentPadding: EdgeInsets.zero,
@@ -189,9 +189,8 @@ class _RequestPayoutScreenState extends ConsumerState<RequestPayoutScreen> {
                         SizedBox(
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: _submitting
-                                ? null
-                                : () => _submit(balance),
+                            onPressed:
+                                _submitting ? null : () => _submit(balance),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppThemeConstants.primary,
                               foregroundColor: AppThemeConstants.white,
@@ -239,8 +238,8 @@ class _BalanceHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppThemeConstants.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: AppThemeConstants.primary.withValues(alpha: 0.2)),
+        border:
+            Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -249,7 +248,8 @@ class _BalanceHeader extends StatelessWidget {
           const SizedBox(width: AppThemeConstants.spaceMd),
           const Expanded(
             child: Text('الرصيد المتاح',
-                style: TextStyle(fontSize: 14, color: AppThemeConstants.textPrimary)),
+                style: TextStyle(
+                    fontSize: 14, color: AppThemeConstants.textPrimary)),
           ),
           Text(
             '${balance.toStringAsFixed(2)} ج.م',
@@ -283,8 +283,8 @@ class _Card extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 15)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: AppThemeConstants.spaceMd),
           child,
         ],

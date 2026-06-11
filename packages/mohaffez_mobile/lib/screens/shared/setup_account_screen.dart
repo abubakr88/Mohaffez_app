@@ -1,4 +1,4 @@
-﻿// lib/screens/setup_account_screen.dart
+// lib/screens/setup_account_screen.dart
 
 import 'dart:async';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -14,14 +14,28 @@ class SetupAccountScreen extends ConsumerStatefulWidget {
   const SetupAccountScreen({super.key});
 
   @override
-  ConsumerState<SetupAccountScreen> createState() =>
-      _SetupAccountScreenState();
+  ConsumerState<SetupAccountScreen> createState() => _SetupAccountScreenState();
 }
 
 class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
   final _pageController = PageController();
   final _formKey = GlobalKey<FormState>();
   int _currentStep = 0;
+  static const int _firstBirthYear = 1940;
+  static const List<String> _arabicMonths = [
+    'يناير',
+    'فبراير',
+    'مارس',
+    'أبريل',
+    'مايو',
+    'يونيو',
+    'يوليو',
+    'أغسطس',
+    'سبتمبر',
+    'أكتوبر',
+    'نوفمبر',
+    'ديسمبر',
+  ];
 
   // ─── Step 1: Profile fields ────────────────────────────────────
   final _phoneController = TextEditingController();
@@ -80,6 +94,60 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
     return age >= 18;
   }
 
+  int? get _birthDay => _dateOfBirth?.day;
+  int? get _birthMonth => _dateOfBirth?.month;
+  int? get _birthYear => _dateOfBirth?.year;
+
+  List<int> get _birthYears {
+    final currentYear = DateTime.now().year;
+    return List<int>.generate(
+      currentYear - _firstBirthYear + 1,
+      (index) => currentYear - index,
+    );
+  }
+
+  List<int> get _availableBirthMonths {
+    final now = DateTime.now();
+    final selectedYear = _birthYear;
+    final maxMonth = selectedYear == now.year ? now.month : 12;
+    return List<int>.generate(maxMonth, (index) => index + 1);
+  }
+
+  List<int> get _availableBirthDays {
+    final now = DateTime.now();
+    final selectedYear = _birthYear;
+    final selectedMonth = _birthMonth;
+    if (selectedYear == null || selectedMonth == null) {
+      return const <int>[];
+    }
+
+    var maxDay = DateTime(selectedYear, selectedMonth + 1, 0).day;
+    if (selectedYear == now.year && selectedMonth == now.month) {
+      maxDay = now.day;
+    }
+    return List<int>.generate(maxDay, (index) => index + 1);
+  }
+
+  void _setBirthDatePart({int? day, int? month, int? year}) {
+    final now = DateTime.now();
+    final nextYear = year ?? _birthYear ?? now.year;
+    var nextMonth = month ?? _birthMonth ?? 1;
+
+    if (nextYear == now.year && nextMonth > now.month) {
+      nextMonth = now.month;
+    }
+
+    var maxDay = DateTime(nextYear, nextMonth + 1, 0).day;
+    if (nextYear == now.year && nextMonth == now.month) {
+      maxDay = now.day;
+    }
+
+    final nextDay = (day ?? _birthDay ?? 1).clamp(1, maxDay);
+    setState(() {
+      _dateOfBirth = DateTime(nextYear, nextMonth, nextDay);
+    });
+  }
+
   // ─── Profile "Next" handler ────────────────────────────────────
   void _onProfileNext() {
     if (!_formKey.currentState!.validate()) return;
@@ -99,8 +167,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       return;
     }
 
-    final isMohaffez =
-        ref.read(currentUserProvider).value?.role == 'mohaffez';
+    final isMohaffez = ref.read(currentUserProvider).value?.role == 'mohaffez';
 
     if (isMohaffez == true && !_isAtLeast18(_dateOfBirth!)) {
       showDialog(
@@ -133,7 +200,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       final config = ref.read(systemConfigProvider).valueOrNull;
       final retryCount = user?.examRetryCount ?? 0;
       final maxRetries = config?.examMaxRetries ?? 3;
-      
+
       if (retryCount >= maxRetries) {
         showDialog(
           context: context,
@@ -148,7 +215,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
               ),
               actions: [
                 ElevatedButton(
-                  onPressed: () => ref.read(authNotifierProvider.notifier).logout(),
+                  onPressed: () =>
+                      ref.read(authNotifierProvider.notifier).logout(),
                   child: const Text('تسجيل الخروج'),
                 ),
               ],
@@ -168,7 +236,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         final remainingText = days > 0
             ? '$days يوم ${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}'
             : '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
-        
+
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -182,7 +250,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
               ),
               actions: [
                 ElevatedButton(
-                  onPressed: () => ref.read(authNotifierProvider.notifier).logout(),
+                  onPressed: () =>
+                      ref.read(authNotifierProvider.notifier).logout(),
                   child: const Text('تسجيل الخروج'),
                 ),
               ],
@@ -255,8 +324,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
     setState(() {
       _mainLocationLat = result['lat'] as double?;
       _mainLocationLng = result['lng'] as double?;
-      _mainLocationText =
-          (result['locationName'] as String?) ??
+      _mainLocationText = (result['locationName'] as String?) ??
           (result['city'] as String?) ??
           'موقع محدد';
 
@@ -299,7 +367,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       },
       error: (e, _) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر تحميل الأسئلة. يرجى المحاولة مرة أخرى')),
+          const SnackBar(
+              content: Text('تعذّر تحميل الأسئلة. يرجى المحاولة مرة أخرى')),
         );
       },
     );
@@ -352,9 +421,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         });
       }
 
-      final score = questions.isNotEmpty
-          ? (correct / questions.length) * 100
-          : 0.0;
+      final score =
+          questions.isNotEmpty ? (correct / questions.length) * 100 : 0.0;
 
       final uid = ref.read(currentAuthUserProvider)?.uid;
       if (uid == null) throw Exception('المستخدم غير مسجل');
@@ -447,7 +515,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                       textDirection: TextDirection.rtl,
                       child: AlertDialog(
                         title: const Text('تسجيل الخروج'),
-                        content: const Text('هل تريد تسجيل الخروج والعودة لاحقاً؟'),
+                        content:
+                            const Text('هل تريد تسجيل الخروج والعودة لاحقاً؟'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
@@ -494,7 +563,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 16),
-            const Icon(Icons.person_outline, size: 64, color: AppThemeConstants.primary),
+            const Icon(Icons.person_outline,
+                size: 64, color: AppThemeConstants.primary),
             const SizedBox(height: 16),
             const Text(
               'أكمل بيانات حسابك',
@@ -525,36 +595,17 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Date of birth
-            InkWell(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime(2000, 1, 1),
-                  firstDate: DateTime(1940),
-                  lastDate: DateTime.now(),
-                  locale: const Locale('ar'),
-                );
-                if (picked != null) {
-                  setState(() => _dateOfBirth = picked);
-                }
-              },
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'تاريخ الميلاد',
-                  prefixIcon: Icon(Icons.calendar_today),
-                  border: OutlineInputBorder(),
-                ),
-                child: Text(
-                  _dateOfBirth != null
-                      ? '${_dateOfBirth!.year}/${_dateOfBirth!.month}/${_dateOfBirth!.day}'
-                      : 'اختر التاريخ',
-                  style: TextStyle(
-                    color: _dateOfBirth != null ? null : AppThemeConstants.grey500,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+            _BirthDateDropdowns(
+              day: _birthDay,
+              month: _birthMonth,
+              year: _birthYear,
+              years: _birthYears,
+              months: _availableBirthMonths,
+              days: _availableBirthDays,
+              monthNames: _arabicMonths,
+              onDayChanged: (value) => _setBirthDatePart(day: value),
+              onMonthChanged: (value) => _setBirthDatePart(month: value),
+              onYearChanged: (value) => _setBirthDatePart(year: value),
             ),
             const SizedBox(height: 16),
 
@@ -591,10 +642,9 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                             ? _mainLocationText!
                             : 'اختر موقعك الرئيسي من الخريطة',
                         style: TextStyle(
-                          color:
-                              (_mainLocationText?.trim().isNotEmpty ?? false)
-                                  ? null
-                                  : AppThemeConstants.grey500,
+                          color: (_mainLocationText?.trim().isNotEmpty ?? false)
+                              ? null
+                              : AppThemeConstants.grey500,
                           fontSize: 16,
                         ),
                       ),
@@ -609,7 +659,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
               const SizedBox(height: 8),
               Text(
                 'الإحداثيات: ${_mainLocationLat!.toStringAsFixed(4)}, ${_mainLocationLng!.toStringAsFixed(4)}',
-                style: const TextStyle(fontSize: 12, color: AppThemeConstants.grey500),
+                style: const TextStyle(
+                    fontSize: 12, color: AppThemeConstants.grey500),
               ),
             ],
             const SizedBox(height: 32),
@@ -652,7 +703,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 24),
-          const Icon(Icons.quiz_outlined, size: 64, color: AppThemeConstants.warning),
+          const Icon(Icons.quiz_outlined,
+              size: 64, color: AppThemeConstants.warning),
           const SizedBox(height: 16),
           const Text(
             'اختبار تقييم المهارات',
@@ -756,7 +808,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
               const Spacer(),
               Text(
                 'سؤال ${_currentQuestionIndex + 1} من $total',
-                style: const TextStyle(fontSize: 14, color: AppThemeConstants.grey500),
+                style: const TextStyle(
+                    fontSize: 14, color: AppThemeConstants.grey500),
               ),
             ],
           ),
@@ -898,6 +951,121 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _BirthDateDropdowns extends StatelessWidget {
+  final int? day;
+  final int? month;
+  final int? year;
+  final List<int> years;
+  final List<int> months;
+  final List<int> days;
+  final List<String> monthNames;
+  final ValueChanged<int?> onDayChanged;
+  final ValueChanged<int?> onMonthChanged;
+  final ValueChanged<int?> onYearChanged;
+
+  const _BirthDateDropdowns({
+    required this.day,
+    required this.month,
+    required this.year,
+    required this.years,
+    required this.months,
+    required this.days,
+    required this.monthNames,
+    required this.onDayChanged,
+    required this.onMonthChanged,
+    required this.onYearChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InputDecorator(
+      decoration: const InputDecoration(
+        labelText: 'تاريخ الميلاد',
+        prefixIcon: Icon(Icons.calendar_today),
+        border: OutlineInputBorder(),
+        contentPadding: EdgeInsets.fromLTRB(12, 14, 12, 10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _BirthDropdown<int>(
+              label: 'اليوم',
+              value: days.contains(day) ? day : null,
+              items: days,
+              itemLabel: (value) => value.toString(),
+              onChanged: month == null || year == null ? null : onDayChanged,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: _BirthDropdown<int>(
+              label: 'الشهر',
+              value: months.contains(month) ? month : null,
+              items: months,
+              itemLabel: (value) => monthNames[value - 1],
+              onChanged: year == null ? null : onMonthChanged,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _BirthDropdown<int>(
+              label: 'السنة',
+              value: years.contains(year) ? year : null,
+              items: years,
+              itemLabel: (value) => value.toString(),
+              onChanged: onYearChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BirthDropdown<T> extends StatelessWidget {
+  final String label;
+  final T? value;
+  final List<T> items;
+  final String Function(T value) itemLabel;
+  final ValueChanged<T?>? onChanged;
+
+  const _BirthDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.itemLabel,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      items: items
+          .map(
+            (item) => DropdownMenuItem<T>(
+              value: item,
+              child: Text(
+                itemLabel(item),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
     );
   }
 }

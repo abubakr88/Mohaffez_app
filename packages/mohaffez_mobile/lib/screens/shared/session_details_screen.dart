@@ -287,7 +287,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     } else if (isBundle && !isTeacher) {
       // Student cancel of bundle: >3h restores the session credit; <3h loses it.
       if (hoursUntilSession > 3) {
-        refundPolicy = 'ستُعاد الحلقة إلى رصيد باقتك (لا يوجد استرداد نقدي للباقات)';
+        refundPolicy =
+            'ستُعاد الحلقة إلى رصيد باقتك (لا يوجد استرداد نقدي للباقات)';
         policyColor = AppThemeConstants.success;
       } else {
         refundPolicy = 'ستفقد هذه الحلقة من الباقة — الإلغاء المتأخر لا يُعاد';
@@ -297,8 +298,8 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
       final priceText = (session.sessionPrice ?? 0) > 0
           ? '${session.sessionPrice!.toStringAsFixed(0)} ج.م '
           : '';
-      // ignore: unnecessary_brace_in_string_interps
-      final base = 'كامل المبلغ ${priceText}سيُخصم من أرباحك ويُعاد إلى محفظة الطالب';
+      final base =
+          'كامل المبلغ $priceTextسيُخصم من أرباحك ويُعاد إلى محفظة الطالب';
       String? penalty;
       if (hoursUntilSession < 1) {
         penalty = '\nبالإضافة إلى زيادة عمولة المنصة بـ 1% لهذه الدورة';
@@ -425,10 +426,14 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
 
     try {
       final sessionId = session.id;
-      if (sessionId == null) throw Exception('معرّف الجلسة غير موجود');
+      if (sessionId == null) {
+        throw Exception('معرّف الجلسة غير موجود');
+      }
       final role = ref.read(currentUserProvider).value?.role ?? 'student';
       final cancelledBy = role == 'mohaffez' ? 'teacher' : 'student';
-      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId, cancelledBy: cancelledBy);
+      await ref
+          .read(sessionActionsProvider.notifier)
+          .cancelSession(sessionId, cancelledBy: cancelledBy);
       dismissLoading();
       // Close session details screen — only if it's still in the stack and
       // we're not popping the last page.
@@ -937,7 +942,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
             ),
             title: Text('${pageMistakes.length} أخطاء'),
             children: pageMistakes.map((m) {
-              final mistake = m as QuranMistake;
+              final mistake = m;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: mistake.buildSummaryTile(
@@ -1120,17 +1125,15 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
     // is the date-only field (midnight). Comparing against sessionDate would
     // make the button appear from 00:10 AM onward instead of 10 min after
     // the actual start.
-    final graceMinutes = ref
-            .watch(systemConfigProvider)
-            .valueOrNull
-            ?.lateSessionGraceMinutes ??
-        10;
+    final graceMinutes =
+        ref.watch(systemConfigProvider).valueOrNull?.lateSessionGraceMinutes ??
+            10;
     final startTime = session.slotStart ?? session.sessionDate;
     if (isStudent &&
         session.status == 'accepted' &&
         startTime != null &&
-        DateTime.now().isAfter(
-            startTime.add(Duration(minutes: graceMinutes)))) {
+        DateTime.now()
+            .isAfter(startTime.add(Duration(minutes: graceMinutes)))) {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1156,8 +1159,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
         session.status == 'accepted' &&
         startTime != null &&
         startTime.isAfter(DateTime.now())) {
-      final hoursUntil =
-          startTime.difference(DateTime.now()).inHours;
+      final hoursUntil = startTime.difference(DateTime.now()).inHours;
 
       final String refundPolicy;
       final Color policyColor;
@@ -1664,8 +1666,8 @@ class _AdminRefundCardState extends ConsumerState<_AdminRefundCard> {
       decoration: BoxDecoration(
         color: AppThemeConstants.error.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: AppThemeConstants.error.withValues(alpha: 0.3)),
+        border:
+            Border.all(color: AppThemeConstants.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1677,12 +1679,11 @@ class _AdminRefundCardState extends ConsumerState<_AdminRefundCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('أدوات الإدارة',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 Text('استرداد المبلغ إلى محفظة الطالب',
                     style: TextStyle(
-                        color: AppThemeConstants.textSecondary,
-                        fontSize: 12)),
+                        color: AppThemeConstants.textSecondary, fontSize: 12)),
               ],
             ),
           ),

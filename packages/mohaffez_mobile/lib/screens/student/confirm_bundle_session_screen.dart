@@ -56,11 +56,12 @@ class _ConfirmBundleSessionScreenState
 
     // 2. If slotContext is already set, cache it locally and move on.
     if (slotCtx != null) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _cachedSlotContext = slotCtx;
           _hydrating = false;
         });
+      }
       if (mounted) await _loadSubscription();
       return;
     }
@@ -183,7 +184,8 @@ class _ConfirmBundleSessionScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _subscriptionError = 'حدث خطأ أثناء تحميل الباقة. يرجى المحاولة مرة أخرى';
+        _subscriptionError =
+            'حدث خطأ أثناء تحميل الباقة. يرجى المحاولة مرة أخرى';
         _loadingSubscription = false;
       });
     }

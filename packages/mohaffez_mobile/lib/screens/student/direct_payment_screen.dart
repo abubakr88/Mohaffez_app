@@ -1,11 +1,10 @@
-﻿// lib/screens/direct_payment_screen.dart
+// lib/screens/direct_payment_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../shared/widgets/payment_deadline_timer.dart';
 import '../../shared/widgets/pay_from_wallet_card.dart';
 import '../../shared/utils/time_formatter.dart';
 
@@ -92,8 +91,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   String? _hydratedPlanId;
   String? _hydratedPlanTitle;
   String? _hydratedPlanType;
-  int?    _hydratedSessions;
-  int?    _hydratedValidity;
+  int? _hydratedSessions;
+  int? _hydratedValidity;
 
   @override
   void initState() {
@@ -160,8 +159,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         widget.imamAddressLat ?? slotContext?.imamAddressLat;
     resolvedImamAddressLng =
         widget.imamAddressLng ?? slotContext?.imamAddressLng;
-    resolvedMohaffezPhone =
-        widget.mohaffezPhone ?? slotContext?.mohaffezPhone;
+    resolvedMohaffezPhone = widget.mohaffezPhone ?? slotContext?.mohaffezPhone;
 
     // Slot dates: prefer widget DateTime params first, then parse from provider
     if (widget.slotDate != null) {
@@ -182,8 +180,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
 
     // Fetch price based on plan type
     if (widget.amount == null) {
-      final isBundlePlan = widget.planType == 'bundle' ||
-                           widget.planType == 'subscription';
+      final isBundlePlan =
+          widget.planType == 'bundle' || widget.planType == 'subscription';
 
       if (isBundlePlan && widget.planId != null) {
         await _fetchBundlePlanPrice(
@@ -209,12 +207,6 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   Future<void> _hydrateSlotFromRequestIfNeeded() async {
     final rid = widget.requestId;
     if (rid == null || rid.isEmpty) return;
-    // Skip when slot timestamps are already resolved
-    if (resolvedSlotDate != null &&
-        resolvedSlotStart != null &&
-        resolvedSlotEnd != null) {
-      return;
-    }
     try {
       final doc = await FirebaseFirestore.instance
           .collection('sessionRequests')
@@ -230,21 +222,25 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       }
 
       setState(() {
-        resolvedSlotDate    ??= parse(d['slotDate']);
-        resolvedSlotStart   ??= parse(d['slotStart']);
-        resolvedSlotEnd     ??= parse(d['slotEnd']);
-        resolvedTimeSlot    ??= d['preferredTimeSlot'] as String?;
+        resolvedMohaffezName = _firstNonEmpty([
+          resolvedMohaffezName,
+          d['mohaffezName'] as String?,
+        ]);
+        resolvedSlotDate ??= parse(d['slotDate']);
+        resolvedSlotStart ??= parse(d['slotStart']);
+        resolvedSlotEnd ??= parse(d['slotEnd']);
+        resolvedTimeSlot ??= d['preferredTimeSlot'] as String?;
         resolvedSessionType ??= d['sessionType'] as String?;
-        _hydratedPlanId     ??= d['planId']         as String?;
-        _hydratedPlanTitle  ??= d['planTitle']      as String?;
-        _hydratedPlanType   ??= d['planType']       as String?;
-        _hydratedSessions   ??= d['sessionsCount']  as int?;
-        _hydratedValidity   ??= d['validityDays']   as int?;
+        _hydratedPlanId ??= d['planId'] as String?;
+        _hydratedPlanTitle ??= d['planTitle'] as String?;
+        _hydratedPlanType ??= d['planType'] as String?;
+        _hydratedSessions ??= (d['sessionsCount'] as num?)?.toInt();
+        _hydratedValidity ??= (d['validityDays'] as num?)?.toInt();
       });
 
       if (resolvedAmount == null && resolvedMohaffezId != null) {
         final effectivePlanType = widget.planType ?? _hydratedPlanType;
-        final effectivePlanId   = widget.planId   ?? _hydratedPlanId;
+        final effectivePlanId = widget.planId ?? _hydratedPlanId;
         final isBundle = effectivePlanType == 'bundle' ||
             effectivePlanType == 'subscription';
         if (isBundle && effectivePlanId != null) {
@@ -269,8 +265,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         orElse: () => SessionMode.online,
       );
       final singlePlan = plans.firstWhere(
-        (plan) =>
-            plan.type == PlanType.single && plan.mode == sessionMode,
+        (plan) => plan.type == PlanType.single && plan.mode == sessionMode,
         orElse: () => throw Exception('No single session plan found'),
       );
       if (!mounted) return;
@@ -280,8 +275,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content:
-                  Text('تعذّر جلب سعر الجلسة، تواصل مع المعلم مباشرة')),
+              content: Text('تعذّر جلب سعر الجلسة، تواصل مع المعلم مباشرة')),
         );
       }
     }
@@ -302,8 +296,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text('تعذّر جلب سعر الباقة، تواصل مع المعلم مباشرة')),
+            content: Text('تعذّر جلب سعر الباقة، تواصل مع المعلم مباشرة')),
       );
     }
   }
@@ -312,16 +305,29 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     final loaded =
         await DirectPaymentService.getMohaffezWalletNumbers(mohaffezId);
     if (!mounted) return;
+    final methods = DirectPaymentMethod.values
+        .where((m) => (loaded[m.value] ?? '').trim().isNotEmpty)
+        .toList();
     setState(() {
       wallets = loaded;
+      if (methods.length == 1) {
+        selectedMethod = methods.first;
+      }
       loading = false;
     });
   }
 
-  List<DirectPaymentMethod> get availableMethods =>
-      DirectPaymentMethod.values
-          .where((m) => (wallets[m.value] ?? '').isNotEmpty)
-          .toList();
+  List<DirectPaymentMethod> get availableMethods => DirectPaymentMethod.values
+      .where((m) => (wallets[m.value] ?? '').trim().isNotEmpty)
+      .toList();
+
+  String? _firstNonEmpty(List<String?> values) {
+    for (final value in values) {
+      final trimmed = value?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+    }
+    return null;
+  }
 
   Future<void> _confirmPayment() async {
     if (selectedMethod == null) {
@@ -391,11 +397,11 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         imamAddressLat: resolvedImamAddressLat,
         imamAddressLng: resolvedImamAddressLng,
         mohaffezPhone: resolvedMohaffezPhone,
-        planType:      widget.planType      ?? _hydratedPlanType,
-        planId:        widget.planId        ?? _hydratedPlanId,
-        planTitle:     widget.planTitle     ?? _hydratedPlanTitle,
+        planType: widget.planType ?? _hydratedPlanType,
+        planId: widget.planId ?? _hydratedPlanId,
+        planTitle: widget.planTitle ?? _hydratedPlanTitle,
         sessionsCount: widget.sessionsCount ?? _hydratedSessions,
-        validityDays:  widget.validityDays  ?? _hydratedValidity,
+        validityDays: widget.validityDays ?? _hydratedValidity,
       );
 
       // 🔍 DIAG Step 3: CF response
@@ -420,8 +426,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  result['message']?.toString() ?? 'فشل إرسال الإشعار')),
+              content:
+                  Text(result['message']?.toString() ?? 'فشل إرسال الإشعار')),
         );
       }
     } on Exception catch (e) {
@@ -472,8 +478,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   const SizedBox(height: 16),
                   const Text(
                     'لم يُضف المعلم أرقام محافظه بعد',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
@@ -510,7 +515,6 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             children: [
               _buildSessionSummaryCard(),
               const SizedBox(height: AppThemeConstants.spaceLg),
-
               if (widget.requestId != null && resolvedAmount != null) ...[
                 PayFromWalletCard(
                   sessionRequestId: widget.requestId!,
@@ -518,10 +522,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 ),
                 const SizedBox(height: AppThemeConstants.spaceLg),
               ],
-
               _buildAmountCard(),
               const SizedBox(height: AppThemeConstants.spaceLg),
-
               if (!(ref
                       .watch(systemConfigProvider)
                       .valueOrNull
@@ -571,21 +573,17 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 ),
                 const SizedBox(height: AppThemeConstants.spaceLg),
               ],
-
               const Text(
                 'اختر طريقة الدفع',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: AppThemeConstants.spaceSm),
               ...availableMethods.map((m) => _buildMethodTile(m)),
               const SizedBox(height: AppThemeConstants.spaceLg),
-
               if (selectedMethod != null) ...[
                 _buildWalletNumberCard(),
                 const SizedBox(height: AppThemeConstants.spaceLg),
               ],
-
               TextField(
                 controller: noteController,
                 maxLines: 3,
@@ -598,10 +596,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 ),
               ),
               const SizedBox(height: AppThemeConstants.spaceLg),
-
               _buildInstructionsCard(),
               const SizedBox(height: AppThemeConstants.spaceLg),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -609,10 +605,9 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.secondary,
                     foregroundColor: AppThemeConstants.onPrimary,
-                    disabledBackgroundColor: AppThemeConstants.secondary
-                        .withValues(alpha: 0.5),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 16),
+                    disabledBackgroundColor:
+                        AppThemeConstants.secondary.withValues(alpha: 0.5),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -621,7 +616,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              color: AppThemeConstants.onPrimary, strokeWidth: 2),
+                              color: AppThemeConstants.onPrimary,
+                              strokeWidth: 2),
                         )
                       : const Icon(Icons.send_outlined),
                   label: Text(
@@ -666,8 +662,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
 
   Widget _buildSessionSummaryCard() {
     return Card(
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -675,20 +670,17 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Row(children: [
-              Icon(Icons.info_outline,
-                  color: AppThemeConstants.primary),
+              Icon(Icons.info_outline, color: AppThemeConstants.primary),
               SizedBox(width: 8),
               Text(
                 'تفاصيل الجلسة',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ]),
             const Divider(height: 20),
 
             if (resolvedMohaffezName != null)
-              _infoRow(Icons.person_outline, 'المحفظ',
-                  resolvedMohaffezName!),
+              _infoRow(Icons.person_outline, 'المحفظ', resolvedMohaffezName!),
 
             if (resolvedSessionType != null) ...[
               const SizedBox(height: 6),
@@ -739,22 +731,18 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 widget.planType == 'subscription') ...[
               const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppThemeConstants.primary
-                      .withValues(alpha: 0.12),
+                  color: AppThemeConstants.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: AppThemeConstants.primary),
+                  border: Border.all(color: AppThemeConstants.primary),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                        Icons.collections_bookmark_outlined,
-                        size: 14,
-                        color: AppThemeConstants.primary),
+                    const Icon(Icons.collections_bookmark_outlined,
+                        size: 14, color: AppThemeConstants.primary),
                     const SizedBox(width: 4),
                     Text(
                       widget.planType == 'bundle'
@@ -781,19 +769,16 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color:
-            AppThemeConstants.secondary.withValues(alpha: 0.08),
+        color: AppThemeConstants.secondary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: AppThemeConstants.secondary
-                .withValues(alpha: 0.4)),
+            color: AppThemeConstants.secondary.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text('المبلغ المطلوب',
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           Text(
             resolvedAmount != null
                 ? '${resolvedAmount!.toStringAsFixed(0)} ج.م'
@@ -815,8 +800,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       onTap: () => setState(() => selectedMethod = method),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
               ? AppThemeConstants.primary.withValues(alpha: 0.08)
@@ -841,9 +825,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           const SizedBox(width: 12),
           Text(method.label,
               style: TextStyle(
-                fontWeight: isSelected
-                    ? FontWeight.bold
-                    : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 fontSize: 15,
               )),
         ]),
@@ -859,7 +841,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
       decoration: BoxDecoration(
         color: AppThemeConstants.info.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppThemeConstants.info.withValues(alpha: 0.2)),
+        border:
+            Border.all(color: AppThemeConstants.info.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -894,8 +877,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                     color: AppThemeConstants.info),
                 tooltip: 'نسخ الرقم',
                 onPressed: () {
-                  Clipboard.setData(
-                      ClipboardData(text: walletNumber));
+                  Clipboard.setData(ClipboardData(text: walletNumber));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('✅ تم نسخ الرقم'),
@@ -923,7 +905,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(children: [
-            Icon(Icons.info_outlined, color: AppThemeConstants.accentAmber, size: 18),
+            Icon(Icons.info_outlined,
+                color: AppThemeConstants.accentAmber, size: 18),
             SizedBox(width: 6),
             Text('تعليمات الدفع',
                 style: TextStyle(
@@ -953,8 +936,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           ),
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: AppThemeConstants.warningLight,
               borderRadius: BorderRadius.circular(8),
@@ -1007,8 +989,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         Icon(icon, size: 16, color: AppThemeConstants.accentAmberDark),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(text,
-              style: const TextStyle(fontSize: 13, height: 1.5)),
+          child: Text(text, style: const TextStyle(fontSize: 13, height: 1.5)),
         ),
       ],
     );
@@ -1025,9 +1006,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                 fontSize: 13,
                 color: AppThemeConstants.grey700,
                 fontWeight: FontWeight.w600)),
-        Expanded(
-            child: Text(value,
-                style: const TextStyle(fontSize: 13))),
+        Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
       ],
     );
   }

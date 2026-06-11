@@ -61,9 +61,8 @@ final activeSubscriptionsProvider = StreamProvider.autoDispose
       .orderBy('createdAt', descending: true)
       .limit(20)
       .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => SubscriptionModel.fromFirestore(d))
-          .toList());
+      .map((snap) =>
+          snap.docs.map((d) => SubscriptionModel.fromFirestore(d)).toList());
 });
 
 class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
@@ -96,8 +95,9 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
       // ✅ FREE SESSION FLOW (100% promo code)
       if (basePayment.amount <= 0.01) {
-        if (kDebugMode) debugPrint('🎫 FREE SESSION: Creating payment document only');
-        
+        if (kDebugMode)
+          debugPrint('🎫 FREE SESSION: Creating payment document only');
+
         // ✅ Only create payment document - Cloud Function handles everything else
         final freePayment = basePayment.copyWith(
           status: PaymentStatus.pending, // ✅ Keep as pending
@@ -107,12 +107,14 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
         );
 
         final paymentId = await _repository.createPayment(freePayment);
-        
-        if (kDebugMode) debugPrint('✅ FREE SESSION: Payment document created: $paymentId');
-        if (kDebugMode) debugPrint('🚀 Next: Call Cloud Function to create session');
-        
+
+        if (kDebugMode)
+          debugPrint('✅ FREE SESSION: Payment document created: $paymentId');
+        if (kDebugMode)
+          debugPrint('🚀 Next: Call Cloud Function to create session');
+
         state = const AsyncValue.data(null);
-        
+
         // ✅ Return empty URL to signal Cloud Function processing needed
         return PaymentStartResult(
           paymentId: paymentId,
@@ -120,26 +122,23 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
           sessionId: null, // Will be created by Cloud Function
         );
       } else {
-        // Direct payment flow � no gateway
-        final directPayment = basePayment.copyWith(
+        final pendingPayment = basePayment.copyWith(
           status: PaymentStatus.pending,
-          method: PaymentMethod.cash,
-          gateway: PaymentGateway.manual,
           metadata: mergedMetadata,
         );
-        final paymentId = await _repository.createPayment(directPayment);
+        final paymentId = await _repository.createPayment(pendingPayment);
         state = const AsyncValue.data(null);
         return PaymentStartResult(
           paymentId: paymentId,
-          paymentUrl: '',   // empty string = no WebView needed
+          paymentUrl: '',
           sessionId: null,
         );
-      }    } catch (e, stack) {
+      }
+    } catch (e, stack) {
       if (kDebugMode) debugPrint('❌ ERROR in startPaymentAndHandleResult: $e');
       if (kDebugMode) debugPrint('Stack trace: $stack');
       state = AsyncValue.error(e, stack);
       return null;
     }
   }
-
 }

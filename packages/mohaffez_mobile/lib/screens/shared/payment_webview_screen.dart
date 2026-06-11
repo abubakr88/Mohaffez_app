@@ -1,13 +1,14 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../services/paymob_callback_parser.dart';
-
 
 class PaymentWebViewScreen extends ConsumerStatefulWidget {
   const PaymentWebViewScreen({
@@ -31,18 +32,27 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
   int loadingProgress = 0;
   bool paymentCompleted = false;
   Timer? _timeoutTimer;
+  bool _externalPaymentOpened = false;
+  BuildContext? _successDialogContext;
   ProviderSubscription<AsyncValue<PaymentModel?>>? _paymentStatusSub;
 
   @override
   void initState() {
     super.initState();
-    _initWebView();
-    _timeoutTimer = Timer(const Duration(minutes: 3), () {
+    if (!kIsWeb) {
+      _initWebView();
+    }
+    _timeoutTimer = Timer(const Duration(minutes: kIsWeb ? 10 : 3), () {
       if (!paymentCompleted && mounted) {
         _showTimeoutDialog();
       }
     });
     _listenToPaymentStatus();
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openPaymentExternally();
+      });
+    }
   }
 
   void _initWebView() {
@@ -104,6 +114,37 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
   bool _isFailureUrl(String url) =>
       parsePaymobCallback(url) == PaymobCallbackResult.failure;
 
+  Future<void> _openPaymentExternally() async {
+    final uri = Uri.tryParse(widget.paymentUrl);
+    if (uri == null) {
+      _showFailureDialog('رابط الدفع غير صالح');
+      return;
+    }
+
+    final opened = await launchUrl(
+      uri,
+      webOnlyWindowName: '_blank',
+    );
+
+    if (!mounted) return;
+    setState(() => _externalPaymentOpened = opened);
+
+    if (!opened) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر فتح صفحة الدفع')),
+      );
+    }
+  }
+
+  void _retryPayment() {
+    if (kIsWeb) {
+      _openPaymentExternally();
+      return;
+    }
+    setState(() => loadingProgress = 0);
+    controller.reload();
+  }
+
   String getPaymentStage(int progress) {
     if (progress < 30) return 'الاتصال ببوابة الدفع...';
     if (progress < 60) return 'في انتظار تأكيد البنك...';
@@ -148,48 +189,57 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 600),
-              builder: (context, value, child) {
-                return Transform.scale(scale: value, child: child);
-              },
-              child: const Icon(Icons.check_circle,
-                  color: AppThemeConstants.success, size: 100),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'تم الدفع بنجاح!',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppThemeConstants.success,
+      builder: (ctx) {
+        _successDialogContext = ctx;
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                builder: (context, value, child) {
+                  return Transform.scale(scale: value, child: child);
+                },
+                child: const Icon(Icons.check_circle,
+                    color: AppThemeConstants.success, size: 100),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'سيتم تأكيد حجزك خلال ثوانٍ',
-              style: TextStyle(fontSize: 14, color: AppThemeConstants.textSecondary),
-            ),
-          ],
-        ),
-      ),
+              const SizedBox(height: 16),
+              const Text(
+                'تم الدفع بنجاح!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeConstants.success,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'سيتم تأكيد حجزك خلال ثوانٍ',
+                style: TextStyle(
+                    fontSize: 14, color: AppThemeConstants.textSecondary),
+              ),
+            ],
+          ),
+        );
+      },
     );
 
     Future.delayed(const Duration(seconds: 2), () {
-      // FIXED: guard with both mounted (StatefulWidget) and context.mounted (BuildContext)
       if (!mounted || !context.mounted) return;
       try {
-        Navigator.popUntil(context, (route) => route.isFirst);
+        final dialogContext = _successDialogContext;
+        if (dialogContext != null && dialogContext.mounted) {
+          Navigator.of(dialogContext, rootNavigator: true).pop();
+        }
+        _successDialogContext = null;
+        context.pop(true);
       } catch (e) {
-        // Navigator may already be in a different state if user navigated away
-        // during the 2-second delay. Absorb silently — payment already succeeded.
-        debugPrint('PaymentWebViewScreen: popUntil on stale context: $e');
+        // Payment already succeeded; if navigation changed underneath us,
+        // avoid trapping the user behind a stale success dialog.
+        debugPrint('PaymentWebViewScreen: success close failed: $e');
       }
     });
   }
@@ -214,8 +264,7 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              setState(() => loadingProgress = 0);
-              controller.reload();
+              _retryPayment();
             },
             child: const Text('إعادة المحاولة'),
           ),
@@ -246,72 +295,136 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
               : null,
           title: const Text('إتمام الدفع'),
         ),
-        body: Stack(
-          children: [
-            WebViewWidget(controller: controller),
-            if (loadingProgress < 100)
-              Container(
-                color: AppThemeConstants.white,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 80,
-                        height: 80,
-                        child: CircularProgressIndicator(
-                          value: loadingProgress / 100,
-                          strokeWidth: 6,
-                          backgroundColor: AppThemeConstants.grey200,
-                          valueColor:
-                              const AlwaysStoppedAnimation<Color>(AppThemeConstants.success),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        getPaymentStage(loadingProgress),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$loadingProgress%',
-                        style:
-                            const TextStyle(fontSize: 14, color: AppThemeConstants.grey500),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: 200,
-                        child: LinearProgressIndicator(
-                          value: loadingProgress / 100,
-                          minHeight: 8,
-                          backgroundColor: AppThemeConstants.grey200,
-                          valueColor:
-                              const AlwaysStoppedAnimation<Color>(AppThemeConstants.success),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 40),
-                        child: Text(
-                          'لا تغلق هذه الصفحة حتى اكتمال العملية',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppThemeConstants.grey600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
+        body: kIsWeb ? _buildWebPaymentBody() : _buildMobileWebViewBody(),
+      ),
+    );
+  }
+
+  Widget _buildWebPaymentBody() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.open_in_new,
+                size: 72,
+                color: AppThemeConstants.secondary,
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'أكمل الدفع في صفحة Paymob',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _externalPaymentOpened
+                    ? 'تم فتح صفحة الدفع. بعد إتمام العملية سيظهر التأكيد هنا تلقائياً.'
+                    : 'اضغط لفتح صفحة الدفع، واترك هذه الصفحة مفتوحة حتى يتم التأكيد.',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppThemeConstants.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _openPaymentExternally,
+                  icon: const Icon(Icons.open_in_new),
+                  label: Text(
+                    _externalPaymentOpened
+                        ? 'فتح صفحة الدفع مرة أخرى'
+                        : 'فتح صفحة الدفع',
                   ),
                 ),
               ),
-          ],
+              const SizedBox(height: 18),
+              const CircularProgressIndicator(
+                color: AppThemeConstants.secondary,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'في انتظار تأكيد الدفع...',
+                style: TextStyle(color: AppThemeConstants.grey600),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMobileWebViewBody() {
+    return Stack(
+      children: [
+        WebViewWidget(controller: controller),
+        if (loadingProgress < 100)
+          Container(
+            color: AppThemeConstants.white,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: CircularProgressIndicator(
+                      value: loadingProgress / 100,
+                      strokeWidth: 6,
+                      backgroundColor: AppThemeConstants.grey200,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppThemeConstants.success),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    getPaymentStage(loadingProgress),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$loadingProgress%',
+                    style: const TextStyle(
+                        fontSize: 14, color: AppThemeConstants.grey500),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: 200,
+                    child: LinearProgressIndicator(
+                      value: loadingProgress / 100,
+                      minHeight: 8,
+                      backgroundColor: AppThemeConstants.grey200,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppThemeConstants.success),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(
+                      'لا تغلق هذه الصفحة حتى اكتمال العملية',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppThemeConstants.grey600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

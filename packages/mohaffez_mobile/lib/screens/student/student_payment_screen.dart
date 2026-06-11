@@ -1,4 +1,4 @@
-﻿// lib/screens/student_payment_screen.dart
+// lib/screens/student_payment_screen.dart
 import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/utils/time_formatter.dart';
+import '../../services/payment_service.dart';
 
 enum _DpMethod { online, direct }
 
@@ -106,6 +107,43 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
   bool get isLockedRequest => widget.lockedRequest != null;
 
+  String get effectiveMohaffezName {
+    for (final value in [
+      widget.mohaffezName,
+      widget.lockedRequest?['mohaffezName'],
+      widget.sessionDetails?['mohaffezName'],
+    ]) {
+      final name = value?.toString().trim();
+      if (name != null && name.isNotEmpty) return name;
+    }
+    return 'المحفظ';
+  }
+
+  bool get lockedRequestIsBundlePlan {
+    final planType =
+        widget.lockedRequest?['planType']?.toString().trim().toLowerCase();
+    final selectedPaymentMethod = widget.lockedRequest?['selectedPaymentMethod']
+        ?.toString()
+        .trim()
+        .toLowerCase();
+    return planType == 'bundle' ||
+        planType == 'subscription' ||
+        selectedPaymentMethod == 'buy_new_package';
+  }
+
+  bool _planMatchesLockedRequest(PricingPlanModel plan) {
+    if (!isLockedRequest) return true;
+
+    final lockedPlanId = widget.lockedRequest?['planId']?.toString().trim();
+    if (lockedPlanId != null && lockedPlanId.isNotEmpty) {
+      return plan.id == lockedPlanId;
+    }
+
+    return lockedRequestIsBundlePlan
+        ? plan.type == PlanType.bundle
+        : plan.type == PlanType.single;
+  }
+
   String? get lockedRequestSessionType =>
       isLockedRequest ? widget.lockedRequest!['sessionType'] as String? : null;
 
@@ -134,15 +172,6 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     //      Leaving the default as DPMethod.online causes "Pay Now"
     //      (Paymob gateway) to appear instead of the request flow.
     if (widget.showBundlePlansOnly) {
-      _selectedDPMethod = _DpMethod.direct;
-    }
-    // Force direct when Paymob is globally disabled (coming-soon state).
-    final paymobOn = ref
-            .read(systemConfigProvider)
-            .valueOrNull
-            ?.paymobEnabled ??
-        false;
-    if (!paymobOn) {
       _selectedDPMethod = _DpMethod.direct;
     }
     debugPrint(
@@ -254,6 +283,11 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   .toList();
             }
 
+            if (isLockedRequest) {
+              filteredPlans =
+                  filteredPlans.where(_planMatchesLockedRequest).toList();
+            }
+
             if (isLockedRequest &&
                 selectedPlan == null &&
                 !planSelectionFallback &&
@@ -279,6 +313,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                     break;
                   }
                 }
+              }
+
+              if (match == null && filteredPlans.length == 1) {
+                match = filteredPlans.first;
               }
 
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -340,7 +378,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
+          error: (_, __) =>
+              const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         ),
         bottomNavigationBar: selectedPlan == null
             ? null
@@ -390,8 +429,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               Expanded(
                 child: InkWell(
                   onTap: paymobOn
-                      ? () => setState(
-                          () => _selectedDPMethod = _DpMethod.online)
+                      ? () =>
+                          setState(() => _selectedDPMethod = _DpMethod.online)
                       : () => ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
@@ -410,10 +449,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                             : (_selectedDPMethod == _DpMethod.online
                                 ? AppThemeConstants.secondary
                                 : AppThemeConstants.grey300),
-                        width: (paymobOn &&
-                                _selectedDPMethod == _DpMethod.online)
-                            ? 2
-                            : 1,
+                        width:
+                            (paymobOn && _selectedDPMethod == _DpMethod.online)
+                                ? 2
+                                : 1,
                       ),
                       color: !paymobOn
                           ? AppThemeConstants.grey100
@@ -470,12 +509,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               Expanded(
                 child: InkWell(
                   onTap: directAvailable
-                      ? () => setState(
-                          () => _selectedDPMethod = _DpMethod.direct)
+                      ? () =>
+                          setState(() => _selectedDPMethod = _DpMethod.direct)
                       : () => ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text(
-                                  'لم يفعّل المحفظ الدفع المباشر بعد.'),
+                              content:
+                                  Text('لم يفعّل المحفظ الدفع المباشر بعد.'),
                             ),
                           ),
                   borderRadius: BorderRadius.circular(12),
@@ -555,12 +594,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 border: Border.all(color: AppThemeConstants.accentOrange),
               ),
               child: const Row(children: [
-                Icon(Icons.info_outline, color: AppThemeConstants.warning, size: 20),
+                Icon(Icons.info_outline,
+                    color: AppThemeConstants.warning, size: 20),
                 SizedBox(width: 8),
                 Expanded(
                     child: Text('يرجى العودة لاختيار الموعد أولاً',
-                        style:
-                            TextStyle(fontSize: 13, color: AppThemeConstants.accentOrange))),
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: AppThemeConstants.accentOrange))),
               ]),
             ),
             const SizedBox(height: 12),
@@ -572,7 +613,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 label: const Text('العودة لاختيار الموعد'),
                 style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppThemeConstants.accentOrange)),
+                    side: const BorderSide(
+                        color: AppThemeConstants.accentOrange)),
               ),
             ),
           ],
@@ -596,10 +638,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 ? 'جاري التأكيد...'
                 : 'تأكيد الجلسة المجانية 🎁',
             style: const TextStyle(
-                color: AppThemeConstants.white, fontWeight: FontWeight.bold, fontSize: 16),
+                color: AppThemeConstants.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppThemeConstants.secondary, // WHY: Replace direct green with themed accent green.
+            backgroundColor: AppThemeConstants
+                .secondary, // WHY: Replace direct green with themed accent green.
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -616,7 +661,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     final planType = selectedPlan?.type;
     final isBundlePlan = planType == PlanType.bundle;
     final requiresSlot = !isFreeSession &&
-        !isBundlePlan &&    // bundles do not require a slot
+        !isBundlePlan && // bundles do not require a slot
         widget.requestId == null;
     final canPay = !isProcessingPayment && (!requiresSlot || hasSelectedSlot);
 
@@ -640,10 +685,15 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   ? 'تأكيد الجلسة المجانية 🎁'
                   : '${pricing.finalPrice.toStringAsFixed(0)} ${ArabicLabels.egp} - ${ArabicLabels.payNow}',
           style: const TextStyle(
-              color: AppThemeConstants.white, fontWeight: FontWeight.bold, fontSize: 16),
+              color: AppThemeConstants.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isFreeSession ? AppThemeConstants.secondary : AppThemeConstants.secondary, // WHY: Replace direct green with themed accent green.
+          backgroundColor: isFreeSession
+              ? AppThemeConstants.secondary
+              : AppThemeConstants
+                  .secondary, // WHY: Replace direct green with themed accent green.
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -672,6 +722,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     // BUG-A FIX: Handle bundle/subscription direct payment
     final planType = selectedPlan?.type;
     final isBundlePlan = planType == PlanType.bundle;
+    final paymobOn = await _isPaymobEnabled();
+    if (!mounted || !context.mounted) return;
 
     if (isFreeSession && appliedPromoCode != null) {
       await handleFreeSession(context, ref, user);
@@ -682,7 +734,34 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         return;
       }
     } else {
+      if (!paymobOn) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'الدفع الإلكتروني غير مفعل حالياً. اختر الدفع المباشر أو حاول مرة أخرى.',
+            ),
+          ),
+        );
+        return;
+      }
       await handleRegularPayment(context, ref, user, pricing);
+    }
+  }
+
+  Future<bool> _isPaymobEnabled() async {
+    final cached = ref.read(systemConfigProvider).valueOrNull;
+    if (cached?.paymobEnabled == true) return true;
+
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('systemConfig')
+          .doc('global')
+          .get();
+      return snap.data()?['paymobEnabled'] == true;
+    } catch (e) {
+      debugPrint('PaymentScreen: failed to read Paymob flag: $e');
+      return cached?.paymobEnabled == true;
     }
   }
 
@@ -719,7 +798,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         extra: {
           'requestId': null,
           'mohaffezId': widget.mohaffezId,
-          'mohaffezName': widget.mohaffezName,
+          'mohaffezName': effectiveMohaffezName,
           'studentName': user.name,
           'studentEmail': user.email ?? '',
           'studentPhone': user.phoneNumber ?? '',
@@ -736,9 +815,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               ? DateTime.tryParse(slotData['slotEnd']!)
               : null,
           'imamAddressText': widget.location,
-          'planId': selectedPlan!.id!,
+          'planId': selectedPlan!.id ?? '',
           'planTitle': selectedPlan!.title,
-          'planType': planType!.name,
+          'planType': planType?.name ?? PlanType.bundle.name,
           'sessionsCount': selectedPlan!.sessionsCount,
           'validityDays': selectedPlan!.validityDays,
           'autoBookFirstSession': widget.autoBookFirstSession,
@@ -785,7 +864,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       extra: {
         'requestId': requestId,
         'mohaffezId': widget.mohaffezId,
-        'mohaffezName': widget.mohaffezName,
+        'mohaffezName': effectiveMohaffezName,
         'studentName': user.name,
         'studentEmail': user.email ?? '',
         'studentPhone': user.phoneNumber ?? '',
@@ -795,9 +874,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         'slotDate': slotDate,
         'slotStart': slotStart,
         'slotEnd': slotEnd,
-        'imamAddressText': widget.location ??
-            widget.mohaffezAddress ??
-            lockedRequestLocation,
+        'imamAddressText':
+            widget.location ?? widget.mohaffezAddress ?? lockedRequestLocation,
         'imamAddressLat': widget.mohaffezLat,
         'imamAddressLng': widget.mohaffezLng,
         'mohaffezPhone':
@@ -833,7 +911,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppThemeConstants.surface, // WHY: Replace direct blue shade with themed surface color.
+        color: AppThemeConstants
+            .surface, // WHY: Replace direct blue shade with themed surface color.
         border: Border.all(color: AppThemeConstants.accentBlue, width: 2),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -841,7 +920,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Icon(Icons.lock, size: 32, color: AppThemeConstants.accentBlue),
+            const Icon(Icons.lock,
+                size: 32, color: AppThemeConstants.accentBlue),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -849,7 +929,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppThemeConstants.textPrimary), // WHY: Replace direct blue shade text with themed primary text.
+                    color: AppThemeConstants
+                        .textPrimary), // WHY: Replace direct blue shade text with themed primary text.
               ),
             ),
           ]),
@@ -857,11 +938,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             const SizedBox(height: 4),
             const Text(
               'راجع تفاصيل جلستك أدناه ثم تابع إلى الدفع',
-              style: TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
+              style:
+                  TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
             ),
           ],
           const Divider(height: 24, color: AppThemeConstants.accentBlue),
-          lockedDetailRow('المحفظ:', widget.mohaffezName),
+          lockedDetailRow('المحفظ:', effectiveMohaffezName),
           lockedDetailRow(ArabicLabels.type, getSessionTypeArabic(sessionType)),
           if (slotDate != null)
             lockedDetailRow(
@@ -869,7 +951,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 DateFormat('EEEE، dd MMMM yyyy', 'ar')
                     .format(slotDate.toDate())),
           if (timeSlot != null && timeSlot.isNotEmpty)
-            lockedDetailRow(ArabicLabels.time, formatTimeToArabicAmPm(timeSlot)),
+            lockedDetailRow(
+                ArabicLabels.time, formatTimeToArabicAmPm(timeSlot)),
           if (location != null && location.isNotEmpty)
             lockedDetailRow(ArabicLabels.location, location),
           const SizedBox(height: 12),
@@ -877,20 +960,26 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppThemeConstants.primary.withValues(alpha: 0.1), // WHY: Replace direct amber shade with themed amber tint.
+                color: AppThemeConstants.primary.withValues(
+                    alpha:
+                        0.1), // WHY: Replace direct amber shade with themed amber tint.
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(children: [
                 const Icon(Icons.info_outline,
-                    size: 20, color: AppThemeConstants.primaryVariant), // WHY: Replace direct amber shade with themed amber dark.
+                    size: 20,
+                    color: AppThemeConstants
+                        .primaryVariant), // WHY: Replace direct amber shade with themed amber dark.
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     isLockedRequest
                         ? 'اختر خطة الدفع واستكمل العملية.'
                         : 'اختر الخطة المناسبة لإتمام الحجز.',
-                    style:
-                        const TextStyle(fontSize: 12, color: AppThemeConstants.primaryVariant), // WHY: Replace direct amber shade with themed amber dark.
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: AppThemeConstants
+                            .primaryVariant), // WHY: Replace direct amber shade with themed amber dark.
                   ),
                 ),
               ]),
@@ -907,7 +996,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             width: 80,
             child: Text(label,
                 style: const TextStyle(
-                    fontWeight: FontWeight.w600, color: AppThemeConstants.accentBlueDark)),
+                    fontWeight: FontWeight.w600,
+                    color: AppThemeConstants.accentBlueDark)),
           ),
           Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ]),
@@ -928,10 +1018,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppThemeConstants.secondary : AppThemeConstants.grey300,
+            color: selected
+                ? AppThemeConstants.secondary
+                : AppThemeConstants.grey300,
             width: selected ? 2.5 : 1,
           ),
-          color: selected ? AppThemeConstants.secondary.withValues(alpha: 0.05) : null,
+          color: selected
+              ? AppThemeConstants.secondary.withValues(alpha: 0.05)
+              : null,
         ),
         child: Row(children: [
           Icon(
@@ -952,7 +1046,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                   plan.sessionsCount > 1
                       ? '${plan.sessionsCount} جلسات'
                       : 'جلسة واحدة',
-                  style: const TextStyle(fontSize: 13, color: AppThemeConstants.grey600),
+                  style: const TextStyle(
+                      fontSize: 13, color: AppThemeConstants.grey600),
                 ),
               ],
             ),
@@ -999,7 +1094,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Text('محدد',
-                style: TextStyle(fontSize: 12, color: AppThemeConstants.secondary)),
+                style: TextStyle(
+                    fontSize: 12, color: AppThemeConstants.secondary)),
           ),
         ],
       ),
@@ -1021,7 +1117,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       decoration: BoxDecoration(
         borderRadius: AppThemeConstants.borderRadiusMd,
         border: Border.all(
-          color: isFreeSession ? AppThemeConstants.success : AppThemeConstants.grey300,
+          color: isFreeSession
+              ? AppThemeConstants.success
+              : AppThemeConstants.grey300,
           width: isFreeSession ? 2 : 1,
         ),
         color: isFreeSession ? AppThemeConstants.successLight : null,
@@ -1058,7 +1156,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                             fontWeight: FontWeight.bold)),
                     SizedBox(height: 4),
                     Text('100% خصم مطبق',
-                        style: TextStyle(color: AppThemeConstants.white70, fontSize: 14)),
+                        style: TextStyle(
+                            color: AppThemeConstants.white70, fontSize: 14)),
                   ],
                 ),
               ),
@@ -1086,7 +1185,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                         padding: EdgeInsets.all(12),
                         child: CircularProgressIndicator(strokeWidth: 2)))
                 : promoCodeValid
-                    ? const Icon(Icons.check_circle, color: AppThemeConstants.success)
+                    ? const Icon(Icons.check_circle,
+                        color: AppThemeConstants.success)
                     : null,
             border: const OutlineInputBorder(),
           ),
@@ -1125,7 +1225,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               const SizedBox(width: 6),
               Expanded(
                   child: Text(promoError,
-                      style: const TextStyle(color: AppThemeConstants.error, fontSize: 12))),
+                      style: const TextStyle(
+                          color: AppThemeConstants.error, fontSize: 12))),
             ]),
           ),
         if (promoCodeValid && discount > 0 && !isFreeSession)
@@ -1139,7 +1240,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 border: Border.all(color: AppThemeConstants.success),
               ),
               child: Row(children: [
-                const Icon(Icons.check_circle, color: AppThemeConstants.success),
+                const Icon(Icons.check_circle,
+                    color: AppThemeConstants.success),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -1204,7 +1306,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             Text(
               '- ${pricing.discount.toStringAsFixed(2)} ${ArabicLabels.currency}',
               style: const TextStyle(
-                  color: AppThemeConstants.success, fontWeight: FontWeight.bold),
+                  color: AppThemeConstants.success,
+                  fontWeight: FontWeight.bold),
             ),
           ]),
         ],
@@ -1219,7 +1322,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
-                color: isFreeSession ? AppThemeConstants.success : AppThemeConstants.primary),
+                color: isFreeSession
+                    ? AppThemeConstants.success
+                    : AppThemeConstants.primary),
           ),
         ]),
       ]),
@@ -1313,8 +1418,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
-        mohaffezName: widget.mohaffezName,
-        planId: selectedPlan!.id!,
+        mohaffezName: effectiveMohaffezName,
+        planId: selectedPlan!.id ?? '',
         planTitle: selectedPlan!.title,
         amount: 0.0,
         method: PaymentMethod.cash,
@@ -1347,7 +1452,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       final result =
           await ref.read(legacyBookingFlowProvider.notifier).createFreeSession(
                 mohaffezId: widget.mohaffezId,
-                mohaffezName: widget.mohaffezName,
+                mohaffezName: effectiveMohaffezName,
                 studentId: user.uid,
                 studentName: user.name,
                 sessionType: sessionType,
@@ -1401,10 +1506,25 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     PricingResult pricing,
   ) async {
     setState(() => isProcessingPayment = true);
+    var loadingDialogOpen = true;
+    BuildContext? loadingDialogContext;
+
+    void closeLoadingDialog() {
+      if (!loadingDialogOpen) return;
+      final dialogContext = loadingDialogContext;
+      if (dialogContext != null && dialogContext.mounted) {
+        Navigator.of(dialogContext).pop();
+      }
+      loadingDialogOpen = false;
+    }
+
     showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()));
+        builder: (dialogContext) {
+          loadingDialogContext = dialogContext;
+          return const Center(child: CircularProgressIndicator());
+        });
     try {
       final basePayment = PaymentModel(
         studentId: user.uid,
@@ -1412,8 +1532,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
-        mohaffezName: widget.mohaffezName,
-        planId: selectedPlan!.id!,
+        mohaffezName: effectiveMohaffezName,
+        planId: selectedPlan!.id ?? '',
         planTitle: selectedPlan!.title,
         amount: pricing.finalPrice,
         method: PaymentMethod.card,
@@ -1445,23 +1565,65 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           );
 
       if (!context.mounted) return;
-      Navigator.pop(context);
 
       if (result == null) {
+        closeLoadingDialog();
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('فشل الدفع، حاول مرة أخرى')));
         return;
       }
 
-      if (result.paymentUrl.isEmpty) {
-        _openDirectPaymentScreen(context, user, pricing);
-        return;
+      var paymentUrl = result.paymentUrl;
+      if (paymentUrl.isEmpty) {
+        final studentPhone = (user.phoneNumber as String?)?.trim();
+        final studentName = (user.name as String).trim();
+        final paymobResult =
+            await ref.read(paymentServiceProvider).initiatePayment(
+                  paymentId: result.paymentId,
+                  amount: pricing.finalPrice,
+                  studentEmail: user.email,
+                  studentPhone: studentPhone != null && studentPhone.isNotEmpty
+                      ? studentPhone
+                      : '01000000000',
+                  studentName: studentName.isNotEmpty ? studentName : 'Student',
+                );
+
+        if (!context.mounted) return;
+        if (paymobResult['success'] != true) {
+          debugPrint('Paymob initiatePayment failed: ${paymobResult['error']}');
+          closeLoadingDialog();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('فشل تجهيز الدفع الإلكتروني. يرجى المحاولة مرة أخرى'),
+              backgroundColor: AppThemeConstants.error,
+            ),
+          );
+          return;
+        }
+
+        paymentUrl = paymobResult['paymentUrl']?.toString() ?? '';
+        if (paymentUrl.isEmpty) {
+          throw Exception('Paymob returned an empty payment URL');
+        }
+
+        try {
+          await ref.read(paymentRepositoryProvider).updatePaymentGatewayInfo(
+                result.paymentId,
+                orderId: paymobResult['orderId']?.toString(),
+              );
+        } catch (e) {
+          debugPrint('Paymob gateway order update failed: $e');
+        }
       }
+
+      if (!context.mounted) return;
+      closeLoadingDialog();
 
       final success = await context.push<bool>(
         '/payment-webview',
         extra: {
-          'paymentUrl': result.paymentUrl,
+          'paymentUrl': paymentUrl,
           'paymentId': result.paymentId,
           'plan': selectedPlan!,
         },
@@ -1470,15 +1632,20 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
       if (success == true && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('تم الدفع بنجاح!'), backgroundColor: AppThemeConstants.success),
+              content: Text('تم الدفع بنجاح!'),
+              backgroundColor: AppThemeConstants.success),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
+      debugPrint('Paymob payment error: $e');
       if (!context.mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')));
+      closeLoadingDialog();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content:
+            Text('حدث خطأ في تجهيز الدفع الإلكتروني. يرجى المحاولة مرة أخرى'),
+        backgroundColor: AppThemeConstants.error,
+      ));
     } finally {
       if (mounted) setState(() => isProcessingPayment = false);
     }

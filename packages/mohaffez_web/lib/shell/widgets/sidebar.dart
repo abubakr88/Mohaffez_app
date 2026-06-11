@@ -63,7 +63,8 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
             ),
             if (widget.bottomItems.isNotEmpty) ...[
               const Divider(height: 1, color: Colors.white12),
-              ...widget.bottomItems.map((item) => _buildItem(context, item, location)),
+              ...widget.bottomItems
+                  .map((item) => _buildItem(context, item, location)),
             ],
             const Divider(height: 1, color: Colors.white12),
             _buildFooter(context),
@@ -84,11 +85,23 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
           Container(
             width: 36,
             height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
+            decoration: const BoxDecoration(
+              color: Colors.white,
               borderRadius: DSRadius.mdAll,
             ),
-            child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Image.asset(
+                'web/favicon.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.menu_book_rounded,
+                  color: DSColors.primary,
+                  size: 20,
+                ),
+              ),
+            ),
           ),
           if (!_collapsed) ...[
             const SizedBox(width: DSSpacing.sm),
@@ -103,7 +116,9 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
           GestureDetector(
             onTap: () => setState(() => _collapsed = !_collapsed),
             child: Icon(
-              _collapsed ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
+              _collapsed
+                  ? Icons.chevron_right_rounded
+                  : Icons.chevron_left_rounded,
               color: Colors.white54,
               size: 18,
             ),
@@ -119,7 +134,8 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
         : location == item.path || location.startsWith('${item.path}/');
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: DSSpacing.sm, vertical: 2),
+      padding:
+          const EdgeInsets.symmetric(horizontal: DSSpacing.sm, vertical: 2),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
@@ -137,8 +153,9 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
               borderRadius: DSRadius.mdAll,
             ),
             child: Row(
-              mainAxisAlignment:
-                  _collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+              mainAxisAlignment: _collapsed
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
                 Icon(
                   item.icon,

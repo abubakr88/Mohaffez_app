@@ -88,7 +88,8 @@ class _GoogleRoleSelectionScreenState
                           ? NetworkImage(widget.photoUrl!)
                           : null,
                       child: widget.photoUrl == null
-                          ? const Icon(Icons.person, size: 48, color: Colors.white)
+                          ? const Icon(Icons.person,
+                              size: 48, color: Colors.white)
                           : null,
                     ),
                   ),
@@ -115,7 +116,7 @@ class _GoogleRoleSelectionScreenState
                   const SizedBox(height: 40),
                   Container(
                     padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppThemeConstants.surface,
                       borderRadius: AppThemeConstants.borderRadiusXl,
                     ),
@@ -167,7 +168,8 @@ class _GoogleRoleSelectionScreenState
                                 title: 'ذكر',
                                 icon: Icons.male,
                                 isSelected: _selectedGender == 'male',
-                                onTap: () => setState(() => _selectedGender = 'male'),
+                                onTap: () =>
+                                    setState(() => _selectedGender = 'male'),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -176,7 +178,8 @@ class _GoogleRoleSelectionScreenState
                                 title: 'أنثى',
                                 icon: Icons.female,
                                 isSelected: _selectedGender == 'female',
-                                onTap: () => setState(() => _selectedGender = 'female'),
+                                onTap: () =>
+                                    setState(() => _selectedGender = 'female'),
                               ),
                             ),
                           ],
@@ -189,7 +192,7 @@ class _GoogleRoleSelectionScreenState
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppThemeConstants.primary,
                               foregroundColor: AppThemeConstants.onPrimary,
-                              shape: RoundedRectangleBorder(
+                              shape: const RoundedRectangleBorder(
                                 borderRadius: AppThemeConstants.borderRadiusMd,
                               ),
                             ),
@@ -257,7 +260,8 @@ class _RoleCard extends StatelessWidget {
               ? AppThemeConstants.primary.withValues(alpha: 0.1)
               : AppThemeConstants.background,
           border: Border.all(
-            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
+            color:
+                isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: AppThemeConstants.borderRadiusMd,
@@ -287,7 +291,9 @@ class _RoleCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: isSelected ? AppThemeConstants.primary : Colors.black87,
+                      color: isSelected
+                          ? AppThemeConstants.primary
+                          : Colors.black87,
                       fontFamily: 'Cairo',
                     ),
                   ),
@@ -336,7 +342,8 @@ class _GenderCard extends StatelessWidget {
               ? AppThemeConstants.primary.withValues(alpha: 0.1)
               : AppThemeConstants.background,
           border: Border.all(
-            color: isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
+            color:
+                isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: AppThemeConstants.borderRadiusMd,
@@ -345,7 +352,8 @@ class _GenderCard extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppThemeConstants.primary : Colors.grey.shade600,
+              color:
+                  isSelected ? AppThemeConstants.primary : Colors.grey.shade600,
             ),
             const SizedBox(height: 4),
             Text(
