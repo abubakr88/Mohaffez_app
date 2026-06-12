@@ -221,9 +221,11 @@ class _CycleBreakdownCard extends ConsumerWidget {
     )));
     final teacherInfo =
         ref.watch(teacherCommissionInfoProvider(uid)).valueOrNull;
-    final globalRate =
-        ref.watch(systemConfigProvider).valueOrNull?.commissionRate ?? 0.05;
-    final effectiveRate = teacherInfo?.effectiveRate(globalRate) ?? globalRate;
+    final config = ref.watch(systemConfigProvider).valueOrNull;
+    final starterRate = config == null
+        ? 0.15
+        : CommissionTierModel.starterRate(config.commissionTiers);
+    final effectiveRate = teacherInfo?.effectiveRate(starterRate) ?? starterRate;
 
     return walletAsync.when(
       loading: () => const SizedBox.shrink(),
@@ -514,14 +516,13 @@ class _PayoutButton extends ConsumerWidget {
     // Effective rate = base tier + cycle penalty (same math as
     // recomputeTeacherTiers / requestPayout). Needed to project the
     // cycle's pending-net.
-    final globalRate = ref
-            .watch(systemConfigProvider)
-            .valueOrNull
-            ?.commissionRate ??
-        0.05;
+    final config = ref.watch(systemConfigProvider).valueOrNull;
+    final starterRate = config == null
+        ? 0.15
+        : CommissionTierModel.starterRate(config.commissionTiers);
     final teacherInfo =
         ref.watch(teacherCommissionInfoProvider(uid)).valueOrNull;
-    final effectiveRate = teacherInfo?.effectiveRate(globalRate) ?? globalRate;
+    final effectiveRate = teacherInfo?.effectiveRate(starterRate) ?? starterRate;
 
     final available = wallet.balanceEgp;
     final debt = wallet.directCommissionOwedEgp; // positive when owed

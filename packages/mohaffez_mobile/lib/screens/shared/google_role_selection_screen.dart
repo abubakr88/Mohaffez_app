@@ -25,6 +25,16 @@ class _GoogleRoleSelectionScreenState
   String _selectedGender = 'male';
   bool _isLoading = false;
 
+  IconData _genderIcon(String gender) {
+    return gender == 'female' ? Icons.woman_rounded : Icons.man_rounded;
+  }
+
+  IconData get _roleBadgeIcon {
+    return _selectedRole == 'mohaffez'
+        ? Icons.menu_book_rounded
+        : Icons.school_rounded;
+  }
+
   Future<void> _submit() async {
     if (_selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -136,7 +146,7 @@ class _GoogleRoleSelectionScreenState
                         _RoleCard(
                           title: 'طالب',
                           subtitle: 'أبحث عن محفظ لحفظ القرآن',
-                          icon: Icons.school_outlined,
+                          icon: Icons.school_rounded,
                           value: 'student',
                           selectedValue: _selectedRole,
                           onSelected: (v) => setState(() => _selectedRole = v),
@@ -145,7 +155,7 @@ class _GoogleRoleSelectionScreenState
                         _RoleCard(
                           title: 'محفظ',
                           subtitle: 'أرغب في تدريس وتسميع القرآن',
-                          icon: Icons.menu_book_outlined,
+                          icon: Icons.menu_book_rounded,
                           value: 'mohaffez',
                           selectedValue: _selectedRole,
                           onSelected: (v) => setState(() => _selectedRole = v),
@@ -166,7 +176,8 @@ class _GoogleRoleSelectionScreenState
                             Expanded(
                               child: _GenderCard(
                                 title: 'ذكر',
-                                icon: Icons.male,
+                                icon: _genderIcon('male'),
+                                badgeIcon: _roleBadgeIcon,
                                 isSelected: _selectedGender == 'male',
                                 onTap: () =>
                                     setState(() => _selectedGender = 'male'),
@@ -176,7 +187,8 @@ class _GoogleRoleSelectionScreenState
                             Expanded(
                               child: _GenderCard(
                                 title: 'أنثى',
-                                icon: Icons.female,
+                                icon: _genderIcon('female'),
+                                badgeIcon: _roleBadgeIcon,
                                 isSelected: _selectedGender == 'female',
                                 onTap: () =>
                                     setState(() => _selectedGender = 'female'),
@@ -320,12 +332,14 @@ class _RoleCard extends StatelessWidget {
 class _GenderCard extends StatelessWidget {
   final String title;
   final IconData icon;
+  final IconData badgeIcon;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _GenderCard({
     required this.title,
     required this.icon,
+    required this.badgeIcon,
     required this.isSelected,
     required this.onTap,
   });
@@ -350,10 +364,45 @@ class _GenderCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              color:
-                  isSelected ? AppThemeConstants.primary : Colors.grey.shade600,
+            SizedBox(
+              width: 42,
+              height: 42,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: Icon(
+                      icon,
+                      size: 34,
+                      color: isSelected
+                          ? AppThemeConstants.primary
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                  PositionedDirectional(
+                    end: -2,
+                    bottom: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppThemeConstants.primary
+                            : Colors.grey.shade500,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppThemeConstants.surface,
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(
+                        badgeIcon,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 4),
             Text(

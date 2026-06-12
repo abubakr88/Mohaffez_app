@@ -30,6 +30,7 @@ import {
   SYSTEM_WALLETS,
 } from '../wallet/walletUtils';
 import { computeCancellationOutcome } from './cancellationPolicy';
+import { resolveBaseRateFromData } from '../utils/commissionRate';
 
 type SessionDoc = Record<string, unknown>;
 
@@ -360,9 +361,12 @@ export const onSessionCancelled = functions.firestore
     // Each cancellation/no-show adds its penalty on top of existing ones.
     // The total resets to 0 at the end of every settlement cycle.
     if (cancelledBy === 'teacher' && penaltyPercent > 0) {
-      const teacherSnap = await db.collection('users').doc(mohaffezId).get();
+      const [teacherSnap, configSnap] = await Promise.all([
+        db.collection('users').doc(mohaffezId).get(),
+        db.collection('systemConfig').doc('global').get(),
+      ]);
       const oldPenaltyPct = (teacherSnap.data()?.commissionPenaltyPercent as number | undefined) ?? 0;
-      const baseRate = (teacherSnap.data()?.commissionRate as number | undefined) ?? 0.10;
+      const baseRate = resolveBaseRateFromData(teacherSnap.data(), configSnap.data());
       const oldEffective = Math.min(baseRate + oldPenaltyPct / 100, 1.0);
       const newEffective = Math.min(baseRate + (oldPenaltyPct + penaltyPercent) / 100, 1.0);
 

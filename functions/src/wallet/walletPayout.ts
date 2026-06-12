@@ -24,6 +24,7 @@ import {
   requireAdmin,
 } from './walletUtils';
 import { writeAdminAuditLog } from '../utils/auditLog';
+import { resolveBaseRateFromData } from '../utils/commissionRate';
 
 const MIN_PAYOUT_EGP = 50;
 
@@ -81,16 +82,9 @@ export const requestPayout = functions.https.onCall(async (data, context) => {
     const debt = dues < 0 ? -dues : 0;
 
     // Effective commission rate: per-teacher tier rate + cycle penalty,
-    // falling back to global. Mirrors resolveTeacherRate logic but inlined
+    // falling back to the starter tier. Mirrors resolveTeacherRate logic but inlined
     // because that helper does its own reads outside our transaction.
-    const teacherBase = teacherSnap.data()?.commissionRate;
-    const globalRate = cfgSnap.data()?.commissionRate;
-    const baseRate: number =
-      typeof teacherBase === 'number' && teacherBase >= 0
-        ? teacherBase
-        : typeof globalRate === 'number' && globalRate >= 0
-          ? globalRate
-          : 0.05;
+    const baseRate = resolveBaseRateFromData(teacherSnap.data(), cfgSnap.data());
     const rawPenalty = teacherSnap.data()?.commissionPenaltyPercent;
     const penaltyPct =
       typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0

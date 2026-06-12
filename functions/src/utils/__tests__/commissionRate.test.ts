@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeEffectiveRate } from '../../payments/recomputeTeacherTiers';
+import { resolveBaseRateFromData, starterTierRateFromConfig } from '../commissionRate';
 
 describe('Direct-payment commission rate composition', () => {
   // These tests mirror what resolveTeacherRate() returns, validated against
@@ -39,6 +40,37 @@ describe('Direct-payment commission rate composition', () => {
     const starterRate = computeEffectiveRate(0.15, 0);
     expect(starterRate).not.toBe(0.10);
     expect(starterRate).toBe(0.15);
+  });
+});
+
+describe('Commission base-rate fallback', () => {
+  const configWithGlobalTen = {
+    commissionRate: 0.10,
+    commissionTiers: [
+      { id: 'starter', minSessions: 0, rate: 0.15 },
+      { id: 'active', minSessions: 8, rate: 0.12 },
+    ],
+  };
+
+  it('uses teacher commissionRate when present', () => {
+    expect(resolveBaseRateFromData({ commissionRate: 0.08 }, configWithGlobalTen)).toBe(0.08);
+  });
+
+  it('new teacher fallback uses starter tier, not legacy global rate', () => {
+    expect(resolveBaseRateFromData({}, configWithGlobalTen)).toBe(0.15);
+  });
+
+  it('starter tier is selected by lowest minSessions even if unordered', () => {
+    expect(starterTierRateFromConfig({
+      commissionTiers: [
+        { id: 'active', minSessions: 8, rate: 0.12 },
+        { id: 'starter', minSessions: 0, rate: 0.15 },
+      ],
+    })).toBe(0.15);
+  });
+
+  it('falls back to 15% when tiers are missing', () => {
+    expect(resolveBaseRateFromData({}, { commissionRate: 0.10 })).toBe(0.15);
   });
 });
 

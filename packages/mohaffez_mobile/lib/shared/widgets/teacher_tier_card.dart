@@ -28,7 +28,8 @@ class TeacherTierCard extends ConsumerWidget {
     final tiers = cfg.commissionTiers;
     if (tiers.isEmpty) return const SizedBox.shrink();
 
-    final effective = info?.effectiveRate(cfg.commissionRate) ?? cfg.commissionRate;
+    final starterRate = CommissionTierModel.starterRate(tiers);
+    final effective = info?.effectiveRate(starterRate) ?? starterRate;
     final currentTier = info?.currentTier(tiers);
     final nextTier = info?.nextTier(tiers);
     final sessions = info?.sessionsLast14d ?? 0;

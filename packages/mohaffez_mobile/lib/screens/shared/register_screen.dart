@@ -23,6 +23,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _selectedRole = 'student';
   String _selectedGender = 'male';
 
+  IconData _genderIcon(String gender) {
+    return gender == 'female' ? Icons.woman_rounded : Icons.man_rounded;
+  }
+
+  IconData get _roleBadgeIcon {
+    return _selectedRole == 'mohaffez'
+        ? Icons.menu_book_rounded
+        : Icons.school_rounded;
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -137,7 +147,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           children: [
                             Expanded(
                               child: _RoleCard(
-                                icon: Icons.school,
+                                icon: Icons.menu_book_rounded,
                                 title: 'محفّظ',
                                 subtitle: 'معلم القرآن',
                                 color: AppThemeConstants.primary,
@@ -155,7 +165,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             Expanded(
                               child: _RoleCard(
-                                icon: Icons.person,
+                                icon: Icons.school_rounded,
                                 title: 'طالب',
                                 subtitle: 'دارس القرآن',
                                 color: AppThemeConstants.secondary,
@@ -250,7 +260,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           children: [
                             Expanded(
                               child: _GenderCard(
-                                icon: Icons.male,
+                                icon: _genderIcon('male'),
+                                badgeIcon: _roleBadgeIcon,
                                 title: _selectedRole == 'student'
                                     ? 'طالب'
                                     : 'معلم',
@@ -269,7 +280,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             Expanded(
                               child: _GenderCard(
-                                icon: Icons.female,
+                                icon: _genderIcon('female'),
+                                badgeIcon: _roleBadgeIcon,
                                 title: _selectedRole == 'student'
                                     ? 'طالبة'
                                     : 'معلمة',
@@ -333,14 +345,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 }
 
 class _GenderCard extends StatelessWidget {
-  final IconData? icon;
+  final IconData icon;
+  final IconData badgeIcon;
   final String title;
   final Color color;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _GenderCard({
-    this.icon,
+    required this.icon,
+    required this.badgeIcon,
     required this.title,
     required this.color,
     required this.isSelected,
@@ -366,14 +380,45 @@ class _GenderCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 48,
-                color: isSelected ? color : AppThemeConstants.textDisabled,
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: Icon(
+                      icon,
+                      size: 48,
+                      color:
+                          isSelected ? color : AppThemeConstants.textDisabled,
+                    ),
+                  ),
+                  PositionedDirectional(
+                    end: -2,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color:
+                            isSelected ? color : AppThemeConstants.textDisabled,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppThemeConstants.surface,
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(
+                        badgeIcon,
+                        size: 14,
+                        color: AppThemeConstants.onPrimary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Spacing.vSm,
-            ],
+            ),
+            Spacing.vSm,
             Text(
               title,
               style: TextStyle(

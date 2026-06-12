@@ -60,7 +60,7 @@ class TourFixtures {
     return DemoStudentFixture(
       user: const UserModel(
         uid: 'tour-student-1',
-        name: 'زائر تجريبي',
+        name: 'طالب تجريبي',
         email: 'tour-student@mohafezy.demo',
         role: 'student',
         status: 'active',
@@ -102,7 +102,7 @@ class TourFixtures {
           'mohaffezId': 'demo-teacher-a',
           'mohaffezName': 'الشيخ محمد عبدالله',
           'studentId': 'tour-student-1',
-          'studentName': 'زائر تجريبي',
+          'studentName': 'طالب تجريبي',
           'status': 'accepted',
           'sessionDate': tomorrowMorning,
           'slotStart': tomorrowMorning,
@@ -116,7 +116,7 @@ class TourFixtures {
           'mohaffezId': 'demo-teacher-b',
           'mohaffezName': 'الشيخ أحمد السيد',
           'studentId': 'tour-student-1',
-          'studentName': 'زائر تجريبي',
+          'studentName': 'طالب تجريبي',
           'status': 'accepted',
           'sessionDate': inOneWeek,
           'slotStart': inOneWeek,
@@ -148,7 +148,7 @@ class TourFixtures {
     return DemoTeacherFixture(
       user: const UserModel(
         uid: 'tour-teacher-1',
-        name: 'الشيخ التجريبي',
+        name: 'المحفظ التجريبي',
         email: 'tour-teacher@mohafezy.demo',
         role: 'mohaffez',
         status: 'active',
@@ -192,7 +192,7 @@ class TourFixtures {
         {
           'id': 'demo-tsess-1',
           'mohaffezId': 'tour-teacher-1',
-          'mohaffezName': 'الشيخ التجريبي',
+          'mohaffezName': 'المحفظ التجريبي',
           'studentId': 'demo-student-1',
           'studentName': 'محمد طارق',
           'status': 'accepted',
@@ -206,7 +206,7 @@ class TourFixtures {
         {
           'id': 'demo-tsess-2',
           'mohaffezId': 'tour-teacher-1',
-          'mohaffezName': 'الشيخ التجريبي',
+          'mohaffezName': 'المحفظ التجريبي',
           'studentId': 'demo-student-2',
           'studentName': 'فاطمة أحمد',
           'status': 'accepted',
