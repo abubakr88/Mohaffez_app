@@ -12,6 +12,7 @@ import {
   walletIdForUser,
   SYSTEM_WALLETS,
 } from '../wallet/walletUtils';
+import { resolveBaseRateFromData } from '../utils/commissionRate';
 
 const STATUS = {
   PENDING: 'pending',
@@ -137,14 +138,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         );
       }
 
-      const teacherBase = teacherSnap.data()?.commissionRate;
-      const globalRate = configSnap.data()?.commissionRate;
-      const baseRate: number =
-        typeof teacherBase === 'number' && teacherBase >= 0
-          ? teacherBase
-          : typeof globalRate === 'number' && globalRate >= 0
-            ? globalRate
-            : 0.05;
+      const baseRate = resolveBaseRateFromData(teacherSnap.data(), configSnap.data());
       const rawPenalty = teacherSnap.data()?.commissionPenaltyPercent;
       const penaltyPct =
         typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0

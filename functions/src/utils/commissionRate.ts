@@ -14,12 +14,48 @@
 import { db } from './admin';
 import { computeEffectiveRate } from '../payments/recomputeTeacherTiers';
 
-const HARD_FALLBACK = 0.05;
+const STARTER_FALLBACK = 0.15;
 
 export interface ResolvedRate {
   baseRate: number;       // tier rate (no penalty)
   penaltyPct: number;     // accumulated penalty for the current cycle, in percent points
   effectiveRate: number;  // base + penalty (capped at 100%)
+}
+
+function isValidRate(value: unknown): value is number {
+  return typeof value === 'number' && isFinite(value) && value >= 0 && value <= 1;
+}
+
+export function starterTierRateFromConfig(
+  configData: FirebaseFirestore.DocumentData | undefined,
+): number {
+  const rawTiers = configData?.commissionTiers;
+  if (Array.isArray(rawTiers) && rawTiers.length > 0) {
+    const sorted = rawTiers
+      .map((entry) => {
+        const e = entry as Record<string, unknown>;
+        const minSessions =
+          typeof e.minSessions === 'number' && isFinite(e.minSessions)
+            ? e.minSessions
+            : 0;
+        return { minSessions, rate: e.rate };
+      })
+      .filter((tier) => isValidRate(tier.rate))
+      .sort((a, b) => a.minSessions - b.minSessions);
+
+    if (sorted.length > 0) return sorted[0].rate as number;
+  }
+
+  return STARTER_FALLBACK;
+}
+
+export function resolveBaseRateFromData(
+  teacherData: FirebaseFirestore.DocumentData | undefined,
+  configData: FirebaseFirestore.DocumentData | undefined,
+): number {
+  const perTeacher = teacherData?.commissionRate;
+  if (isValidRate(perTeacher)) return perTeacher;
+  return starterTierRateFromConfig(configData);
 }
 
 /**
@@ -28,7 +64,7 @@ export interface ResolvedRate {
  * of "your tier rate" and `penaltyPct` separately if showing the penalty.
  */
 export async function resolveTeacherRate(teacherId: string): Promise<ResolvedRate> {
-  let baseRate = HARD_FALLBACK;
+  let baseRate = STARTER_FALLBACK;
   let penaltyPct = 0;
 
   try {
@@ -37,15 +73,7 @@ export async function resolveTeacherRate(teacherId: string): Promise<ResolvedRat
       db.collection('systemConfig').doc('global').get(),
     ]);
 
-    const perTeacher = userSnap.data()?.commissionRate;
-    if (typeof perTeacher === 'number' && isFinite(perTeacher) && perTeacher >= 0) {
-      baseRate = perTeacher;
-    } else {
-      const global = configSnap.data()?.commissionRate;
-      if (typeof global === 'number' && isFinite(global) && global >= 0) {
-        baseRate = global;
-      }
-    }
+    baseRate = resolveBaseRateFromData(userSnap.data(), configSnap.data());
 
     const rawPenalty = userSnap.data()?.commissionPenaltyPercent;
     if (typeof rawPenalty === 'number' && isFinite(rawPenalty) && rawPenalty >= 0) {

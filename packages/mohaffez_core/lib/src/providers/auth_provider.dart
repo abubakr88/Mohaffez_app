@@ -16,6 +16,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../services/cache_service.dart';
+import '../models/commission_tier_model.dart';
 import 'booking_flow_provider.dart';
 
 /// Thrown when a new Google user has authenticated but has no Firestore doc yet.
@@ -54,6 +55,22 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;
 
   AuthNotifier(this._authService, this._ref) : super(const AsyncValue.data(null));
+
+  Map<String, dynamic> _initialCommissionFields(String role) {
+    if (role != 'mohaffez') return const <String, dynamic>{};
+    final starterTier = CommissionTierModel.defaultTiers.first;
+    return {
+      'commissionRate': starterTier.rate,
+      'commissionTier': starterTier.id,
+      'commissionPenaltyPercent': 0,
+      'tierStats': {
+        'last14dRevenueEgp': 0,
+        'sessionsLast14d': 0,
+        'totalSessionsLast14d': 0,
+        'lateSessionsLast14d': 0,
+      },
+    };
+  }
 
   Future<void> signIn({
     required String email,
@@ -167,6 +184,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'examPassed': false,
           'examNextRetryAt': null,
           'gender': gender,
+          ..._initialCommissionFields(role),
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (e) {
@@ -287,6 +305,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'examPassed': false,
           'examNextRetryAt': null,
           'gender': gender,
+          ..._initialCommissionFields(role),
           'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (e) {

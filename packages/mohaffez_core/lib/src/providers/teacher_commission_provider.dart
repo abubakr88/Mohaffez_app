@@ -53,11 +53,11 @@ class TeacherCommissionInfo {
   });
 
   /// Returns the effective rate (base tier rate + cycle penalty),
-  /// falling back to [globalRate] when this teacher hasn't been
+  /// falling back to [fallbackRate] when this teacher hasn't been
   /// evaluated yet. Capped at 100% so teachers never owe more than
   /// they earned.
-  double effectiveRate(double globalRate) {
-    final base = rate ?? globalRate;
+  double effectiveRate(double fallbackRate) {
+    final base = rate ?? fallbackRate;
     final effective = base + penaltyPct / 100;
     return effective > 1.0 ? 1.0 : effective;
   }
@@ -136,14 +136,15 @@ final teacherCommissionInfoProvider =
   },
 );
 
-/// Convenience: resolves the effective rate for [teacherId] (per-teacher
-/// rate when set, else the global config rate). Returns null while either
-/// source is still loading.
+/// Convenience: resolves the effective rate for [teacherId]. If the
+/// per-teacher rate is not initialized yet, new teachers start from the
+/// first configured tier, not the legacy global config rate.
 final effectiveCommissionRateProvider =
     Provider.autoDispose.family<double?, String>((ref, teacherId) {
   final cfg = ref.watch(systemConfigProvider).valueOrNull;
   if (cfg == null) return null;
   final info = ref.watch(teacherCommissionInfoProvider(teacherId)).valueOrNull;
-  if (info == null) return cfg.commissionRate;
-  return info.effectiveRate(cfg.commissionRate);
+  final starterRate = CommissionTierModel.starterRate(cfg.commissionTiers);
+  if (info == null) return starterRate;
+  return info.effectiveRate(starterRate);
 });

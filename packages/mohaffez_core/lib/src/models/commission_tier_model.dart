@@ -109,6 +109,18 @@ class CommissionTierModel {
     ),
   ];
 
+  /// New teachers start from the lowest threshold tier, which carries the
+  /// highest platform commission until their completed-session goals lower it.
+  static CommissionTierModel starterTier(List<CommissionTierModel> tiers) {
+    if (tiers.isEmpty) return defaultTiers.first;
+    final sorted = [...tiers]
+      ..sort((a, b) => a.minSessions.compareTo(b.minSessions));
+    return sorted.first;
+  }
+
+  static double starterRate(List<CommissionTierModel> tiers) =>
+      starterTier(tiers).rate;
+
   /// Given a sorted-ascending tier list and a session count, returns the
   /// highest-qualifying tier. Returns null if list is empty.
   static CommissionTierModel? tierForSessions(

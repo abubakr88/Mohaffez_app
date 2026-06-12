@@ -27,7 +27,7 @@ class AddPricingPlanSheet extends ConsumerStatefulWidget {
 const double _kPaymobPercent = 0.0275;
 const double _kPaymobFlat = 3.0;
 const double _kVatRate = 0.14;
-const double _kDefaultCommission = 0.05; // fallback when systemConfig is null
+const double _kDefaultCommission = 0.15; // starter-tier fallback when config is null
 
 class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   final _formKey = GlobalKey<FormState>();
@@ -83,12 +83,14 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
     final teacherInfo = ref
         .read(teacherCommissionInfoProvider(widget.mohaffezId))
         .valueOrNull;
-    final global =
-        ref.read(systemConfigProvider).valueOrNull?.commissionRate;
-    if (teacherInfo != null && global != null) {
-      return teacherInfo.effectiveRate(global);
+    final config = ref.read(systemConfigProvider).valueOrNull;
+    final starterRate = config == null
+        ? _kDefaultCommission
+        : CommissionTierModel.starterRate(config.commissionTiers);
+    if (teacherInfo != null) {
+      return teacherInfo.effectiveRate(starterRate);
     }
-    return teacherInfo?.rate ?? global ?? _kDefaultCommission;
+    return starterRate;
   }
 
   void _onPriceChanged() {

@@ -609,23 +609,6 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
             ),
             const SizedBox(height: 16),
 
-            // City
-            TextFormField(
-              controller: _cityController,
-              decoration: const InputDecoration(
-                labelText: 'المدينة',
-                prefixIcon: Icon(Icons.location_city),
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'يرجى إدخال المدينة';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
             InkWell(
               onTap: _pickMainLocation,
               child: InputDecorator(
@@ -663,6 +646,23 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
                     fontSize: 12, color: AppThemeConstants.grey500),
               ),
             ],
+            const SizedBox(height: 16),
+
+            // City
+            TextFormField(
+              controller: _cityController,
+              decoration: const InputDecoration(
+                labelText: 'المدينة',
+                prefixIcon: Icon(Icons.location_city),
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'يرجى إدخال المدينة';
+                }
+                return null;
+              },
+            ),
             const SizedBox(height: 32),
 
             // Next / Submit button
@@ -982,44 +982,69 @@ class _BirthDateDropdowns extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InputDecorator(
-      decoration: const InputDecoration(
-        labelText: 'تاريخ الميلاد',
-        prefixIcon: Icon(Icons.calendar_today),
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.fromLTRB(12, 14, 12, 10),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
+        borderRadius: BorderRadius.circular(4),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: _BirthDropdown<int>(
-              label: 'اليوم',
-              value: days.contains(day) ? day : null,
-              items: days,
-              itemLabel: (value) => value.toString(),
-              onChanged: month == null || year == null ? null : onDayChanged,
-            ),
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'تاريخ الميلاد',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
-            child: _BirthDropdown<int>(
-              label: 'الشهر',
-              value: months.contains(month) ? month : null,
-              items: months,
-              itemLabel: (value) => monthNames[value - 1],
-              onChanged: year == null ? null : onMonthChanged,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _BirthDropdown<int>(
-              label: 'السنة',
-              value: years.contains(year) ? year : null,
-              items: years,
-              itemLabel: (value) => value.toString(),
-              onChanged: onYearChanged,
-            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                flex: 8,
+                child: _BirthDropdown<int>(
+                  label: 'اليوم',
+                  value: days.contains(day) ? day : null,
+                  items: days,
+                  itemLabel: (value) => value.toString(),
+                  onChanged:
+                      month == null || year == null ? null : onDayChanged,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 10,
+                child: _BirthDropdown<int>(
+                  label: 'الشهر',
+                  value: months.contains(month) ? month : null,
+                  items: months,
+                  itemLabel: (value) => monthNames[value - 1],
+                  onChanged: year == null ? null : onMonthChanged,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 12,
+                child: _BirthDropdown<int>(
+                  label: 'السنة',
+                  value: years.contains(year) ? year : null,
+                  items: years,
+                  itemLabel: (value) => value.toString(),
+                  onChanged: onYearChanged,
+                ),
+              ),
+            ],
           ),
         ],
       ),
