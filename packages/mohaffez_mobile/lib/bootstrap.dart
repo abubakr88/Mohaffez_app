@@ -22,7 +22,6 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('📨 Background message received: ${message.messageId}');
 }
 
-
 Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -50,17 +49,24 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
       if (kDebugMode) {
         FirebaseAppCheck.instance.onTokenChange.listen((token) {
           final hasToken = token != null && token.isNotEmpty;
-          debugPrint('App Check token: ${hasToken ? 'valid' : 'null_or_empty'}');
+          debugPrint(
+              'App Check token: ${hasToken ? 'valid' : 'null_or_empty'}');
         });
       }
     } else {
       debugPrint('ℹ️ Firebase App Check skipped for web');
     }
 
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
+    try {
+      FirebaseFirestore.instance.settings = const Settings(
+        // Safari/iOS browser storage can be unavailable on first launch or in
+        // embedded contexts. Native apps keep offline persistence enabled.
+        persistenceEnabled: !kIsWeb,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    } catch (e) {
+      debugPrint('⚠️ Firestore settings skipped: $e');
+    }
 
     if (!kIsWeb) {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

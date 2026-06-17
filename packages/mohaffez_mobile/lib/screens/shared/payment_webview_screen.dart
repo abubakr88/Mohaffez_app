@@ -78,13 +78,20 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
           onNavigationRequest: (request) {
             if (_isSuccessUrl(request.url)) {
               _showSuccessAnimation();
+              return NavigationDecision.prevent;
             }
             if (_isFailureUrl(request.url)) {
               _showFailureDialog('فشلت عملية الدفع');
+              return NavigationDecision.prevent;
+            }
+            if (_isPaymobReturnUrl(request.url)) {
+              if (mounted) setState(() => loadingProgress = 100);
+              return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
           },
           onWebResourceError: (error) {
+            if (paymentCompleted || error.isForMainFrame == false) return;
             _showFailureDialog(error.description);
           },
         ),
@@ -113,6 +120,13 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
 
   bool _isFailureUrl(String url) =>
       parsePaymobCallback(url) == PaymobCallbackResult.failure;
+
+  bool _isPaymobReturnUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final host = uri.host.toLowerCase();
+    return host.endsWith('mohafezy.com') && uri.path == '/payment/return';
+  }
 
   Future<void> _openPaymentExternally() async {
     final uri = Uri.tryParse(widget.paymentUrl);

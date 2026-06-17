@@ -5,14 +5,16 @@ import {
   PaymentEventType,
   PaymentState,
 } from '../types/events.types';
+import { sanitizeForFirestore } from '../utils/firestoreSanitizer';
 
 export class EventStore {
   async appendPaymentEvent(
     event: Omit<PaymentEvent, 'eventId' | 'timestamp'>
   ): Promise<string> {
     const eventRef = db.collection('paymentEvents').doc();
+    const cleanEvent = sanitizeForFirestore(event);
     await eventRef.set({
-      ...event,
+      ...cleanEvent,
       eventId: eventRef.id,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });

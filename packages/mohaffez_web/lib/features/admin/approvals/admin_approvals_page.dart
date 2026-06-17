@@ -5,13 +5,15 @@ import 'package:intl/intl.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../../../design_system/design_system.dart';
+import '../../../platform/web_download.dart';
 
 class AdminApprovalsPage extends ConsumerWidget {
   const AdminApprovalsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(pendingTeachersProvider);
+    final pendingTeachers = ref.watch(pendingTeachersProvider);
+    final pendingCredentials = ref.watch(pendingCredentialsProvider);
 
     return PageContainer(
       child: Column(
@@ -22,7 +24,9 @@ class AdminApprovalsPage extends ConsumerWidget {
             subtitle: 'مركز مراجعة حسابات المحفظين قبل تفعيلهم للطلاب',
           ),
           const SizedBox(height: DSSpacing.xxl),
-          async.when(
+          _PendingCredentialsQueue(async: pendingCredentials),
+          const SizedBox(height: DSSpacing.xxl),
+          pendingTeachers.when(
             loading: () => const DSSkeletonCard(),
             error: (e, _) =>
                 DSBanner(message: '$e', variant: DSBannerVariant.error),
@@ -57,6 +61,262 @@ class AdminApprovalsPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _PendingCredentialsQueue extends StatelessWidget {
+  const _PendingCredentialsQueue({required this.async});
+
+  final AsyncValue<List<Map<String, dynamic>>> async;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'مراجعة الشهادات'),
+        const SizedBox(height: DSSpacing.md),
+        async.when(
+          loading: () => const DSSkeletonCard(),
+          error: (e, _) => DSBanner(
+            message: 'تعذر تحميل الشهادات المعلقة: $e',
+            variant: DSBannerVariant.error,
+          ),
+          data: (items) {
+            if (items.isEmpty) {
+              return DSCard(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.workspace_premium_outlined,
+                      color: DSColors.success,
+                    ),
+                    const SizedBox(width: DSSpacing.md),
+                    Expanded(
+                      child: Text(
+                        'لا توجد شهادات بانتظار الاعتماد الآن',
+                        style: DSText.body(context, color: DSColors.text2),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${items.length} شهادة بانتظار الاعتماد',
+                  style: DSText.caption(context, color: DSColors.text3),
+                ),
+                const SizedBox(height: DSSpacing.md),
+                ...items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: DSSpacing.md),
+                    child: _PendingCredentialCard(credential: item),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _PendingCredentialCard extends ConsumerWidget {
+  const _PendingCredentialCard({required this.credential});
+
+  final Map<String, dynamic> credential;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userId = credential['userId'] as String? ?? '';
+    final credentialId = credential['id'] as String? ?? '';
+    final teacherAsync =
+        userId.isEmpty ? null : ref.watch(adminUserProvider(userId));
+    final teacher = teacherAsync?.valueOrNull;
+    final teacherName = teacher == null
+        ? (userId.isEmpty ? 'محفظ غير محدد' : userId)
+        : _text(teacher, const ['name', 'displayName'], userId);
+    final title = _text(credential, const ['title', 'name'], 'شهادة');
+    final organization = _nullableText(
+      credential,
+      const ['organization', 'issuer', 'source'],
+    );
+    final uploadedAt = credential['uploadedAt'] ?? credential['createdAt'];
+    final images = _credentialImages(credential);
+    final notes = _nullableText(credential, const ['description', 'notes']);
+
+    return DSCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.workspace_premium_outlined,
+                color: DSColors.primary,
+              ),
+              const SizedBox(width: DSSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: DSText.h3(context)),
+                    const SizedBox(height: DSSpacing.xs),
+                    Wrap(
+                      spacing: DSSpacing.sm,
+                      runSpacing: DSSpacing.sm,
+                      children: [
+                        _MetaChip(
+                          icon: Icons.person_outline_rounded,
+                          label: teacherName,
+                        ),
+                        if (organization != null)
+                          _MetaChip(
+                            icon: Icons.account_balance_outlined,
+                            label: organization,
+                          ),
+                        _MetaChip(
+                          icon: Icons.schedule_outlined,
+                          label: _date(uploadedAt),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: DSSpacing.md),
+              const DSBadge(
+                label: 'قيد المراجعة',
+                variant: DSBadgeVariant.warning,
+                dot: true,
+              ),
+            ],
+          ),
+          if (notes != null) ...[
+            const SizedBox(height: DSSpacing.sm),
+            Text(notes, style: DSText.caption(context, color: DSColors.text2)),
+          ],
+          const SizedBox(height: DSSpacing.md),
+          if (images.isEmpty)
+            const _EmptyPanel(
+              icon: Icons.image_not_supported_outlined,
+              title: 'لا توجد صور مرفقة',
+              message: 'راجع بيانات الشهادة قبل الاعتماد.',
+            )
+          else
+            Wrap(
+              spacing: DSSpacing.sm,
+              runSpacing: DSSpacing.sm,
+              children: [
+                for (final url in images)
+                  _Thumbnail(
+                    url: url,
+                    onTap: () => _openViewer(context, images, url),
+                  ),
+              ],
+            ),
+          const SizedBox(height: DSSpacing.md),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: DSSpacing.sm,
+            runSpacing: DSSpacing.sm,
+            children: [
+              DSButton(
+                label: 'فتح ملف المحفظ',
+                size: DSButtonSize.sm,
+                variant: DSButtonVariant.secondary,
+                leading: const Icon(Icons.open_in_new_rounded, size: 16),
+                onPressed: userId.isEmpty
+                    ? null
+                    : () => context.go('/admin/users/$userId'),
+              ),
+              DSButton(
+                label: 'رفض الشهادة',
+                size: DSButtonSize.sm,
+                variant: DSButtonVariant.destructive,
+                leading: const Icon(Icons.close_rounded, size: 16),
+                onPressed: userId.isEmpty || credentialId.isEmpty
+                    ? null
+                    : () => _reject(context, ref, userId, credentialId, title),
+              ),
+              DSButton(
+                label: 'اعتماد الشهادة',
+                size: DSButtonSize.sm,
+                leading: const Icon(Icons.check_rounded, size: 16),
+                onPressed: userId.isEmpty || credentialId.isEmpty
+                    ? null
+                    : () => _approve(context, ref, userId, credentialId, title),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openViewer(BuildContext context, List<String> images, String current) {
+    if (images.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (_) => _ImageViewer(images: images, initial: current),
+    );
+  }
+
+  Future<void> _approve(
+    BuildContext context,
+    WidgetRef ref,
+    String userId,
+    String credentialId,
+    String title,
+  ) async {
+    final ok = await DSDialog.confirm(
+      context,
+      title: 'اعتماد الشهادة',
+      message:
+          'اعتماد شهادة "$title"؟ ستظهر للطلاب في ملف المحفظ بعد الاعتماد.',
+      confirmLabel: 'اعتماد',
+    );
+    if (!ok || !context.mounted) return;
+
+    await _runAction(
+      context,
+      ref,
+      () => ref
+          .read(adminActionsProvider.notifier)
+          .approveCredential(userId, credentialId),
+      'تم اعتماد الشهادة',
+    );
+    ref.invalidate(pendingCredentialsProvider);
+    ref.invalidate(teacherCredentialsProvider(userId));
+  }
+
+  Future<void> _reject(
+    BuildContext context,
+    WidgetRef ref,
+    String userId,
+    String credentialId,
+    String title,
+  ) async {
+    final reason = await _showCredentialRejectDialog(context, title);
+    if (reason == null || !context.mounted) return;
+
+    await _runAction(
+      context,
+      ref,
+      () => ref
+          .read(adminActionsProvider.notifier)
+          .rejectCredential(userId, credentialId, reason),
+      'تم رفض الشهادة',
+    );
+    ref.invalidate(pendingCredentialsProvider);
+    ref.invalidate(teacherCredentialsProvider(userId));
   }
 }
 
@@ -449,6 +709,10 @@ class _ProfileSection extends StatelessWidget {
       const ['addressText', 'address', 'locationAddress'],
     );
     final location = _locationLabel(teacher);
+    final examScore = _examScoreLabel(teacher);
+    final examStatus = _examStatusLabel(teacher);
+    final examTakenAt = _date(teacher['examTakenAt']);
+    final examAnswers = _examAnswersLabel(teacher);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,6 +728,11 @@ class _ProfileSection extends StatelessWidget {
             _DetailRow(label: 'العنوان', value: address),
             _DetailRow(label: 'الإحداثيات', value: location),
             _DetailRow(label: 'نبذة', value: bio),
+            _DetailRow(label: 'نتيجة الاختبار', value: examScore),
+            _DetailRow(label: 'حالة الاختبار', value: examStatus),
+            if (examTakenAt != '—')
+              _DetailRow(label: 'تاريخ الاختبار', value: examTakenAt),
+            _DetailRow(label: 'إجابات الاختبار', value: examAnswers),
             if (videoUrl != null)
               _DetailRow(
                 label: 'فيديو تعريفي',
@@ -740,6 +1009,7 @@ class _CredentialsSection extends ConsumerWidget {
               children: [
                 ...creds.map(
                   (credential) => _CredentialRow(
+                    userId: userId,
                     credential: credential,
                     allImages: images,
                   ),
@@ -753,22 +1023,25 @@ class _CredentialsSection extends ConsumerWidget {
   }
 }
 
-class _CredentialRow extends StatelessWidget {
+class _CredentialRow extends ConsumerWidget {
   const _CredentialRow({
+    required this.userId,
     required this.credential,
     required this.allImages,
   });
 
+  final String userId;
   final Map<String, dynamic> credential;
   final List<String> allImages;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final title = _text(credential, const ['title', 'name'], 'وثيقة');
     final organization = _nullableText(
       credential,
       const ['organization', 'issuer', 'source'],
     );
+    final credentialId = credential['id'] as String? ?? '';
     final status = _text(credential, const ['status'], 'pending');
     final notes = _nullableText(credential, const ['description', 'notes']);
     final images = _credentialImages(credential);
@@ -810,6 +1083,35 @@ class _CredentialRow extends StatelessWidget {
               ],
             ),
           ],
+          if (status == 'pending') ...[
+            const SizedBox(height: DSSpacing.sm),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: DSSpacing.sm,
+              runSpacing: DSSpacing.sm,
+              children: [
+                DSButton(
+                  label: 'رفض الشهادة',
+                  size: DSButtonSize.sm,
+                  variant: DSButtonVariant.destructive,
+                  leading: const Icon(Icons.close_rounded, size: 16),
+                  onPressed: userId.isEmpty || credentialId.isEmpty
+                      ? null
+                      : () =>
+                          _reject(context, ref, userId, credentialId, title),
+                ),
+                DSButton(
+                  label: 'اعتماد الشهادة',
+                  size: DSButtonSize.sm,
+                  leading: const Icon(Icons.check_rounded, size: 16),
+                  onPressed: userId.isEmpty || credentialId.isEmpty
+                      ? null
+                      : () =>
+                          _approve(context, ref, userId, credentialId, title),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -822,6 +1124,56 @@ class _CredentialRow extends StatelessWidget {
       barrierColor: Colors.black.withValues(alpha: 0.85),
       builder: (_) => _ImageViewer(images: images, initial: current),
     );
+  }
+
+  Future<void> _approve(
+    BuildContext context,
+    WidgetRef ref,
+    String userId,
+    String credentialId,
+    String title,
+  ) async {
+    final ok = await DSDialog.confirm(
+      context,
+      title: 'اعتماد الشهادة',
+      message:
+          'اعتماد شهادة "$title"؟ ستظهر للطلاب في ملف المحفظ بعد الاعتماد.',
+      confirmLabel: 'اعتماد',
+    );
+    if (!ok || !context.mounted) return;
+
+    await _runAction(
+      context,
+      ref,
+      () => ref
+          .read(adminActionsProvider.notifier)
+          .approveCredential(userId, credentialId),
+      'تم اعتماد الشهادة',
+    );
+    ref.invalidate(pendingCredentialsProvider);
+    ref.invalidate(teacherCredentialsProvider(userId));
+  }
+
+  Future<void> _reject(
+    BuildContext context,
+    WidgetRef ref,
+    String userId,
+    String credentialId,
+    String title,
+  ) async {
+    final reason = await _showCredentialRejectDialog(context, title);
+    if (reason == null || !context.mounted) return;
+
+    await _runAction(
+      context,
+      ref,
+      () => ref
+          .read(adminActionsProvider.notifier)
+          .rejectCredential(userId, credentialId, reason),
+      'تم رفض الشهادة',
+    );
+    ref.invalidate(pendingCredentialsProvider);
+    ref.invalidate(teacherCredentialsProvider(userId));
   }
 }
 
@@ -1122,9 +1474,20 @@ class _ImageViewerState extends State<_ImageViewer> {
           Positioned(
             top: 0,
             right: 0,
-            child: IconButton(
-              icon: const Icon(Icons.close_rounded, color: Colors.white),
-              onPressed: () => Navigator.of(context).pop(),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'فتح الملف الأصلي',
+                  icon: const Icon(Icons.open_in_new_rounded,
+                      color: Colors.white),
+                  onPressed: () => openExternalUrl(widget.images[_index]),
+                ),
+                IconButton(
+                  tooltip: 'إغلاق',
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
             ),
           ),
           if (widget.images.length > 1) ...[
@@ -1178,6 +1541,68 @@ class _ImageViewerState extends State<_ImageViewer> {
         ],
       ),
     );
+  }
+}
+
+Future<String?> _showCredentialRejectDialog(
+  BuildContext context,
+  String title,
+) async {
+  final controller = TextEditingController();
+
+  try {
+    return await DSDialog.show<String>(
+      context,
+      title: 'رفض الشهادة',
+      width: 520,
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          final reason = controller.text.trim();
+          final canSubmit = reason.length >= 3;
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'سيتم إشعار المحفظ بسبب رفض شهادة "$title". اكتب سبباً واضحاً ليعرف ما المطلوب تعديله.',
+                style: DSText.body(context, color: DSColors.text2),
+              ),
+              const SizedBox(height: DSSpacing.lg),
+              DSTextField(
+                controller: controller,
+                label: 'سبب رفض الشهادة',
+                hint: 'مثال: الصورة غير واضحة أو لا تثبت بيانات الشهادة',
+                maxLines: 3,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: DSSpacing.lg),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  DSButton(
+                    label: 'إلغاء',
+                    variant: DSButtonVariant.ghost,
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const SizedBox(width: DSSpacing.sm),
+                  DSButton(
+                    label: 'رفض الشهادة',
+                    variant: DSButtonVariant.destructive,
+                    onPressed: canSubmit
+                        ? () => Navigator.of(context).pop(reason)
+                        : null,
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  } finally {
+    controller.dispose();
   }
 }
 
@@ -1295,12 +1720,16 @@ List<String> _credentialImages(Map<String, dynamic> credential) {
   final urls = <String>{
     ..._stringList(credential['imageUrls']),
     ..._stringList(credential['fileUrls']),
+    ..._stringList(credential['downloadUrls']),
+    ..._stringList(credential['urls']),
   };
   for (final key in const [
     'imageUrl',
     'fileUrl',
     'documentUrl',
-    'certificateUrl'
+    'certificateUrl',
+    'downloadUrl',
+    'url'
   ]) {
     final value = credential[key];
     if (value is String && value.trim().isNotEmpty) urls.add(value.trim());
@@ -1358,6 +1787,29 @@ double _price(Map<String, dynamic> plan) {
 
 String _money(double value) {
   return '${NumberFormat.decimalPattern('ar').format(value.round())} ج.م';
+}
+
+String? _examScoreLabel(Map<String, dynamic> teacher) {
+  final score = (teacher['examScore'] as num?)?.toDouble();
+  if (score == null) return null;
+  final formatted =
+      score % 1 == 0 ? score.toStringAsFixed(0) : score.toStringAsFixed(1);
+  return '$formatted%';
+}
+
+String? _examStatusLabel(Map<String, dynamic> teacher) {
+  final passed = teacher['examPassed'];
+  final score = teacher['examScore'];
+  if (passed is! bool && score == null) return null;
+  if (passed == true) return 'ناجح';
+  return 'لم يجتز';
+}
+
+String? _examAnswersLabel(Map<String, dynamic> teacher) {
+  final correct = (teacher['examCorrectCount'] as num?)?.toInt();
+  final total = (teacher['examQuestionCount'] as num?)?.toInt();
+  if (correct == null || total == null || total <= 0) return null;
+  return '$correct / $total';
 }
 
 List<Map<String, dynamic>> _activePricingPlans(

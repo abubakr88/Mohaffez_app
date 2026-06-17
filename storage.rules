@@ -11,6 +11,21 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
+    // Teacher credentials: teachers upload their own certificate images, admins review.
+    match /credentials/{userId}/{fileName} {
+      allow read: if request.auth != null
+                  && (
+                    request.auth.uid == userId ||
+                    firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+                    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+                  );
+      allow create, update: if request.auth != null
+                            && request.auth.uid == userId
+                            && request.resource.size < 3 * 1024 * 1024
+                            && request.resource.contentType.matches('image/(jpeg|png)');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Deny everything else by default
     match /{allPaths=**} {
       allow read, write: if false;

@@ -23,6 +23,7 @@ import '../screens/shared/settings_screen.dart';
 import '../screens/shared/location_settings_screen.dart';
 import '../screens/shared/privacy_settings_screen.dart';
 import '../screens/shared/cancellation_policy_screen.dart';
+import '../screens/shared/payment_return_screen.dart';
 import '../screens/shared/payment_webview_screen.dart';
 import '../screens/shared/pick_location_screen.dart';
 import '../screens/shared/session_details_screen.dart';
@@ -154,6 +155,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/payment/return',
+        name: 'payment-return',
+        builder: (context, state) => PaymentReturnScreen(uri: state.uri),
       ),
       GoRoute(
         path: '/google-role-selection',

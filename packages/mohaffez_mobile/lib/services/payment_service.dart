@@ -1,5 +1,6 @@
 // lib/services/payment_service.dart
 import 'dart:convert';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crypto/crypto.dart';
@@ -9,11 +10,18 @@ final paymentServiceProvider = Provider((ref) {
 });
 
 class PaymentService {
-  // Paymob credentials (store in .env file)
+  // Paymob credentials (store in .env file).
+  // Flash intention creation is server-side; the mobile app never receives
+  // Paymob's secret key. The legacy iframe flow is kept as a guarded fallback.
   static const String _paymobApiKey = String.fromEnvironment('PAYMOB_API_KEY');
-  static const String _paymobIntegrationId = String.fromEnvironment('PAYMOB_INTEGRATION_ID');
-  static const String _paymobIframeId = String.fromEnvironment('PAYMOB_IFRAME_ID');
-  static const String _paymobHmacSecret = String.fromEnvironment('PAYMOB_HMAC_SECRET');
+  static const String _paymobUseFlash =
+      String.fromEnvironment('PAYMOB_USE_FLASH');
+  static const String _paymobIntegrationId =
+      String.fromEnvironment('PAYMOB_INTEGRATION_ID');
+  static const String _paymobIframeId =
+      String.fromEnvironment('PAYMOB_IFRAME_ID');
+  static const String _paymobHmacSecret =
+      String.fromEnvironment('PAYMOB_HMAC_SECRET');
 
   static const String _baseUrl = 'https://accept.paymob.com/api';
 
@@ -95,7 +103,7 @@ class PaymentService {
           'state': 'NA',
         },
         'currency': 'EGP',
-        'integration_id': _paymobIntegrationId,
+        'integration_id': _parsedIntegrationId,
         'lock_order_when_paid': 'false',
       }),
     );
@@ -117,6 +125,16 @@ class PaymentService {
     required String studentName,
   }) async {
     try {
+      if (_shouldUseFlash) {
+        return await _initiateFlashPayment(
+          paymentId: paymentId,
+          amount: amount,
+          studentEmail: studentEmail,
+          studentPhone: studentPhone,
+          studentName: studentName,
+        );
+      }
+
       // Step 1: Get auth token
       final authToken = await _getAuthToken();
 
@@ -155,6 +173,63 @@ class PaymentService {
     }
   }
 
+  bool get _shouldUseFlash {
+    final value = _paymobUseFlash.trim().toLowerCase();
+    return value == 'true' || value == '1' || value == 'yes';
+  }
+
+  Future<Map<String, dynamic>> _initiateFlashPayment({
+    required String paymentId,
+    required double amount,
+    required String studentEmail,
+    required String studentPhone,
+    required String studentName,
+  }) async {
+    final callable =
+        FirebaseFunctions.instance.httpsCallable('createPaymobIntention');
+    final response = await callable.call<Map<String, dynamic>>({
+      'paymentId': paymentId,
+      'amount': amount,
+      'integrationId': _parsedIntegrationId,
+      'studentEmail': _safeEmail(studentEmail),
+      'studentPhone': _normalizePhone(studentPhone),
+      'studentName':
+          studentName.trim().isNotEmpty ? studentName.trim() : 'Student',
+    });
+
+    final data = Map<String, dynamic>.from(response.data);
+    if (data['success'] != true) {
+      throw Exception(data['error']?.toString() ?? 'فشل إنشاء رابط الدفع');
+    }
+
+    return {
+      'success': true,
+      'paymentUrl': data['paymentUrl']?.toString() ?? '',
+      'orderId': data['orderId']?.toString(),
+      'paymentKey': data['clientSecret']?.toString(),
+    };
+  }
+
+  int get _parsedIntegrationId {
+    final asInt = int.tryParse(_paymobIntegrationId.trim());
+    if (asInt != null) return asInt;
+    throw Exception('PAYMOB_INTEGRATION_ID غير صحيح');
+  }
+
+  String _normalizePhone(String phone) {
+    final trimmed = phone.trim();
+    if (trimmed.isEmpty) return '01000000000';
+    return trimmed;
+  }
+
+  String _safeEmail(String email) {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty || !trimmed.contains('@')) {
+      return 'customer@mohafezy.com';
+    }
+    return trimmed;
+  }
+
   /// Verify Paymob HMAC (for backend webhook use)
   bool verifyPaymobHmac({
     required Map<String, dynamic> data,
@@ -184,9 +259,10 @@ class PaymentService {
       data['success']?.toString() ?? 'false',
     ].join('');
 
-    final calculatedHmac = Hmac(sha512, utf8.encode(_paymobHmacSecret)).convert(utf8.encode(hmacString)).toString();
+    final calculatedHmac = Hmac(sha512, utf8.encode(_paymobHmacSecret))
+        .convert(utf8.encode(hmacString))
+        .toString();
 
     return calculatedHmac == receivedHmac;
   }
-
 }

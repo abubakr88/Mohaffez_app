@@ -26,6 +26,7 @@ class AuthGuard implements RouteGuard {
     '/register',
     '/forgot-password',
     '/maintenance',
+    '/payment/return',
   };
 
   @override

@@ -26,6 +26,8 @@ class CancellationPolicyScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _teacherSection(),
             const SizedBox(height: 16),
+            _bundleSection(),
+            const SizedBox(height: 16),
             _generalRules(),
             const SizedBox(height: 32),
           ],
@@ -96,7 +98,7 @@ class CancellationPolicyScreen extends StatelessWidget {
           valueColor: AppThemeConstants.error,
         ),
         const Divider(height: 24),
-        _note('يتم إصدار إنذار تنبيهي على الحساب عند كل إلغاء أو غياب.'),
+        _note('قد يتم تسجيل تنبيه على الحساب عند تكرار الإلغاء أو الغياب.'),
       ],
     );
   }
@@ -138,6 +140,7 @@ class CancellationPolicyScreen extends StatelessWidget {
           value: 'استرداد 100% للطالب + زيادة 1.5% على العمولة',
           valueColor: AppThemeConstants.error,
         ),
+        _note('يمكن للطالب الإبلاغ عن غياب المحفظ بعد مرور 10 دقائق من موعد بداية الجلسة. وفي الجلسات الأونلاين، إذا لم ينضم المحفظ خلال 60 دقيقة يُسجّل الغياب تلقائياً.'),
         const Divider(height: 24),
         const _SectionHeader('نظام العمولة الإضافية'),
         _note(
@@ -146,6 +149,40 @@ class CancellationPolicyScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _note('يتم إصدار إنذار تنبيهي وتنبيه للإدارة عند كل إلغاء أو غياب.'),
+      ],
+    );
+  }
+
+  Widget _bundleSection() {
+    return _PolicyCard(
+      title: 'جلسات الباقات',
+      icon: Icons.inventory_2_rounded,
+      color: AppThemeConstants.primary,
+      children: [
+        const _SectionHeader('إلغاء جلسة من باقة'),
+        const _PolicyRow(
+          icon: Icons.check_circle_outline,
+          iconColor: AppThemeConstants.success,
+          label: 'إلغاء الطالب قبل الجلسة بأكثر من 3 ساعات',
+          value: 'تُعاد الجلسة إلى رصيد الباقة',
+          valueColor: AppThemeConstants.success,
+        ),
+        const _PolicyRow(
+          icon: Icons.cancel_outlined,
+          iconColor: AppThemeConstants.error,
+          label: 'إلغاء الطالب قبل الجلسة بأقل من 3 ساعات',
+          value: 'تُفقد الجلسة من الباقة — لا استرداد ولا إعادة',
+          valueColor: AppThemeConstants.error,
+        ),
+        const _PolicyRow(
+          icon: Icons.replay_rounded,
+          iconColor: AppThemeConstants.warning,
+          label: 'إلغاء المحفظ أو غيابه',
+          value: 'تُعاد الجلسة إلى رصيد الباقة + تُطبق غرامة المحفظ',
+          valueColor: AppThemeConstants.warning,
+        ),
+        const Divider(height: 24),
+        _note('جلسات الباقات لا تُرد كمبلغ مالي إلى المحفظة عند الإلغاء، بل تُعاد كرصيد جلسة داخل نفس الباقة عندما تنطبق شروط الإعادة.'),
       ],
     );
   }
