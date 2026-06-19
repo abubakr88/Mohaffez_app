@@ -14,6 +14,10 @@ export { sendSessionReminders } from './notifications/sessionReminders';
 // systemConfig/global.paymobEnabled. Admin toggles from the web panel.
 export { paymobWebhook } from './payments/paymobWebhook';
 export { createPaymobIntention } from './payments/createPaymobIntention';
+export {
+  reconcilePaymobPayment,
+  reconcilePendingPaymobPayments,
+} from './payments/reconcilePaymobPayment';
 export { projectPaymentAnalytics } from './payments/projections';
 export { checkExpiredPayments } from './payments/expiredPayments';
 export { onPaymentCreated } from './payments/triggers';

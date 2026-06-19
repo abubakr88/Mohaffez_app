@@ -32,6 +32,10 @@ if %ERRORLEVEL% neq 0 (
 
 echo.
 echo [2/3] Building release web app...
+if exist "build\web" (
+    echo Removing previous web build...
+    rmdir /S /Q "build\web"
+)
 call flutter build web --release --pwa-strategy none --source-maps --dart-define-from-file="%REPO_ROOT%.env"
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Build failed. Check the output above.
