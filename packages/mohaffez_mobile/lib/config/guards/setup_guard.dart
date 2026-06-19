@@ -23,6 +23,7 @@ class SetupGuard implements RouteGuard {
     '/maintenance',
     '/suspended',
     '/exam-result',
+    '/payment/return',
     setupPath,
     '/teacher-certificates',
     '/teacher-pending',

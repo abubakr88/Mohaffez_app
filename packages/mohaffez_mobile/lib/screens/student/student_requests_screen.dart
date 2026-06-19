@@ -74,6 +74,20 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
   String? _requestIdOf(Map<String, dynamic> request) =>
       request['id'] as String? ?? request['requestId'] as String?;
 
+  bool _shouldShowPaymentProcessing(Map<String, dynamic> request) {
+    final requestId = _requestIdOf(request);
+    if (requestId == null || !_recentlyPaidRequestIds.contains(requestId)) {
+      return false;
+    }
+
+    final status = (request['status'] as String? ?? '').toLowerCase();
+    return status == 'awaitingpayment' ||
+        status == 'awaiting_payment' ||
+        status == 'awaitingdirectpayment' ||
+        status == 'paymentprocessing' ||
+        status == 'processing';
+  }
+
   // ── Navigate to payment ──────────────────────────────────────────────────
   Future<void> _navigateToPayment(Map<String, dynamic> request) async {
     try {
@@ -427,9 +441,7 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final request = filteredRequests[index];
-                final requestId = _requestIdOf(request);
-                final displayRequest = requestId != null &&
-                        _recentlyPaidRequestIds.contains(requestId)
+                final displayRequest = _shouldShowPaymentProcessing(request)
                     ? {
                         ...request,
                         'status': 'paymentprocessing',

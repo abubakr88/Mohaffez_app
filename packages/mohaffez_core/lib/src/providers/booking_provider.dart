@@ -206,9 +206,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
       final methodRequiresPayment =
           method == BookingPaymentMethod.payAfterAcceptance;
       final methodSubscriptionId =
-          method == BookingPaymentMethod.bundleCredit
-              ? subscriptionId
-              : null;
+          method == BookingPaymentMethod.bundleCredit ? subscriptionId : null;
 
       final result = await _bookingService.createSessionRequest(
         mohaffezId: mohaffezId,
@@ -295,7 +293,8 @@ class BookingService {
   Future<String?> _ensureAuthenticatedForCallable(String flowLabel) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      if (kDebugMode) debugPrint('❌ [$flowLabel] No Firebase user is signed in.');
+      if (kDebugMode)
+        debugPrint('❌ [$flowLabel] No Firebase user is signed in.');
       return 'يجب تسجيل الدخول أولاً';
     }
 
@@ -303,8 +302,7 @@ class BookingService {
       final token = await user.getIdToken(false);
       if (token == null || token.isEmpty) {
         if (kDebugMode) {
-          debugPrint(
-              '❌ [$flowLabel] Refreshed Firebase ID token is empty.');
+          debugPrint('❌ [$flowLabel] Refreshed Firebase ID token is empty.');
         }
         return 'تعذر التحقق من تسجيل الدخول. حاول تسجيل الخروج ثم الدخول مرة أخرى';
       }
@@ -312,8 +310,7 @@ class BookingService {
       return null;
     } catch (e, stack) {
       if (kDebugMode) {
-        debugPrint(
-            '❌ [$flowLabel] Failed to refresh Firebase ID token: $e');
+        debugPrint('❌ [$flowLabel] Failed to refresh Firebase ID token: $e');
         debugPrintStack(stackTrace: stack);
       }
       return 'تعذر التحقق من تسجيل الدخول. تحقق من الاتصال ثم حاول مرة أخرى';
@@ -513,8 +510,7 @@ class BookingService {
         if (lockResult?.success == true) {
           await _releaseSlotLock(lockResult!).catchError((e) {
             if (kDebugMode) {
-              debugPrint(
-                  '⚠️ [SESSION REQUEST] Failed to release lock: $e');
+              debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
             }
           });
         }
@@ -527,8 +523,7 @@ class BookingService {
           slotDate ?? DateTime(slotStart.year, slotStart.month, slotStart.day);
 
       if (kDebugMode) {
-        debugPrint(
-            '🔄 [SESSION REQUEST] Calling createSessionRequest CF...');
+        debugPrint('🔄 [SESSION REQUEST] Calling createSessionRequest CF...');
         debugPrint('   mohaffezId: $mohaffezId');
         debugPrint('   studentId: $studentId');
         debugPrint('   slotLockId: $slotLockId');
@@ -590,7 +585,7 @@ class BookingService {
         final requestId = responseMap['requestId'] as String?;
         final isDuplicate = responseMap['isDuplicate'] == true;
         if (kDebugMode) {
-          debugPrint(isDuplicate 
+          debugPrint(isDuplicate
               ? '⚠️ Session request already exists: $requestId'
               : '🎉 Session request created: $requestId');
         }
@@ -616,8 +611,7 @@ class BookingService {
       if (lockResult?.success == true) {
         await _releaseSlotLock(lockResult!).catchError((e) {
           if (kDebugMode) {
-            debugPrint(
-                '⚠️ [SESSION REQUEST] Failed to release lock: $e');
+            debugPrint('⚠️ [SESSION REQUEST] Failed to release lock: $e');
           }
         });
       }
@@ -775,6 +769,22 @@ class BookingService {
         final timeSlot = requestData['preferredTimeSlot'] as String?;
         final sessionType = requestData['sessionType'] as String?;
 
+        DocumentReference<Map<String, dynamic>>? availRef;
+        DocumentSnapshot<Map<String, dynamic>>? availSnap;
+        if (mohaffezId != null &&
+            slotDate != null &&
+            timeSlot != null &&
+            sessionType != null) {
+          availRef = await _findAvailabilityRefTransaction(
+            transaction: transaction,
+            mohaffezId: mohaffezId,
+            slotDate: slotDate,
+          );
+          if (availRef != null) {
+            availSnap = await transaction.get(availRef);
+          }
+        }
+
         transaction.update(requestRef, {
           'status': 'cancelled',
           'cancelledAt': FieldValue.serverTimestamp(),
@@ -782,42 +792,30 @@ class BookingService {
         });
 
         if (slotLockId != null && slotLockId.trim().isNotEmpty) {
-          final lockRef =
-              _firestore.collection('slotLocks').doc(slotLockId);
+          final lockRef = _firestore.collection('slotLocks').doc(slotLockId);
           transaction.delete(lockRef);
         }
 
-        if (mohaffezId != null &&
-            slotDate != null &&
+        if (availRef != null &&
+            availSnap != null &&
+            availSnap.exists &&
             timeSlot != null &&
             sessionType != null) {
-          final availRef = await _findAvailabilityRefTransaction(
-            transaction: transaction,
-            mohaffezId: mohaffezId,
-            slotDate: slotDate,
-          );
-          if (availRef != null) {
-            final availSnap = await transaction.get(availRef);
-            if (availSnap.exists) {
-              final availData =
-                  availSnap.data();
-              if (availData != null) {
-                final updated = _computeRestoredSlots(
-                    availData, timeSlot, sessionType);
-                if (updated != null) {
-                  transaction.update(availRef, {
-                    'timeSlots': updated,
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  });
-                }
-              }
+          final availData = availSnap.data();
+          if (availData != null) {
+            final updated =
+                _computeRestoredSlots(availData, timeSlot, sessionType);
+            if (updated != null) {
+              transaction.update(availRef, {
+                'timeSlots': updated,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
             }
           }
         }
 
         if (mohaffezId != null && notifyStudentId != null) {
-          final notifRef =
-              _firestore.collection('notifications').doc();
+          final notifRef = _firestore.collection('notifications').doc();
           transaction.set(notifRef, {
             'userId': mohaffezId,
             'recipientId': mohaffezId,
@@ -859,13 +857,15 @@ class BookingService {
   // Every other place in the codebase (SessionRepository, SessionActionsNotifier)
   // uses `.weekday` directly. This mismatch meant student cancellations silently
   // failed to restore the availability slot for any day Mon–Sat.
-  Future<DocumentReference<Map<String, dynamic>>?> _findAvailabilityRefTransaction({
+  Future<DocumentReference<Map<String, dynamic>>?>
+      _findAvailabilityRefTransaction({
     required Transaction transaction,
     required String mohaffezId,
     required Timestamp slotDate,
   }) async {
     final slotDateObj = slotDate.toDate();
-    final dayOfWeek = slotDateObj.weekday; // FIX: was weekday == 7 ? 7 : weekday + 1
+    final dayOfWeek =
+        slotDateObj.weekday; // FIX: was weekday == 7 ? 7 : weekday + 1
 
     final availQuery = _firestore
         .collection('users')
@@ -884,8 +884,8 @@ class BookingService {
     String timeSlot,
     String sessionType,
   ) {
-    final timeSlots = List<Map<String, dynamic>>.from(
-        availabilityData['timeSlots'] ?? []);
+    final timeSlots =
+        List<Map<String, dynamic>>.from(availabilityData['timeSlots'] ?? []);
     final normalizedSelected = _normalizeTimeSlot(timeSlot);
     var restored = false;
     for (final slot in timeSlots) {
@@ -937,8 +937,7 @@ class BookingService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                <String, dynamic>{...doc.data(), 'id': doc.id})
+            .map((doc) => <String, dynamic>{...doc.data(), 'id': doc.id})
             .toList());
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import 'package:flutter/foundation.dart';
@@ -27,18 +28,22 @@ class PaymentWebViewScreen extends ConsumerStatefulWidget {
       _PaymentWebViewScreenState();
 }
 
-class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
+class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen>
+    with WidgetsBindingObserver {
   late final WebViewController controller;
   int loadingProgress = 0;
   bool paymentCompleted = false;
   Timer? _timeoutTimer;
+  Timer? _reconcileTimer;
   bool _externalPaymentOpened = false;
+  bool _reconciliationInProgress = false;
   BuildContext? _successDialogContext;
   ProviderSubscription<AsyncValue<PaymentModel?>>? _paymentStatusSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (!kIsWeb) {
       _initWebView();
     }
@@ -48,10 +53,45 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
       }
     });
     _listenToPaymentStatus();
+    _startPaymentReconciliation();
     if (kIsWeb) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _openPaymentExternally();
       });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reconcilePayment();
+    }
+  }
+
+  void _startPaymentReconciliation() {
+    _reconcileTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      _reconcilePayment();
+    });
+    Future.delayed(const Duration(seconds: 6), _reconcilePayment);
+  }
+
+  Future<void> _reconcilePayment() async {
+    if (!mounted || paymentCompleted || _reconciliationInProgress) return;
+    _reconciliationInProgress = true;
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('reconcilePaymobPayment');
+      final response = await callable.call<Map<String, dynamic>>({
+        'paymentId': widget.paymentId,
+      });
+      final status = response.data['status']?.toString();
+      if (status == 'completed' && mounted) {
+        _showSuccessAnimation();
+      }
+    } catch (error) {
+      debugPrint('Payment reconciliation pending: $error');
+    } finally {
+      _reconciliationInProgress = false;
     }
   }
 
@@ -78,13 +118,20 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
           onNavigationRequest: (request) {
             if (_isSuccessUrl(request.url)) {
               _showSuccessAnimation();
+              return NavigationDecision.prevent;
             }
             if (_isFailureUrl(request.url)) {
               _showFailureDialog('فشلت عملية الدفع');
+              return NavigationDecision.prevent;
+            }
+            if (_isPaymobReturnUrl(request.url)) {
+              if (mounted) setState(() => loadingProgress = 100);
+              return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
           },
           onWebResourceError: (error) {
+            if (paymentCompleted || error.isForMainFrame == false) return;
             _showFailureDialog(error.description);
           },
         ),
@@ -96,11 +143,17 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
     _paymentStatusSub = ref.listenManual<AsyncValue<PaymentModel?>>(
       paymentStatusProvider(widget.paymentId),
       (_, next) {
+        if (next.hasError) {
+          debugPrint('Payment status listener failed: ${next.error}');
+          _reconcilePayment();
+          return;
+        }
         final payment = next.valueOrNull;
         if (payment == null) return;
         if (payment.status == PaymentStatus.completed) {
           _showSuccessAnimation();
         } else if (payment.status == PaymentStatus.failed) {
+          _reconcileTimer?.cancel();
           _showFailureDialog(payment.failureReason ?? 'فشلت عملية الدفع');
         }
       },
@@ -113,6 +166,13 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
 
   bool _isFailureUrl(String url) =>
       parsePaymobCallback(url) == PaymobCallbackResult.failure;
+
+  bool _isPaymobReturnUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final host = uri.host.toLowerCase();
+    return host.endsWith('mohafezy.com') && uri.path == '/payment/return';
+  }
 
   Future<void> _openPaymentExternally() async {
     final uri = Uri.tryParse(widget.paymentUrl);
@@ -185,6 +245,7 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
     if (paymentCompleted || !mounted) return;
     setState(() => paymentCompleted = true);
     _timeoutTimer?.cancel();
+    _reconcileTimer?.cancel();
 
     showDialog(
       context: context,
@@ -275,7 +336,9 @@ class _PaymentWebViewScreenState extends ConsumerState<PaymentWebViewScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timeoutTimer?.cancel();
+    _reconcileTimer?.cancel();
     _paymentStatusSub?.close();
     super.dispose();
   }

@@ -40,7 +40,7 @@ export class PaymentOrchestrationService {
       },
     });
 
-    let result: PaymentResult;
+    let result: PaymentResult | undefined;
 
     try {
       if (context.metadata.confirmBooking && context.metadata.requestId) {
@@ -56,8 +56,8 @@ export class PaymentOrchestrationService {
         paymentId: context.paymentId,
         userId:    context.payment.studentId,
         data: {
-          sessionId:      result.sessionId,
-          subscriptionId: result.subscriptionId,
+          sessionId:      result.sessionId ?? null,
+          subscriptionId: result.subscriptionId ?? null,
         },
         metadata: {
           source:        'webhook',
@@ -77,6 +77,22 @@ export class PaymentOrchestrationService {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown payment processing error';
+
+      const paymentAfterError = await db
+        .collection('payments')
+        .doc(context.paymentId)
+        .get()
+        .catch(() => null);
+      const paymentStatus = paymentAfterError?.data()?.status;
+
+      if (paymentStatus === 'completed') {
+        functions.logger.error('Payment post-completion side effect failed', {
+          paymentId:     context.paymentId,
+          transactionId: context.transactionId,
+          error:         message,
+        });
+        return result ?? { success: true };
+      }
 
       await db.collection('payments').doc(context.paymentId).update({
         status:        'failed',

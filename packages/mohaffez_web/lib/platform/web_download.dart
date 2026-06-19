@@ -24,6 +24,11 @@ void downloadCsv(String filename, String csvContent) {
   web.URL.revokeObjectURL(url);
 }
 
+/// Opens an external URL in a new browser tab/window.
+void openExternalUrl(String url) {
+  web.window.open(url, '_blank');
+}
+
 /// Escapes a single CSV cell (quotes, commas, newlines).
 String csvCell(Object? value) {
   final s = value?.toString() ?? '';

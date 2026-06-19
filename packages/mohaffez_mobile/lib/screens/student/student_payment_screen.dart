@@ -1611,6 +1611,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           await ref.read(paymentRepositoryProvider).updatePaymentGatewayInfo(
                 result.paymentId,
                 orderId: paymobResult['orderId']?.toString(),
+                paymentKey: paymobResult['paymentKey']?.toString(),
               );
         } catch (e) {
           debugPrint('Paymob gateway order update failed: $e');

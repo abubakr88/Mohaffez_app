@@ -32,11 +32,21 @@ if %ERRORLEVEL% neq 0 (
 
 echo.
 echo [2/3] Building release web app...
-call flutter build web --release --pwa-strategy offline-first --source-maps --dart-define-from-file="%REPO_ROOT%.env"
+if exist "build\web" (
+    echo Removing previous web build...
+    rmdir /S /Q "build\web"
+)
+call flutter build web --release --pwa-strategy none --source-maps --dart-define-from-file="%REPO_ROOT%.env"
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Build failed. Check the output above.
     pause
     exit /b 1
+)
+
+echo.
+echo Ensuring SPA rewrite file is included...
+if exist "%REPO_ROOT%packages\mohaffez_mobile\web\.htaccess" (
+    copy /Y "%REPO_ROOT%packages\mohaffez_mobile\web\.htaccess" "build\web\.htaccess" >nul
 )
 
 echo.

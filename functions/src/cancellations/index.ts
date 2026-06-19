@@ -16,7 +16,7 @@
 //   no-show      → 100% student refund, +1.5% commission penalty
 //   Any cancel   → warning notification + admin alert (if penalty)
 //
-// Only the HIGHEST penalty in a cycle applies (not cumulative). Resets each cycle.
+// Penalties accumulate within the cycle. The accumulated penalty resets each cycle.
 // For direct-payment sessions: student wallet is credited from system (admin collects from teacher).
 
 import * as functions from 'firebase-functions';

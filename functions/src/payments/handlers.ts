@@ -2,6 +2,7 @@
 import * as functions from 'firebase-functions';
 import admin, { db } from '../utils/admin';
 import { PaymentDocument, PaymentMetadata } from '../types/payment.types';
+import { sanitizeForFirestore } from '../utils/firestoreSanitizer';
 
 const STATUS = {
   PENDING: 'pending',
@@ -39,6 +40,119 @@ const parseNumber = (v: unknown, fb: number): number =>
 
 const parseString = (v: unknown, fb: string): string =>
   typeof v === 'string' && v.trim().length > 0 ? v : fb;
+
+const isPresent = (v: unknown): boolean =>
+  v !== undefined && v !== null && v !== '';
+
+const sessionFallbackFields = [
+  'slotDate',
+  'slotStart',
+  'slotEnd',
+  'preferredTimeSlot',
+  'timeSlot',
+  'sessionType',
+  'location',
+  'imamAddressText',
+  'imamAddressLat',
+  'imamAddressLng',
+  'mohaffezPhone',
+  'preferredProvider',
+];
+
+function parseTimeRange(timeSlot: unknown):
+  | { startHour: number; startMinute: number; endHour: number; endMinute: number }
+  | null {
+  if (typeof timeSlot !== 'string' || timeSlot.trim().length === 0) return null;
+
+  const parts = timeSlot.split('-');
+  const start = parts[0]?.trim().split(':') ?? [];
+  const end = (parts[1]?.trim().split(':') ?? start);
+  const startHour = Number.parseInt(start[0] ?? '', 10);
+  const startMinute = Number.parseInt(start[1] ?? '0', 10);
+  const endHour = Number.parseInt(end[0] ?? '', 10);
+  const endMinute = Number.parseInt(end[1] ?? '0', 10);
+
+  if (
+    Number.isNaN(startHour) ||
+    Number.isNaN(startMinute) ||
+    Number.isNaN(endHour) ||
+    Number.isNaN(endMinute)
+  ) {
+    return null;
+  }
+
+  return { startHour, startMinute, endHour, endMinute };
+}
+
+function toDate(value: unknown): Date | null {
+  if (value instanceof admin.firestore.Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  if (typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function buildSlotTimestamp(dayValue: unknown, hour: number, minute: number):
+  admin.firestore.Timestamp | null {
+  const day = toDate(dayValue);
+  if (!day) return null;
+
+  // Last-resort fallback only. Normal request docs already carry exact
+  // slotStart/slotEnd timestamps, which preserve the user's local timezone.
+  const date = new Date(day);
+  date.setUTCHours(hour, minute, 0, 0);
+  return admin.firestore.Timestamp.fromDate(date);
+}
+
+function normalizeSessionDetails(
+  sessionDetails: Record<string, unknown>,
+  requestData?: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalized = { ...sessionDetails };
+
+  if (requestData) {
+    for (const field of sessionFallbackFields) {
+      if (!isPresent(normalized[field]) && isPresent(requestData[field])) {
+        normalized[field] = requestData[field];
+      }
+    }
+  }
+
+  const sessionDay = normalized['sessionDate'] ?? normalized['slotDate'];
+  if (!isPresent(normalized['sessionDate']) && isPresent(sessionDay)) {
+    normalized['sessionDate'] = sessionDay;
+  }
+  if (!isPresent(normalized['slotDate']) && isPresent(sessionDay)) {
+    normalized['slotDate'] = sessionDay;
+  }
+
+  const timeSlot = normalized['preferredTimeSlot'] ?? normalized['timeSlot'];
+  const range = parseTimeRange(timeSlot);
+  if (range && isPresent(sessionDay)) {
+    if (!isPresent(normalized['slotStart'])) {
+      normalized['slotStart'] = buildSlotTimestamp(
+        sessionDay,
+        range.startHour,
+        range.startMinute,
+      );
+    }
+    if (!isPresent(normalized['slotEnd'])) {
+      normalized['slotEnd'] = buildSlotTimestamp(
+        sessionDay,
+        range.endHour,
+        range.endMinute,
+      );
+    }
+  }
+
+  return sanitizeForFirestore(normalized);
+}
 
 /**
  * READS the availability document for a slot inside an existing transaction
@@ -128,6 +242,11 @@ export async function confirmBookingAfterPayment(
 
     // ── VALIDATE ──────────────────────────────────────────────────────────────
     if (!requestSnap.exists) throw new Error('Session request not found');
+    const requestData = requestSnap.data() as Record<string, unknown>;
+    const normalizedSessionDetails = normalizeSessionDetails(
+      sessionDetails,
+      requestData,
+    );
 
     // ── WRITES ────────────────────────────────────────────────────────────────
     const sessionRef = db.collection('hafizSessions').doc();
@@ -135,22 +254,27 @@ export async function confirmBookingAfterPayment(
     transaction.update(requestRef, {
       status: STATUS.ACCEPTED,
       isPaid: true,
+      sessionId:            sessionRef.id,
       paidAt:               admin.firestore.FieldValue.serverTimestamp(),
       paymentTransactionId: transactionId,
       updatedAt:            admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    transaction.set(sessionRef, {
-      ...sessionDetails,
+    transaction.set(sessionRef, sanitizeForFirestore({
+      ...normalizedSessionDetails,
       requestId,
       status:               STATUS.ACCEPTED,
       isPaid:               true,
+      ...(paymentUpdate ? { paymentId: paymentUpdate.paymentId } : {}),
       paymentTransactionId: transactionId,
       createdAt:            admin.firestore.FieldValue.serverTimestamp(),
       acceptedAt:           admin.firestore.FieldValue.serverTimestamp(),
       studentId:            payment.studentId,
+      studentName:          payment.studentName,
       mohaffezId:           payment.mohaffezId,
-    });
+      mohaffezName:         payment.mohaffezName,
+      sessionPrice:         payment.amount,
+    }));
 
     if (availUpdate) {
       transaction.update(availUpdate.doc.ref, {
@@ -165,6 +289,7 @@ export async function confirmBookingAfterPayment(
     if (paymentUpdate && paymentRef) {
       transaction.update(paymentRef, {
         status: 'completed',
+        sessionId: sessionRef.id,
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
@@ -251,20 +376,27 @@ export async function consumeSubscriptionAndCreateSession(
     if (requestRef && requestSnap && metadata.sessionDetails) {
       const sessionRef = db.collection('hafizSessions').doc();
       sessionId = sessionRef.id;
+      const requestData = requestSnap.data() as Record<string, unknown>;
+      const normalizedSessionDetails = normalizeSessionDetails(
+        metadata.sessionDetails,
+        requestData,
+      );
 
       transaction.update(requestRef, {
         status:               STATUS.ACCEPTED,
         isPaid:               true,
+        sessionId:            sessionRef.id,
         paidAt:               admin.firestore.FieldValue.serverTimestamp(),
         paymentTransactionId: transactionId,
         updatedAt:            admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      transaction.set(sessionRef, {
-        ...metadata.sessionDetails,
+      transaction.set(sessionRef, sanitizeForFirestore({
+        ...normalizedSessionDetails,
         requestId:            metadata.requestId,
         status:               STATUS.ACCEPTED,
         isPaid:               true,
+        ...(paymentUpdate ? { paymentId: paymentUpdate.paymentId } : {}),
         paymentTransactionId: transactionId,
         // Stamp subscriptionId so onSessionCancelled can detect bundle
         // sessions and restore a credit instead of refunding money.
@@ -272,8 +404,11 @@ export async function consumeSubscriptionAndCreateSession(
         createdAt:            admin.firestore.FieldValue.serverTimestamp(),
         acceptedAt:           admin.firestore.FieldValue.serverTimestamp(),
         studentId:            payment.studentId,
+        studentName:          payment.studentName,
         mohaffezId:           payment.mohaffezId,
-      });
+        mohaffezName:         payment.mohaffezName,
+        sessionPrice:         payment.amount,
+      }));
     }
 
     if (availUpdate) {
@@ -286,6 +421,7 @@ export async function consumeSubscriptionAndCreateSession(
     if (paymentUpdate && paymentRef) {
       transaction.update(paymentRef, {
         status: 'completed',
+        ...(sessionId ? { sessionId } : {}),
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,

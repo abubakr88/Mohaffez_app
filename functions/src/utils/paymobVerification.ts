@@ -1,8 +1,6 @@
 import * as crypto from 'crypto';
 import * as functions from 'firebase-functions';
 
-const PAYMOB_HMAC_SECRET = functions.config().paymob?.hmac_secret || '';
-
 interface PaymobVerificationObject {
   amount_cents?: number;
   created_at?: string;
@@ -26,6 +24,17 @@ interface PaymobVerificationObject {
     type?: string;
   };
   success?: boolean;
+}
+
+function getPaymobHmacSecret(): string {
+  const envSecret = process.env.PAYMOB_HMAC_SECRET?.trim();
+  if (envSecret) return envSecret;
+
+  try {
+    return functions.config().paymob?.hmac_secret || '';
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -80,9 +89,10 @@ export function verifyPaymobHmac(
   obj: PaymobVerificationObject,
   receivedHmac: string,
 ): boolean {
-  if (!PAYMOB_HMAC_SECRET) {
+  const secret = getPaymobHmacSecret();
+  if (!secret) {
     functions.logger.error('PAYMOB_HMAC_SECRET not configured');
     return false;
   }
-  return verifyPaymobHmacWithSecret(obj, receivedHmac, PAYMOB_HMAC_SECRET);
+  return verifyPaymobHmacWithSecret(obj, receivedHmac, secret);
 }
