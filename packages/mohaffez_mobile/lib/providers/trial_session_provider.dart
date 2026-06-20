@@ -1,0 +1,155 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
+
+class TrialSessionPair {
+  const TrialSessionPair({
+    required this.mohaffezId,
+    required this.studentId,
+  });
+
+  final String mohaffezId;
+  final String studentId;
+
+  String get requestId => '${mohaffezId}_$studentId';
+
+  @override
+  bool operator ==(Object other) =>
+      other is TrialSessionPair &&
+      other.mohaffezId == mohaffezId &&
+      other.studentId == studentId;
+
+  @override
+  int get hashCode => Object.hash(mohaffezId, studentId);
+}
+
+final trialRequestForPairProvider =
+    StreamProvider.autoDispose.family<Map<String, dynamic>?, TrialSessionPair>(
+  (ref, pair) {
+    return FirebaseFirestore.instance
+        .collection('trialSessionRequests')
+        .doc(pair.requestId)
+        .snapshots()
+        .map((snapshot) => snapshot.exists
+            ? <String, dynamic>{
+                ...snapshot.data()!,
+                'id': snapshot.id,
+              }
+            : null);
+  },
+);
+
+final trialSessionRequestsProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+  final user = ref.watch(currentUserProvider).valueOrNull;
+  if (user == null) return Stream.value(const []);
+
+  final field = user.role == 'mohaffez' ? 'mohaffezId' : 'studentId';
+  return FirebaseFirestore.instance
+      .collection('trialSessionRequests')
+      .where(field, isEqualTo: user.uid)
+      .snapshots()
+      .map((snapshot) {
+    final requests = snapshot.docs
+        .map((doc) => <String, dynamic>{
+              ...doc.data(),
+              'id': doc.id,
+            })
+        .toList();
+    requests.sort((left, right) {
+      final leftTime = left['createdAt'] is Timestamp
+          ? (left['createdAt'] as Timestamp).millisecondsSinceEpoch
+          : 0;
+      final rightTime = right['createdAt'] is Timestamp
+          ? (right['createdAt'] as Timestamp).millisecondsSinceEpoch
+          : 0;
+      return rightTime.compareTo(leftTime);
+    });
+    return requests;
+  });
+});
+
+final teacherTrialSettingsProvider =
+    StreamProvider.autoDispose.family<Map<String, dynamic>, String>(
+  (ref, teacherId) {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(teacherId)
+        .snapshots()
+        .map((snapshot) {
+      final data = snapshot.data() ?? const <String, dynamic>{};
+      return {
+        'enabled': data['trialSessionEnabled'] == true,
+        'durationMinutes':
+            (data['trialSessionDurationMinutes'] as num?)?.toInt() ?? 30,
+      };
+    });
+  },
+);
+
+final trialSessionActionsProvider =
+    StateNotifierProvider<TrialSessionActions, AsyncValue<void>>((ref) {
+  return TrialSessionActions();
+});
+
+class TrialSessionActions extends StateNotifier<AsyncValue<void>> {
+  TrialSessionActions() : super(const AsyncValue.data(null));
+
+  Future<void> _call(String name, Map<String, dynamic> data) async {
+    state = const AsyncValue.loading();
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable(
+            name,
+            options: HttpsCallableOptions(
+              timeout: const Duration(seconds: 30),
+            ),
+          )
+          .call(data);
+      state = const AsyncValue.data(null);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<void> createRequest({
+    required String mohaffezId,
+    required String sessionType,
+    required List<Map<String, String>> availabilityWindows,
+  }) {
+    return _call('createTrialSessionRequest', {
+      'mohaffezId': mohaffezId,
+      'sessionType': sessionType,
+      'availabilityWindows': availabilityWindows,
+      'timezoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
+    });
+  }
+
+  Future<void> proposeTime({
+    required String requestId,
+    required DateTime proposedStart,
+  }) {
+    return _call('proposeTrialSessionTime', {
+      'requestId': requestId,
+      'proposedStart': proposedStart.toUtc().toIso8601String(),
+    });
+  }
+
+  Future<void> confirmTime(String requestId) {
+    return _call('confirmTrialSessionTime', {
+      'requestId': requestId,
+    });
+  }
+
+  Future<void> reject({
+    required String requestId,
+    String? reason,
+  }) {
+    return _call('rejectTrialSessionRequest', {
+      'requestId': requestId,
+      if (reason != null) 'reason': reason,
+    });
+  }
+}

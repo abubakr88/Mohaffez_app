@@ -402,6 +402,7 @@ export const onSessionCompleted = functions.firestore
 
     // Only send notifications when status becomes 'completed'
     if (afterStatus !== 'completed') return;
+    const isTrial = after.isTrial === true || after.bookingKind === 'trial';
 
     // ── Refresh this teacher's commission tier in real-time ──────────
     // The bi-weekly cron (`recomputeTeacherTiers`) still owns the global
@@ -409,12 +410,12 @@ export const onSessionCompleted = functions.firestore
     // session is bad UX — the teacher's home card stays at the old count.
     // This call updates `users/{mohaffezId}.tierStats` immediately. Errors
     // are swallowed inside the helper so they can't break notification flow.
-    if (mohaffezId) {
+    if (mohaffezId && !isTrial) {
       await recomputeForTeacherById(mohaffezId);
     }
 
     // ── Increment student completed-session counter ──────────────────
-    if (studentId) {
+    if (studentId && !isTrial) {
       try {
         await db
           .collection('users')
@@ -437,7 +438,7 @@ export const onSessionCompleted = functions.firestore
     // ─────────────────────────────────────────────────────────────────
 
     // ── Increment teacher completed-session and students-served counters ──
-    if (mohaffezId) {
+    if (mohaffezId && !isTrial) {
       try {
         // Check if this student has had any prior completed session with this teacher.
         // limit(2): one would be the session just completed, two means a repeat student.

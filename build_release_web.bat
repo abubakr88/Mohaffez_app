@@ -36,7 +36,7 @@ if exist "build\web" (
     echo Removing previous web build...
     rmdir /S /Q "build\web"
 )
-call flutter build web --release --pwa-strategy none --source-maps --dart-define-from-file="%REPO_ROOT%.env"
+call flutter build web --release -t lib/main.dart --pwa-strategy none --source-maps --dart-define-from-file="%REPO_ROOT%.env"
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Build failed. Check the output above.
     pause

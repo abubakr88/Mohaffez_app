@@ -27,6 +27,12 @@ export { releaseExpiredSlotLocks } from './cleanup/releaseExpiredSlotLocks';
 
 export { confirmFreeSession } from './bookings/confirmFreeSession';
 export { createSessionRequest } from './bookings/createSessionRequest';
+export {
+  createTrialSessionRequest,
+  proposeTrialSessionTime,
+  confirmTrialSessionTime,
+  rejectTrialSessionRequest,
+} from './trialSessions';
 export { studentMarkedDirectPayment, mohaffezConfirmDirectPayment, mohaffezRejectDirectPayment } from './payments/directPayment';
 
 // Bundle and subscription payment functions

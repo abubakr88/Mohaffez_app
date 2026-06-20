@@ -46,7 +46,6 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   int _sessionsCount = 1;
   int? _validityDays;
   int? _sessionsPerWeek;
-  bool _isFreeTrialAvailable = false;
 
   @override
   void initState() {
@@ -66,7 +65,6 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       _sessionsCount = plan.sessionsCount;
       _validityDays = plan.validityDays;
       _sessionsPerWeek = plan.sessionsPerWeek;
-      _isFreeTrialAvailable = plan.isFreeTrialAvailable;
     }
 
     _priceController.addListener(_onPriceChanged);
@@ -352,15 +350,6 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                 ),
                 const SizedBox(height: 16),
                 
-                // Free Trial
-                SwitchListTile(
-                  value: _isFreeTrialAvailable,
-                  onChanged: (val) => setState(() => _isFreeTrialAvailable = val),
-                  title: const Text('يتضمن جلسة تجريبية مجانية'),
-                  subtitle: const Text('سيتمكن الطلاب من تجربة جلسة قبل الدفع'),
-                  // FIX: Use activeThumbColor instead of activeColor
-                  activeThumbColor: AppThemeConstants.secondary,
-                ),
                 const SizedBox(height: 24),
                 
                 // Action Buttons
@@ -484,7 +473,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       sessionsCount: _sessionsCount,
       validityDays: _validityDays,
       sessionsPerWeek: _sessionsPerWeek,
-      isFreeTrialAvailable: _isFreeTrialAvailable,
+      isFreeTrialAvailable: false,
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),

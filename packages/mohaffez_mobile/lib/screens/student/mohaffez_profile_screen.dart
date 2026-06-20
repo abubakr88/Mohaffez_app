@@ -12,6 +12,8 @@ import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../providers/mohaffez_profile_providers.dart';
 import '../../providers/student_count_provider.dart';
+import '../../providers/trial_session_provider.dart';
+import 'request_trial_session_sheet.dart';
 import '../../tour/tour_guard_helper.dart';
 
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
@@ -196,6 +198,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     children: [
                       const SizedBox(height: 16),
                       _buildCompactTrustStrip(ref, profile),
+                      if (profile['trialSessionEnabled'] == true) ...[
+                        const SizedBox(height: 18),
+                        _buildTrialSessionSection(profile, plansAsync),
+                      ],
                       const SizedBox(height: 18),
                       _buildModernSessionSelector(plansAsync),
                       const SizedBox(height: 20),
@@ -337,6 +343,154 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       ),
     );
   }
+
+  Widget _buildTrialSessionSection(
+    Map<String, dynamic> profile,
+    AsyncValue<List<PricingPlanModel>> plansAsync,
+  ) {
+    final student = ref.watch(currentUserProvider).valueOrNull;
+    if (student == null || student.role != 'student') {
+      return const SizedBox.shrink();
+    }
+
+    final duration =
+        (profile['trialSessionDurationMinutes'] as num?)?.toInt() ?? 30;
+    final pair = TrialSessionPair(
+      mohaffezId: widget.mohaffezId,
+      studentId: student.uid,
+    );
+    final existingRequest = ref.watch(trialRequestForPairProvider(pair));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppThemeConstants.secondary.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.science_outlined,
+                    color: AppThemeConstants.secondary),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'حلقة تجريبية مجانية',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'حدد الأوقات المناسبة لك اليوم أو غدًا أو بعد غد، ثم يقترح '
+              'المحفظ موعدًا مدته $duration دقيقة لتأكيده.',
+              style: const TextStyle(
+                color: AppThemeConstants.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 14),
+            existingRequest.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (_, __) => const Text('تعذر تحميل حالة الطلب'),
+              data: (request) {
+                if (request != null) {
+                  return SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push('/trial-requests'),
+                      icon: const Icon(Icons.assignment_outlined),
+                      label: Text(_trialRequestButtonLabel(
+                        request['status'] as String? ?? '',
+                      )),
+                    ),
+                  );
+                }
+
+                return SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _requestTrialSession(
+                      plansAsync.valueOrNull ?? const [],
+                      duration,
+                    ),
+                    icon: const Icon(Icons.science_outlined),
+                    label: const Text('طلب حلقة تجريبية'),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _requestTrialSession(
+    List<PricingPlanModel> plans,
+    int duration,
+  ) async {
+    if (guardWriteInTour(ref, context)) return;
+    final supportedTypes = plans
+        .map((plan) => plan.mode?.name)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    if (supportedTypes.isEmpty) supportedTypes.add('online');
+
+    final sent = await RequestTrialSessionSheet.show(
+      context,
+      mohaffezId: widget.mohaffezId,
+      durationMinutes: duration,
+      supportedSessionTypes: supportedTypes,
+    );
+    if (sent == true && mounted) {
+      final studentId = ref.read(currentUserProvider).valueOrNull?.uid;
+      if (studentId != null) {
+        ref.invalidate(
+          trialRequestForPairProvider(
+            TrialSessionPair(
+              mohaffezId: widget.mohaffezId,
+              studentId: studentId,
+            ),
+          ),
+        );
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال طلب الحلقة التجريبية للمحفظ'),
+          backgroundColor: AppThemeConstants.success,
+        ),
+      );
+    }
+  }
+
+  String _trialRequestButtonLabel(String status) {
+    switch (status) {
+      case 'pending_teacher':
+        return 'الطلب بانتظار المحفظ';
+      case 'awaiting_student_confirmation':
+        return 'لديك موعد يحتاج التأكيد';
+      case 'confirmed':
+        return 'تم تأكيد الحلقة التجريبية';
+      default:
+        return 'عرض طلب الحلقة التجريبية';
+    }
+  }
+
   // ─── Pricing section ──────────────────────────────────────────────────────
 
   Widget _buildReadOnlyPlanCard(PricingPlanModel plan) {

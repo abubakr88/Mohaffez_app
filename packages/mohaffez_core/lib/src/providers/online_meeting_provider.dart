@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, Timestamp;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'auth_provider.dart';
 import 'system_config_provider.dart';
 
 class MeetingInfo {
@@ -76,8 +77,9 @@ enum MeetingButtonState {
 }
 
 final meetingInfoProvider =
-    StreamProvider.family<MeetingInfo?, String>((ref, sessionId) {
-  if (sessionId.isEmpty) return Stream.value(null);
+    StreamProvider.autoDispose.family<MeetingInfo?, String>((ref, sessionId) {
+  final authUid = ref.watch(authStateProvider).valueOrNull?.uid;
+  if (authUid == null || sessionId.isEmpty) return Stream.value(null);
   return FirebaseFirestore.instance
       .collection('hafizSessions')
       .doc(sessionId)
@@ -108,7 +110,7 @@ final _meetingClockProvider = StreamProvider<DateTime>((ref) {
 typedef MeetingButtonKey = ({String sessionId, String role});
 
 final meetingButtonStateProvider =
-    Provider.family<MeetingButtonState, MeetingButtonKey>(
+    Provider.autoDispose.family<MeetingButtonState, MeetingButtonKey>(
   (ref, key) {
     if (key.sessionId.isEmpty) return MeetingButtonState.hidden;
 

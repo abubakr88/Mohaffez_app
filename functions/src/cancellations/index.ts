@@ -112,6 +112,7 @@ export const onSessionCancelled = functions.firestore
     const mohaffezId = after.mohaffezId as string;
     const sessionPrice = (after.sessionPrice as number | undefined) ?? 0;
     const paymentType = (after.paymentType as string | undefined) ?? null;
+    const isTrial = after.isTrial === true || after.bookingKind === 'trial';
 
     // Use slotStart (precise start time) for the hours-until-session math.
     // sessionDate is a date-only field that normalizes to midnight — a 23:10
@@ -123,12 +124,14 @@ export const onSessionCancelled = functions.firestore
     const cancelledAt = toDate(after.cancelledAt) ?? new Date();
 
     // ── Determine refund % and penalty % ─────────────────────────────────
-    const { refundPercent, penaltyPercent } = computeCancellationOutcome({
-      cancelledBy,
-      teacherNoShow,
-      sessionDate: sessionStart,
-      cancelledAt,
-    });
+    const { refundPercent, penaltyPercent } = isTrial
+      ? { refundPercent: 0, penaltyPercent: 0 }
+      : computeCancellationOutcome({
+          cancelledBy,
+          teacherNoShow,
+          sessionDate: sessionStart,
+          cancelledAt,
+        });
 
     const refundAmountEgp = Math.round(sessionPrice * refundPercent) / 100;
     const refundPiastres = refundAmountEgp > 0 ? egpToPiastres(refundAmountEgp) : 0;
@@ -415,7 +418,10 @@ export const onSessionCancelled = functions.firestore
     // see only the generic "إلغاء" message and can't tell the consequence.
     const cancellerTitle = 'تحذير: تسجيل إلغاء';
     let cancellerBody: string;
-    if (cancelledBy === 'teacher') {
+    if (isTrial) {
+      cancellerBody =
+        'تم إلغاء الحلقة التجريبية المجانية، ولا توجد أي حركة مالية.';
+    } else if (cancelledBy === 'teacher') {
       cancellerBody = `تم تسجيل ${teacherNoShow ? 'غياب' : 'إلغاء'} على حسابك.`
         + (penaltyPercent > 0
           ? ` سيرتفع معدل عمولتك بنسبة ${penaltyPercent}% هذه الدورة.`
@@ -438,7 +444,9 @@ export const onSessionCancelled = functions.firestore
     const otherTitle = cancelledBy === 'teacher'
       ? (teacherNoShow ? 'المحفظ لم يحضر الجلسة' : 'تم إلغاء جلستك من المحفظ')
       : 'الطالب ألغى الجلسة';
-    const otherBody = isBundleSession
+    const otherBody = isTrial
+      ? 'تم إلغاء الحلقة التجريبية المجانية، ولا توجد أي حركة مالية.'
+      : isBundleSession
       ? (cancelledBy === 'teacher'
           ? `${teacherNoShow ? 'المحفظ لم يحضر.' : 'المحفظ ألغى الجلسة.'} تم إعادة الحلقة إلى رصيد باقتك.`
           : (bundleRestored

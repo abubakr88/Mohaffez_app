@@ -1,11 +1,10 @@
-// lib/services/credential_service.dart
-import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as path;
 
 class CredentialService {
@@ -24,28 +23,33 @@ class CredentialService {
       throw Exception('يمكنك اختيار $_maxImagesPerCredential صور كحد أقصى');
     }
 
-    List<String> imageUrls = [];
+    final imageUrls = <String>[];
 
-    for (var image in images) {
-      final file = File(image.path);
-      final extension = path.extension(image.path).toLowerCase();
+    for (final image in images) {
+      final originalName =
+          image.name.trim().isNotEmpty ? image.name : path.basename(image.path);
+      final extension = _resolveExtension(originalName, image.mimeType);
 
       if (!_allowedExtensions.contains(extension)) {
         throw Exception('الصيغة المسموحة: JPG, PNG فقط');
       }
 
-      // Validate original file size before spending time compressing.
-      final fileSize = await file.length();
+      // Browser-picked files do not expose a usable dart:io File path.
+      final originalBytes = await image.readAsBytes();
+      final fileSize = originalBytes.length;
       if (fileSize > _maxOriginalBytes) {
         throw Exception('حجم الملف يجب أن يكون أقل من 5 ميجابايت');
       }
 
-      final compressed = await _compressCredentialImage(file);
+      final compressed = _compressCredentialImage(originalBytes);
       Uint8List uploadBytes;
       String uploadExtension;
       String contentType;
 
-      if (compressed != null && compressed.isNotEmpty) {
+      if (compressed != null &&
+          compressed.isNotEmpty &&
+          (compressed.length < originalBytes.length ||
+              originalBytes.length > _maxUploadBytes)) {
         uploadBytes = compressed;
         uploadExtension = '.jpg';
         contentType = 'image/jpeg';
@@ -53,7 +57,7 @@ class CredentialService {
         if (fileSize > _maxUploadBytes) {
           throw Exception('تعذر ضغط الصورة. يرجى اختيار صورة أوضح بحجم أصغر');
         }
-        uploadBytes = await file.readAsBytes();
+        uploadBytes = originalBytes;
         uploadExtension = extension == '.png' ? '.png' : '.jpg';
         contentType = extension == '.png' ? 'image/png' : 'image/jpeg';
       }
@@ -76,7 +80,7 @@ class CredentialService {
         SettableMetadata(
           contentType: contentType,
           customMetadata: {
-            'originalName': path.basename(image.path),
+            'originalName': originalName,
             'originalSize': fileSize.toString(),
             'compressedSize': uploadBytes.length.toString(),
           },
@@ -89,15 +93,35 @@ class CredentialService {
     return imageUrls;
   }
 
-  static Future<Uint8List?> _compressCredentialImage(File file) async {
-    final bytes = await FlutterImageCompress.compressWithFile(
-      file.absolute.path,
-      minWidth: 1600,
-      minHeight: 1600,
-      quality: 82,
-      format: CompressFormat.jpeg,
-    );
-    return bytes == null ? null : Uint8List.fromList(bytes);
+  static String _resolveExtension(String name, String? mimeType) {
+    final extension = path.extension(name).toLowerCase();
+    if (extension.isNotEmpty) return extension;
+    if (mimeType == 'image/png') return '.png';
+    if (mimeType == 'image/jpeg') return '.jpg';
+    return extension;
+  }
+
+  static Uint8List? _compressCredentialImage(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+
+    final oriented = img.bakeOrientation(decoded);
+    img.Image resized = oriented;
+    if (oriented.width > 1600 || oriented.height > 1600) {
+      resized = oriented.width >= oriented.height
+          ? img.copyResize(
+              oriented,
+              width: 1600,
+              interpolation: img.Interpolation.average,
+            )
+          : img.copyResize(
+              oriented,
+              height: 1600,
+              interpolation: img.Interpolation.average,
+            );
+    }
+
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 82));
   }
 
   /// Add a new credential

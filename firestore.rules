@@ -112,6 +112,7 @@ service cloud.firestore {
             'addressLng', 'specialization', 'name',
             'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
+            'trialSessionEnabled', 'trialSessionDurationMinutes',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
             'setupCompleted', 'dateOfBirth', 'city',
@@ -119,7 +120,28 @@ service cloud.firestore {
             'examQuestionCount', 'examCorrectCount',
             'examPassed', 'examRetryCount', 'examNextRetryAt',
             'setupWizardSeen'
-          ]);
+          ]) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['trialSessionEnabled', 'trialSessionDurationMinutes'])
+          ||
+          (
+            resource.data.role == 'mohaffez' &&
+            (
+              !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['trialSessionEnabled'])
+              ||
+              request.resource.data.trialSessionEnabled is bool
+            ) &&
+            (
+              !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['trialSessionDurationMinutes'])
+              ||
+              request.resource.data.trialSessionDurationMinutes
+                in [15, 20, 30, 45, 60]
+            )
+          )
+        );
 
       // Mohaffez submitting for admin approval (registration step 3)
       // Separated so that 'status' is tightly constrained to 'pending_approval' only —
@@ -335,6 +357,19 @@ service cloud.firestore {
                      resource.data.status in [
                        'pending', 'awaitingpayment', 'rejected', 'expired'
                      ];
+    }
+
+    match /trialSessionRequests/{requestId} {
+      allow get: if isAuthenticated() && (
+        resource == null ||
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+      allow list: if isAuthenticated() && (
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.mohaffezId
+      );
+      allow create, update, delete: if false;
     }
 
     // ============================================
