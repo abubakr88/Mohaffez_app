@@ -13,6 +13,7 @@ import '../../shared/widgets/error_widgets.dart';
 import '../../shared/utils/time_formatter.dart';
 
 import '../../shared/widgets/request_payment_type_badge.dart';
+import '../shared/trial_session_requests_screen.dart';
 import '../../tour/tour_guard_helper.dart';
 
 // FIX Bug 1: import BookingPaymentMethod so we can reference
@@ -55,6 +56,11 @@ class _PendingRequestsScreenState extends ConsumerState<PendingRequestsScreen> {
         body: CustomScrollView(
           slivers: [
             _buildAppBar(user.uid),
+            if (_selectedFilter == 'all' ||
+                _selectedFilter == RequestStatus.pending)
+              const SliverToBoxAdapter(
+                child: ActiveTrialSessionRequestsSection(isTeacher: true),
+              ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16),

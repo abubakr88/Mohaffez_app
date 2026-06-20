@@ -40,6 +40,7 @@ class HomeShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authUser = ref.watch(authStateProvider).valueOrNull;
     final userAsync = ref.watch(currentUserProvider);
 
     return userAsync.when(
@@ -77,7 +78,7 @@ class HomeShell extends ConsumerWidget {
         ),
       ),
       data: (user) {
-        if (user == null) {
+        if (authUser == null || user == null || authUser.uid != user.uid) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
@@ -739,6 +740,9 @@ Widget _buildDrawer(
                 _drawerTile(context, title: 'إدارة الأسعار',
                     icon: Icons.sell_rounded, route: 'pricing-management',
                     color: _ShellDS.teal500),
+                _drawerTile(context, title: 'الحلقات التجريبية',
+                    icon: Icons.science_outlined, route: 'trial-requests',
+                    color: _ShellDS.teal600),
                 _drawerTile(context, title: 'إعدادات المحفظة',
                     icon: Icons.account_balance_wallet_rounded,
                     route: 'wallet-settings', color: _ShellDS.teal600),
@@ -761,6 +765,9 @@ Widget _buildDrawer(
                 _drawerTile(context, title: 'طلباتي',
                     icon: Icons.pending_actions_rounded, route: 'requests',
                     color: AppThemeConstants.warning),
+                _drawerTile(context, title: 'الحلقات التجريبية',
+                    icon: Icons.science_outlined, route: 'trial-requests',
+                    color: _ShellDS.teal600),
               ],
 
               const Divider(height: 28, indent: 16, endIndent: 16),

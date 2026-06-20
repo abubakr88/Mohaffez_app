@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 import '../../shared/utils/time_formatter.dart';
+import '../shared/trial_session_requests_screen.dart';
 import '../../tour/tour_mode_state.dart';
 
 // ============================================================================
@@ -227,6 +228,11 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
           child: CustomScrollView(
             slivers: [
               _buildAppBar(context, ref, filter, studentId),
+              if (filter == RequestFilter.all ||
+                  filter == RequestFilter.pending)
+                const SliverToBoxAdapter(
+                  child: ActiveTrialSessionRequestsSection(isTeacher: false),
+                ),
               _buildSearchBar(),
               _buildFilterChips(ref, filter),
               _buildRequestsList(

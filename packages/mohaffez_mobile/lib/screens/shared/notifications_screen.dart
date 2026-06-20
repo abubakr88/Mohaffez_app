@@ -375,6 +375,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         context.go('/mohaffez-home');
         break;
 
+      case 'trial_session_requested':
+      case 'trial_session_proposed':
+      case 'trial_session_confirmed':
+      case 'trial_session_rejected':
+        context.push('/trial-requests');
+        break;
+
       case 'assignment_updated':
         // Navigate to student assignments
         context.push('/assignments');
