@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../shared/theme/theme_extensions.dart';
+import '../../providers/trial_session_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -21,6 +22,11 @@ class SettingsScreen extends ConsumerWidget {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (ref.watch(currentUserProvider).valueOrNull?.role ==
+                'mohaffez') ...[
+              const _TeacherTrialSettingsSection(),
+              Spacing.vLg,
+            ],
             // التطبيق
             buildSection(
               title: 'التطبيق',
@@ -499,6 +505,112 @@ class SettingsScreen extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Text(text, style: const TextStyle(fontSize: 14)),
     );
+  }
+}
+
+class _TeacherTrialSettingsSection extends ConsumerWidget {
+  const _TeacherTrialSettingsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    if (user == null) return const SizedBox.shrink();
+    final settings = ref.watch(teacherTrialSettingsProvider(user.uid));
+
+    return settings.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (data) {
+        final enabled = data['enabled'] == true;
+        final duration = data['durationMinutes'] as int? ?? 30;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(right: 16, bottom: 8),
+              child: Text(
+                'الحلقة التجريبية',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeConstants.grey500,
+                ),
+              ),
+            ),
+            Container(
+              decoration: const BoxDecoration(
+                color: AppThemeConstants.surface,
+                borderRadius: AppThemeConstants.borderRadiusMd,
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.science_outlined),
+                    title: const Text('استقبال طلبات تجريبية'),
+                    subtitle: const Text(
+                      'يمكن لكل طالب طلب حلقة تجريبية واحدة فقط',
+                    ),
+                    value: enabled,
+                    onChanged: (value) => _update(
+                      context,
+                      ref,
+                      {'trialSessionEnabled': value},
+                    ),
+                  ),
+                  if (enabled) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.timer_outlined),
+                      title: const Text('مدة الحلقة'),
+                      trailing: DropdownButton<int>(
+                        value: [15, 20, 30, 45, 60].contains(duration)
+                            ? duration
+                            : 30,
+                        items: const [15, 20, 30, 45, 60]
+                            .map(
+                              (minutes) => DropdownMenuItem<int>(
+                                value: minutes,
+                                child: Text('$minutes دقيقة'),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (minutes) {
+                          if (minutes != null) {
+                            _update(
+                              context,
+                              ref,
+                              {'trialSessionDurationMinutes': minutes},
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _update(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> changes,
+  ) async {
+    try {
+      await ref
+          .read(userUpdateNotifierProvider.notifier)
+          .updateProfile(changes);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر حفظ إعدادات الحلقة التجريبية')),
+        );
+      }
+    }
   }
 }
 

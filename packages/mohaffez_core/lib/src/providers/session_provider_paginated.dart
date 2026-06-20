@@ -8,6 +8,7 @@ import '../models/request_status.dart';
 import '../models/quran_mistake_model.dart';
 import '../models/mohaffez_student_summary.dart';
 import '../models/subscription_model.dart';
+import 'auth_provider.dart';
 
 /// Parses time from timeSlot (e.g., "15:30 - 16:15" → 15:30) and combines with date
 DateTime? _parseSessionDateTime(DateTime? date, String? timeSlot) {
@@ -592,6 +593,10 @@ final paginatedStudentSessionsProvider = StateNotifierProvider.autoDispose.famil
 final studentSessionsFirstPageProvider =
     StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
   (ref, studentId) {
+    final authUid = ref.watch(authStateProvider).valueOrNull?.uid;
+    if (authUid == null || authUid != studentId) {
+      return Stream.value(const <Map<String, dynamic>>[]);
+    }
     return FirebaseFirestore.instance
         .collection('hafizSessions')
         .where('studentId', isEqualTo: studentId)
@@ -613,8 +618,13 @@ final studentSessionsFirstPageProvider =
 // Now uses RequestStatus.studentVisible as the single source of truth.
 // ─── studentRequestsFirstPageProvider ── FIXED ─────────────────
 final studentRequestsFirstPageProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, studentId) {
-  return FirebaseFirestore.instance
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
+  (ref, studentId) {
+    final authUid = ref.watch(authStateProvider).valueOrNull?.uid;
+    if (authUid == null || authUid != studentId) {
+      return Stream.value(const <Map<String, dynamic>>[]);
+    }
+    return FirebaseFirestore.instance
       .collection('sessionRequests')
       .where('studentId', isEqualTo: studentId)
       .where('status', whereIn: RequestStatus.studentVisible)
@@ -648,7 +658,8 @@ final studentRequestsFirstPageProvider =
               'directPaymentRequestId': data['directPaymentRequestId'] as String?,
             };
           }).toList());
-});
+  },
+);
 
 // ============================================================================
 // SESSION ACTIONS

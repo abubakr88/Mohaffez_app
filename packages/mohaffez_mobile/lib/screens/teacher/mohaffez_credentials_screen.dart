@@ -1,4 +1,6 @@
 ﻿// lib/screens/mohaffez_credentials_screen.dart
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,7 +11,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../services/credential_service.dart';
-import 'dart:io';
 
 class MohaffezCredentialsScreen extends StatefulWidget {
   const MohaffezCredentialsScreen({super.key});
@@ -722,6 +723,58 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
 // ============================================================================
 // ADD CREDENTIAL SCREEN
 // ============================================================================
+class _XFileImage extends StatefulWidget {
+  const _XFileImage({required this.file});
+
+  final XFile file;
+
+  @override
+  State<_XFileImage> createState() => _XFileImageState();
+}
+
+class _XFileImageState extends State<_XFileImage> {
+  late Future<Uint8List> _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _bytes = widget.file.readAsBytes();
+  }
+
+  @override
+  void didUpdateWidget(covariant _XFileImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path ||
+        oldWidget.file.name != widget.file.name) {
+      _bytes = widget.file.readAsBytes();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List>(
+      future: _bytes,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return Image.memory(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+          );
+        }
+        if (snapshot.hasError) {
+          return const Center(
+            child: Icon(Icons.broken_image_outlined),
+          );
+        }
+        return const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        );
+      },
+    );
+  }
+}
+
 class AddCredentialScreen extends StatefulWidget {
   const AddCredentialScreen({super.key});
 
@@ -735,7 +788,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
   final organizationController = TextEditingController();
   String selectedType = 'ijazah';
   DateTime? issueDate;
-  List<String> selectedImagePaths = [];
+  List<XFile> selectedImages = [];
   bool uploading = false;
 
   @override
@@ -749,7 +802,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
     try {
       final images = await CredentialService.pickImages(maxImages: 3);
       setState(() {
-        selectedImagePaths = images.map((img) => img.path).toList();
+        selectedImages = images;
       });
     } catch (e) {
       if (mounted) {
@@ -771,7 +824,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
     }
 
     // ✅ REMOVED: Image validation - now optional
-    // if (selectedImagePaths.isEmpty) {
+    // if (selectedImages.isEmpty) {
     //   ScaffoldMessenger.of(context).showSnackBar(
     //     const SnackBar(content: Text('يرجى إضافة صورة واحدة على الأقل')),
     //   );
@@ -785,10 +838,9 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
 
       // ✅ Upload images only if selected
       List<String> imageUrls = [];
-      if (selectedImagePaths.isNotEmpty) {
-        final images = selectedImagePaths.map((path) => XFile(path)).toList();
+      if (selectedImages.isNotEmpty) {
         imageUrls = await CredentialService.uploadCredentialImages(
-          images,
+          selectedImages,
           user.uid,
         );
       }
@@ -811,10 +863,24 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Credential upload failed: $e');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
+        final message = e is FirebaseException
+            ? switch (e.code) {
+                'unauthorized' =>
+                  'لا تملك صلاحية رفع هذا المستند. أعد تسجيل الدخول ثم حاول مرة أخرى.',
+                'canceled' => 'تم إلغاء رفع المستند.',
+                'retry-limit-exceeded' =>
+                  'تعذر الاتصال بخدمة رفع الملفات. تحقق من الإنترنت وحاول مرة أخرى.',
+                'invalid-checksum' =>
+                  'تعذر التحقق من الملف المرفوع. يرجى اختيار الصورة مرة أخرى.',
+                _ => 'تعذّر رفع المستند (${e.code}). يرجى المحاولة مرة أخرى.',
+              }
+            : 'تعذّر رفع المستند. يرجى المحاولة مرة أخرى';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر رفع المستند. يرجى المحاولة مرة أخرى')),
+          SnackBar(content: Text(message)),
         );
       }
     } finally {
@@ -938,7 +1004,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                if (selectedImagePaths.isEmpty)
+                if (selectedImages.isEmpty)
                   GestureDetector(
                     onTap: _pickImages,
                     child: Container(
@@ -972,7 +1038,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                         height: 150,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          itemCount: selectedImagePaths.length,
+                          itemCount: selectedImages.length,
                           itemBuilder: (context, index) {
                             return Container(
                               width: 150,
@@ -983,9 +1049,8 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.file(
-                                  File(selectedImagePaths[index]),
-                                  fit: BoxFit.cover,
+                                child: _XFileImage(
+                                  file: selectedImages[index],
                                 ),
                               ),
                             );

@@ -81,11 +81,7 @@ class PricingService {
     return true;
   }
 
-  bool isFreeTrial(PricingPlanModel plan, PromoCodeModel? promo) {
-    if (plan.isFreeTrialAvailable) {
-      return true;
-    }
-
+  bool isFreeTrial(PricingPlanModel _, PromoCodeModel? promo) {
     if (promo == null) {
       return false;
     }

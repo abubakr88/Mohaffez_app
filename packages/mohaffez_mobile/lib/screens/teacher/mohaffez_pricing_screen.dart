@@ -239,12 +239,6 @@ class PricingPlanCard extends ConsumerWidget {
                     'صالح لـ ${plan.validityDays} يوم',
                     Icons.schedule,
                   ),
-                if (plan.isFreeTrialAvailable)
-                  _buildChip(
-                    'جلسة تجريبية',
-                    Icons.stars,
-                    color: AppThemeConstants.warning,
-                  ),
               ],
             ),
             if (plan.description != null) ...[

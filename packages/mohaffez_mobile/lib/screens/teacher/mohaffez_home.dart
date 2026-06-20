@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../services/app_version_service.dart';
+import '../../providers/trial_session_provider.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 import '../../shared/widgets/teacher_tier_card.dart';
@@ -135,7 +136,13 @@ class MohaffezHomeContent extends ConsumerWidget {
     final user             = ref.watch(currentUserProvider).value;
     final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
     final pendingCount     = ref.watch(pendingRequestsCountProvider(mohaffezId));
+    final trialRequests    = ref.watch(trialSessionRequestsProvider);
     final now              = serverNow(ref);
+    final trialPendingCount = trialRequests.valueOrNull
+            ?.where((request) => request['status'] == 'pending_teacher')
+            .length ??
+        0;
+    final totalPendingCount = pendingCount + trialPendingCount;
 
     final nextSessionDate = upcomingSessions.when(
       data: (sessions) {
@@ -186,6 +193,7 @@ class MohaffezHomeContent extends ConsumerWidget {
             onRefresh: () async {
               ref.invalidate(currentUserProvider);
               ref.invalidate(pendingRequestsFirstPageProvider(mohaffezId));
+              ref.invalidate(trialSessionRequestsProvider);
               ref.invalidate(upcomingSessionsProvider(mohaffezId));
               await ref
                   .read(upcomingSessionsProvider(mohaffezId).future)
@@ -210,7 +218,7 @@ class MohaffezHomeContent extends ConsumerWidget {
                       photoUrl:     user?.photoUrl,
                       dateText:     DateFormat('EEEE، d MMMM', 'ar').format(now),
                       greeting:     _greeting(now),
-                      pendingCount: pendingCount,
+                      pendingCount: totalPendingCount,
                     ),
                   ),
                 ),
@@ -221,7 +229,7 @@ class MohaffezHomeContent extends ConsumerWidget {
                     mohaffezId:       mohaffezId,
                     todayCount:       todayCount,
                     upcomingSessions: upcomingSessions,
-                    pendingCount:     pendingCount,
+                    pendingCount:     totalPendingCount,
                   ),
                 ),
 
@@ -230,9 +238,9 @@ class MohaffezHomeContent extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 36),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      if (pendingCount > 0) ...[
+                      if (totalPendingCount > 0) ...[
                         _PendingAlertBanner(
-                          count: pendingCount,
+                          count: totalPendingCount,
                           onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
                         ),
                         const SizedBox(height: 20),

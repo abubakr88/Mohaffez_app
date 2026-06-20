@@ -32,6 +32,7 @@ class RoleGuard implements RouteGuard {
     '/student-rewards',
     '/session', // session details
     '/mohaffez/requests',
+    '/trial-requests',
   ];
 
   static const List<String> teacherRegistrationRoutePrefixes = <String>[

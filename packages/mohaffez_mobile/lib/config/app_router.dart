@@ -25,6 +25,7 @@ import '../screens/shared/privacy_settings_screen.dart';
 import '../screens/shared/cancellation_policy_screen.dart';
 import '../screens/shared/payment_return_screen.dart';
 import '../screens/shared/payment_webview_screen.dart';
+import '../screens/shared/trial_session_requests_screen.dart';
 import '../screens/shared/pick_location_screen.dart';
 import '../screens/shared/session_details_screen.dart';
 // Student screens
@@ -460,6 +461,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             name: 'settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/trial-requests',
+            name: 'trial-requests',
+            builder: (context, state) => const TrialSessionRequestsScreen(),
           ),
           GoRoute(
             path: '/location-settings',

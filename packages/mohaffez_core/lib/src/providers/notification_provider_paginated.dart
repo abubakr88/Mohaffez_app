@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
 import '../models/pagination_state.dart';
 import '../repositories/notification_repository.dart';
+import 'auth_provider.dart';
 import 'user_provider.dart';
 
 // ===== REPOSITORY PROVIDER =====
@@ -16,8 +17,13 @@ final notificationRepositoryProvider = Provider((ref) {
 
 // ===== FIRST PAGE PROVIDER (Real-time) =====
 
-final notificationsFirstPageProvider = StreamProvider.family<List<NotificationModel>, String>(
+final notificationsFirstPageProvider = StreamProvider.autoDispose
+    .family<List<NotificationModel>, String>(
   (ref, userId) {
+    final authUid = ref.watch(authStateProvider).valueOrNull?.uid;
+    if (authUid == null || authUid != userId) {
+      return Stream.value(const <NotificationModel>[]);
+    }
     final repository = ref.watch(notificationRepositoryProvider);
     return repository.watchNotificationsFirstPage(userId);
   },
@@ -25,8 +31,13 @@ final notificationsFirstPageProvider = StreamProvider.family<List<NotificationMo
 
 // ===== UNREAD COUNT PROVIDER (Real-time) =====
 
-final unreadNotificationsCountProvider = StreamProvider.family<int, String>(
+final unreadNotificationsCountProvider =
+    StreamProvider.autoDispose.family<int, String>(
   (ref, userId) {
+    final authUid = ref.watch(authStateProvider).valueOrNull?.uid;
+    if (authUid == null || authUid != userId) {
+      return Stream.value(0);
+    }
     final repository = ref.watch(notificationRepositoryProvider);
     return repository.watchUnreadCount(userId);
   },

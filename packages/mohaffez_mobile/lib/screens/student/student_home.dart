@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../providers/quiz_access_provider.dart';
+import '../../providers/trial_session_provider.dart';
 import '../../services/app_version_service.dart';
 import '../../shared/widgets/error_widgets.dart';
 
@@ -154,6 +155,17 @@ class StudentHomeContent extends ConsumerWidget {
       loading: () => 0,
       error: (_, __) => 0,
     );
+    final trialRequests = ref.watch(trialSessionRequestsProvider);
+    final activeTrialRequestsCount = trialRequests.valueOrNull
+            ?.where((request) {
+              final status = request['status'] as String? ?? '';
+              return status == 'pending_teacher' ||
+                  status == 'awaiting_student_confirmation';
+            })
+            .length ??
+        0;
+    final totalActiveRequests =
+        activeRequestsCount + activeTrialRequestsCount;
 
     final awaitingPaymentCount = requestsAsync.when(
       data: (requests) => requests.where((r) {
@@ -180,7 +192,8 @@ class StudentHomeContent extends ConsumerWidget {
       error: (_, __) => 0,
     );
 
-    final requestsLoading     = requestsAsync is AsyncLoading;
+    final requestsLoading =
+        requestsAsync is AsyncLoading || trialRequests is AsyncLoading;
     final subscriptionsLoading = subscriptionsAsync is AsyncLoading;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -199,6 +212,7 @@ class StudentHomeContent extends ConsumerWidget {
               ref.invalidate(currentUserProvider);
               ref.invalidate(studentSessionsFirstPageProvider(studentId));
               ref.invalidate(studentRequestsFirstPageProvider(studentId));
+              ref.invalidate(trialSessionRequestsProvider);
               ref.invalidate(activeSubscriptionsProvider(studentId));
               await ref
                   .read(studentSessionsFirstPageProvider(studentId).future)
@@ -230,7 +244,7 @@ class StudentHomeContent extends ConsumerWidget {
                 // ─── Stats row ───────────────────────────────────────────
                 SliverToBoxAdapter(
                   child: _StatsRow(
-                    activeRequests:    activeRequestsCount,
+                    activeRequests:    totalActiveRequests,
                     subscriptionsCount: subscriptionsCount,
                     upcomingSessions:  upcomingSessionsCount,
                     requestsLoading:     requestsLoading,
