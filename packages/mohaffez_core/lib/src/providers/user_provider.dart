@@ -36,33 +36,38 @@ final currentUserProvider = StreamProvider<UserModel?>((ref) {
       .watch(userRepositoryProvider)
       .watchUser(userId)
       .distinct((prev, next) {
-        if (prev == null && next == null) return true;
-        if (prev == null || next == null) return false;
-        return prev.uid == next.uid &&
-            prev.name == next.name &&
-            prev.role == next.role &&
-            prev.status == next.status &&
-            prev.photoUrl == next.photoUrl;
-      })
-      .handleError((error, stack) {
-        if (kDebugMode) {
-          debugPrint('❌ currentUserProvider error: $error');
-        }
-      });
+    if (prev == null && next == null) return true;
+    if (prev == null || next == null) return false;
+    return prev.uid == next.uid &&
+        prev.name == next.name &&
+        prev.role == next.role &&
+        prev.status == next.status &&
+        prev.photoUrl == next.photoUrl &&
+        prev.badges.foundingTeacher.enabled ==
+            next.badges.foundingTeacher.enabled &&
+        prev.badges.foundingTeacher.updatedAt ==
+            next.badges.foundingTeacher.updatedAt;
+  }).handleError((error, stack) {
+    if (kDebugMode) {
+      debugPrint('❌ currentUserProvider error: $error');
+    }
+  });
 });
 
-final userByIdProvider = StreamProvider.family<UserModel?, String>((ref, userId) {
+final userByIdProvider =
+    StreamProvider.family<UserModel?, String>((ref, userId) {
   if (kDebugMode) debugPrint('userByIdProvider: $userId');
 
   return ref
       .watch(userRepositoryProvider)
       .watchUser(userId)
       .handleError((error, stack) {
-        if (kDebugMode) debugPrint('❌ userByIdProvider error for $userId: $error');
-      });
+    if (kDebugMode) debugPrint('❌ userByIdProvider error for $userId: $error');
+  });
 });
 
-final getUserOnceProvider = FutureProvider.family<UserModel?, String>((ref, userId) async {
+final getUserOnceProvider =
+    FutureProvider.family<UserModel?, String>((ref, userId) async {
   try {
     return await ref.watch(userRepositoryProvider).getUser(userId);
   } catch (e) {
@@ -106,12 +111,14 @@ class UserUpdateNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> updatePhotoUrl(String photoUrl) => updateProfile({'photoUrl': photoUrl});
+  Future<void> updatePhotoUrl(String photoUrl) =>
+      updateProfile({'photoUrl': photoUrl});
 
   Future<void> updateBio(String bio) {
     final trimmed = bio.trim();
     if (trimmed.isEmpty) throw ArgumentError('السيرة الذاتية فارغة');
-    if (trimmed.length > 500) throw ArgumentError('السيرة الذاتية طويلة جداً (الحد الأقصى 500 حرف)');
+    if (trimmed.length > 500)
+      throw ArgumentError('السيرة الذاتية طويلة جداً (الحد الأقصى 500 حرف)');
 
     return updateProfile({'bio': trimmed});
   }

@@ -129,6 +129,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       mohaffezId: widget.mohaffezId,
       mohaffezName: profileValue?['name'] as String? ?? '',
       mohaffezPhone: profileValue?['phoneNumber'] as String?,
+      isFoundingTeacher: profileValue?['status'] == 'active' &&
+          UserBadges.fromJson(profileValue?['badges']).foundingTeacher.enabled,
       sessionType: selectedSessionType,
       preferredTimeSlot: '$startRaw - $endRaw',
       slotDate: DateTime.utc(
@@ -583,7 +585,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  Widget _buildModernPricingSection(AsyncValue<List<PricingPlanModel>> plansAsync) {
+  Widget _buildModernPricingSection(
+      AsyncValue<List<PricingPlanModel>> plansAsync) {
     return plansAsync.when(
       data: (plans) {
         if (plans.isEmpty) return const SizedBox.shrink();
@@ -775,7 +778,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _miniTrust(Icons.star_rounded, rating.toStringAsFixed(1), 'التقييم'),
+            _miniTrust(
+                Icons.star_rounded, rating.toStringAsFixed(1), 'التقييم'),
             _miniTrust(Icons.people_alt_rounded, '$studentCount+', 'طالب'),
             _miniTrust(Icons.workspace_premium_rounded, 'إجازة', 'معتمد'),
             _miniTrust(Icons.access_time_filled_rounded, '10 د', 'الرد'),
@@ -814,6 +818,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     final name = (profile['name'] as String?)?.trim().isNotEmpty == true
         ? profile['name'] as String
         : 'المحفّظ';
+    final hasFoundingBadge = profile['status'] == 'active' &&
+        UserBadges.fromJson(profile['badges']).foundingTeacher.enabled;
     final specialization = (profile['specialization'] as String?)?.trim();
     final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
     final reviewCount = profile['reviewCount'] as int? ?? 0;
@@ -928,6 +934,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          if (hasFoundingBadge) ...[
+                            const SizedBox(height: 8),
+                            const FoundingTeacherBadge(
+                              compact: true,
+                              showLabel: true,
+                              size: 18,
+                            ),
+                          ],
                           if (specialization != null &&
                               specialization.isNotEmpty) ...[
                             const SizedBox(height: 8),
@@ -1282,9 +1296,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               color: hasPlan && selected ? null : Colors.white,
               border: Border.all(
                 color: hasPlan
-                    ? (selected
-                        ? Colors.transparent
-                        : const Color(0xFFE5E7EB))
+                    ? (selected ? Colors.transparent : const Color(0xFFE5E7EB))
                     : Colors.grey.withValues(alpha: 0.3),
               ),
               boxShadow: hasPlan && selected
@@ -1490,10 +1502,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   final currentDayOfWeek = today.weekday;
 
                   final sortedSlots = [...slots]..sort((a, b) {
-                    int dA = ((a['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
-                    int dB = ((b['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
-                    return dA.compareTo(dB);
-                  });
+                      int dA =
+                          ((a['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
+                      int dB =
+                          ((b['dayOfWeek'] as int) - currentDayOfWeek + 7) % 7;
+                      return dA.compareTo(dB);
+                    });
 
                   // Build (date, enabledSlots) for each available day
                   final availableDays =
@@ -1511,7 +1525,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
                     final enabled = timeSlots.where((ts) {
                       if (ts['enabled'] != true) return false;
-                      if (ts['sessionType'] != selectedSessionType) return false;
+                      if (ts['sessionType'] != selectedSessionType) {
+                        return false;
+                      }
                       if (isToday) {
                         final parts =
                             (ts['startTime'] as String? ?? '0:0').split(':');
@@ -1535,9 +1551,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
                   // Which day is currently highlighted in the strip
                   final effectiveDate = (selectedDate != null &&
-                          availableDays
-                              .any((d) => d.date.day == selectedDate!.day &&
-                                  d.date.month == selectedDate!.month))
+                          availableDays.any((d) =>
+                              d.date.day == selectedDate!.day &&
+                              d.date.month == selectedDate!.month))
                       ? selectedDate!
                       : availableDays.first.date;
 
@@ -1565,8 +1581,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         scrollDirection: Axis.horizontal,
                         padding: EdgeInsets.zero,
                         itemCount: availableDays.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(width: 8),
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
                         itemBuilder: (_, i) {
                           final day = availableDays[i];
                           final isSelected =
@@ -1617,13 +1632,11 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    DateFormat('dd/MM', 'ar')
-                                        .format(day.date),
+                                    DateFormat('dd/MM', 'ar').format(day.date),
                                     style: TextStyle(
                                       fontSize: 11,
-                                       color: isSelected
-                                          ? Colors.white
-                                              .withValues(alpha: 0.75)
+                                      color: isSelected
+                                          ? Colors.white.withValues(alpha: 0.75)
                                           : Colors.grey,
                                     ),
                                   ),
@@ -1648,8 +1661,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       children: activeSlots.map((ts) {
                         final startTime = ts['startTime'] as String?;
                         final endTime = ts['endTime'] as String?;
-                        final timeText = formatTimeToArabicAmPm(
-                            '$startTime - $endTime');
+                        final timeText =
+                            formatTimeToArabicAmPm('$startTime - $endTime');
                         final isSelected = selectedTimeSlot != null &&
                             selectedTimeSlot!['startTime'] == startTime &&
                             selectedTimeSlot!['endTime'] == endTime &&
@@ -1716,5 +1729,4 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       error: (_, __) => const SizedBox.shrink(),
     );
   }
-
 }

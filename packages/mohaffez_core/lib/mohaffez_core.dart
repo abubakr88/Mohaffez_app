@@ -26,6 +26,7 @@ export 'src/models/slot_context.dart';
 export 'src/models/subscription_model.dart';
 export 'src/models/suspension_model.dart';
 export 'src/models/system_config_model.dart';
+export 'src/models/teacher_badge.dart';
 export 'src/models/user_model.dart' hide TimestampConverter;
 export 'src/models/wallet_model.dart';
 export 'src/models/wallet_transaction_model.dart';
@@ -37,7 +38,8 @@ export 'src/models/payout_request_model.dart';
 export 'src/repositories/admin_repository.dart';
 export 'src/repositories/notification_repository.dart';
 export 'src/repositories/payment_repository.dart';
-export 'src/repositories/pricing_repository.dart' hide pricingRepositoryProvider;
+export 'src/repositories/pricing_repository.dart'
+    hide pricingRepositoryProvider;
 export 'src/repositories/promo_code_repository.dart';
 export 'src/repositories/session_repository.dart';
 export 'src/repositories/subscription_repository.dart';
@@ -109,3 +111,6 @@ export 'src/utils/quran_mistake_utils.dart';
 export 'src/utils/specialization_constants.dart';
 export 'src/utils/status_utils.dart';
 export 'src/utils/validation_utils.dart';
+
+// WIDGETS
+export 'src/widgets/founding_teacher_badge.dart';

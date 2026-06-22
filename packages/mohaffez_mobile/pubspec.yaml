@@ -165,6 +165,7 @@ flutter:
     - assets/images/visa.png
     - assets/quran_data.json
     - assets/sounds/
+    - assets/badges/
 
 
 flutter_launcher_icons:

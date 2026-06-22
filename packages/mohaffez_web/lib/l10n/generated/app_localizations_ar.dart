@@ -121,4 +121,75 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get promoCodes => 'أكواد الخصم';
+
+  @override
+  String get badgesAndRecognition => 'الشارات والتكريمات';
+
+  @override
+  String get foundingTeacher => 'المحفّظ المؤسس';
+
+  @override
+  String get foundingTeacherBadge => 'شارة المحفّظ المؤسس';
+
+  @override
+  String get grantBadge => 'منح الشارة';
+
+  @override
+  String get revokeBadge => 'إلغاء الشارة';
+
+  @override
+  String get grantBadgeTitle => 'منح شارة المحفّظ المؤسس';
+
+  @override
+  String get grantBadgeMessage =>
+      'هل تريد منح شارة المحفّظ المؤسس لهذا الحساب؟ ستظهر الشارة في ملف المحفّظ وبطاقاته داخل التطبيق.';
+
+  @override
+  String get revokeBadgeTitle => 'إلغاء شارة المحفّظ المؤسس';
+
+  @override
+  String get revokeBadgeMessage =>
+      'هل تريد إلغاء شارة المحفّظ المؤسس من هذا الحساب؟ لن تظهر الشارة بعد ذلك في ملف المحفّظ أو بطاقاته.';
+
+  @override
+  String get grantReasonOptional => 'سبب المنح - اختياري';
+
+  @override
+  String get revocationReasonOptional => 'سبب الإلغاء - اختياري';
+
+  @override
+  String get badgeActive => 'مفعّلة';
+
+  @override
+  String get badgeInactive => 'غير مفعّلة';
+
+  @override
+  String get grantedAt => 'تاريخ المنح';
+
+  @override
+  String get grantedBy => 'مُنحت بواسطة';
+
+  @override
+  String get lastUpdated => 'آخر تحديث';
+
+  @override
+  String get internalReason => 'السبب الداخلي';
+
+  @override
+  String get reasonTooLong => 'يجب ألا يتجاوز السبب 500 حرف.';
+
+  @override
+  String get badgeGrantedSuccess => 'تم منح شارة المحفّظ المؤسس بنجاح.';
+
+  @override
+  String get badgeRevokedSuccess => 'تم إلغاء شارة المحفّظ المؤسس بنجاح.';
+
+  @override
+  String get badgePermissionDenied => 'ليست لديك صلاحية إدارة شارات المحفظين.';
+
+  @override
+  String get badgeInvalidTeacher => 'يمكن منح هذه الشارة لحساب محفّظ نشط فقط.';
+
+  @override
+  String get badgeActionFailed => 'تعذر تحديث الشارة. يرجى المحاولة مرة أخرى.';
 }

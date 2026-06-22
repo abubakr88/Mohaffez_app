@@ -59,3 +59,4 @@ flutter:
   generate: true
   assets:
     - web/favicon.png
+    - assets/badges/

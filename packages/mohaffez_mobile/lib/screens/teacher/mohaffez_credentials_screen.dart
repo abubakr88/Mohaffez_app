@@ -1,4 +1,4 @@
-﻿// lib/screens/mohaffez_credentials_screen.dart
+// lib/screens/mohaffez_credentials_screen.dart
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -29,6 +29,20 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
     );
   }
 
+  void _showEditCredentialDialog(
+    String credentialId,
+    Map<String, dynamic> credential,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddCredentialScreen(
+          credentialId: credentialId,
+          initialData: credential,
+        ),
+      ),
+    );
+  }
+
   Future<void> _deleteCredential(String credentialId) async {
     final result = await showDialog<bool>(
       context: context,
@@ -44,7 +58,8 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.error),
               child: const Text('حذف'),
             ),
           ],
@@ -63,7 +78,8 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تعذّر حذف المستند. يرجى المحاولة مرة أخرى')),
+            const SnackBar(
+                content: Text('تعذّر حذف المستند. يرجى المحاولة مرة أخرى')),
           );
         }
       }
@@ -124,7 +140,8 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: AppThemeConstants.surface.withValues(alpha: 0.2),
+                                  color: AppThemeConstants.surface
+                                      .withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
@@ -221,6 +238,7 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
                         return _CredentialCard(
                           credentialId: doc.id,
                           data: data,
+                          onEdit: () => _showEditCredentialDialog(doc.id, data),
                           onDelete: () => _deleteCredential(doc.id),
                           onImageTap: (imageUrls, initialIndex) =>
                               _viewCredentialImages(imageUrls, initialIndex),
@@ -251,12 +269,14 @@ class _MohaffezCredentialsScreenState extends State<MohaffezCredentialsScreen> {
 class _CredentialCard extends StatelessWidget {
   final String credentialId;
   final Map<String, dynamic> data;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
   final Function(List<String>, int) onImageTap;
 
   const _CredentialCard({
     required this.credentialId,
     required this.data,
+    required this.onEdit,
     required this.onDelete,
     required this.onImageTap,
   });
@@ -498,7 +518,9 @@ class _CredentialCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppThemeConstants.error.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppThemeConstants.error.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color:
+                              AppThemeConstants.error.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -536,18 +558,33 @@ class _CredentialCard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Delete Button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete, size: 18),
-                    label: const Text('حذف الشهادة'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppThemeConstants.error,
-                      side: const BorderSide(color: AppThemeConstants.error),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: onEdit,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('تعديل الشهادة'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppThemeConstants.primary,
+                          foregroundColor: AppThemeConstants.white,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onDelete,
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('حذف'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppThemeConstants.error,
+                          side:
+                              const BorderSide(color: AppThemeConstants.error),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -704,7 +741,8 @@ class _ImageGalleryScreenState extends State<ImageGalleryScreen> {
                 imageUrl: widget.imageUrls[index],
                 fit: BoxFit.contain,
                 placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(color: AppThemeConstants.white),
+                  child:
+                      CircularProgressIndicator(color: AppThemeConstants.white),
                 ),
                 errorWidget: (context, url, error) => const Icon(
                   Icons.broken_image,
@@ -776,7 +814,16 @@ class _XFileImageState extends State<_XFileImage> {
 }
 
 class AddCredentialScreen extends StatefulWidget {
-  const AddCredentialScreen({super.key});
+  const AddCredentialScreen({
+    super.key,
+    this.credentialId,
+    this.initialData,
+  });
+
+  final String? credentialId;
+  final Map<String, dynamic>? initialData;
+
+  bool get isEditing => credentialId != null;
 
   @override
   State<AddCredentialScreen> createState() => _AddCredentialScreenState();
@@ -789,7 +836,22 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
   String selectedType = 'ijazah';
   DateTime? issueDate;
   List<XFile> selectedImages = [];
+  List<String> existingImageUrls = [];
+  List<String> removedImageUrls = [];
   bool uploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.initialData;
+    if (data == null) return;
+
+    titleController.text = data['title'] as String? ?? '';
+    organizationController.text = data['organization'] as String? ?? '';
+    selectedType = data['type'] as String? ?? 'ijazah';
+    issueDate = (data['issueDate'] as Timestamp?)?.toDate();
+    existingImageUrls = List<String>.from(data['imageUrls'] ?? const []);
+  }
 
   @override
   void dispose() {
@@ -799,15 +861,26 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
   }
 
   Future<void> _pickImages() async {
+    final remainingSlots = 3 - existingImageUrls.length;
+    if (remainingSlots <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يمكن إرفاق 3 صور كحد أقصى')),
+      );
+      return;
+    }
+
     try {
-      final images = await CredentialService.pickImages(maxImages: 3);
+      final images = await CredentialService.pickImages(
+        maxImages: remainingSlots,
+      );
       setState(() {
         selectedImages = images;
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر اختيار الصور. يرجى المحاولة مرة أخرى')),
+          const SnackBar(
+              content: Text('تعذّر اختيار الصور. يرجى المحاولة مرة أخرى')),
         );
       }
     }
@@ -845,20 +918,42 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
         );
       }
 
-      // Add credential
-      await CredentialService.addCredential(
-        type: selectedType,
-        title: titleController.text.trim(),
-        organization: organizationController.text.trim(),
-        issueDate: issueDate!,
-        imageUrls: imageUrls,
-      );
+      final finalImageUrls = [...existingImageUrls, ...imageUrls];
+
+      try {
+        if (widget.isEditing) {
+          await CredentialService.updateCredential(
+            credentialId: widget.credentialId!,
+            type: selectedType,
+            title: titleController.text.trim(),
+            organization: organizationController.text.trim(),
+            issueDate: issueDate!,
+            imageUrls: finalImageUrls,
+          );
+          await CredentialService.deleteCredentialImages(removedImageUrls);
+        } else {
+          await CredentialService.addCredential(
+            type: selectedType,
+            title: titleController.text.trim(),
+            organization: organizationController.text.trim(),
+            issueDate: issueDate!,
+            imageUrls: finalImageUrls,
+          );
+        }
+      } catch (_) {
+        await CredentialService.deleteCredentialImages(imageUrls);
+        rethrow;
+      }
 
       if (mounted) {
         context.pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تمت إضافة الشهادة بنجاح ✅'),
+          SnackBar(
+            content: Text(
+              widget.isEditing
+                  ? 'تم تحديث الشهادة وإرسالها للمراجعة'
+                  : 'تمت إضافة الشهادة بنجاح ✅',
+            ),
             backgroundColor: AppThemeConstants.success,
           ),
         );
@@ -903,7 +998,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                   tooltip: 'رجوع',
                 )
               : null,
-          title: const Text('إضافة شهادة'),
+          title: Text(widget.isEditing ? 'تعديل الشهادة' : 'إضافة شهادة'),
           backgroundColor: AppThemeConstants.primary,
         ),
         body: SingleChildScrollView(
@@ -913,6 +1008,40 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (widget.isEditing) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppThemeConstants.warning.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color:
+                            AppThemeConstants.warning.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: AppThemeConstants.warning,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'بعد حفظ التعديلات ستعود الشهادة إلى قيد المراجعة.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 // Type selection
                 const Text(
                   'نوع الشهادة',
@@ -939,6 +1068,11 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                       selected: selectedType == 'license',
                       onSelected: (_) =>
                           setState(() => selectedType = 'license'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('جائزة'),
+                      selected: selectedType == 'award',
+                      onSelected: (_) => setState(() => selectedType = 'award'),
                     ),
                   ],
                 ),
@@ -1004,7 +1138,7 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                if (selectedImages.isEmpty)
+                if (existingImageUrls.isEmpty && selectedImages.isEmpty)
                   GestureDetector(
                     onTap: _pickImages,
                     child: Container(
@@ -1034,32 +1168,124 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                 else
                   Column(
                     children: [
-                      SizedBox(
-                        height: 150,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: selectedImages.length,
-                          itemBuilder: (context, index) {
-                            return Container(
-                              width: 150,
-                              margin: const EdgeInsets.only(left: 8),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppThemeConstants.grey300),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: _XFileImage(
-                                  file: selectedImages[index],
-                                ),
-                              ),
-                            );
-                          },
+                      if (existingImageUrls.isNotEmpty)
+                        SizedBox(
+                          height: 150,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: existingImageUrls.length,
+                            itemBuilder: (context, index) {
+                              final imageUrl = existingImageUrls[index];
+                              return Stack(
+                                children: [
+                                  Container(
+                                    width: 150,
+                                    margin: const EdgeInsets.only(left: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: AppThemeConstants.grey300,
+                                      ),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: CachedNetworkImage(
+                                        imageUrl: imageUrl,
+                                        fit: BoxFit.cover,
+                                        placeholder: (_, __) => const Center(
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        errorWidget: (_, __, ___) =>
+                                            const Icon(Icons.broken_image),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 6,
+                                    left: 14,
+                                    child: IconButton.filled(
+                                      onPressed: () {
+                                        setState(() {
+                                          removedImageUrls.add(imageUrl);
+                                          existingImageUrls.removeAt(index);
+                                        });
+                                      },
+                                      tooltip: 'إزالة الصورة',
+                                      icon: const Icon(
+                                        Icons.close,
+                                        size: 18,
+                                      ),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor:
+                                            AppThemeConstants.error,
+                                        foregroundColor:
+                                            AppThemeConstants.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
-                      ),
+                      if (existingImageUrls.isNotEmpty &&
+                          selectedImages.isNotEmpty)
+                        const SizedBox(height: 12),
+                      if (selectedImages.isNotEmpty)
+                        SizedBox(
+                          height: 150,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: selectedImages.length,
+                            itemBuilder: (context, index) {
+                              return Stack(
+                                children: [
+                                  Container(
+                                    width: 150,
+                                    margin: const EdgeInsets.only(left: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: AppThemeConstants.grey300,
+                                      ),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: _XFileImage(
+                                        file: selectedImages[index],
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 6,
+                                    left: 14,
+                                    child: IconButton.filled(
+                                      onPressed: () => setState(
+                                        () => selectedImages.removeAt(index),
+                                      ),
+                                      tooltip: 'إزالة الصورة',
+                                      icon: const Icon(Icons.close, size: 18),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor:
+                                            AppThemeConstants.error,
+                                        foregroundColor:
+                                            AppThemeConstants.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
                       const SizedBox(height: 12),
                       TextButton.icon(
-                        onPressed: _pickImages,
+                        onPressed:
+                            existingImageUrls.length + selectedImages.length < 3
+                                ? _pickImages
+                                : null,
                         icon: const Icon(Icons.add),
                         label: const Text('إضافة المزيد من الصور'),
                       ),
@@ -1078,10 +1304,13 @@ class _AddCredentialScreenState extends State<AddCredentialScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: uploading
-                        ? const CircularProgressIndicator(color: AppThemeConstants.white)
-                        : const Text(
-                            'إضافة الشهادة',
-                            style: TextStyle(fontSize: 16),
+                        ? const CircularProgressIndicator(
+                            color: AppThemeConstants.white)
+                        : Text(
+                            widget.isEditing
+                                ? 'حفظ التعديلات'
+                                : 'إضافة الشهادة',
+                            style: const TextStyle(fontSize: 16),
                           ),
                   ),
                 ),

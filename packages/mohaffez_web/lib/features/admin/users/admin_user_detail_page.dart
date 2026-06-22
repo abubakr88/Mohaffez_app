@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../design_system/design_system.dart';
+import '../../../l10n/generated/app_localizations.dart';
 
 class AdminUserDetailPage extends ConsumerWidget {
   const AdminUserDetailPage({super.key, required this.userId});
@@ -110,7 +112,7 @@ class _UserProfileState extends ConsumerState<_UserProfile> {
         AnimatedSwitcher(
           duration: DSDuration.fast,
           child: switch (_selected) {
-            _DetailTab.account => _AccountTab(user: user),
+            _DetailTab.account => _AccountTab(userId: userId, user: user),
             _DetailTab.sessions => _SessionsTab(userId: userId),
             _DetailTab.wallet => _WalletTab(userId: userId, user: user),
             _DetailTab.review => _TeacherReviewTab(userId: userId),
@@ -381,8 +383,9 @@ class _TabButton extends StatelessWidget {
 }
 
 class _AccountTab extends StatelessWidget {
-  const _AccountTab({required this.user});
+  const _AccountTab({required this.userId, required this.user});
 
+  final String userId;
   final Map<String, dynamic> user;
 
   @override
@@ -521,9 +524,305 @@ class _AccountTab extends StatelessWidget {
             );
           },
         ),
+        if (_text(user, const ['role'], 'student') == 'mohaffez') ...[
+          const SizedBox(height: DSSpacing.xl),
+          _FoundingBadgeAdminSection(userId: userId, user: user),
+        ],
       ],
     );
   }
+}
+
+class _FoundingBadgeAdminSection extends ConsumerWidget {
+  const _FoundingBadgeAdminSection({
+    required this.userId,
+    required this.user,
+  });
+
+  final String userId;
+  final Map<String, dynamic> user;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final assignment = UserBadges.fromJson(user['badges']).foundingTeacher;
+    final internalReason = assignment.enabled
+        ? assignment.reason
+        : assignment.revocationReason ?? assignment.reason;
+    final access = ref.watch(currentAdminAccessProvider).valueOrNull ??
+        AdminAccessState.none();
+    final actionState = ref.watch(adminActionsProvider);
+    final canManage = access.can(AdminPermission.manageTeacherBadges);
+    final isLoading = actionState.isLoading;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: l10n.badgesAndRecognition),
+        const SizedBox(height: DSSpacing.md),
+        DSCard(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 720;
+              final details = Wrap(
+                spacing: DSSpacing.xl,
+                runSpacing: DSSpacing.md,
+                children: [
+                  _BadgeFact(
+                    label: l10n.grantedAt,
+                    value: _date(assignment.grantedAt),
+                  ),
+                  _BadgeFact(
+                    label: l10n.grantedBy,
+                    value: assignment.grantedByName ?? '—',
+                  ),
+                  _BadgeFact(
+                    label: l10n.lastUpdated,
+                    value: _date(assignment.updatedAt),
+                  ),
+                  if ((internalReason ?? '').isNotEmpty)
+                    _BadgeFact(
+                      label: l10n.internalReason,
+                      value: internalReason!,
+                    ),
+                ],
+              );
+
+              final identity = Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FoundingTeacherBadge(
+                    compact: true,
+                    showLabel: true,
+                    size: compact ? 30 : 38,
+                  ),
+                  const SizedBox(width: DSSpacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.foundingTeacherBadge,
+                          style: DSText.h3(context),
+                        ),
+                        const SizedBox(height: DSSpacing.sm),
+                        DSBadge(
+                          label: assignment.enabled
+                              ? l10n.badgeActive
+                              : l10n.badgeInactive,
+                          variant: assignment.enabled
+                              ? DSBadgeVariant.success
+                              : DSBadgeVariant.neutral,
+                          dot: true,
+                        ),
+                        if (assignment.enabled ||
+                            assignment.updatedAt != null) ...[
+                          const SizedBox(height: DSSpacing.lg),
+                          details,
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              );
+
+              final action = Semantics(
+                button: true,
+                label: assignment.enabled ? l10n.revokeBadge : l10n.grantBadge,
+                child: Tooltip(
+                  message:
+                      assignment.enabled ? l10n.revokeBadge : l10n.grantBadge,
+                  child: DSButton(
+                    label:
+                        assignment.enabled ? l10n.revokeBadge : l10n.grantBadge,
+                    variant: assignment.enabled
+                        ? DSButtonVariant.destructive
+                        : DSButtonVariant.primary,
+                    leading: Icon(
+                      assignment.enabled
+                          ? Icons.remove_circle_outline_rounded
+                          : Icons.workspace_premium_rounded,
+                      size: 17,
+                    ),
+                    loading: isLoading,
+                    onPressed: canManage && !isLoading
+                        ? () => _changeBadge(
+                              context,
+                              ref,
+                              enabled: !assignment.enabled,
+                            )
+                        : null,
+                  ),
+                ),
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    identity,
+                    const SizedBox(height: DSSpacing.lg),
+                    action,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: identity),
+                  const SizedBox(width: DSSpacing.xl),
+                  action,
+                ],
+              );
+            },
+          ),
+        ),
+        if (!canManage) ...[
+          const SizedBox(height: DSSpacing.sm),
+          DSBanner(
+            message: l10n.badgePermissionDenied,
+            variant: DSBannerVariant.warning,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _changeBadge(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool enabled,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final reasonController = TextEditingController();
+    try {
+      final reason = await DSDialog.show<String>(
+        context,
+        title: enabled ? l10n.grantBadgeTitle : l10n.revokeBadgeTitle,
+        width: 560,
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            final length = reasonController.text.trim().length;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  enabled ? l10n.grantBadgeMessage : l10n.revokeBadgeMessage,
+                  style: DSText.body(context, color: DSColors.text2),
+                ),
+                const SizedBox(height: DSSpacing.lg),
+                DSTextField(
+                  controller: reasonController,
+                  label: enabled
+                      ? l10n.grantReasonOptional
+                      : l10n.revocationReasonOptional,
+                  maxLines: 3,
+                  autofocus: true,
+                  helper: '$length/500',
+                  error: length > 500 ? l10n.reasonTooLong : null,
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: DSSpacing.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    DSButton(
+                      label: l10n.cancel,
+                      variant: DSButtonVariant.ghost,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: DSSpacing.sm),
+                    DSButton(
+                      label: enabled ? l10n.grantBadge : l10n.revokeBadge,
+                      variant: enabled
+                          ? DSButtonVariant.primary
+                          : DSButtonVariant.destructive,
+                      onPressed: length <= 500
+                          ? () => Navigator.of(context)
+                              .pop(reasonController.text.trim())
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (reason == null || !context.mounted) return;
+
+      await ref.read(adminActionsProvider.notifier).setTeacherFoundingBadge(
+            teacherId: userId,
+            enabled: enabled,
+            reason: reason,
+          );
+      if (!context.mounted) return;
+
+      final result = ref.read(adminActionsProvider);
+      if (result.hasError) {
+        DSToast.show(
+          context,
+          _badgeErrorMessage(context, result.error),
+          type: DSToastType.error,
+        );
+        return;
+      }
+
+      ref.invalidate(adminUserProvider(userId));
+      DSToast.show(
+        context,
+        enabled ? l10n.badgeGrantedSuccess : l10n.badgeRevokedSuccess,
+        type: DSToastType.success,
+      );
+    } finally {
+      reasonController.dispose();
+    }
+  }
+}
+
+class _BadgeFact extends StatelessWidget {
+  const _BadgeFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 170,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: DSText.caption(context, color: DSColors.text3)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: DSText.bodyMedium(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _badgeErrorMessage(BuildContext context, Object? error) {
+  final l10n = AppLocalizations.of(context);
+  if (error is FirebaseFunctionsException) {
+    final details = error.details;
+    final detailCode = details is Map ? details['code']?.toString() : null;
+    if (error.code == 'permission-denied') {
+      return l10n.badgePermissionDenied;
+    }
+    if (detailCode == 'target-not-teacher' ||
+        detailCode == 'account-deleted' ||
+        detailCode == 'account-suspended') {
+      return l10n.badgeInvalidTeacher;
+    }
+  }
+  return l10n.badgeActionFailed;
 }
 
 class _SessionsTab extends ConsumerWidget {

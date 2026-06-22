@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math'; // ✅ إضافة هذا السطر
+import 'teacher_badge.dart';
 
 class MohaffezModel {
   final String id;
@@ -14,6 +15,8 @@ class MohaffezModel {
   final String? bio;
   final String? phoneNumber;
   final String? gender;
+  final bool trialSessionEnabled;
+  final UserBadges badges;
 
   MohaffezModel({
     required this.id,
@@ -28,6 +31,8 @@ class MohaffezModel {
     this.bio,
     this.phoneNumber,
     this.gender,
+    this.trialSessionEnabled = false,
+    this.badges = const UserBadges(),
   });
 
   factory MohaffezModel.fromFirestore(DocumentSnapshot doc) {
@@ -49,6 +54,8 @@ class MohaffezModel {
       bio: data['bio'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
       gender: data['gender'] as String?,
+      trialSessionEnabled: data['trialSessionEnabled'] == true,
+      badges: UserBadges.fromJson(data['badges']),
     );
   }
 

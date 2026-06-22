@@ -279,6 +279,10 @@ class AdminUsersPage extends ConsumerWidget {
                         sortValue: (u) => u['role'] as String? ?? 'student',
                         cellBuilder: (ctx, u) {
                           final role = u['role'] as String? ?? 'student';
+                          final hasFoundingBadge =
+                              UserBadges.fromJson(u['badges'])
+                                  .foundingTeacher
+                                  .enabled;
                           return Wrap(
                             spacing: DSSpacing.xs,
                             runSpacing: DSSpacing.xs,
@@ -301,6 +305,12 @@ class AdminUsersPage extends ConsumerWidget {
                                   variant: _adminRole(u) == 'super_admin'
                                       ? DSBadgeVariant.error
                                       : DSBadgeVariant.info,
+                                ),
+                              if (role == 'mohaffez' && hasFoundingBadge)
+                                const FoundingTeacherBadge(
+                                  compact: true,
+                                  showLabel: false,
+                                  size: 16,
                                 ),
                             ],
                           );
@@ -1138,6 +1148,7 @@ class _UserActionsMenu extends ConsumerWidget {
 const _assignableAdminPermissions = [
   AdminPermission.manageUsers,
   AdminPermission.manageUserRoles,
+  AdminPermission.manageTeacherBadges,
   AdminPermission.deleteUsers,
   AdminPermission.reviewTeachers,
   AdminPermission.manageFinance,

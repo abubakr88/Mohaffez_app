@@ -144,6 +144,11 @@ class CredentialService {
     if (sanitizedTitle.isEmpty || sanitizedOrg.isEmpty) {
       throw Exception('يرجى ملء جميع الحقول المطلوبة');
     }
+    if (imageUrls.length > _maxImagesPerCredential) {
+      throw Exception(
+        'يمكن إرفاق $_maxImagesPerCredential صور كحد أقصى',
+      );
+    }
 
     final credentialRef = FirebaseFirestore.instance
         .collection('users')
@@ -168,6 +173,61 @@ class CredentialService {
     });
   }
 
+  /// Update an existing credential and return it to the admin review queue.
+  static Future<void> updateCredential({
+    required String credentialId,
+    required String type,
+    required String title,
+    required String organization,
+    required DateTime issueDate,
+    DateTime? expiryDate,
+    required List<String> imageUrls,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('يجب تسجيل الدخول');
+
+    final sanitizedTitle = title.trim();
+    final sanitizedOrg = organization.trim();
+    if (sanitizedTitle.isEmpty || sanitizedOrg.isEmpty) {
+      throw Exception('يرجى ملء جميع الحقول المطلوبة');
+    }
+    if (imageUrls.length > _maxImagesPerCredential) {
+      throw Exception(
+        'يمكن إرفاق $_maxImagesPerCredential صور كحد أقصى',
+      );
+    }
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('credentials')
+        .doc(credentialId)
+        .update({
+      'type': type,
+      'title': sanitizedTitle,
+      'organization': sanitizedOrg,
+      'issueDate': Timestamp.fromDate(issueDate),
+      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
+      'imageUrls': imageUrls,
+      'status': 'pending',
+      'reviewedAt': null,
+      'reviewedBy': null,
+      'rejectionReason': null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Delete selected credential images after a successful document update.
+  static Future<void> deleteCredentialImages(List<String> imageUrls) async {
+    for (final url in imageUrls) {
+      try {
+        await FirebaseStorage.instance.refFromURL(url).delete();
+      } catch (_) {
+        // A missing image must not block saving the credential metadata.
+      }
+    }
+  }
+
   /// Delete credential and its images from storage
   static Future<void> deleteCredential(String credentialId) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -186,14 +246,7 @@ class CredentialService {
           List<String>.from(credentialDoc.data()?['imageUrls'] ?? []);
 
       // Delete images from storage
-      for (var url in imageUrls) {
-        try {
-          final ref = FirebaseStorage.instance.refFromURL(url);
-          await ref.delete();
-        } catch (e) {
-          // Continue even if delete fails
-        }
-      }
+      await deleteCredentialImages(imageUrls);
     }
 
     // Delete credential document
