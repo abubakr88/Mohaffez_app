@@ -121,4 +121,80 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get promoCodes => 'Promo Codes';
+
+  @override
+  String get badgesAndRecognition => 'Badges and Recognition';
+
+  @override
+  String get foundingTeacher => 'Founding Teacher';
+
+  @override
+  String get foundingTeacherBadge => 'Founding Teacher Badge';
+
+  @override
+  String get grantBadge => 'Grant Badge';
+
+  @override
+  String get revokeBadge => 'Revoke Badge';
+
+  @override
+  String get grantBadgeTitle => 'Grant Founding Teacher Badge';
+
+  @override
+  String get grantBadgeMessage =>
+      'Do you want to grant the Founding Teacher badge to this account? The badge will appear on the teacher\'s profile and teacher cards.';
+
+  @override
+  String get revokeBadgeTitle => 'Revoke Founding Teacher Badge';
+
+  @override
+  String get revokeBadgeMessage =>
+      'Do you want to revoke the Founding Teacher badge from this account? It will no longer appear on the teacher\'s profile or teacher cards.';
+
+  @override
+  String get grantReasonOptional => 'Grant reason - optional';
+
+  @override
+  String get revocationReasonOptional => 'Revocation reason - optional';
+
+  @override
+  String get badgeActive => 'Active';
+
+  @override
+  String get badgeInactive => 'Inactive';
+
+  @override
+  String get grantedAt => 'Granted at';
+
+  @override
+  String get grantedBy => 'Granted by';
+
+  @override
+  String get lastUpdated => 'Last updated';
+
+  @override
+  String get internalReason => 'Internal reason';
+
+  @override
+  String get reasonTooLong => 'The reason must not exceed 500 characters.';
+
+  @override
+  String get badgeGrantedSuccess =>
+      'The Founding Teacher badge was granted successfully.';
+
+  @override
+  String get badgeRevokedSuccess =>
+      'The Founding Teacher badge was revoked successfully.';
+
+  @override
+  String get badgePermissionDenied =>
+      'You do not have permission to manage teacher badges.';
+
+  @override
+  String get badgeInvalidTeacher =>
+      'This badge can only be assigned to an active teacher account.';
+
+  @override
+  String get badgeActionFailed =>
+      'The badge could not be updated. Please try again.';
 }

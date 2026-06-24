@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'teacher_badge.dart';
 
 part 'user_model.freezed.dart';
 part 'user_model.g.dart';
@@ -37,6 +38,7 @@ class UserModel with _$UserModel {
     @Default(false) bool examPassed,
     @TimestampConverter() DateTime? examNextRetryAt,
     String? gender,
+    @UserBadgesConverter() @Default(UserBadges()) UserBadges badges,
     // ── Commission Penalty & Warnings ───────────────────────
     @Default(0.0)
     double

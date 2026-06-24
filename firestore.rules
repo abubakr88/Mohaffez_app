@@ -99,7 +99,8 @@ service cloud.firestore {
                     request.auth.uid == userId &&
                     request.resource.data.uid == userId &&
                     request.resource.data.role in ['student', 'mohaffez'] &&
-                    request.resource.data.status in ['active', 'pending_approval'];
+                    request.resource.data.status in ['active', 'pending_approval'] &&
+                    !request.resource.data.keys().hasAny(['badges']);
 
       // User self-update: profile fields + setup account fields
       allow update: if isOwner(userId) &&
@@ -158,9 +159,13 @@ service cloud.firestore {
 
       // Admin user-management writes are permission-scoped. Cloud Functions
       // still bypass rules via Admin SDK for privileged workflows.
-      allow update: if canManageUsers() ||
-                    canReviewTeachers() ||
-                    hasAdminPermission('manageUserRoles');
+      allow update: if (
+                      canManageUsers() ||
+                      canReviewTeachers() ||
+                      hasAdminPermission('manageUserRoles')
+                    ) &&
+                    !request.resource.data.diff(resource.data).affectedKeys()
+                      .hasAny(['badges']);
 
       allow delete: if isOwner(userId);
 
@@ -175,7 +180,29 @@ service cloud.firestore {
                       request.resource.data.userId == userId &&
                       request.resource.data.status == 'pending';
 
-        allow update: if isOwner(userId) ||
+        allow update: if (
+                        isOwner(userId) &&
+                        request.resource.data.userId == userId &&
+                        request.resource.data.status == 'pending' &&
+                        request.resource.data.imageUrls is list &&
+                        request.resource.data.imageUrls.size() <= 3 &&
+                        request.resource.data.reviewedAt == null &&
+                        request.resource.data.reviewedBy == null &&
+                        request.resource.data.rejectionReason == null &&
+                        onlyUpdating([
+                          'type',
+                          'title',
+                          'organization',
+                          'issueDate',
+                          'expiryDate',
+                          'imageUrls',
+                          'status',
+                          'reviewedAt',
+                          'reviewedBy',
+                          'rejectionReason',
+                          'updatedAt'
+                        ])
+                      ) ||
                       (canReviewTeachers() && onlyUpdating(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason']));
 
         allow delete: if isOwner(userId);

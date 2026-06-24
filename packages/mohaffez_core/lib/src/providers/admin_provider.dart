@@ -21,6 +21,7 @@ const int adminUsersPageStep = 50;
 enum AdminPermission {
   manageUsers('manageUsers', 'إدارة المستخدمين'),
   manageUserRoles('manageUserRoles', 'تغيير أدوار المستخدمين'),
+  manageTeacherBadges('manageTeacherBadges', 'إدارة شارات المحفظين'),
   deleteUsers('deleteUsers', 'حذف المستخدمين'),
   manageAdminAccess('manageAdminAccess', 'إدارة صلاحيات الأدمنز'),
   reviewTeachers('reviewTeachers', 'مراجعة المحفظين'),
@@ -37,6 +38,7 @@ enum AdminPermission {
 const Map<AdminPermission, bool> defaultAdminPermissions = {
   AdminPermission.manageUsers: true,
   AdminPermission.manageUserRoles: false,
+  AdminPermission.manageTeacherBadges: true,
   AdminPermission.deleteUsers: false,
   AdminPermission.manageAdminAccess: false,
   AdminPermission.reviewTeachers: true,
@@ -605,6 +607,18 @@ class AdminActionsNotifier extends StateNotifier<AsyncValue<void>> {
     await _callFunction('setUserRole', {
       'userId': userId,
       'newRole': newRole,
+    });
+  }
+
+  Future<void> setTeacherFoundingBadge({
+    required String teacherId,
+    required bool enabled,
+    String? reason,
+  }) async {
+    await _callFunction('setTeacherFoundingBadge', {
+      'teacherId': teacherId,
+      'enabled': enabled,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
     });
   }
 

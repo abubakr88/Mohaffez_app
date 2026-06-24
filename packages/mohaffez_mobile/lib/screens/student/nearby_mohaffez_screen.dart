@@ -32,6 +32,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   TeacherAvailabilityFilter availabilityFilter =
       TeacherAvailabilityFilter.availableOnly;
   TeacherGenderFilter genderFilter = TeacherGenderFilter.all;
+  TeacherTrialSessionFilter trialSessionFilter = TeacherTrialSessionFilter.all;
   double? userLat;
   double? userLng;
   bool isLoadingLocation = true;
@@ -135,6 +136,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       specialization: selectedSpecialization,
       availabilityFilter: availabilityFilter,
       genderFilter: genderFilter,
+      trialSessionFilter: trialSessionFilter,
     );
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
 
@@ -680,6 +682,14 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                     label: _genderLabel(genderFilter),
                   ),
                 ],
+                if (trialSessionFilter ==
+                    TeacherTrialSessionFilter.enabledOnly) ...[
+                  const SizedBox(width: 8),
+                  const _ActiveFilterPill(
+                    icon: Icons.school_outlined,
+                    label: 'الحلقة التجريبية',
+                  ),
+                ],
                 if (selectedSpecialization != null) ...[
                   const SizedBox(width: 8),
                   _ActiveFilterPill(
@@ -703,6 +713,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   void _openFiltersSheet() {
     var tempAvailabilityFilter = availabilityFilter;
     var tempGenderFilter = genderFilter;
+    var tempTrialSessionFilter = trialSessionFilter;
     var tempSpecialization = selectedSpecialization;
     var tempRadius = radiusKm;
 
@@ -803,6 +814,37 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                     tempAvailabilityFilter =
                                         TeacherAvailabilityFilter
                                             .unavailableOnly;
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            const _SheetSectionTitle(
+                              icon: Icons.school_outlined,
+                              title: 'الحلقة التجريبية',
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _FilterOptionChip(
+                                  label: 'الكل',
+                                  icon: Icons.groups_rounded,
+                                  isSelected: tempTrialSessionFilter ==
+                                      TeacherTrialSessionFilter.all,
+                                  onTap: () => setSheetState(() {
+                                    tempTrialSessionFilter =
+                                        TeacherTrialSessionFilter.all;
+                                  }),
+                                ),
+                                _FilterOptionChip(
+                                  label: 'متاحة',
+                                  icon: Icons.school_outlined,
+                                  isSelected: tempTrialSessionFilter ==
+                                      TeacherTrialSessionFilter.enabledOnly,
+                                  onTap: () => setSheetState(() {
+                                    tempTrialSessionFilter =
+                                        TeacherTrialSessionFilter.enabledOnly;
                                   }),
                                 ),
                               ],
@@ -947,6 +989,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                               tempAvailabilityFilter =
                                   TeacherAvailabilityFilter.availableOnly;
                               tempGenderFilter = TeacherGenderFilter.all;
+                              tempTrialSessionFilter =
+                                  TeacherTrialSessionFilter.all;
                               tempSpecialization = null;
                               tempRadius = 50;
                             }),
@@ -960,6 +1004,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                 _applyDetailedFilters(
                                   availability: tempAvailabilityFilter,
                                   gender: tempGenderFilter,
+                                  trialSession: tempTrialSessionFilter,
                                   specialization: tempSpecialization,
                                   radius: tempRadius,
                                 );
@@ -1072,6 +1117,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     var count = 0;
     if (availabilityFilter != TeacherAvailabilityFilter.availableOnly) count++;
     if (genderFilter != TeacherGenderFilter.all) count++;
+    if (trialSessionFilter != TeacherTrialSessionFilter.all) count++;
     if (selectedSpecialization != null) count++;
     if (radiusKm.round() != 50) count++;
     return count;
@@ -1102,6 +1148,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   void _applyDetailedFilters({
     required TeacherAvailabilityFilter availability,
     required TeacherGenderFilter gender,
+    required TeacherTrialSessionFilter trialSession,
     required String? specialization,
     required double radius,
   }) {
@@ -1110,6 +1157,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     setState(() {
       availabilityFilter = availability;
       genderFilter = gender;
+      trialSessionFilter = trialSession;
       selectedSpecialization = specialization;
       radiusKm = normalizedRadius;
       _selectedTeacher = null;
@@ -1331,6 +1379,15 @@ class _MapTeacherPreviewCard extends StatelessWidget {
                         color: AppThemeConstants.textPrimary,
                       ),
                     ),
+                    if (teacher.badges.foundingTeacher.enabled) ...[
+                      const SizedBox(height: 5),
+                      const FoundingTeacherBadge(
+                        compact: true,
+                        showLabel: true,
+                        useFullLabel: true,
+                        size: 20,
+                      ),
+                    ],
                     if (teacher.specialization?.isNotEmpty ?? false) ...[
                       const SizedBox(height: 3),
                       Text(
@@ -1498,6 +1555,15 @@ class _TeacherPreviewCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (teacher.badges.foundingTeacher.enabled) ...[
+                      const SizedBox(height: 5),
+                      const FoundingTeacherBadge(
+                        compact: true,
+                        showLabel: true,
+                        useFullLabel: true,
+                        size: 20,
+                      ),
+                    ],
                     if (teacher.specialization?.isNotEmpty ?? false)
                       Text(
                         teacher.specialization!,
@@ -1651,6 +1717,15 @@ class _TeacherResultTile extends StatelessWidget {
                         color: AppThemeConstants.textPrimary,
                       ),
                     ),
+                    if (teacher.badges.foundingTeacher.enabled) ...[
+                      const SizedBox(height: 5),
+                      const FoundingTeacherBadge(
+                        compact: true,
+                        showLabel: true,
+                        useFullLabel: true,
+                        size: 20,
+                      ),
+                    ],
                     if (teacher.specialization?.isNotEmpty ?? false) ...[
                       const SizedBox(height: 3),
                       Text(

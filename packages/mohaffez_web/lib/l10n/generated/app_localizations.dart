@@ -325,6 +325,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Promo Codes'**
   String get promoCodes;
+
+  /// No description provided for @badgesAndRecognition.
+  ///
+  /// In en, this message translates to:
+  /// **'Badges and Recognition'**
+  String get badgesAndRecognition;
+
+  /// No description provided for @foundingTeacher.
+  ///
+  /// In en, this message translates to:
+  /// **'Founding Teacher'**
+  String get foundingTeacher;
+
+  /// No description provided for @foundingTeacherBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Founding Teacher Badge'**
+  String get foundingTeacherBadge;
+
+  /// No description provided for @grantBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant Badge'**
+  String get grantBadge;
+
+  /// No description provided for @revokeBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke Badge'**
+  String get revokeBadge;
+
+  /// No description provided for @grantBadgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant Founding Teacher Badge'**
+  String get grantBadgeTitle;
+
+  /// No description provided for @grantBadgeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Do you want to grant the Founding Teacher badge to this account? The badge will appear on the teacher\'s profile and teacher cards.'**
+  String get grantBadgeMessage;
+
+  /// No description provided for @revokeBadgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke Founding Teacher Badge'**
+  String get revokeBadgeTitle;
+
+  /// No description provided for @revokeBadgeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Do you want to revoke the Founding Teacher badge from this account? It will no longer appear on the teacher\'s profile or teacher cards.'**
+  String get revokeBadgeMessage;
+
+  /// No description provided for @grantReasonOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant reason - optional'**
+  String get grantReasonOptional;
+
+  /// No description provided for @revocationReasonOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Revocation reason - optional'**
+  String get revocationReasonOptional;
+
+  /// No description provided for @badgeActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get badgeActive;
+
+  /// No description provided for @badgeInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get badgeInactive;
+
+  /// No description provided for @grantedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Granted at'**
+  String get grantedAt;
+
+  /// No description provided for @grantedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Granted by'**
+  String get grantedBy;
+
+  /// No description provided for @lastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated'**
+  String get lastUpdated;
+
+  /// No description provided for @internalReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal reason'**
+  String get internalReason;
+
+  /// No description provided for @reasonTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'The reason must not exceed 500 characters.'**
+  String get reasonTooLong;
+
+  /// No description provided for @badgeGrantedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'The Founding Teacher badge was granted successfully.'**
+  String get badgeGrantedSuccess;
+
+  /// No description provided for @badgeRevokedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'The Founding Teacher badge was revoked successfully.'**
+  String get badgeRevokedSuccess;
+
+  /// No description provided for @badgePermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to manage teacher badges.'**
+  String get badgePermissionDenied;
+
+  /// No description provided for @badgeInvalidTeacher.
+  ///
+  /// In en, this message translates to:
+  /// **'This badge can only be assigned to an active teacher account.'**
+  String get badgeInvalidTeacher;
+
+  /// No description provided for @badgeActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The badge could not be updated. Please try again.'**
+  String get badgeActionFailed;
 }
 
 class _AppLocalizationsDelegate

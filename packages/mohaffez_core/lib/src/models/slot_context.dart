@@ -4,8 +4,10 @@ class SlotContext {
   final String mohaffezId;
   final String mohaffezName;
   final String? mohaffezPhone;
+  final bool isFoundingTeacher;
   final String sessionType; // 'online', 'home', 'mosque'
-  final String? preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (only for online)
+  final String?
+      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (only for online)
   final String preferredTimeSlot; // e.g. "10:00-11:00"
   final String slotDate; // ISO8601 string
   final String slotStart; // ISO8601 string
@@ -19,6 +21,7 @@ class SlotContext {
     required this.mohaffezId,
     required this.mohaffezName,
     this.mohaffezPhone,
+    this.isFoundingTeacher = false,
     required this.sessionType,
     this.preferredProvider,
     required this.preferredTimeSlot,
@@ -35,6 +38,7 @@ class SlotContext {
     String? mohaffezId,
     String? mohaffezName,
     String? mohaffezPhone,
+    bool? isFoundingTeacher,
     String? sessionType,
     String? preferredProvider,
     String? preferredTimeSlot,
@@ -50,6 +54,7 @@ class SlotContext {
       mohaffezId: mohaffezId ?? this.mohaffezId,
       mohaffezName: mohaffezName ?? this.mohaffezName,
       mohaffezPhone: mohaffezPhone ?? this.mohaffezPhone,
+      isFoundingTeacher: isFoundingTeacher ?? this.isFoundingTeacher,
       sessionType: sessionType ?? this.sessionType,
       preferredProvider: preferredProvider ?? this.preferredProvider,
       preferredTimeSlot: preferredTimeSlot ?? this.preferredTimeSlot,
@@ -68,6 +73,7 @@ class SlotContext {
       'mohaffezId': mohaffezId,
       'mohaffezName': mohaffezName,
       'mohaffezPhone': mohaffezPhone,
+      'isFoundingTeacher': isFoundingTeacher,
       'sessionType': sessionType,
       if (preferredProvider != null) 'preferredProvider': preferredProvider,
       'preferredTimeSlot': preferredTimeSlot,

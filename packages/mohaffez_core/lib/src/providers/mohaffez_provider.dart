@@ -60,6 +60,12 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       }).toList();
     }
 
+    if (params.trialSessionFilter == TeacherTrialSessionFilter.enabledOnly) {
+      mohaffezList = mohaffezList
+          .where((mohaffez) => mohaffez.trialSessionEnabled)
+          .toList();
+    }
+
     // تصفية حسب قابلية الحجز: وقت قادم مفعّل + خطة سعر نشطة
     if (params.availabilityFilter != TeacherAvailabilityFilter.all) {
       final now = serverNowFromRef(ref);
@@ -211,6 +217,7 @@ class NearbyParams {
   final String? specialization;
   final TeacherAvailabilityFilter availabilityFilter;
   final TeacherGenderFilter genderFilter;
+  final TeacherTrialSessionFilter trialSessionFilter;
 
   NearbyParams({
     this.userLat,
@@ -221,6 +228,7 @@ class NearbyParams {
     this.specialization,
     this.availabilityFilter = TeacherAvailabilityFilter.availableOnly,
     this.genderFilter = TeacherGenderFilter.all,
+    this.trialSessionFilter = TeacherTrialSessionFilter.all,
   });
 
   @override
@@ -235,7 +243,8 @@ class NearbyParams {
           searchQuery == other.searchQuery &&
           specialization == other.specialization &&
           availabilityFilter == other.availabilityFilter &&
-          genderFilter == other.genderFilter;
+          genderFilter == other.genderFilter &&
+          trialSessionFilter == other.trialSessionFilter;
 
   @override
   int get hashCode => Object.hash(
@@ -247,6 +256,7 @@ class NearbyParams {
         specialization,
         availabilityFilter,
         genderFilter,
+        trialSessionFilter,
       );
 }
 
@@ -255,6 +265,8 @@ enum SortType { distance, rating, followers }
 enum TeacherAvailabilityFilter { availableOnly, all, unavailableOnly }
 
 enum TeacherGenderFilter { all, male, female }
+
+enum TeacherTrialSessionFilter { all, enabledOnly }
 
 /// Provider for mohaffez session counts (for search results)
 final mohaffezSessionCountProvider = FutureProvider.family<int, String>(

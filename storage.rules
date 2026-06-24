@@ -13,12 +13,10 @@ service firebase.storage {
 
     // Teacher credentials: teachers upload their own certificate images, admins review.
     match /credentials/{userId}/{fileName} {
-      allow read: if request.auth != null
-                  && (
-                    request.auth.uid == userId ||
-                    firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
-                    firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
-                  );
+      // Approved certificate URLs are exposed only through authenticated
+      // teacher profiles. The Firestore query controls which credentials are
+      // public; Storage allows signed-in viewers to load their image assets.
+      allow read: if request.auth != null;
       allow create, update: if request.auth != null
                             && request.auth.uid == userId
                             && request.resource.size < 3 * 1024 * 1024

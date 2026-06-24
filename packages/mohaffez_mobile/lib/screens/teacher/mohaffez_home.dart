@@ -19,35 +19,35 @@ import '../../tour/tour_mode_state.dart';
 // DESIGN TOKENS
 // ═══════════════════════════════════════════════════════════════════════════════
 class _DS {
-  static const teal800   = Color(0xFF095752);
-  static const teal700   = Color(0xFF0C6F6A);
-  static const teal600   = Color(0xFF0E8278);
-  static const teal500   = Color(0xFF1A9E84);
-  static const teal100   = Color(0xFFD4EDE7);
-  static const teal50    = Color(0xFFEAF6F3);
+  static const teal800 = Color(0xFF095752);
+  static const teal700 = Color(0xFF0C6F6A);
+  static const teal600 = Color(0xFF0E8278);
+  static const teal500 = Color(0xFF1A9E84);
+  static const teal100 = Color(0xFFD4EDE7);
+  static const teal50 = Color(0xFFEAF6F3);
 
-  static const amber     = Color(0xFFE67E22);
-  static const amberBg   = Color(0xFFFFF3E0);
-  static const purple    = Color(0xFF7A5AF8);
-  static const purpleBg  = Color(0xFFF0EEFF);
-  static const green     = Color(0xFF2E8B57);
-  static const greenBg   = Color(0xFFE8F5E9);
-  static const blue      = Color(0xFF2563EB);
-  static const blueBg    = Color(0xFFE3F2FD);
-  static const red       = Color(0xFFDC2626);
-  static const redBg     = Color(0xFFFFEBEE);
-  static const gold      = Color(0xFFB7791F);
-  static const goldBg    = Color(0xFFFFF8E1);
-  static const darkTeal  = Color(0xFF0F766E);
-  static const darkTealBg= Color(0xFFE0F2F1);
+  static const amber = Color(0xFFE67E22);
+  static const amberBg = Color(0xFFFFF3E0);
+  static const purple = Color(0xFF7A5AF8);
+  static const purpleBg = Color(0xFFF0EEFF);
+  static const green = Color(0xFF2E8B57);
+  static const greenBg = Color(0xFFE8F5E9);
+  static const blue = Color(0xFF2563EB);
+  static const blueBg = Color(0xFFE3F2FD);
+  static const red = Color(0xFFDC2626);
+  static const redBg = Color(0xFFFFEBEE);
+  static const gold = Color(0xFFB7791F);
+  static const goldBg = Color(0xFFFFF8E1);
+  static const darkTeal = Color(0xFF0F766E);
+  static const darkTealBg = Color(0xFFE0F2F1);
 
-  static const bg      = Color(0xFFF4F7F6);
-  static const text1   = Color(0xFF111827);
-  static const text2   = Color(0xFF4B5563);
-  static const text3   = Color(0xFF9CA3AF);
-  static const border  = Color(0xFFE5EDE9);
+  static const bg = Color(0xFFF4F7F6);
+  static const text1 = Color(0xFF111827);
+  static const text2 = Color(0xFF4B5563);
+  static const text3 = Color(0xFF9CA3AF);
+  static const border = Color(0xFFE5EDE9);
 
-  static const r8  = BorderRadius.all(Radius.circular(8));
+  static const r8 = BorderRadius.all(Radius.circular(8));
   static const r12 = BorderRadius.all(Radius.circular(12));
   static const r16 = BorderRadius.all(Radius.circular(16));
 
@@ -110,13 +110,16 @@ class _MohaffezHomeState extends ConsumerState<MohaffezHome> {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('لم يتم تسجيل الدخول')));
+          return const Scaffold(
+              body: Center(child: Text('لم يتم تسجيل الدخول')));
         }
         return MohaffezHomeContent(mohaffezId: user.uid);
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        body: ErrorDisplay.dataLoad(onRetry: () => ref.invalidate(currentUserProvider)),
+        body: ErrorDisplay.dataLoad(
+            onRetry: () => ref.invalidate(currentUserProvider)),
       ),
     );
   }
@@ -133,11 +136,11 @@ class MohaffezHomeContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     assert(RequestStatus.teacherInbox.isNotEmpty);
 
-    final user             = ref.watch(currentUserProvider).value;
+    final user = ref.watch(currentUserProvider).value;
     final upcomingSessions = ref.watch(upcomingSessionsProvider(mohaffezId));
-    final pendingCount     = ref.watch(pendingRequestsCountProvider(mohaffezId));
-    final trialRequests    = ref.watch(trialSessionRequestsProvider);
-    final now              = serverNow(ref);
+    final pendingCount = ref.watch(pendingRequestsCountProvider(mohaffezId));
+    final trialRequests = ref.watch(trialSessionRequestsProvider);
+    final now = serverNow(ref);
     final trialPendingCount = trialRequests.valueOrNull
             ?.where((request) => request['status'] == 'pending_teacher')
             .length ??
@@ -172,7 +175,10 @@ class MohaffezHomeContent extends ConsumerWidget {
     final todayCount = upcomingSessions.when(
       data: (sessions) => sessions.where((s) {
         final d = s['sessionDate'] as DateTime?;
-        return d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+        return d != null &&
+            d.year == now.year &&
+            d.month == now.month &&
+            d.day == now.day;
       }).length,
       loading: () => 0,
       error: (_, __) => 0,
@@ -214,11 +220,13 @@ class MohaffezHomeContent extends ConsumerWidget {
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
                     background: _HomeHeader(
-                      name:         user?.name ?? 'المحفظ',
-                      photoUrl:     user?.photoUrl,
-                      dateText:     DateFormat('EEEE، d MMMM', 'ar').format(now),
-                      greeting:     _greeting(now),
+                      name: user?.name ?? 'المحفظ',
+                      photoUrl: user?.photoUrl,
+                      dateText: DateFormat('EEEE، d MMMM', 'ar').format(now),
+                      greeting: _greeting(now),
                       pendingCount: totalPendingCount,
+                      isFoundingTeacher:
+                          user?.badges.foundingTeacher.enabled ?? false,
                     ),
                   ),
                 ),
@@ -226,10 +234,10 @@ class MohaffezHomeContent extends ConsumerWidget {
                 // ─── Stat cards pinned below header ───────────────────────
                 SliverToBoxAdapter(
                   child: _StatsRow(
-                    mohaffezId:       mohaffezId,
-                    todayCount:       todayCount,
+                    mohaffezId: mohaffezId,
+                    todayCount: todayCount,
                     upcomingSessions: upcomingSessions,
-                    pendingCount:     totalPendingCount,
+                    pendingCount: totalPendingCount,
                   ),
                 ),
 
@@ -241,7 +249,8 @@ class MohaffezHomeContent extends ConsumerWidget {
                       if (totalPendingCount > 0) ...[
                         _PendingAlertBanner(
                           count: totalPendingCount,
-                          onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId'),
+                          onTap: () => context
+                              .push('/pending-requests?mohaffezId=$mohaffezId'),
                         ),
                         const SizedBox(height: 20),
                       ],
@@ -281,6 +290,7 @@ class _HomeHeader extends StatelessWidget {
   final String dateText;
   final String greeting;
   final int pendingCount;
+  final bool isFoundingTeacher;
 
   const _HomeHeader({
     required this.name,
@@ -288,6 +298,7 @@ class _HomeHeader extends StatelessWidget {
     required this.dateText,
     required this.greeting,
     required this.pendingCount,
+    required this.isFoundingTeacher,
   });
 
   @override
@@ -304,9 +315,11 @@ class _HomeHeader extends StatelessWidget {
         children: [
           // Decorative circles
           Positioned(
-            top: -50, left: -50,
+            top: -50,
+            left: -50,
             child: Container(
-              width: 220, height: 220,
+              width: 220,
+              height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppThemeConstants.white.withValues(alpha: 0.04),
@@ -314,9 +327,11 @@ class _HomeHeader extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: -20, right: -20,
+            bottom: -20,
+            right: -20,
             child: Container(
-              width: 130, height: 130,
+              width: 130,
+              height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppThemeConstants.white.withValues(alpha: 0.03),
@@ -334,27 +349,36 @@ class _HomeHeader extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _Avatar(name: name, photoUrl: photoUrl, size: 112),
-                      const SizedBox(width: 16),
+                      _Avatar(name: name, photoUrl: photoUrl, size: 96),
+                      const SizedBox(width: 12),
                       Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 22, fontWeight: FontWeight.w800,
-                                color: AppThemeConstants.white, letterSpacing: -0.3,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppThemeConstants.white,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppThemeConstants.white.withValues(alpha: 0.15),
+                                color: AppThemeConstants.white
+                                    .withValues(alpha: 0.15),
                                 borderRadius: _DS.r8,
-                                border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.25)),
+                                border: Border.all(
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.25)),
                               ),
                               child: const Text(
                                 'معلم',
@@ -368,14 +392,17 @@ class _HomeHeader extends StatelessWidget {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(Icons.calendar_today_rounded, size: 12,
-                                    color: AppThemeConstants.white.withValues(alpha: 0.7)),
+                                Icon(Icons.calendar_today_rounded,
+                                    size: 12,
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.7)),
                                 const SizedBox(width: 5),
                                 Text(
                                   dateText,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: AppThemeConstants.white.withValues(alpha: 0.75),
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.75),
                                   ),
                                 ),
                               ],
@@ -384,34 +411,49 @@ class _HomeHeader extends StatelessWidget {
                         ),
                       ),
                       if (pendingCount > 0) _PendingBadge(count: pendingCount),
+                      if (isFoundingTeacher) ...[
+                        const SizedBox(width: 10),
+                        const _FoundingTeacherHomeMark(),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 14),
                   // Compact greeting chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppThemeConstants.white.withValues(alpha: 0.13),
-                      borderRadius: _DS.r12,
-                      border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.18)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.auto_awesome_rounded, color: AppThemeConstants.white, size: 12),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            greeting,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppThemeConstants.white.withValues(alpha: 0.95),
-                              fontWeight: FontWeight.w500,
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppThemeConstants.white.withValues(alpha: 0.13),
+                        borderRadius: _DS.r12,
+                        border: Border.all(
+                            color: AppThemeConstants.white
+                                .withValues(alpha: 0.18)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded,
+                              color: AppThemeConstants.white, size: 12),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              greeting,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppThemeConstants.white
+                                    .withValues(alpha: 0.95),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -419,6 +461,24 @@ class _HomeHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FoundingTeacherHomeMark extends StatelessWidget {
+  const _FoundingTeacherHomeMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'المحفّظ المؤسس',
+      child: Image.asset(
+        FoundingTeacherBadge.assetPath,
+        width: 112,
+        height: 112,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       ),
     );
   }
@@ -438,18 +498,23 @@ class _PendingBadge extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: _DS.amber.withValues(alpha: 0.4),
-            blurRadius: 10, offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.pending_actions_rounded, color: AppThemeConstants.white, size: 13),
+          const Icon(Icons.pending_actions_rounded,
+              color: AppThemeConstants.white, size: 13),
           const SizedBox(width: 5),
           Text(
             '$count ${count == 1 ? "طلب" : "طلبات"}',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppThemeConstants.white),
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppThemeConstants.white),
           ),
         ],
       ),
@@ -479,7 +544,8 @@ class _PendingAlertBanner extends StatelessWidget {
           decoration: BoxDecoration(
             color: _DS.amberBg,
             borderRadius: _DS.r16,
-            border: Border.all(color: _DS.amber.withValues(alpha: 0.35), width: 1.5),
+            border: Border.all(
+                color: _DS.amber.withValues(alpha: 0.35), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: _DS.amber.withValues(alpha: 0.08),
@@ -493,12 +559,14 @@ class _PendingAlertBanner extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 42, height: 42,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: _DS.amber.withValues(alpha: 0.15),
                     borderRadius: _DS.r12,
                   ),
-                  child: const Icon(Icons.pending_actions_rounded, color: _DS.amber, size: 22),
+                  child: const Icon(Icons.pending_actions_rounded,
+                      color: _DS.amber, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -508,7 +576,9 @@ class _PendingAlertBanner extends StatelessWidget {
                       Text(
                         'لديك $count ${count == 1 ? "طلب معلق" : "طلبات معلقة"}',
                         style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700, color: _DS.text1,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _DS.text1,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -520,7 +590,8 @@ class _PendingAlertBanner extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: _DS.amber),
+                const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 14, color: _DS.amber),
               ],
             ),
           ),
@@ -563,13 +634,16 @@ class _StatsRow extends StatelessWidget {
         value: '$todayCount',
         color: _DS.teal500,
         bg: _DS.teal50,
-        onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId&filter=today'),
+        onTap: () => context
+            .push('/upcoming-sessions?mohaffezId=$mohaffezId&filter=today'),
       ),
       _StatData(
         icon: Icons.event_available_rounded,
         label: 'القادمة',
         value: upcomingSessions.when(
-          data: (s) => '${s.length}', loading: () => '…', error: (_, __) => '0',
+          data: (s) => '${s.length}',
+          loading: () => '…',
+          error: (_, __) => '0',
         ),
         color: _DS.green,
         bg: _DS.greenBg,
@@ -646,7 +720,9 @@ class _StatCard extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
-                color: data.isAlert ? data.color.withValues(alpha: 0.45) : _DS.border,
+                color: data.isAlert
+                    ? data.color.withValues(alpha: 0.45)
+                    : _DS.border,
                 width: data.isAlert ? 1.5 : 1,
               ),
               borderRadius: _DS.r16,
@@ -658,7 +734,8 @@ class _StatCard extends StatelessWidget {
                 Container(
                   height: 3,
                   decoration: BoxDecoration(
-                    color: data.color.withValues(alpha: data.isAlert ? 1.0 : 0.5),
+                    color:
+                        data.color.withValues(alpha: data.isAlert ? 1.0 : 0.5),
                   ),
                 ),
                 Padding(
@@ -667,8 +744,10 @@ class _StatCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 32, height: 32,
-                        decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r8),
+                        width: 32,
+                        height: 32,
+                        decoration:
+                            BoxDecoration(color: data.bg, borderRadius: _DS.r8),
                         child: Icon(data.icon, color: data.color, size: 18),
                       ),
                       const SizedBox(height: 10),
@@ -685,9 +764,12 @@ class _StatCard extends StatelessWidget {
                       Text(
                         data.label,
                         style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600, color: _DS.text2,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _DS.text2,
                         ),
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -712,34 +794,63 @@ class _ActionsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       // ── Row 1: Daily core ──
-      _ActionData(icon: Icons.calendar_month_rounded, label: 'الجدول',
-          color: _DS.teal500, bg: _DS.teal50,
+      _ActionData(
+          icon: Icons.calendar_month_rounded,
+          label: 'الجدول',
+          color: _DS.teal500,
+          bg: _DS.teal50,
           onTap: () => context.push('/teacher-schedule')),
-      _ActionData(icon: Icons.event_note_rounded, label: 'القادمة',
-          color: _DS.green, bg: _DS.greenBg,
-          onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId')),
-      _ActionData(icon: Icons.groups_rounded, label: 'طلابي',
-          color: _DS.darkTeal, bg: _DS.darkTealBg,
+      _ActionData(
+          icon: Icons.event_note_rounded,
+          label: 'القادمة',
+          color: _DS.green,
+          bg: _DS.greenBg,
+          onTap: () =>
+              context.push('/upcoming-sessions?mohaffezId=$mohaffezId')),
+      _ActionData(
+          icon: Icons.groups_rounded,
+          label: 'طلابي',
+          color: _DS.darkTeal,
+          bg: _DS.darkTealBg,
           onTap: () => context.push('/my-students')),
       // ── Row 2: Action items ──
-      _ActionData(icon: Icons.pending_actions_rounded, label: 'الطلبات',
-          color: _DS.amber, bg: _DS.amberBg,
-          onTap: () => context.push('/pending-requests?mohaffezId=$mohaffezId')),
-      _ActionData(icon: Icons.calendar_view_week_rounded, label: 'مواعيدي',
-          color: _DS.red, bg: _DS.redBg,
+      _ActionData(
+          icon: Icons.pending_actions_rounded,
+          label: 'الطلبات',
+          color: _DS.amber,
+          bg: _DS.amberBg,
+          onTap: () =>
+              context.push('/pending-requests?mohaffezId=$mohaffezId')),
+      _ActionData(
+          icon: Icons.calendar_view_week_rounded,
+          label: 'مواعيدي',
+          color: _DS.red,
+          bg: _DS.redBg,
           onTap: () => context.push('/availability')),
-      _ActionData(icon: Icons.account_balance_wallet_rounded, label: 'محفظتي',
-          color: _DS.teal600, bg: _DS.teal100,
+      _ActionData(
+          icon: Icons.account_balance_wallet_rounded,
+          label: 'محفظتي',
+          color: _DS.teal600,
+          bg: _DS.teal100,
           onTap: () => context.push('/mohaffez-wallet')),
       // ── Row 3: Settings / rare ──
-      _ActionData(icon: Icons.sell_rounded, label: 'الأسعار',
-          color: _DS.purple, bg: _DS.purpleBg,
+      _ActionData(
+          icon: Icons.sell_rounded,
+          label: 'الأسعار',
+          color: _DS.purple,
+          bg: _DS.purpleBg,
           onTap: () => context.push('/pricing-management')),
-      _ActionData(icon: Icons.workspace_premium_rounded, label: 'الشهادات',
-          color: _DS.blue, bg: _DS.blueBg,
+      _ActionData(
+          icon: Icons.workspace_premium_rounded,
+          label: 'الشهادات',
+          color: _DS.blue,
+          bg: _DS.blueBg,
           onTap: () => context.push('/credentials')),
-      _ActionData(icon: Icons.quiz_rounded, label: 'التحديات',
-          color: _DS.amber, bg: _DS.amberBg,
+      _ActionData(
+          icon: Icons.quiz_rounded,
+          label: 'التحديات',
+          color: _DS.amber,
+          bg: _DS.amberBg,
           onTap: () => context.push('/session-quiz')),
     ];
 
@@ -785,8 +896,11 @@ class _ActionData {
   final VoidCallback onTap;
 
   const _ActionData({
-    required this.icon, required this.label, required this.color,
-    required this.bg, required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.bg,
+    required this.onTap,
   });
 }
 
@@ -817,19 +931,24 @@ class _ActionCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 48, height: 48,
-                  decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r12),
+                  width: 48,
+                  height: 48,
+                  decoration:
+                      BoxDecoration(color: data.bg, borderRadius: _DS.r12),
                   child: Icon(data.icon, color: data.color, size: 26),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   data.label,
                   style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700,
-                    color: _DS.text1, height: 1.4,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _DS.text1,
+                    height: 1.4,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -848,7 +967,8 @@ class _NextSessionCountdown extends ConsumerStatefulWidget {
   const _NextSessionCountdown({required this.nextSessionDate});
 
   @override
-  ConsumerState<_NextSessionCountdown> createState() => _NextSessionCountdownState();
+  ConsumerState<_NextSessionCountdown> createState() =>
+      _NextSessionCountdownState();
 }
 
 class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
@@ -878,13 +998,24 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
 
   void _recalculate() {
     final d = widget.nextSessionDate;
-    if (d == null) { _remaining = Duration.zero; return; }
+    if (d == null) {
+      _remaining = Duration.zero;
+      return;
+    }
     final diff = d.difference(serverNow(ref));
     _remaining = diff.isNegative ? Duration.zero : diff;
   }
 
   String _formatSessionDate(DateTime date) {
-    final weekdays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    final weekdays = [
+      'الأحد',
+      'الاثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت'
+    ];
     final dayName = weekdays[date.weekday % 7];
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final period = date.hour >= 12 ? 'م' : 'ص';
@@ -900,9 +1031,7 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
           constraints: const BoxConstraints(minWidth: 58),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: isUrgent
-                ? const Color(0xFFFEE2E2)
-                : const Color(0xFFFDF5E6),
+            color: isUrgent ? const Color(0xFFFEE2E2) : const Color(0xFFFDF5E6),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isUrgent
@@ -950,9 +1079,8 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
     final isUrgent = _remaining.inHours < 1 && days == 0;
     final accentColor = isUrgent ? const Color(0xFFDC2626) : _DS.gold;
     final bgColor = isUrgent ? const Color(0xFFFEF2F2) : _DS.goldBg;
-    final borderColor = isUrgent
-        ? const Color(0xFFFCA5A5)
-        : _DS.gold.withValues(alpha: 0.35);
+    final borderColor =
+        isUrgent ? const Color(0xFFFCA5A5) : _DS.gold.withValues(alpha: 0.35);
 
     return Container(
       decoration: BoxDecoration(
@@ -981,7 +1109,9 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
                   borderRadius: _DS.r12,
                 ),
                 child: Icon(
-                  isUrgent ? Icons.notification_important_rounded : Icons.timer_rounded,
+                  isUrgent
+                      ? Icons.notification_important_rounded
+                      : Icons.timer_rounded,
                   color: accentColor,
                   size: 22,
                 ),
@@ -1018,15 +1148,19 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               if (days > 0) ...[
-                _buildTimeUnit(days.toString().padLeft(2, '0'), 'يوم', isUrgent),
+                _buildTimeUnit(
+                    days.toString().padLeft(2, '0'), 'يوم', isUrgent),
                 _buildSeparator(isUrgent),
               ],
-              _buildTimeUnit(hours.toString().padLeft(2, '0'), 'ساعة', isUrgent),
+              _buildTimeUnit(
+                  hours.toString().padLeft(2, '0'), 'ساعة', isUrgent),
               _buildSeparator(isUrgent),
-              _buildTimeUnit(minutes.toString().padLeft(2, '0'), 'دقيقة', isUrgent),
+              _buildTimeUnit(
+                  minutes.toString().padLeft(2, '0'), 'دقيقة', isUrgent),
               if (days == 0) ...[
                 _buildSeparator(isUrgent),
-                _buildTimeUnit(seconds.toString().padLeft(2, '0'), 'ثانية', isUrgent),
+                _buildTimeUnit(
+                    seconds.toString().padLeft(2, '0'), 'ثانية', isUrgent),
               ],
             ],
           ),
@@ -1089,13 +1223,15 @@ class _UpcomingSection extends ConsumerWidget {
           title: ArabicLabels.upcomingSessions,
           subtitle: subtitle,
           trailing: TextButton.icon(
-            onPressed: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
+            onPressed: () =>
+                context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 11),
             label: const Text('عرض الكل'),
             style: TextButton.styleFrom(
               foregroundColor: _DS.teal500,
               padding: EdgeInsets.zero,
-              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              textStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -1115,11 +1251,13 @@ class _UpcomingSection extends ConsumerWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _SessionCard(
-                    studentName: s['studentName'] as String? ?? ArabicLabels.notSpecified,
+                    studentName: s['studentName'] as String? ??
+                        ArabicLabels.notSpecified,
                     sessionDate: s['sessionDate'] as DateTime?,
                     timeSlot: s['preferredTimeSlot'] as String? ?? '08:00',
                     colorIndex: i,
-                    onTap: () => context.push('/upcoming-sessions?mohaffezId=$mohaffezId'),
+                    onTap: () => context
+                        .push('/upcoming-sessions?mohaffezId=$mohaffezId'),
                   ),
                 );
               }),
@@ -1172,9 +1310,9 @@ class _SessionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const colors = [_DS.teal500, _DS.green, _DS.purple];
-    const bgs    = [_DS.teal50,  _DS.greenBg, _DS.purpleBg];
-    final color  = colors[colorIndex % colors.length];
-    final bg     = bgs[colorIndex % bgs.length];
+    const bgs = [_DS.teal50, _DS.greenBg, _DS.purpleBg];
+    final color = colors[colorIndex % colors.length];
+    final bg = bgs[colorIndex % bgs.length];
 
     final now = serverNow(ref);
     final isToday = sessionDate != null &&
@@ -1198,7 +1336,8 @@ class _SessionCard extends ConsumerWidget {
           decoration: BoxDecoration(
             color: AppThemeConstants.white,
             borderRadius: _DS.r16,
-            border: Border.all(color: isToday ? color.withValues(alpha: 0.3) : _DS.border),
+            border: Border.all(
+                color: isToday ? color.withValues(alpha: 0.3) : _DS.border),
             boxShadow: _DS.subtleShadow,
           ),
           child: IntrinsicHeight(
@@ -1216,7 +1355,8 @@ class _SessionCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: 14),
                 Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   margin: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(color: bg, borderRadius: _DS.r12),
                   child: Icon(Icons.person_rounded, color: color, size: 24),
@@ -1234,20 +1374,28 @@ class _SessionCard extends ConsumerWidget {
                               child: Text(
                                 studentName,
                                 style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w700, color: _DS.text1,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: _DS.text1,
                                 ),
-                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (relDate.isNotEmpty) ...[
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: isToday ? color.withValues(alpha: 0.1) : _DS.teal50,
+                                  color: isToday
+                                      ? color.withValues(alpha: 0.1)
+                                      : _DS.teal50,
                                   borderRadius: _DS.r8,
                                   border: Border.all(
-                                    color: isToday ? color.withValues(alpha: 0.35) : _DS.teal100,
+                                    color: isToday
+                                        ? color.withValues(alpha: 0.35)
+                                        : _DS.teal100,
                                   ),
                                 ),
                                 child: Text(
@@ -1270,9 +1418,12 @@ class _SessionCard extends ConsumerWidget {
                               icon: Icons.calendar_today_rounded,
                               text: sessionDate == null
                                   ? ArabicLabels.notSpecified
-                                  : DateFormat('dd/MM/yyyy', 'ar').format(sessionDate!),
+                                  : DateFormat('dd/MM/yyyy', 'ar')
+                                      .format(sessionDate!),
                             ),
-                            _InfoPill(icon: Icons.access_time_rounded, text: formatTimeToArabicAmPm(timeSlot)),
+                            _InfoPill(
+                                icon: Icons.access_time_rounded,
+                                text: formatTimeToArabicAmPm(timeSlot)),
                           ],
                         ),
                       ],
@@ -1308,7 +1459,9 @@ class _InfoPill extends StatelessWidget {
       children: [
         Icon(icon, size: 12, color: _DS.text3),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.4)),
+        Text(text,
+            style:
+                const TextStyle(fontSize: 13, color: _DS.text2, height: 1.4)),
       ],
     );
   }
@@ -1322,7 +1475,8 @@ class _SectionLabel extends StatelessWidget {
   final String subtitle;
   final Widget? trailing;
 
-  const _SectionLabel({required this.title, required this.subtitle, this.trailing});
+  const _SectionLabel(
+      {required this.title, required this.subtitle, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -1337,7 +1491,8 @@ class _SectionLabel extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 5, left: 8),
                 child: Container(
-                  width: 6, height: 6,
+                  width: 6,
+                  height: 6,
                   decoration: const BoxDecoration(
                     color: _DS.teal500,
                     shape: BoxShape.circle,
@@ -1351,12 +1506,16 @@ class _SectionLabel extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w800,
-                        color: _DS.text1, letterSpacing: -0.3,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _DS.text1,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.4)),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 13, color: _DS.text2, height: 1.4)),
                   ],
                 ),
               ),
@@ -1376,7 +1535,10 @@ class _EmptyCard extends StatelessWidget {
   final bool isError;
 
   const _EmptyCard({
-    required this.icon, required this.title, required this.subtitle, this.isError = false,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.isError = false,
   });
 
   @override
@@ -1393,20 +1555,24 @@ class _EmptyCard extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 52, height: 52,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: AppThemeConstants.white, borderRadius: _DS.r16,
+              color: AppThemeConstants.white,
+              borderRadius: _DS.r16,
               border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Icon(icon, color: color, size: 26),
           ),
           const SizedBox(height: 12),
           Text(title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _DS.text1),
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: _DS.text1),
               textAlign: TextAlign.center),
           const SizedBox(height: 4),
           Text(subtitle,
-              style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.5),
+              style:
+                  const TextStyle(fontSize: 13, color: _DS.text2, height: 1.5),
               textAlign: TextAlign.center),
         ],
       ),
@@ -1425,11 +1591,13 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final initials = name.trim().isEmpty ? 'م' : name.trim().substring(0, 1);
     return Container(
-      width: size, height: size,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: AppThemeConstants.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(size / 2),
-        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.45), width: 2),
+        border: Border.all(
+            color: AppThemeConstants.white.withValues(alpha: 0.45), width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(size / 2),
@@ -1439,7 +1607,9 @@ class _Avatar extends StatelessWidget {
                 child: Text(
                   initials,
                   style: TextStyle(
-                    fontSize: size * 0.38, fontWeight: FontWeight.w800, color: AppThemeConstants.white,
+                    fontSize: size * 0.38,
+                    fontWeight: FontWeight.w800,
+                    color: AppThemeConstants.white,
                   ),
                 ),
               ),

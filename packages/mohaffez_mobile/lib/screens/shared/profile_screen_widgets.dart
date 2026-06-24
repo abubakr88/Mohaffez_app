@@ -1,4 +1,4 @@
-﻿// lib/screens/profile_screen_widgets.dart
+// lib/screens/profile_screen_widgets.dart
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import '../../shared/widgets/cached_avatar.dart';
@@ -24,7 +24,10 @@ class ProfileAppBar extends StatelessWidget {
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
+                  colors: [
+                    AppThemeConstants.primary,
+                    AppThemeConstants.primaryVariant
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -53,6 +56,14 @@ class ProfileAppBar extends StatelessWidget {
                       color: AppThemeConstants.onPrimary,
                     ),
                   ),
+                  if (user.badges.foundingTeacher.enabled) ...[
+                    const SizedBox(height: 6),
+                    const FoundingTeacherBadge(
+                      compact: true,
+                      showLabel: true,
+                      size: 18,
+                    ),
+                  ],
                   // Role
                   Text(
                     user.role == 'mohaffez' ? 'محفّظ' : 'طالب',
@@ -110,7 +121,9 @@ class ProfileCompletionCard extends StatelessWidget {
                 children: [
                   Icon(
                     isComplete ? Icons.check_circle : Icons.info_outline,
-                    color: isComplete ? AppThemeConstants.secondary : AppThemeConstants.warning,
+                    color: isComplete
+                        ? AppThemeConstants.secondary
+                        : AppThemeConstants.warning,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -127,7 +140,9 @@ class ProfileCompletionCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isComplete ? AppThemeConstants.secondary : AppThemeConstants.primary,
+                      color: isComplete
+                          ? AppThemeConstants.secondary
+                          : AppThemeConstants.primary,
                     ),
                   ),
                 ],
@@ -141,7 +156,9 @@ class ProfileCompletionCard extends StatelessWidget {
                   minHeight: 8,
                   backgroundColor: AppThemeConstants.grey200,
                   valueColor: AlwaysStoppedAnimation(
-                    isComplete ? AppThemeConstants.secondary : AppThemeConstants.primary,
+                    isComplete
+                        ? AppThemeConstants.secondary
+                        : AppThemeConstants.primary,
                   ),
                 ),
               ),
@@ -168,10 +185,12 @@ class ProfileCompletionCard extends StatelessWidget {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: AppThemeConstants.warning.withValues(alpha: 0.1),
+                            color: AppThemeConstants.warning
+                                .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: AppThemeConstants.warning.withValues(alpha: 0.3),
+                              color: AppThemeConstants.warning
+                                  .withValues(alpha: 0.3),
                               width: 2,
                             ),
                           ),
@@ -485,7 +504,8 @@ class BasicInfoSection extends StatelessWidget {
     );
   }
 
-  Widget _specializationChip({required String label, required VoidCallback onTap}) {
+  Widget _specializationChip(
+      {required String label, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -493,7 +513,8 @@ class BasicInfoSection extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppThemeConstants.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.3)),
+          border: Border.all(
+              color: AppThemeConstants.primary.withValues(alpha: 0.3)),
         ),
         child: Text(
           label,

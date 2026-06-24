@@ -223,6 +223,7 @@ class _DirectBookingRequestScreenState
               // Session summary
               SummaryCard(
                 mohaffezName: slotContext.mohaffezName,
+                isFoundingTeacher: slotContext.isFoundingTeacher,
                 sessionType: slotContext.sessionType,
                 timeSlot: slotContext.preferredTimeSlot,
                 dateStr: dateStr,
@@ -344,6 +345,7 @@ class _DirectBookingRequestScreenState
 
 class SummaryCard extends StatelessWidget {
   final String mohaffezName;
+  final bool isFoundingTeacher;
   final String sessionType;
   final String timeSlot;
   final String dateStr;
@@ -351,6 +353,7 @@ class SummaryCard extends StatelessWidget {
 
   const SummaryCard({
     required this.mohaffezName,
+    this.isFoundingTeacher = false,
     required this.sessionType,
     required this.timeSlot,
     required this.dateStr,
@@ -389,6 +392,14 @@ class SummaryCard extends StatelessWidget {
             ]),
             const Divider(height: 20),
             _row(Icons.person_outline, 'المحفظ: ', mohaffezName),
+            if (isFoundingTeacher) ...[
+              const SizedBox(height: 8),
+              const FoundingTeacherBadge(
+                compact: true,
+                showLabel: true,
+                size: 16,
+              ),
+            ],
             const SizedBox(height: 8),
             _row(Icons.category_outlined, 'نوع الجلسة: ',
                 translateSessionType(sessionType)),
