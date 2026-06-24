@@ -574,6 +574,23 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const MohaffezHome(),
           ),
           GoRoute(
+            path: '/teacher-profile-preview',
+            name: 'teacher-profile-preview',
+            builder: (context, state) {
+              final mohaffezId = ref.read(currentUserIdProvider);
+              if (mohaffezId == null || mohaffezId.isEmpty) {
+                return ErrorScreen(
+                  error: 'تعذر تحديد حساب المحفظ',
+                  onRetry: () => context.go('/mohaffez-home'),
+                );
+              }
+              return MohaffezProfileScreen(
+                mohaffezId: mohaffezId,
+                previewMode: true,
+              );
+            },
+          ),
+          GoRoute(
             path: '/pending-requests',
             name: 'pending-requests',
             builder: (context, state) => const PendingRequestsScreen(),

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
@@ -20,26 +20,26 @@ import '../../tour/tour_guard_helper.dart';
 // DESIGN TOKENS (consistent with home screens)
 // ═══════════════════════════════════════════════════════════════════════════════
 class _DS {
-  static const teal800  = Color(0xFF095752);
-  static const teal700  = Color(0xFF0C6F6A);
-  static const teal600  = Color(0xFF0E8278);
-  static const teal500  = Color(0xFF1A9E84);
-  static const teal50   = Color(0xFFEAF6F3);
+  static const teal800 = Color(0xFF095752);
+  static const teal700 = Color(0xFF0C6F6A);
+  static const teal600 = Color(0xFF0E8278);
+  static const teal500 = Color(0xFF1A9E84);
+  static const teal50 = Color(0xFFEAF6F3);
 
-  static const amber  = Color(0xFFE67E22);
+  static const amber = Color(0xFFE67E22);
   static const purple = Color(0xFF7A5AF8);
-  static const green  = Color(0xFF2E8B57);
-  static const blue   = Color(0xFF2563EB);
-  static const red    = Color(0xFFDC2626);
-  static const redBg  = Color(0xFFFFEBEE);
+  static const green = Color(0xFF2E8B57);
+  static const blue = Color(0xFF2563EB);
+  static const red = Color(0xFFDC2626);
+  static const redBg = Color(0xFFFFEBEE);
 
-  static const bg     = Color(0xFFF4F7F6);
-  static const text1  = Color(0xFF111827);
-  static const text2  = Color(0xFF4B5563);
-  static const text3  = Color(0xFF9CA3AF);
+  static const bg = Color(0xFFF4F7F6);
+  static const text1 = Color(0xFF111827);
+  static const text2 = Color(0xFF4B5563);
+  static const text3 = Color(0xFF9CA3AF);
   static const border = Color(0xFFE5EDE9);
 
-  static const r8  = BorderRadius.all(Radius.circular(8));
+  static const r8 = BorderRadius.all(Radius.circular(8));
   static const r12 = BorderRadius.all(Radius.circular(12));
   static const r16 = BorderRadius.all(Radius.circular(16));
 
@@ -112,8 +112,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   String _meetingLinksSubtitle(UserModel user) {
-    final count = user.meetingLinks.values.where((v) => v.trim().isNotEmpty).length +
-        ((user.meetingLink?.trim().isNotEmpty ?? false) && user.meetingLinks.isEmpty ? 1 : 0);
+    final count =
+        user.meetingLinks.values.where((v) => v.trim().isNotEmpty).length +
+            ((user.meetingLink?.trim().isNotEmpty ?? false) &&
+                    user.meetingLinks.isEmpty
+                ? 1
+                : 0);
     if (count == 0) return 'أضف رابط Zoom أو Google Meet أو Teams';
     if (count == 1) return 'تم إضافة رابط واحد';
     return 'تم إضافة $count روابط';
@@ -165,8 +169,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                leading: const Icon(Icons.photo_library_rounded,
-                    color: _DS.teal500),
+                leading:
+                    const Icon(Icons.photo_library_rounded, color: _DS.teal500),
                 title: const Text('اختيار صورة جديدة'),
                 onTap: () => Navigator.pop(ctx, 'pick'),
               ),
@@ -329,7 +333,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.invalidate(currentUserProvider);
       if (mounted) _showSnackBar('تم حفظ رابط الفيديو بنجاح', isSuccess: true);
     } catch (e) {
-      if (mounted) _showSnackBar(e is Exception && e.toString().contains('YouTube') ? e.toString().replaceFirst('Exception: ', '') : 'تعذّر حفظ رابط الفيديو. يرجى المحاولة مرة أخرى');
+      if (mounted) {
+        _showSnackBar(e is Exception && e.toString().contains('YouTube')
+            ? e.toString().replaceFirst('Exception: ', '')
+            : 'تعذّر حفظ رابط الفيديو. يرجى المحاولة مرة أخرى');
+      }
     }
   }
 
@@ -367,7 +375,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ref.invalidate(currentUserProvider);
       if (mounted) _showSnackBar('تم حفظ رقم الهاتف بنجاح', isSuccess: true);
     } catch (_) {
-      if (mounted) _showSnackBar('تعذّر حفظ رقم الهاتف. يرجى المحاولة مرة أخرى');
+      if (mounted) {
+        _showSnackBar('تعذّر حفظ رقم الهاتف. يرجى المحاولة مرة أخرى');
+      }
     }
   }
 
@@ -486,7 +496,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 decoration: const InputDecoration(
                   hintText: 'https://youtube.com/...',
                   border: OutlineInputBorder(borderRadius: _DS.r12),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
               const SizedBox(height: 8),
@@ -586,7 +597,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(ctx);
                   if (mounted) {
-                    _showSnackBar('تم تغيير كلمة المرور بنجاح', isSuccess: true);
+                    _showSnackBar('تم تغيير كلمة المرور بنجاح',
+                        isSuccess: true);
                   }
                 }
               },
@@ -666,7 +678,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 backgroundColor: AppThemeConstants.surface,
                 onRefresh: () async {
                   ref.invalidate(currentUserProvider);
-                  await ref.read(currentUserProvider.future).catchError((_) => null);
+                  await ref
+                      .read(currentUserProvider.future)
+                      .catchError((_) => null);
                 },
                 child: CustomScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -701,9 +715,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         delegate: SliverChildListDelegate([
                           // Rewards card + wallet balance — students only (top of screen)
                           if (!isMohaffez) ...[
-                            _RewardsTeaserCard(userId: user.uid, dateOfBirth: user.dateOfBirth),
+                            _RewardsTeaserCard(
+                                userId: user.uid,
+                                dateOfBirth: user.dateOfBirth),
                             const SizedBox(height: 12),
                             _StudentWalletCard(userId: user.uid),
+                            const SizedBox(height: 12),
+                          ],
+
+                          if (isMohaffez) ...[
+                            _TeacherProfilePreviewCard(
+                              onTap: () =>
+                                  context.push('/teacher-profile-preview'),
+                            ),
                             const SizedBox(height: 12),
                           ],
 
@@ -716,7 +740,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ? _BioEditor(
                                     controller: _bioController,
                                     onSave: () => _saveBio(user.uid),
-                                    onCancel: () => setState(() => _isEditingBio = false),
+                                    onCancel: () =>
+                                        setState(() => _isEditingBio = false),
                                   )
                                 : _BioDisplay(
                                     bio: user.bio,
@@ -789,19 +814,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   _ActionTile(
                                     icon: Icons.account_balance_wallet_rounded,
                                     title: 'محافظ الدفع المباشر',
-                                    subtitle: 'InstaPay، فودافون كاش، أورانج موني',
+                                    subtitle:
+                                        'InstaPay، فودافون كاش، أورانج موني',
                                     color: _DS.green,
-                                    onTap: () => context.push('/wallet-settings'),
+                                    onTap: () =>
+                                        context.push('/wallet-settings'),
                                   ),
                                   _ActionTile(
                                     icon: Icons.ondemand_video_rounded,
                                     title: 'رابط فيديو التلاوة',
-                                    subtitle: (user.youtubeVideoUrl?.isNotEmpty ?? false)
-                                        ? 'تمت إضافة رابط YouTube'
-                                        : 'أضف رابط YouTube لتلاوة مسجلة',
+                                    subtitle:
+                                        (user.youtubeVideoUrl?.isNotEmpty ??
+                                                false)
+                                            ? 'تمت إضافة رابط YouTube'
+                                            : 'أضف رابط YouTube لتلاوة مسجلة',
                                     color: _DS.red,
                                     onTap: () {
-                                      _youtubeController.text = user.youtubeVideoUrl ?? '';
+                                      _youtubeController.text =
+                                          user.youtubeVideoUrl ?? '';
                                       _showYoutubeLinkDialog(user.uid);
                                     },
                                   ),
@@ -838,14 +868,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   title: 'إعدادات الخصوصية',
                                   subtitle: 'التحكم في بيانات حسابك',
                                   color: _DS.purple,
-                                  onTap: () => context.push('/privacy-settings'),
+                                  onTap: () =>
+                                      context.push('/privacy-settings'),
                                 ),
                                 _ActionTile(
                                   icon: Icons.policy_rounded,
                                   title: 'سياسة الإلغاء والغياب',
-                                  subtitle: 'قواعد الإلغاء والاسترداد لكلا الطرفين',
+                                  subtitle:
+                                      'قواعد الإلغاء والاسترداد لكلا الطرفين',
                                   color: _DS.teal700,
-                                  onTap: () => context.push('/cancellation-policy'),
+                                  onTap: () =>
+                                      context.push('/cancellation-policy'),
                                 ),
                                 _ActionTile(
                                   icon: Icons.location_on_rounded,
@@ -875,14 +908,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 decoration: BoxDecoration(
                                   color: _DS.redBg,
                                   borderRadius: _DS.r16,
-                                  border: Border.all(color: _DS.red.withValues(alpha: 0.25)),
+                                  border: Border.all(
+                                      color: _DS.red.withValues(alpha: 0.25)),
                                 ),
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.logout_rounded, color: _DS.red, size: 20),
+                                      Icon(Icons.logout_rounded,
+                                          color: _DS.red, size: 20),
                                       SizedBox(width: 10),
                                       Text(
                                         'تسجيل الخروج',
@@ -909,7 +944,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (_, __) => Scaffold(
         body: ErrorDisplay(
           message: 'تعذّر تحميل الملف الشخصي. يرجى المحاولة مرة أخرى',
@@ -956,9 +992,11 @@ class _ProfileHeader extends StatelessWidget {
         children: [
           // Decorative circles
           Positioned(
-            top: -50, left: -50,
+            top: -50,
+            left: -50,
             child: Container(
-              width: 220, height: 220,
+              width: 220,
+              height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppThemeConstants.white.withValues(alpha: 0.04),
@@ -966,9 +1004,11 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: -20, right: -20,
+            bottom: -20,
+            right: -20,
             child: Container(
-              width: 130, height: 130,
+              width: 130,
+              height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppThemeConstants.white.withValues(alpha: 0.03),
@@ -983,131 +1023,149 @@ class _ProfileHeader extends StatelessWidget {
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
                   child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    // Avatar with edit overlay
-                    Stack(
-                      children: [
-                        Hero(
-                          tag: 'profile-avatar',
-                          child: CachedAvatar(
-                            imageUrl: photoUrl,
-                            radius: 46,
-                            semanticLabel: name,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      // Avatar with edit overlay
+                      Stack(
+                        children: [
+                          Hero(
+                            tag: 'profile-avatar',
+                            child: CachedAvatar(
+                              imageUrl: photoUrl,
+                              radius: 46,
+                              semanticLabel: name,
+                            ),
                           ),
-                        ),
-                        if (!kIsWeb)
-                          Positioned(
-                            bottom: 0, right: 0,
-                            child: GestureDetector(
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                onEditPhoto();
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: _DS.teal500,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: AppThemeConstants.white, width: 2.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppThemeConstants.black.withValues(alpha: 0.2),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                          if (!kIsWeb)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  onEditPhoto();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: _DS.teal500,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: AppThemeConstants.white,
+                                        width: 2.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppThemeConstants.black
+                                            .withValues(alpha: 0.2),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.camera_alt_rounded,
+                                      color: AppThemeConstants.white, size: 16),
                                 ),
-                                child: const Icon(Icons.camera_alt_rounded, color: AppThemeConstants.white, size: 16),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Name (tap pencil to edit)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppThemeConstants.white,
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              onEditName();
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: AppThemeConstants.white
+                                    .withValues(alpha: 0.18),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.edit_rounded,
+                                size: 14,
+                                color: AppThemeConstants.white,
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Name (tap pencil to edit)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w800,
-                              color: AppThemeConstants.white, letterSpacing: -0.3,
-                            ),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        InkWell(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            onEditName();
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: AppThemeConstants.white.withValues(alpha: 0.18),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.edit_rounded,
-                              size: 14,
-                              color: AppThemeConstants.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    // Role chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppThemeConstants.white.withValues(alpha: 0.15),
-                        borderRadius: _DS.r12,
-                        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.2)),
-                      ),
-                      child: Text(
-                        isMohaffez ? 'محفّظ' : 'طالب',
-                        style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600,
-                          color: AppThemeConstants.white.withValues(alpha: 0.95),
-                        ),
-                      ),
-                    ),
-                    // Mohaffez stats
-                    if (isMohaffez) ...[
-                      const SizedBox(height: 14),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _HeaderStat(
-                            icon: Icons.people_rounded,
-                            label: 'المتابعون',
-                            value: followerCount.toString(),
-                          ),
-                          Container(
-                            width: 1, height: 24,
-                            margin: const EdgeInsets.symmetric(horizontal: 20),
-                            color: AppThemeConstants.white.withValues(alpha: 0.25),
-                          ),
-                          _HeaderStat(
-                            icon: Icons.star_rounded,
-                            label: 'التقييم',
-                            value: rating.toStringAsFixed(1),
-                          ),
                         ],
                       ),
+                      const SizedBox(height: 6),
+                      // Role chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 5),
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.white.withValues(alpha: 0.15),
+                          borderRadius: _DS.r12,
+                          border: Border.all(
+                              color: AppThemeConstants.white
+                                  .withValues(alpha: 0.2)),
+                        ),
+                        child: Text(
+                          isMohaffez ? 'محفّظ' : 'طالب',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color:
+                                AppThemeConstants.white.withValues(alpha: 0.95),
+                          ),
+                        ),
+                      ),
+                      // Mohaffez stats
+                      if (isMohaffez) ...[
+                        const SizedBox(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _HeaderStat(
+                              icon: Icons.people_rounded,
+                              label: 'المتابعون',
+                              value: followerCount.toString(),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 24,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              color: AppThemeConstants.white
+                                  .withValues(alpha: 0.25),
+                            ),
+                            _HeaderStat(
+                              icon: Icons.star_rounded,
+                              label: 'التقييم',
+                              value: rating.toStringAsFixed(1),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         ],
       ),
     );
@@ -1119,14 +1177,16 @@ class _HeaderStat extends StatelessWidget {
   final String label;
   final String value;
 
-  const _HeaderStat({required this.icon, required this.label, required this.value});
+  const _HeaderStat(
+      {required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: AppThemeConstants.white.withValues(alpha: 0.7), size: 16),
+        Icon(icon,
+            color: AppThemeConstants.white.withValues(alpha: 0.7), size: 16),
         const SizedBox(width: 6),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1134,18 +1194,103 @@ class _HeaderStat extends StatelessWidget {
             Text(
               value,
               style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: AppThemeConstants.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppThemeConstants.white,
               ),
             ),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10, color: AppThemeConstants.white.withValues(alpha: 0.7),
+                fontSize: 10,
+                color: AppThemeConstants.white.withValues(alpha: 0.7),
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _TeacherProfilePreviewCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _TeacherProfilePreviewCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppThemeConstants.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: _DS.r16,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_DS.teal700, _DS.teal500],
+              begin: Alignment.centerRight,
+              end: Alignment.centerLeft,
+            ),
+            borderRadius: _DS.r16,
+            boxShadow: _DS.subtleShadow,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.white.withValues(alpha: 0.16),
+                    borderRadius: _DS.r12,
+                  ),
+                  child: const Icon(
+                    Icons.visibility_rounded,
+                    color: AppThemeConstants.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'معاينة ملفي للطلاب',
+                        style: TextStyle(
+                          color: AppThemeConstants.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'شاهد ملفك بالشكل الذي يظهر عند البحث',
+                        style: TextStyle(
+                          color: Color(0xDFFFFFFF),
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppThemeConstants.white,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1183,7 +1328,8 @@ class _SectionCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 34, height: 34,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: _DS.r8,
@@ -1194,7 +1340,9 @@ class _SectionCard extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: _DS.text1,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _DS.text1,
                   ),
                 ),
               ],
@@ -1250,7 +1398,8 @@ class _BioDisplay extends StatelessWidget {
                 color: _DS.teal50,
                 borderRadius: _DS.r8,
               ),
-              child: const Icon(Icons.edit_rounded, size: 16, color: _DS.teal500),
+              child:
+                  const Icon(Icons.edit_rounded, size: 16, color: _DS.teal500),
             ),
           ),
         ),
@@ -1349,7 +1498,8 @@ class _ContactRow extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 34, height: 34,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.08),
                   borderRadius: _DS.r8,
@@ -1367,7 +1517,9 @@ class _ContactRow extends StatelessWidget {
                     Text(
                       value,
                       style: TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600, color: color,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: color,
                       ),
                     ),
                   ],
@@ -1392,7 +1544,8 @@ class _ContactRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: color.withValues(alpha: 0.5)),
+              Icon(Icons.arrow_back_ios_new_rounded,
+                  size: 12, color: color.withValues(alpha: 0.5)),
             ],
           ),
         ),
@@ -1438,7 +1591,8 @@ class _ActionTile extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.08),
                       borderRadius: _DS.r12,
@@ -1453,20 +1607,25 @@ class _ActionTile extends StatelessWidget {
                         Text(
                           title,
                           style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w700, color: _DS.text1,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _DS.text1,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
-                          style: const TextStyle(fontSize: 12, color: _DS.text2),
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style:
+                              const TextStyle(fontSize: 12, color: _DS.text2),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: _DS.text3),
+                  const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 12, color: _DS.text3),
                 ],
               ),
             ),
@@ -1529,13 +1688,13 @@ class _RewardsTeaserCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surahsAsync   = ref.watch(memorizedSurahsProvider(userId));
+    final surahsAsync = ref.watch(memorizedSurahsProvider(userId));
     final sessionsAsync = ref.watch(studentCompletedSessionsProvider(userId));
 
-    final age      = calculateAge(dateOfBirth);
+    final age = calculateAge(dateOfBirth);
     final sessions = sessionsAsync.valueOrNull ?? 0;
     final memorized = surahsAsync.valueOrNull?.length ?? 0;
-    final level    = resolveLevel(sessions, age);
+    final level = resolveLevel(sessions, age);
 
     return GestureDetector(
       onTap: () => context.push('/student-rewards'),
@@ -1571,7 +1730,8 @@ class _RewardsTeaserCard extends ConsumerWidget {
                   ),
                 ),
                 child: Center(
-                  child: Text(level.emoji, style: const TextStyle(fontSize: 26)),
+                  child:
+                      Text(level.emoji, style: const TextStyle(fontSize: 26)),
                 ),
               ),
               const SizedBox(width: 14),
@@ -1601,7 +1761,8 @@ class _RewardsTeaserCard extends ConsumerWidget {
                       children: [
                         Text(
                           '$sessions حلقة',
-                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12),
                         ),
                         const SizedBox(width: 8),
                         Container(
@@ -1615,7 +1776,8 @@ class _RewardsTeaserCard extends ConsumerWidget {
                         const SizedBox(width: 8),
                         Text(
                           '$memorized سورة محفوظة',
-                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12),
                         ),
                       ],
                     ),
@@ -1687,7 +1849,8 @@ class _StudentWalletCard extends ConsumerWidget {
                       child: CircularProgressIndicator(strokeWidth: 2)),
                   error: (_, __) => const Text('—',
                       style: TextStyle(
-                          fontSize: 20, color: AppThemeConstants.textSecondary)),
+                          fontSize: 20,
+                          color: AppThemeConstants.textSecondary)),
                 ),
               ],
             ),

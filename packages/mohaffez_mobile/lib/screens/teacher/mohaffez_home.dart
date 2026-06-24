@@ -338,12 +338,6 @@ class _HomeHeader extends StatelessWidget {
               ),
             ),
           ),
-          if (isFoundingTeacher)
-            const Positioned(
-              top: 28,
-              left: 16,
-              child: _FoundingTeacherHomeMark(),
-            ),
           SafeArea(
             bottom: false,
             child: Padding(
@@ -355,22 +349,24 @@ class _HomeHeader extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _Avatar(name: name, photoUrl: photoUrl, size: 112),
-                      const SizedBox(width: 16),
+                      _Avatar(name: name, photoUrl: photoUrl, size: 96),
+                      const SizedBox(width: 12),
                       Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppThemeConstants.white,
-                                letterSpacing: -0.3,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppThemeConstants.white,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
                             Container(
@@ -415,40 +411,49 @@ class _HomeHeader extends StatelessWidget {
                         ),
                       ),
                       if (pendingCount > 0) _PendingBadge(count: pendingCount),
+                      if (isFoundingTeacher) ...[
+                        const SizedBox(width: 10),
+                        const _FoundingTeacherHomeMark(),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 14),
                   // Compact greeting chip
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppThemeConstants.white.withValues(alpha: 0.13),
-                      borderRadius: _DS.r12,
-                      border: Border.all(
-                          color:
-                              AppThemeConstants.white.withValues(alpha: 0.18)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.auto_awesome_rounded,
-                            color: AppThemeConstants.white, size: 12),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            greeting,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppThemeConstants.white
-                                  .withValues(alpha: 0.95),
-                              fontWeight: FontWeight.w500,
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppThemeConstants.white.withValues(alpha: 0.13),
+                        borderRadius: _DS.r12,
+                        border: Border.all(
+                            color: AppThemeConstants.white
+                                .withValues(alpha: 0.18)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded,
+                              color: AppThemeConstants.white, size: 12),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              greeting,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppThemeConstants.white
+                                    .withValues(alpha: 0.95),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -470,8 +475,8 @@ class _FoundingTeacherHomeMark extends StatelessWidget {
       label: 'المحفّظ المؤسس',
       child: Image.asset(
         FoundingTeacherBadge.assetPath,
-        width: 164,
-        height: 164,
+        width: 112,
+        height: 112,
         fit: BoxFit.contain,
         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       ),

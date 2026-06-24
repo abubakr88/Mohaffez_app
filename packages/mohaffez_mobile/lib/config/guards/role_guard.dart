@@ -44,6 +44,7 @@ class RoleGuard implements RouteGuard {
   // Mohaffez-only routes.
   static const List<String> mohaffezRoutePrefixes = <String>[
     '/mohaffez-home',
+    '/teacher-profile-preview',
     '/pending-requests',
     '/completed-sessions',
     '/upcoming-sessions',

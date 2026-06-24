@@ -11,7 +11,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../providers/mohaffez_profile_providers.dart';
-import '../../providers/student_count_provider.dart';
 import '../../providers/trial_session_provider.dart';
 import 'request_trial_session_sheet.dart';
 import '../../tour/tour_guard_helper.dart';
@@ -20,12 +19,14 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
   final double? userLat;
   final double? userLng;
+  final bool previewMode;
 
   const MohaffezProfileScreen({
     super.key,
     required this.mohaffezId,
     this.userLat,
     this.userLng,
+    this.previewMode = false,
   });
 
   @override
@@ -58,27 +59,101 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     }).toList();
   }
 
-  Future<void> _openYoutubeVideo(String url) async {
-    final uri = Uri.tryParse(url.trim());
-    if (uri == null) return;
+  String? _teacherVideoUrl(Map<String, dynamic> profile) {
+    for (final key in const [
+      'youtubeVideoUrl',
+      'introVideoUrl',
+      'videoUrl',
+    ]) {
+      final value = (profile[key] as String?)?.trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
 
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+  Uri? _normalizedWebUri(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    if (RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(trimmed)) {
+      return Uri.parse('https://www.youtube.com/watch?v=$trimmed');
+    }
+    final withScheme =
+        trimmed.startsWith('http://') || trimmed.startsWith('https://')
+            ? trimmed
+            : 'https://$trimmed';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null ||
+        !uri.hasAuthority ||
+        (!uri.host.contains('.') && uri.host != 'localhost')) {
+      return null;
+    }
+    return uri;
+  }
+
+  String? _youtubeVideoId(String value) {
+    final uri = _normalizedWebUri(value);
+    if (uri == null) return null;
+    final host = uri.host.toLowerCase().replaceFirst('www.', '');
+
+    if (host == 'youtu.be' && uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.first;
+    }
+    if (host.endsWith('youtube.com')) {
+      final queryId = uri.queryParameters['v'];
+      if (queryId != null && queryId.isNotEmpty) return queryId;
+      final segments = uri.pathSegments;
+      if (segments.length >= 2 &&
+          const {'embed', 'shorts', 'live'}.contains(segments.first)) {
+        return segments[1];
+      }
+    }
+    return null;
+  }
+
+  Future<void> _openTeacherVideo(String url) async {
+    final uri = _normalizedWebUri(url);
+    if (uri == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('تعذر فتح الرابط'),
+            content: Text('رابط الفيديو غير صالح'),
             backgroundColor: AppThemeConstants.error,
           ),
         );
       }
+      return;
+    }
+
+    var launched = false;
+    try {
+      launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      launched = false;
+    }
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر فتح رابط الفيديو'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
     }
   }
 
   // ─── Navigation helper ────────────────────────────────────────────────────
 
   void _navigateToBookingMethod() {
+    if (widget.previewMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('هذه معاينة لملفك كما يراه الطالب'),
+        ),
+      );
+      return;
+    }
     if (guardWriteInTour(ref, context)) return;
     if (selectedTimeSlot == null || selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -180,55 +255,62 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       child: Scaffold(
         backgroundColor: AppThemeConstants.background,
         body: profileAsync.when(
-          data: (profile) => RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
-              ref.invalidate(activePricingPlansProvider(widget.mohaffezId));
-              ref.invalidate(credentialsProvider(widget.mohaffezId));
-              ref.invalidate(availabilityProvider(widget.mohaffezId));
-              await ref
-                  .read(mohaffezProfileProvider(widget.mohaffezId).future)
-                  .catchError((_) => <String, dynamic>{});
-            },
-            child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                _buildAppBar(context, profile),
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildCompactTrustStrip(ref, profile),
-                      if (profile['trialSessionEnabled'] == true) ...[
-                        const SizedBox(height: 18),
-                        _buildTrialSessionSection(profile, plansAsync),
+          data: (profile) {
+            final videoUrl = _teacherVideoUrl(profile);
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
+                ref.invalidate(activePricingPlansProvider(widget.mohaffezId));
+                ref.invalidate(credentialsProvider(widget.mohaffezId));
+                ref.invalidate(availabilityProvider(widget.mohaffezId));
+                await ref
+                    .read(mohaffezProfileProvider(widget.mohaffezId).future)
+                    .catchError((_) => <String, dynamic>{});
+              },
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  _buildAppBar(context, profile),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        if (widget.previewMode) ...[
+                          _buildOwnerPreviewPanel(),
+                          const SizedBox(height: 16),
+                        ],
+                        _buildCompactTrustStrip(ref, profile),
+                        if (videoUrl != null) ...[
+                          const SizedBox(height: 20),
+                          _buildPremiumVideoSection(videoUrl),
+                        ],
+                        if (profile['bio'] != null &&
+                            (profile['bio'] as String).trim().isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          _buildModernBioSection(profile['bio'] as String),
+                        ],
+                        const SizedBox(height: 20),
+                        _buildCredentialsSection(ref),
+                        if (profile['trialSessionEnabled'] == true) ...[
+                          const SizedBox(height: 20),
+                          _buildTrialSessionSection(profile, plansAsync),
+                        ],
+                        const SizedBox(height: 20),
+                        _buildModernSessionSelector(plansAsync),
+                        const SizedBox(height: 20),
+                        _buildModernPricingSection(plansAsync),
+                        const SizedBox(height: 20),
+                        _buildModernAvailabilitySection(
+                            ref, profile, plansAsync),
+                        const SizedBox(height: 120),
                       ],
-                      const SizedBox(height: 18),
-                      _buildModernSessionSelector(plansAsync),
-                      const SizedBox(height: 20),
-                      _buildModernAvailabilitySection(ref, profile, plansAsync),
-                      const SizedBox(height: 20),
-                      _buildModernPricingSection(plansAsync),
-                      const SizedBox(height: 20),
-                      if (profile['bio'] != null &&
-                          (profile['bio'] as String).isNotEmpty)
-                        _buildModernBioSection(profile['bio'] as String),
-                      const SizedBox(height: 20),
-                      _buildCompactCredentialsSection(ref),
-                      const SizedBox(height: 20),
-                      if (profile['youtubeVideoUrl'] != null &&
-                          (profile['youtubeVideoUrl'] as String).isNotEmpty)
-                        _buildPremiumYoutubeSection(
-                          profile['youtubeVideoUrl'] as String,
-                        ),
-                      const SizedBox(height: 120),
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
             child: Column(
@@ -269,79 +351,225 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             ),
           ),
         ),
-        bottomNavigationBar: selectedTimeSlot != null && selectedDate != null
-            ? SafeArea(
-                child: Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      )
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              selectedDate != null
-                                  ? DateFormat(
-                                      'EEEE، d MMM',
-                                      'ar',
-                                    ).format(selectedDate!)
-                                  : '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
+        bottomNavigationBar: widget.previewMode
+            ? _buildPreviewBottomBar()
+            : selectedTimeSlot != null && selectedDate != null
+                ? SafeArea(
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 30,
+                            offset: const Offset(0, 10),
+                          )
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedDate != null
+                                      ? DateFormat(
+                                          'EEEE، d MMM',
+                                          'ar',
+                                        ).format(selectedDate!)
+                                      : '',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  formatTimeToArabicAmPm(
+                                    selectedTimeSlot!['startTime'],
+                                  ),
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: _navigateToBookingMethod,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1D9E75),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 28,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              formatTimeToArabicAmPm(
-                                selectedTimeSlot!['startTime'],
-                              ),
-                              style: const TextStyle(
-                                color: Colors.grey,
+                            child: const Text(
+                              'تأكيد الحجز',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      ElevatedButton(
-                        onPressed: _navigateToBookingMethod,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1D9E75),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 28,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        child: const Text(
-                          'تأكيد الحجز',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
+                  )
+                : null,
+      ),
+    );
+  }
+
+  Widget _buildOwnerPreviewPanel() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7E2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: const Color(0xFFE8A020).withValues(alpha: 0.45),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.visibility_outlined,
+                  color: Color(0xFF9A6500),
+                ),
+                SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'معاينة ملفك كما يراه الطالب',
+                    style: TextStyle(
+                      color: Color(0xFF684600),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              )
-            : null,
+              ],
+            ),
+            const SizedBox(height: 7),
+            const Text(
+              'راجع المعلومات والصور والأسعار والمواعيد، ثم استخدم الاختصارات لتحسين أي جزء.',
+              style: TextStyle(
+                color: Color(0xFF765B22),
+                height: 1.5,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 13),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _previewEditChip(
+                  icon: Icons.edit_outlined,
+                  label: 'البيانات والفيديو',
+                  route: '/profile',
+                ),
+                _previewEditChip(
+                  icon: Icons.workspace_premium_outlined,
+                  label: 'الشهادات',
+                  route: '/credentials',
+                ),
+                _previewEditChip(
+                  icon: Icons.sell_outlined,
+                  label: 'الأسعار',
+                  route: '/pricing-management',
+                ),
+                _previewEditChip(
+                  icon: Icons.calendar_month_outlined,
+                  label: 'المواعيد',
+                  route: '/availability',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _previewEditChip({
+    required IconData icon,
+    required String label,
+    required String route,
+  }) {
+    return ActionChip(
+      onPressed: () => context.push(route),
+      avatar: Icon(icon, size: 18, color: AppThemeConstants.primary),
+      label: Text(label),
+      backgroundColor: Colors.white,
+      side: BorderSide(
+        color: AppThemeConstants.primary.withValues(alpha: 0.22),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      labelStyle: const TextStyle(
+        color: AppThemeConstants.primary,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+
+  Widget _buildPreviewBottomBar() {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: const Border(
+            top: BorderSide(color: AppThemeConstants.grey200),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/credentials'),
+                icon: const Icon(Icons.workspace_premium_outlined),
+                label: const Text('الشهادات'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => context.push('/profile'),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('تعديل الملف'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -593,6 +821,40 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         final relevantPlans = _relevantPlans(plans);
 
+        if (selectedSessionType.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppThemeConstants.primary.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.24),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.touch_app_outlined,
+                    color: AppThemeConstants.primary,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'اختر نوع الجلسة لعرض الأسعار والمواعيد المناسبة.',
+                      style: TextStyle(
+                        color: AppThemeConstants.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         if (relevantPlans.isEmpty) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -748,14 +1010,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     Map<String, dynamic> profile,
   ) {
     final rating = profile['rating'] as num? ?? 0.0;
-    final studentCountAsync =
-        ref.watch(mohaffezStudentCountProvider(widget.mohaffezId));
-
-    final studentCount = studentCountAsync.when(
-      data: (count) => count,
-      loading: () => 0,
-      error: (_, __) => 0,
-    );
+    final reviewCount = (profile['reviewCount'] as num?)?.toInt() ?? 0;
+    final stats = ref.watch(mohaffezStatsProvider(widget.mohaffezId));
+    final credentials = ref.watch(credentialsProvider(widget.mohaffezId));
+    final completedSessions =
+        stats.valueOrNull?['completedSessions'] as int? ?? 0;
+    final uniqueStudents = stats.valueOrNull?['uniqueStudents'] as int? ?? 0;
+    final approvedCredentials = credentials.valueOrNull?.length ?? 0;
+    final statsAreLoading = stats.isLoading && !stats.hasValue;
+    final credentialsAreLoading =
+        credentials.isLoading && !credentials.hasValue;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -779,10 +1043,25 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _miniTrust(
-                Icons.star_rounded, rating.toStringAsFixed(1), 'التقييم'),
-            _miniTrust(Icons.people_alt_rounded, '$studentCount+', 'طالب'),
-            _miniTrust(Icons.workspace_premium_rounded, 'إجازة', 'معتمد'),
-            _miniTrust(Icons.access_time_filled_rounded, '10 د', 'الرد'),
+              Icons.star_rounded,
+              reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد',
+              reviewCount > 0 ? '$reviewCount تقييم' : 'التقييم',
+            ),
+            _miniTrust(
+              Icons.people_alt_rounded,
+              statsAreLoading ? '—' : '$uniqueStudents',
+              'طالب',
+            ),
+            _miniTrust(
+              Icons.task_alt_rounded,
+              statsAreLoading ? '—' : '$completedSessions',
+              'جلسة مكتملة',
+            ),
+            _miniTrust(
+              Icons.workspace_premium_rounded,
+              credentialsAreLoading ? '—' : '$approvedCredentials',
+              'شهادة معتمدة',
+            ),
           ],
         ),
       ),
@@ -790,25 +1069,33 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 
   Widget _miniTrust(IconData icon, String value, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: const Color(0xFF1D9E75), size: 20),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 14,
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, color: const Color(0xFF1D9E75), size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.grey,
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -939,7 +1226,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                             const FoundingTeacherBadge(
                               compact: true,
                               showLabel: true,
-                              size: 18,
+                              useFullLabel: true,
+                              size: 20,
                             ),
                           ],
                           if (specialization != null &&
@@ -1034,6 +1322,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1071,9 +1360,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // ─── Compact Credentials Section ──────────────────────────────────────────
+  // ─── Credentials Gallery ──────────────────────────────────────────────────
 
-  Widget _buildCompactCredentialsSection(WidgetRef ref) {
+  Widget _buildCredentialsSection(WidgetRef ref) {
     final credsAsync = ref.watch(credentialsProvider(widget.mohaffezId));
 
     return credsAsync.when(
@@ -1098,45 +1387,73 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'الإجازات والشهادات',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: creds.map((cred) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(18),
+                        color: const Color(0xFFFFF7E2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: const Icon(
+                        Icons.workspace_premium_rounded,
+                        color: Color(0xFFE8A020),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.workspace_premium_rounded,
-                            color: Color(0xFFE8A020),
-                          ),
-                          const SizedBox(width: 8),
                           Text(
-                            cred['title'] ?? 'إجازة',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
+                            'الإجازات والشهادات',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'وثائق راجعتها واعتمدتها إدارة المنصة',
+                            style: TextStyle(
+                              color: AppThemeConstants.textSecondary,
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            AppThemeConstants.success.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${creds.length}',
+                        style: const TextStyle(
+                          color: AppThemeConstants.success,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 254,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: creds.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) =>
+                        _buildCredentialCard(creds[index]),
+                  ),
                 ),
               ],
             ),
@@ -1154,23 +1471,207 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  // ─── Premium YouTube Section ──────────────────────────────────────────────
+  Widget _buildCredentialCard(Map<String, dynamic> credential) {
+    final title = (credential['title'] as String?)?.trim();
+    final organization = (credential['organization'] as String?)?.trim();
+    final type = credential['type'] as String? ?? 'ijazah';
+    final imageUrls = List<String>.from(
+      credential['imageUrls'] as List? ?? const [],
+    ).where((url) => url.trim().isNotEmpty).toList();
+    final issueDate = _credentialDate(credential['issueDate']);
 
-  Widget _buildPremiumYoutubeSection(String url) {
+    return SizedBox(
+      width: 224,
+      child: Material(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: imageUrls.isEmpty
+              ? null
+              : () => _openCredentialGallery(
+                    imageUrls,
+                    title ?? 'شهادة معتمدة',
+                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 132,
+                child: imageUrls.isEmpty
+                    ? Container(
+                        color: const Color(0xFFFFF7E2),
+                        child: const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 54,
+                          color: Color(0xFFE8A020),
+                        ),
+                      )
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CachedNetworkImage(
+                            imageUrl: imageUrls.first,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            errorWidget: (_, __, ___) => const ColoredBox(
+                              color: Color(0xFFFFF7E2),
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: Color(0xFFE8A020),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 8,
+                            bottom: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.68),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.photo_library_outlined,
+                                    size: 13,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${imageUrls.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title?.isNotEmpty == true ? title! : 'شهادة معتمدة',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        organization?.isNotEmpty == true
+                            ? organization!
+                            : _credentialTypeLabel(type),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppThemeConstants.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.verified_rounded,
+                            size: 16,
+                            color: AppThemeConstants.success,
+                          ),
+                          const SizedBox(width: 5),
+                          const Text(
+                            'معتمدة',
+                            style: TextStyle(
+                              color: AppThemeConstants.success,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (issueDate != null) ...[
+                            const Spacer(),
+                            Text(
+                              DateFormat('yyyy/MM').format(issueDate),
+                              style: const TextStyle(
+                                color: AppThemeConstants.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  DateTime? _credentialDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    try {
+      return value.toDate() as DateTime;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _credentialTypeLabel(String type) {
+    return switch (type) {
+      'education' => 'مؤهل تعليمي',
+      'license' => 'ترخيص',
+      'award' => 'جائزة',
+      _ => 'إجازة',
+    };
+  }
+
+  void _openCredentialGallery(List<String> imageUrls, String title) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.90),
+      builder: (_) => _CredentialGalleryDialog(
+        imageUrls: imageUrls,
+        title: title,
+      ),
+    );
+  }
+
+  // ─── Premium Video Section ────────────────────────────────────────────────
+
+  Widget _buildPremiumVideoSection(String url) {
+    final youtubeId = _youtubeVideoId(url);
+    final thumbnailUrl = youtubeId == null
+        ? null
+        : 'https://img.youtube.com/vi/$youtubeId/hqdefault.jpg';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFF085041),
-              Color(0xFF1D9E75),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: const Color(0xFF073F37),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF1D9E75).withValues(alpha: 0.2),
@@ -1179,49 +1680,92 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             ),
           ],
         ),
-        child: Column(
-          children: [
-            const Text(
-              'شاهد فيديو تعريفي',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'تعرف على أسلوب المحفظ في التدريس',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: () => _openYoutubeVideo(url),
-                icon: const Icon(Icons.play_arrow_rounded, size: 24),
-                label: const Text(
-                  'مشاهدة الفيديو',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _openTeacherVideo(url),
+            child: SizedBox(
+              height: 210,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (thumbnailUrl != null)
+                    CachedNetworkImage(
+                      imageUrl: thumbnailUrl,
+                      fit: BoxFit.cover,
+                      color: Colors.black.withValues(alpha: 0.30),
+                      colorBlendMode: BlendMode.darken,
+                      errorWidget: (_, __, ___) =>
+                          const ColoredBox(color: Color(0xFF073F37)),
+                    ),
+                  if (thumbnailUrl == null)
+                    const ColoredBox(color: Color(0xFF073F37)),
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Color(0xE6073F37),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF1D9E75),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                  Center(
+                    child: Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.22),
+                            blurRadius: 18,
+                            offset: const Offset(0, 7),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        size: 38,
+                        color: Color(0xFF0A806F),
+                      ),
+                    ),
                   ),
-                ),
+                  const Positioned(
+                    right: 18,
+                    left: 18,
+                    bottom: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'الفيديو التعريفي',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'شاهد المحفّظ وتعرّف على أسلوبه قبل الحجز',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1335,22 +1879,43 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          item(
-            type: 'online',
-            title: 'أونلاين',
-            icon: Icons.videocam_rounded,
+          const Text(
+            'اختر نوع الجلسة',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          item(
-            type: 'mosque',
-            title: 'في المسجد',
-            icon: Icons.mosque_rounded,
+          const SizedBox(height: 4),
+          const Text(
+            'ستظهر الخطط والمواعيد المتاحة لهذا النوع فقط',
+            style: TextStyle(
+              color: AppThemeConstants.textSecondary,
+              fontSize: 13,
+            ),
           ),
-          item(
-            type: 'home',
-            title: 'زيارة منزلية',
-            icon: Icons.home_rounded,
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              item(
+                type: 'online',
+                title: 'أونلاين',
+                icon: Icons.videocam_rounded,
+              ),
+              item(
+                type: 'mosque',
+                title: 'في المسجد',
+                icon: Icons.mosque_rounded,
+              ),
+              item(
+                type: 'home',
+                title: 'زيارة منزلية',
+                icon: Icons.home_rounded,
+              ),
+            ],
           ),
         ],
       ),
@@ -1364,6 +1929,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     Map<String, dynamic> profile,
     AsyncValue<List<PricingPlanModel>> plansAsync,
   ) {
+    if (selectedSessionType.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final availability = ref.watch(
       availabilityProvider(widget.mohaffezId),
     );
@@ -1727,6 +2296,121 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         child: CircularProgressIndicator(),
       ),
       error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _CredentialGalleryDialog extends StatefulWidget {
+  const _CredentialGalleryDialog({
+    required this.imageUrls,
+    required this.title,
+  });
+
+  final List<String> imageUrls;
+  final String title;
+
+  @override
+  State<_CredentialGalleryDialog> createState() =>
+      _CredentialGalleryDialogState();
+}
+
+class _CredentialGalleryDialogState extends State<_CredentialGalleryDialog> {
+  late final PageController _controller;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: ui.TextDirection.rtl,
+      child: Dialog.fullscreen(
+        backgroundColor: const Color(0xFF071F1B),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${_currentIndex + 1} / ${widget.imageUrls.length}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      tooltip: 'إغلاق',
+                      icon: const Icon(Icons.close_rounded),
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: widget.imageUrls.length,
+                  onPageChanged: (index) =>
+                      setState(() => _currentIndex = index),
+                  itemBuilder: (context, index) => InteractiveViewer(
+                    minScale: 0.8,
+                    maxScale: 4,
+                    child: Center(
+                      child: CachedNetworkImage(
+                        imageUrl: widget.imageUrls[index],
+                        fit: BoxFit.contain,
+                        placeholder: (_, __) => const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.white70,
+                              size: 56,
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              'تعذر تحميل صورة الشهادة',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
