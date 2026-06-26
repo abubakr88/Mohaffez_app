@@ -23,6 +23,16 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../../shared/widgets/teacher_tier_card.dart';
 
+DateTime _nextFixedSettlementDate([DateTime? from]) {
+  final now = from ?? DateTime.now();
+  final firstThisMonth = DateTime(now.year, now.month, 1, 0, 5);
+  final fifteenthThisMonth = DateTime(now.year, now.month, 15, 0, 5);
+
+  if (now.isBefore(firstThisMonth)) return firstThisMonth;
+  if (now.isBefore(fifteenthThisMonth)) return fifteenthThisMonth;
+  return DateTime(now.year, now.month + 1, 1, 0, 5);
+}
+
 class MohaffezWalletScreen extends ConsumerWidget {
   const MohaffezWalletScreen({super.key});
 
@@ -32,7 +42,8 @@ class MohaffezWalletScreen extends ConsumerWidget {
     return userAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (_, __) => const Scaffold(body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى'))),
+      error: (_, __) => const Scaffold(
+          body: Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى'))),
       data: (user) {
         if (user == null) {
           WidgetsBinding.instance
@@ -225,7 +236,8 @@ class _CycleBreakdownCard extends ConsumerWidget {
     final starterRate = config == null
         ? 0.15
         : CommissionTierModel.starterRate(config.commissionTiers);
-    final effectiveRate = teacherInfo?.effectiveRate(starterRate) ?? starterRate;
+    final effectiveRate =
+        teacherInfo?.effectiveRate(starterRate) ?? starterRate;
 
     return walletAsync.when(
       loading: () => const SizedBox.shrink(),
@@ -239,9 +251,8 @@ class _CycleBreakdownCard extends ConsumerWidget {
         final onlineCommission = onlineGross * effectiveRate;
         final duesEgp = w.directCommissionOwedEgp; // positive
         final estimatedNet = onlineGross - onlineCommission - duesEgp;
-        final nextEvalLabel = teacherInfo?.nextEvalAt != null
-            ? DateFormat('d MMM', 'ar').format(teacherInfo!.nextEvalAt!)
-            : null;
+        final nextEvalLabel =
+            DateFormat('d MMM', 'ar').format(_nextFixedSettlementDate());
 
         return Container(
           padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
@@ -270,16 +281,14 @@ class _CycleBreakdownCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (nextEvalLabel != null) ...[
-                    const Spacer(),
-                    Text(
-                      'التسوية القادمة: $nextEvalLabel',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppThemeConstants.textSecondary,
-                      ),
+                  const Spacer(),
+                  Text(
+                    'التسوية القادمة: $nextEvalLabel',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppThemeConstants.textSecondary,
                     ),
-                  ],
+                  ),
                 ],
               ),
               const SizedBox(height: AppThemeConstants.spaceMd),
@@ -318,8 +327,7 @@ class _CycleBreakdownCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color:
-                        AppThemeConstants.warning.withValues(alpha: 0.12),
+                    color: AppThemeConstants.warning.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -377,7 +385,8 @@ class _BreakdownRow extends StatelessWidget {
     final textStyle = TextStyle(
       fontSize: bold ? 14 : 13,
       fontWeight: bold ? FontWeight.bold : FontWeight.w500,
-      color: bold ? AppThemeConstants.textPrimary : AppThemeConstants.textPrimary,
+      color:
+          bold ? AppThemeConstants.textPrimary : AppThemeConstants.textPrimary,
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -522,7 +531,8 @@ class _PayoutButton extends ConsumerWidget {
         : CommissionTierModel.starterRate(config.commissionTiers);
     final teacherInfo =
         ref.watch(teacherCommissionInfoProvider(uid)).valueOrNull;
-    final effectiveRate = teacherInfo?.effectiveRate(starterRate) ?? starterRate;
+    final effectiveRate =
+        teacherInfo?.effectiveRate(starterRate) ?? starterRate;
 
     final available = wallet.balanceEgp;
     final debt = wallet.directCommissionOwedEgp; // positive when owed
@@ -624,8 +634,8 @@ class _PayoutButton extends ConsumerWidget {
             backgroundColor: AppThemeConstants.secondary,
             foregroundColor: AppThemeConstants.white,
             disabledBackgroundColor: AppThemeConstants.grey300,
-            padding: const EdgeInsets.symmetric(
-                vertical: AppThemeConstants.spaceMd),
+            padding:
+                const EdgeInsets.symmetric(vertical: AppThemeConstants.spaceMd),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -653,7 +663,8 @@ class _PayoutsList extends ConsumerWidget {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => const Text('تعذّر تحميل طلبات السحب. يرجى المحاولة مرة أخرى',
+      error: (_, __) => const Text(
+          'تعذّر تحميل طلبات السحب. يرجى المحاولة مرة أخرى',
           style: TextStyle(color: AppThemeConstants.error)),
       data: (payouts) {
         if (payouts.isEmpty) {
@@ -798,7 +809,8 @@ class _TxList extends ConsumerWidget {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => const Text('تعذّر تحميل العمليات. يرجى المحاولة مرة أخرى',
+      error: (_, __) => const Text(
+          'تعذّر تحميل العمليات. يرجى المحاولة مرة أخرى',
           style: TextStyle(color: AppThemeConstants.error)),
       data: (txs) {
         if (txs.isEmpty) {

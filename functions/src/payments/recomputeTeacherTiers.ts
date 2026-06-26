@@ -12,15 +12,15 @@
 //
 // Idempotent: re-running on the same window produces the same writes.
 
-import * as functions from 'firebase-functions';
-import admin, { db, FieldValue } from '../utils/admin';
-import { createAndSendNotification } from '../utils/notificationHelpers';
+import * as functions from "firebase-functions";
+import admin, { db, FieldValue } from "../utils/admin";
+import { createAndSendNotification } from "../utils/notificationHelpers";
 import {
   postLedgerEntry,
   postWalletEvent,
   walletIdForUser,
   SYSTEM_WALLETS,
-} from '../wallet/walletUtils';
+} from "../wallet/walletUtils";
 
 export interface TierConfig {
   id: string;
@@ -31,18 +31,39 @@ export interface TierConfig {
 }
 
 export const DEFAULT_TIERS: TierConfig[] = [
-  { id: 'starter', labelAr: 'البداية', minSessions: 0, rate: 0.15, badge: '🌱' },
-  { id: 'active', labelAr: 'نشط', minSessions: 8, rate: 0.12, badge: '⭐' },
-  { id: 'intermediate', labelAr: 'متوسط', minSessions: 14, rate: 0.10, badge: '✨' },
-  { id: 'distinguished', labelAr: 'متميز', minSessions: 20, rate: 0.08, badge: '🏆' },
-  { id: 'elite', labelAr: 'نخبة', minSessions: 35, rate: 0.05, badge: '💎' },
+  {
+    id: "starter",
+    labelAr: "البداية",
+    minSessions: 0,
+    rate: 0.15,
+    badge: "🌱",
+  },
+  { id: "active", labelAr: "نشط", minSessions: 8, rate: 0.12, badge: "⭐" },
+  {
+    id: "intermediate",
+    labelAr: "متوسط",
+    minSessions: 14,
+    rate: 0.1,
+    badge: "✨",
+  },
+  {
+    id: "distinguished",
+    labelAr: "متميز",
+    minSessions: 20,
+    rate: 0.08,
+    badge: "🏆",
+  },
+  { id: "elite", labelAr: "نخبة", minSessions: 35, rate: 0.05, badge: "💎" },
 ];
 
 /**
  * Effective commission rate = base tier rate + accumulated penalty.
  * Capped at 100% so the teacher never owes more than they earned.
  */
-export function computeEffectiveRate(baseRate: number, penaltyPct: number): number {
+export function computeEffectiveRate(
+  baseRate: number,
+  penaltyPct: number,
+): number {
   return Math.min(baseRate + penaltyPct / 100, 1.0);
 }
 
@@ -61,6 +82,9 @@ export function computeSettlementPiastres(
 
 const ROLLING_WINDOW_DAYS = 14;
 const TEACHER_PAGE_SIZE = 200;
+const SETTLEMENT_TIME_ZONE = "Africa/Cairo";
+const SETTLEMENT_HOUR = 0;
+const SETTLEMENT_MINUTE = 5;
 
 interface WalletLikeData {
   balancePiastres?: number;
@@ -69,17 +93,17 @@ interface WalletLikeData {
 }
 
 async function loadTiers(): Promise<TierConfig[]> {
-  const snap = await db.collection('systemConfig').doc('global').get();
+  const snap = await db.collection("systemConfig").doc("global").get();
   const raw = snap.data()?.commissionTiers as unknown[] | undefined;
   if (!raw || !Array.isArray(raw) || raw.length === 0) return DEFAULT_TIERS;
   const tiers = raw
     .map((entry) => {
       const e = entry as Record<string, unknown>;
       return {
-        id: String(e.id ?? ''),
-        labelAr: String(e.labelAr ?? ''),
+        id: String(e.id ?? ""),
+        labelAr: String(e.labelAr ?? ""),
         minSessions: Number(e.minSessions ?? 0),
-        rate: Number(e.rate ?? 0.10),
+        rate: Number(e.rate ?? 0.1),
         badge: e.badge ? String(e.badge) : undefined,
       } as TierConfig;
     })
@@ -89,12 +113,124 @@ async function loadTiers(): Promise<TierConfig[]> {
   return tiers;
 }
 
-export function pickTier(tiers: TierConfig[], sessionCount: number): TierConfig {
+export function pickTier(
+  tiers: TierConfig[],
+  sessionCount: number,
+): TierConfig {
   let current = tiers[0];
   for (const t of tiers) {
     if (sessionCount >= t.minSessions) current = t;
   }
   return current;
+}
+
+function timeZoneParts(
+  date: Date,
+  timeZone: string,
+): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const value = (type: Intl.DateTimeFormatPartTypes): number => {
+    const part = parts.find((p) => p.type === type)?.value;
+    return Number(part ?? 0);
+  };
+
+  return {
+    year: value("year"),
+    month: value("month"),
+    day: value("day"),
+    hour: value("hour"),
+    minute: value("minute"),
+    second: value("second"),
+  };
+}
+
+function zonedDateTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string,
+): Date {
+  let utc = new Date(Date.UTC(year, month - 1, day, hour, minute));
+
+  for (let i = 0; i < 3; i += 1) {
+    const actual = timeZoneParts(utc, timeZone);
+    const desiredMs = Date.UTC(year, month - 1, day, hour, minute);
+    const actualMs = Date.UTC(
+      actual.year,
+      actual.month - 1,
+      actual.day,
+      actual.hour,
+      actual.minute,
+    );
+    const diffMs = desiredMs - actualMs;
+    if (diffMs === 0) break;
+    utc = new Date(utc.getTime() + diffMs);
+  }
+
+  return utc;
+}
+
+function addMonth(
+  year: number,
+  month: number,
+): { year: number; month: number } {
+  if (month === 12) return { year: year + 1, month: 1 };
+  return { year, month: month + 1 };
+}
+
+export function nextScheduledSettlementAt(from: Date = new Date()): Date {
+  const nowInCairo = timeZoneParts(from, SETTLEMENT_TIME_ZONE);
+  const nextMonth = addMonth(nowInCairo.year, nowInCairo.month);
+  const candidates = [
+    zonedDateTimeToUtc(
+      nowInCairo.year,
+      nowInCairo.month,
+      1,
+      SETTLEMENT_HOUR,
+      SETTLEMENT_MINUTE,
+      SETTLEMENT_TIME_ZONE,
+    ),
+    zonedDateTimeToUtc(
+      nowInCairo.year,
+      nowInCairo.month,
+      15,
+      SETTLEMENT_HOUR,
+      SETTLEMENT_MINUTE,
+      SETTLEMENT_TIME_ZONE,
+    ),
+    zonedDateTimeToUtc(
+      nextMonth.year,
+      nextMonth.month,
+      1,
+      SETTLEMENT_HOUR,
+      SETTLEMENT_MINUTE,
+      SETTLEMENT_TIME_ZONE,
+    ),
+  ].sort((a, b) => a.getTime() - b.getTime());
+
+  return (
+    candidates.find((candidate) => candidate.getTime() > from.getTime()) ??
+    candidates[candidates.length - 1]
+  );
 }
 
 interface TeacherStats {
@@ -111,10 +247,10 @@ async function statsForTeacher(
   // We deliberately don't filter on isPaid in the Firestore query to keep
   // the index simple — payment-cleared check happens in-memory below.
   const snap = await db
-    .collection('hafizSessions')
-    .where('mohaffezId', '==', teacherId)
-    .where('status', '==', 'completed')
-    .where('completedAt', '>=', admin.firestore.Timestamp.fromDate(windowStart))
+    .collection("hafizSessions")
+    .where("mohaffezId", "==", teacherId)
+    .where("status", "==", "completed")
+    .where("completedAt", ">=", admin.firestore.Timestamp.fromDate(windowStart))
     .get();
 
   let totalRevenueEgp = 0;
@@ -125,7 +261,7 @@ async function statsForTeacher(
     const data = doc.data();
     if (data.isPaid !== true) continue;
     const price =
-      typeof data.sessionPrice === 'number'
+      typeof data.sessionPrice === "number"
         ? data.sessionPrice
         : Number(data.sessionPrice ?? 0);
     if (!isFinite(price) || price <= 0) continue;
@@ -160,9 +296,11 @@ async function maybeNotifyTierChange(
   const newIdx = tiers.findIndex((t) => t.id === next.id);
   const isUp = newIdx > oldIdx;
 
-  const title = isUp ? 'تهانينا — انتقلت إلى شريحة جديدة!' : 'تحديث شريحة العمولة';
+  const title = isUp
+    ? "تهانينا — انتقلت إلى شريحة جديدة!"
+    : "تحديث شريحة العمولة";
   const body = isUp
-    ? `${next.badge ?? ''} انتقلت إلى شريحة ${next.labelAr}. عمولة المنصة الآن ${(next.rate * 100).toFixed(0)}%`
+    ? `${next.badge ?? ""} انتقلت إلى شريحة ${next.labelAr}. عمولة المنصة الآن ${(next.rate * 100).toFixed(0)}%`
     : `شريحتك الحالية: ${next.labelAr} (عمولة ${(next.rate * 100).toFixed(0)}%). أكمل المزيد من الحلقات للعودة لشريحة أعلى.`;
 
   try {
@@ -170,11 +308,14 @@ async function maybeNotifyTierChange(
       userId: teacherId,
       title,
       body,
-      type: 'tier_change',
+      type: "tier_change",
       data: { tierId: next.id, rate: String(next.rate) },
     });
   } catch (err) {
-    functions.logger.warn('tier-change notification failed', { teacherId, err });
+    functions.logger.warn("tier-change notification failed", {
+      teacherId,
+      err,
+    });
   }
 }
 
@@ -190,18 +331,19 @@ async function recomputeForTeacher(
   // Tier is determined by on-time session count, not revenue.
   const tier = pickTier(tiers, stats.sessionCount);
 
-  const userRef = db.collection('users').doc(teacherId);
+  const userRef = db.collection("users").doc(teacherId);
   const userSnap = await userRef.get();
   const previousTierId = userSnap.data()?.commissionTier as string | undefined;
 
   // Cancellation penalty: stored as percent points (e.g. 1.5 = 1.5%).
   // Only the highest penalty in the cycle applies (enforced by onSessionCancelled).
   // Converts to decimal and adds on top of the base tier rate.
-  const penaltyPct = (userSnap.data()?.commissionPenaltyPercent as number | undefined) ?? 0;
+  const penaltyPct =
+    (userSnap.data()?.commissionPenaltyPercent as number | undefined) ?? 0;
   const effectiveRate = computeEffectiveRate(tier.rate, penaltyPct);
 
   const update: Record<string, unknown> = {
-    commissionRate: tier.rate,          // base tier rate (no penalty — for display)
+    commissionRate: tier.rate, // base tier rate (no penalty — for display)
     commissionTier: tier.id,
     tierStats: {
       last14dRevenueEgp: stats.totalRevenueEgp,
@@ -226,33 +368,33 @@ async function recomputeForTeacher(
   await userRef.set(update, { merge: true });
 
   const historyId = now.toISOString().slice(0, 10);
-  await userRef
-    .collection('commissionHistory')
-    .doc(historyId)
-    .set(
-      {
-        tier: tier.id,
-        rate: tier.rate,
-        effectiveRate,           // actual rate used for settlement (base + penalty)
-        penaltyPct,              // penalty applied this cycle (0 if none)
-        revenueEgp: stats.totalRevenueEgp,
-        sessions: stats.sessionCount,
-        computedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+  await userRef.collection("commissionHistory").doc(historyId).set(
+    {
+      tier: tier.id,
+      rate: tier.rate,
+      effectiveRate, // actual rate used for settlement (base + penalty)
+      penaltyPct, // penalty applied this cycle (0 if none)
+      revenueEgp: stats.totalRevenueEgp,
+      sessions: stats.sessionCount,
+      computedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
 
   // ── Record informational wallet events for tier/rate changes ────────────
-  const oldTierSnap = previousTierId ? tiers.find((t) => t.id === previousTierId) : undefined;
+  const oldTierSnap = previousTierId
+    ? tiers.find((t) => t.id === previousTierId)
+    : undefined;
   const oldBaseRate = oldTierSnap?.rate ?? tier.rate;
-  const oldPenaltyPct = (userSnap.data()?.commissionPenaltyPercent as number | undefined) ?? 0;
+  const oldPenaltyPct =
+    (userSnap.data()?.commissionPenaltyPercent as number | undefined) ?? 0;
   const oldEffective = Math.min(oldBaseRate + oldPenaltyPct / 100, 1.0);
 
   // Tier changed → record a commission_rate_change event.
   if (previousTierId && previousTierId !== tier.id) {
     const eventId = `tier_change_${teacherId}_${historyId}`;
     await postWalletEvent(teacherId, {
-      type: 'commission_rate_change',
+      type: "commission_rate_change",
       eventId,
       reason: `تغيير الشريحة: ${oldTierSnap?.labelAr ?? previousTierId} ← ${tier.labelAr} (${(oldBaseRate * 100).toFixed(0)}% → ${(tier.rate * 100).toFixed(0)}%)`,
       metadata: {
@@ -271,7 +413,7 @@ async function recomputeForTeacher(
   if (options.settleWallet && penaltyPct > 0) {
     const penaltyEventId = `penalty_reset_${teacherId}_${historyId}`;
     await postWalletEvent(teacherId, {
-      type: 'commission_rate_change',
+      type: "commission_rate_change",
       eventId: penaltyEventId,
       reason: `إعادة ضبط العقوبة عند التسوية: ${(effectiveRate * 100).toFixed(1)}% → ${(tier.rate * 100).toFixed(0)}%`,
       metadata: {
@@ -317,7 +459,7 @@ async function settleCycleForTeacher(
   now: Date,
   cycleId: string,
 ): Promise<void> {
-  const walletRef = db.collection('wallets').doc(walletIdForUser(teacherId));
+  const walletRef = db.collection("wallets").doc(walletIdForUser(teacherId));
   const walletSnap = await walletRef.get();
   if (!walletSnap.exists) return;
 
@@ -337,46 +479,51 @@ async function settleCycleForTeacher(
 
   // ── STEP 1: settle online pending → available + revenue ──
   if (pendingPiastres > 0) {
-    const { commissionPiastres, teacherNetPiastres } = computeSettlementPiastres(
-      pendingPiastres,
-      rate,
-    );
+    const { commissionPiastres, teacherNetPiastres } =
+      computeSettlementPiastres(pendingPiastres, rate);
 
     try {
       await db.runTransaction(async (tx) => {
         await postLedgerEntry(tx, {
-          type: 'cycle_settlement',
+          type: "cycle_settlement",
           legs: [
             {
               walletId: walletIdForUser(teacherId),
-              ownerType: 'mohaffez',
+              ownerType: "mohaffez",
               amountPiastres: -pendingPiastres,
-              target: 'pending',
+              target: "pending",
             },
             ...(teacherNetPiastres > 0
-              ? [{
-                  walletId: walletIdForUser(teacherId),
-                  ownerType: 'mohaffez' as const,
-                  amountPiastres: teacherNetPiastres,
-                }]
+              ? [
+                  {
+                    walletId: walletIdForUser(teacherId),
+                    ownerType: "mohaffez" as const,
+                    amountPiastres: teacherNetPiastres,
+                  },
+                ]
               : []),
             ...(commissionPiastres > 0
-              ? [{
-                  walletId: SYSTEM_WALLETS.revenue,
-                  ownerType: 'system' as const,
-                  amountPiastres: commissionPiastres,
-                }]
+              ? [
+                  {
+                    walletId: SYSTEM_WALLETS.revenue,
+                    ownerType: "system" as const,
+                    amountPiastres: commissionPiastres,
+                  },
+                ]
               : []),
           ],
           reason: `Cycle settlement: pending=${pendingPiastres} rate=${rate}`,
           groupId: `settle_${teacherId}_${cycleId}`,
-          createdBy: 'system',
+          createdBy: "system",
           metadata: { rate, cycleId, pendingPiastres, commissionPiastres },
         });
       });
     } catch (err) {
-      functions.logger.error('settleCycleForTeacher: pending step failed', {
-        teacherId, rate, pendingPiastres, err,
+      functions.logger.error("settleCycleForTeacher: pending step failed", {
+        teacherId,
+        rate,
+        pendingPiastres,
+        err,
       });
     }
   }
@@ -401,12 +548,12 @@ async function settleCycleForTeacher(
           // Teacher has no available balance to pay dues. Leave the debt
           // in dues to roll forward into next cycle. Admin alert so ops
           // can decide whether to follow up.
-          await db.collection('adminAlerts').add({
-            type: 'teacher_dues_unsettled',
+          await db.collection("adminAlerts").add({
+            type: "teacher_dues_unsettled",
             mohaffezId: teacherId,
             duesOwedEgp: debt / 100,
             cycleId,
-            note: 'Available balance was 0 at settlement; debt rolls forward.',
+            note: "Available balance was 0 at settlement; debt rolls forward.",
             resolved: false,
             createdAt: FieldValue.serverTimestamp(),
           });
@@ -414,45 +561,51 @@ async function settleCycleForTeacher(
         }
 
         await postLedgerEntry(tx, {
-          type: 'cycle_settlement',
+          type: "cycle_settlement",
           legs: [
             // Take from teacher's available balance...
             {
               walletId: walletIdForUser(teacherId),
-              ownerType: 'mohaffez',
+              ownerType: "mohaffez",
               amountPiastres: -drainable,
             },
             // ...and zero out (or reduce) the dues bucket.
             {
               walletId: walletIdForUser(teacherId),
-              ownerType: 'mohaffez',
+              ownerType: "mohaffez",
               amountPiastres: drainable,
-              target: 'dues',
+              target: "dues",
             },
           ],
           reason: `Direct-commission dues settlement: drained ${drainable} of ${debt}`,
           groupId: `settle_dues_${teacherId}_${cycleId}`,
-          createdBy: 'system',
-          metadata: { cycleId, duesOwedPiastres: debt, drainedPiastres: drainable },
+          createdBy: "system",
+          metadata: {
+            cycleId,
+            duesOwedPiastres: debt,
+            drainedPiastres: drainable,
+          },
         });
 
         // Partial-settle case: log so ops can see rolling debt.
         if (drainable < debt) {
-          await db.collection('adminAlerts').add({
-            type: 'teacher_dues_partially_settled',
+          await db.collection("adminAlerts").add({
+            type: "teacher_dues_partially_settled",
             mohaffezId: teacherId,
             settledEgp: drainable / 100,
             remainingOwedEgp: (debt - drainable) / 100,
             cycleId,
-            note: 'Partial settlement; remaining dues rolled forward.',
+            note: "Partial settlement; remaining dues rolled forward.",
             resolved: false,
             createdAt: FieldValue.serverTimestamp(),
           });
         }
       });
     } catch (err) {
-      functions.logger.error('settleCycleForTeacher: dues step failed', {
-        teacherId, duesPiastres, err,
+      functions.logger.error("settleCycleForTeacher: dues step failed", {
+        teacherId,
+        duesPiastres,
+        err,
       });
     }
   }
@@ -469,16 +622,18 @@ async function runRecompute(
 ): Promise<{ teachersProcessed: number }> {
   const tiers = await loadTiers();
   const now = new Date();
-  const windowStart = new Date(now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000);
-  const nextEval = new Date(now.getTime() + 14 * 86_400_000);
+  const windowStart = new Date(
+    now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000,
+  );
+  const nextEval = nextScheduledSettlementAt(now);
 
   let teachersProcessed = 0;
   let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined;
 
   while (true) {
     let query = db
-      .collection('users')
-      .where('role', '==', 'mohaffez')
+      .collection("users")
+      .where("role", "==", "mohaffez")
       .orderBy(admin.firestore.FieldPath.documentId())
       .limit(TEACHER_PAGE_SIZE);
     if (lastDoc) query = query.startAfter(lastDoc);
@@ -488,10 +643,17 @@ async function runRecompute(
 
     for (const doc of page.docs) {
       try {
-        await recomputeForTeacher(doc.id, tiers, now, windowStart, nextEval, options);
+        await recomputeForTeacher(
+          doc.id,
+          tiers,
+          now,
+          windowStart,
+          nextEval,
+          options,
+        );
         teachersProcessed += 1;
       } catch (err) {
-        functions.logger.error('tier recompute failed for teacher', {
+        functions.logger.error("tier recompute failed for teacher", {
           teacherId: doc.id,
           err,
         });
@@ -507,12 +669,12 @@ async function runRecompute(
 
 // Scheduled — bi-weekly: 1st and 15th of each month at 00:05 Africa/Cairo.
 export const recomputeTeacherTiers = functions
-  .region('us-central1')
-  .pubsub.schedule('5 0 1,15 * *')
-  .timeZone('Africa/Cairo')
+  .region("us-central1")
+  .pubsub.schedule("5 0 1,15 * *")
+  .timeZone("Africa/Cairo")
   .onRun(async () => {
     const result = await runRecompute();
-    functions.logger.info('recomputeTeacherTiers complete', result);
+    functions.logger.info("recomputeTeacherTiers complete", result);
     return null;
   });
 
@@ -524,15 +686,13 @@ export const recomputeTeacherTiers = functions
 // teachers' pending balances). To force a full cycle close, pass
 // `{ settleWallets: true }`.
 export const recomputeTeacherTiersNow = functions
-  .region('us-central1')
+  .region("us-central1")
   .https.onCall(async (data, context) => {
     if (context.auth?.token?.admin !== true) {
-      throw new functions.https.HttpsError(
-        'permission-denied',
-        'Admin only.',
-      );
+      throw new functions.https.HttpsError("permission-denied", "Admin only.");
     }
-    const settleWallets = (data as { settleWallets?: boolean } | undefined)?.settleWallets === true;
+    const settleWallets =
+      (data as { settleWallets?: boolean } | undefined)?.settleWallets === true;
     const result = await runRecompute({ settleWallet: settleWallets });
     return { ok: true, settleWallets, ...result };
   });
@@ -541,15 +701,19 @@ export const recomputeTeacherTiersNow = functions
 // teacher's tier immediately, instead of waiting for the bi-weekly cron.
 // Failures are logged but never thrown — recompute is best-effort and must
 // not break the caller's primary flow.
-export async function recomputeForTeacherById(teacherId: string): Promise<void> {
+export async function recomputeForTeacherById(
+  teacherId: string,
+): Promise<void> {
   if (!teacherId) return;
   try {
     const tiers = await loadTiers();
     const now = new Date();
-    const windowStart = new Date(now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000);
-    const nextEval = new Date(now.getTime() + 14 * 86_400_000);
+    const windowStart = new Date(
+      now.getTime() - ROLLING_WINDOW_DAYS * 86_400_000,
+    );
+    const nextEval = nextScheduledSettlementAt(now);
     await recomputeForTeacher(teacherId, tiers, now, windowStart, nextEval);
   } catch (err) {
-    functions.logger.warn('recomputeForTeacherById failed', { teacherId, err });
+    functions.logger.warn("recomputeForTeacherById failed", { teacherId, err });
   }
 }

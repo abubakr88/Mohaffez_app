@@ -63,6 +63,8 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  static const int _maxWebProfilePhotoBytes = 5 * 1024 * 1024;
+
   bool _isEditingBio = false;
   bool _isUploadingPhoto = false;
   final _bioController = TextEditingController();
@@ -174,7 +176,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 title: const Text('اختيار صورة جديدة'),
                 onTap: () => Navigator.pop(ctx, 'pick'),
               ),
-              if (hasPhoto)
+              if (hasPhoto && !kIsWeb)
                 ListTile(
                   leading: const Icon(Icons.crop_rounded, color: _DS.amber),
                   title: const Text('تعديل الصورة الحالية'),
@@ -252,14 +254,77 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
   }
 
+  String _imageContentTypeFor(XFile image) {
+    final mimeType = image.mimeType;
+    if (mimeType != null && mimeType.startsWith('image/')) return mimeType;
+
+    final name = image.name.toLowerCase();
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  Future<void> _uploadWebPhoto(
+    String userId,
+    Uint8List bytes, {
+    required String contentType,
+  }) async {
+    if (!mounted) return;
+    if (bytes.length >= _maxWebProfilePhotoBytes) {
+      _showSnackBar('حجم الصورة كبير. اختر صورة أقل من 5 ميجابايت.');
+      return;
+    }
+
+    BuildContext? loadingCtx;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        loadingCtx = dialogCtx;
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    await PhotoUploadService.uploadProfilePhotoBytes(
+      userId,
+      bytes,
+      FirebaseFirestore.instance,
+      contentType: contentType,
+    );
+
+    if (!mounted) return;
+    final ctx = loadingCtx;
+    if (ctx != null && ctx.mounted && Navigator.canPop(ctx)) {
+      Navigator.of(ctx).pop();
+    }
+    ref.invalidate(currentUserProvider);
+    _showSnackBar('تم تحديث الصورة بنجاح', isSuccess: true);
+  }
+
   Future<void> _pickAndUploadPhoto(String userId) async {
     if (_isUploadingPhoto) return;
     setState(() => _isUploadingPhoto = true);
     try {
       final picker = ImagePicker();
-      final image = await picker.pickImage(source: ImageSource.gallery);
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: kIsWeb ? 1200 : null,
+        maxHeight: kIsWeb ? 1200 : null,
+        imageQuality: kIsWeb ? 85 : null,
+      );
       if (image == null) return;
       if (!mounted) return;
+
+      if (kIsWeb) {
+        final bytes = await image.readAsBytes();
+        await _uploadWebPhoto(
+          userId,
+          bytes,
+          contentType: _imageContentTypeFor(image),
+        );
+        return;
+      }
+
       final croppedPath = await _runCropper(image.path);
       if (croppedPath == null) return;
       await _uploadCroppedPhoto(userId, croppedPath);
@@ -1036,37 +1101,36 @@ class _ProfileHeader extends StatelessWidget {
                               semanticLabel: name,
                             ),
                           ),
-                          if (!kIsWeb)
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  onEditPhoto();
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: _DS.teal500,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: AppThemeConstants.white,
-                                        width: 2.5),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppThemeConstants.black
-                                            .withValues(alpha: 0.2),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(Icons.camera_alt_rounded,
-                                      color: AppThemeConstants.white, size: 16),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                onEditPhoto();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: _DS.teal500,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: AppThemeConstants.white,
+                                      width: 2.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppThemeConstants.black
+                                          .withValues(alpha: 0.2),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
+                                child: const Icon(Icons.camera_alt_rounded,
+                                    color: AppThemeConstants.white, size: 16),
                               ),
                             ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),

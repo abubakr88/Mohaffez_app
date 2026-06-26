@@ -29,6 +29,22 @@ void openExternalUrl(String url) {
   web.window.open(url, '_blank');
 }
 
+/// Asks the browser to download an external file.
+///
+/// Some browsers ignore the download hint for cross-origin URLs and open the
+/// file in a new tab instead, which is still better than a silent no-op.
+void downloadExternalUrl(String url, {String? filename}) {
+  final anchor = web.HTMLAnchorElement()
+    ..href = url
+    ..target = '_blank'
+    ..download = filename ?? ''
+    ..style.display = 'none';
+  anchor.setAttribute('rel', 'noopener');
+  web.document.body!.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
 /// Escapes a single CSV cell (quotes, commas, newlines).
 String csvCell(Object? value) {
   final s = value?.toString() ?? '';
