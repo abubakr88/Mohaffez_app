@@ -1459,85 +1459,228 @@ class _ImageViewerState extends State<_ImageViewer> {
   @override
   Widget build(BuildContext context) {
     if (widget.images.isEmpty) return const SizedBox.shrink();
+    final currentUrl = widget.images[_index];
+    final viewport = MediaQuery.sizeOf(context);
 
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(DSSpacing.xxl),
-      child: Stack(
-        children: [
-          Center(
-            child: InteractiveViewer(
-              maxScale: 4,
-              child: Image.network(widget.images[_index], fit: BoxFit.contain),
-            ),
-          ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: 'فتح الملف الأصلي',
-                  icon: const Icon(Icons.open_in_new_rounded,
-                      color: Colors.white),
-                  onPressed: () => openExternalUrl(widget.images[_index]),
-                ),
-                IconButton(
-                  tooltip: 'إغلاق',
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          if (widget.images.length > 1) ...[
-            Positioned(
-              right: 8,
-              top: 0,
-              bottom: 0,
+      child: SizedBox(
+        width: viewport.width * 0.86,
+        height: viewport.height * 0.82,
+        child: Stack(
+          children: [
+            Positioned.fill(
               child: Center(
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                  onPressed: () => setState(
-                    () => _index = (_index + 1) % widget.images.length,
+                child: InteractiveViewer(
+                  maxScale: 4,
+                  child: Image.network(
+                    currentUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const _ViewerLoading();
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return _ViewerFileFallback(
+                        url: currentUrl,
+                        error: error.toString(),
+                      );
+                    },
                   ),
                 ),
               ),
             ),
             Positioned(
-              left: 8,
               top: 0,
-              bottom: 0,
-              child: Center(
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.chevron_left_rounded,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                  onPressed: () => setState(
-                    () => _index = (_index - 1 + widget.images.length) %
-                        widget.images.length,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 8,
-              left: 0,
               right: 0,
-              child: Center(
-                child: Text(
-                  '${_index + 1} / ${widget.images.length}',
-                  style: const TextStyle(color: Colors.white70),
-                ),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'فتح الملف الأصلي',
+                    icon: const Icon(Icons.open_in_new_rounded,
+                        color: Colors.white),
+                    onPressed: () => openExternalUrl(currentUrl),
+                  ),
+                  IconButton(
+                    tooltip: 'تحميل الملف',
+                    icon:
+                        const Icon(Icons.download_rounded, color: Colors.white),
+                    onPressed: () => downloadExternalUrl(
+                      currentUrl,
+                      filename: _downloadFileName(currentUrl),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'إغلاق',
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
               ),
             ),
+            if (widget.images.length > 1) ...[
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                    onPressed: () => setState(
+                      () => _index = (_index + 1) % widget.images.length,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                    onPressed: () => setState(
+                      () => _index = (_index - 1 + widget.images.length) %
+                          widget.images.length,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 8,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Text(
+                    '${_index + 1} / ${widget.images.length}',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ViewerLoading extends StatelessWidget {
+  const _ViewerLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(DSSpacing.xl),
+      decoration: const BoxDecoration(
+        color: DSColors.surface,
+        borderRadius: DSRadius.lgAll,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox.square(
+            dimension: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: DSColors.primary,
+            ),
+          ),
+          const SizedBox(height: DSSpacing.md),
+          Text(
+            'جار تحميل الشهادة...',
+            style: DSText.body(context, color: DSColors.text2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ViewerFileFallback extends StatelessWidget {
+  const _ViewerFileFallback({
+    required this.url,
+    required this.error,
+  });
+
+  final String url;
+  final String error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 480),
+      padding: const EdgeInsets.all(DSSpacing.xl),
+      decoration: const BoxDecoration(
+        color: DSColors.surface,
+        borderRadius: DSRadius.lgAll,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(DSSpacing.lg),
+            decoration: const BoxDecoration(
+              color: DSColors.warningBg,
+              borderRadius: DSRadius.lgAll,
+            ),
+            child: const Icon(
+              Icons.insert_drive_file_outlined,
+              color: DSColors.warning,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: DSSpacing.lg),
+          Text(
+            'تعذر عرض الملف داخل اللوحة',
+            textAlign: TextAlign.center,
+            style: DSText.h3(context),
+          ),
+          const SizedBox(height: DSSpacing.sm),
+          Text(
+            'قد يكون الملف PDF أو رابطا لا يسمح بالمعاينة المباشرة. يمكنك فتحه أو تحميله من الرابط الأصلي.',
+            textAlign: TextAlign.center,
+            style: DSText.body(context, color: DSColors.text2),
+          ),
+          const SizedBox(height: DSSpacing.lg),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: DSSpacing.sm,
+            runSpacing: DSSpacing.sm,
+            children: [
+              DSButton(
+                label: 'فتح الملف',
+                leading: const Icon(Icons.open_in_new_rounded, size: 16),
+                onPressed: () => openExternalUrl(url),
+              ),
+              DSButton(
+                label: 'تحميل',
+                variant: DSButtonVariant.secondary,
+                leading: const Icon(Icons.download_rounded, size: 16),
+                onPressed: () => downloadExternalUrl(
+                  url,
+                  filename: _downloadFileName(url),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DSSpacing.md),
+          SelectableText(
+            error,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: DSText.caption(context, color: DSColors.text3),
+          ),
         ],
       ),
     );
@@ -1714,6 +1857,18 @@ List<String> _stringList(dynamic raw) {
       .map((e) => e.toString().trim())
       .where((e) => e.isNotEmpty)
       .toList();
+}
+
+String _downloadFileName(String url) {
+  final uri = Uri.tryParse(url);
+  final rawName = uri == null || uri.pathSegments.isEmpty
+      ? 'certificate'
+      : uri.pathSegments.last;
+  final decoded = Uri.decodeComponent(rawName);
+  final parts = decoded.split('/').where((part) => part.isNotEmpty).toList();
+  final fileName = parts.isEmpty ? null : parts.last;
+  if (fileName == null || fileName.trim().isEmpty) return 'certificate';
+  return fileName;
 }
 
 List<String> _credentialImages(Map<String, dynamic> credential) {

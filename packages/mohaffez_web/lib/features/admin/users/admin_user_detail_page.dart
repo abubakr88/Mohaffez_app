@@ -382,15 +382,25 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-class _AccountTab extends StatelessWidget {
+class _AccountTab extends ConsumerWidget {
   const _AccountTab({required this.userId, required this.user});
 
   final String userId;
   final Map<String, dynamic> user;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = _text(user, const ['role'], 'student');
+    final status = _text(user, const ['status'], 'active');
     final adminPermissions = _adminPermissionsLabel(user);
+    final access = ref.watch(currentAdminAccessProvider).valueOrNull ??
+        AdminAccessState.none();
+    final actionState = ref.watch(adminActionsProvider);
+    final canEditAdminAccess = role == 'admin' &&
+        status != 'deleted' &&
+        access.can(AdminPermission.manageAdminAccess) &&
+        access.uid != userId;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -408,12 +418,12 @@ class _AccountTab extends StatelessWidget {
             ),
             _InfoCard(
               label: 'الدور',
-              value: _roleLabel(_text(user, const ['role'], 'student')),
+              value: _roleLabel(role),
               icon: Icons.admin_panel_settings_outlined,
             ),
             _InfoCard(
               label: 'الحالة',
-              value: _statusLabel(_text(user, const ['status'], 'active')),
+              value: _statusLabel(status),
               icon: Icons.verified_outlined,
             ),
             _InfoCard(
@@ -493,6 +503,21 @@ class _AccountTab extends StatelessWidget {
                 _TextPanel(
                   title: 'صلاحيات الأدمن',
                   value: adminPermissions,
+                  trailing: canEditAdminAccess
+                      ? DSButton(
+                          label: 'تعديل',
+                          size: DSButtonSize.sm,
+                          variant: DSButtonVariant.secondary,
+                          leading: const Icon(
+                            Icons.admin_panel_settings_rounded,
+                            size: 16,
+                          ),
+                          loading: actionState.isLoading,
+                          onPressed: actionState.isLoading
+                              ? null
+                              : () => _editAdminAccess(context, ref),
+                        )
+                      : null,
                 ),
             ];
 
@@ -524,11 +549,282 @@ class _AccountTab extends StatelessWidget {
             );
           },
         ),
-        if (_text(user, const ['role'], 'student') == 'mohaffez') ...[
+        if (role == 'mohaffez') ...[
           const SizedBox(height: DSSpacing.xl),
           _FoundingBadgeAdminSection(userId: userId, user: user),
         ],
       ],
+    );
+  }
+
+  Future<void> _editAdminAccess(BuildContext context, WidgetRef ref) async {
+    final name = _text(user, const ['name', 'displayName'], 'مستخدم');
+    final input = await _showAdminAccessDialog(context, name, user);
+    if (input == null || !context.mounted) return;
+
+    await ref.read(adminActionsProvider.notifier).updateAdminAccess(
+          userId: userId,
+          adminRole: input.adminRole,
+          permissions: input.permissions,
+        );
+    if (!context.mounted) return;
+
+    ref.read(adminActionsProvider).when(
+          data: (_) {
+            ref.invalidate(adminUserProvider(userId));
+            DSToast.show(
+              context,
+              'تم تحديث صلاحيات الأدمن',
+              type: DSToastType.success,
+            );
+          },
+          loading: () {},
+          error: (e, _) => DSToast.show(
+            context,
+            'فشل تحديث الصلاحيات: $e',
+            type: DSToastType.error,
+          ),
+        );
+  }
+}
+
+Future<_AdminAccessInput?> _showAdminAccessDialog(
+  BuildContext context,
+  String name,
+  Map<String, dynamic> user,
+) async {
+  var selectedRole = _adminRoleKey(user);
+  final permissions = _limitedAdminPermissionsFromUser(user);
+
+  return DSDialog.show<_AdminAccessInput>(
+    context,
+    title: 'إدارة صلاحيات الأدمن',
+    width: 620,
+    child: StatefulBuilder(
+      builder: (context, setState) {
+        final isLimitedAdmin = selectedRole == 'admin';
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: DSText.bodyMedium(context, color: DSColors.text1),
+            ),
+            const SizedBox(height: DSSpacing.lg),
+            Row(
+              children: [
+                Expanded(
+                  child: _AdminRoleOption(
+                    label: 'Super Admin',
+                    icon: Icons.workspace_premium_rounded,
+                    selected: selectedRole == 'super_admin',
+                    onTap: () => setState(() => selectedRole = 'super_admin'),
+                  ),
+                ),
+                const SizedBox(width: DSSpacing.sm),
+                Expanded(
+                  child: _AdminRoleOption(
+                    label: 'Admin',
+                    icon: Icons.admin_panel_settings_rounded,
+                    selected: isLimitedAdmin,
+                    onTap: () => setState(() => selectedRole = 'admin'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: DSSpacing.lg),
+            AnimatedSwitcher(
+              duration: DSDuration.fast,
+              child: isLimitedAdmin
+                  ? ConstrainedBox(
+                      key: const ValueKey('limited-admin-permissions'),
+                      constraints: const BoxConstraints(maxHeight: 360),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            for (final permission
+                                in _assignableAdminPermissions)
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                title: Text(
+                                  permission.label,
+                                  style: DSText.body(
+                                    context,
+                                    color: DSColors.text1,
+                                  ),
+                                ),
+                                value: permissions[permission] == true,
+                                onChanged: (value) => setState(
+                                  () =>
+                                      permissions[permission] = value ?? false,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Container(
+                      key: const ValueKey('super-admin-note'),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(DSSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: DSColors.errorBg,
+                        borderRadius: DSRadius.mdAll,
+                        border: Border.all(
+                          color: DSColors.error.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.verified_user_rounded,
+                            color: DSColors.error,
+                            size: 20,
+                          ),
+                          const SizedBox(width: DSSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'صلاحية كاملة لكل أدوات الإدارة.',
+                              style: DSText.body(
+                                context,
+                                color: DSColors.text1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+            const SizedBox(height: DSSpacing.xl),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                DSButton(
+                  label: 'إلغاء',
+                  variant: DSButtonVariant.ghost,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: DSSpacing.sm),
+                DSButton(
+                  label: 'حفظ الصلاحيات',
+                  onPressed: () {
+                    Navigator.of(context).pop(
+                      _AdminAccessInput(
+                        adminRole: selectedRole,
+                        permissions: selectedRole == 'admin'
+                            ? Map<AdminPermission, bool>.from(permissions)
+                            : {
+                                for (final permission in AdminPermission.values)
+                                  permission: true,
+                              },
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+Map<AdminPermission, bool> _limitedAdminPermissionsFromUser(
+  Map<String, dynamic> user,
+) {
+  final raw = user['adminPermissions'];
+  final rawMap = raw is Map ? raw : const {};
+
+  return {
+    for (final permission in _assignableAdminPermissions)
+      permission: rawMap[permission.key] is bool
+          ? rawMap[permission.key] as bool
+          : defaultAdminPermissions[permission] ?? false,
+  };
+}
+
+const _assignableAdminPermissions = [
+  AdminPermission.manageUsers,
+  AdminPermission.manageUserRoles,
+  AdminPermission.manageTeacherBadges,
+  AdminPermission.deleteUsers,
+  AdminPermission.reviewTeachers,
+  AdminPermission.manageFinance,
+  AdminPermission.sendBroadcasts,
+  AdminPermission.runMaintenance,
+];
+
+class _AdminAccessInput {
+  const _AdminAccessInput({
+    required this.adminRole,
+    required this.permissions,
+  });
+
+  final String adminRole;
+  final Map<AdminPermission, bool> permissions;
+}
+
+class _AdminRoleOption extends StatelessWidget {
+  const _AdminRoleOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? DSColors.primary : DSColors.text2;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: DSDuration.fast,
+          padding: const EdgeInsets.symmetric(
+            horizontal: DSSpacing.lg,
+            vertical: DSSpacing.md,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? DSColors.primary.withValues(alpha: 0.08)
+                : DSColors.surfaceMuted,
+            borderRadius: DSRadius.mdAll,
+            border: Border.all(
+              color: selected ? DSColors.primary : DSColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: DSSpacing.sm),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: DSText.bodyMedium(context, color: color),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1713,10 +2009,15 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _TextPanel extends StatelessWidget {
-  const _TextPanel({required this.title, required this.value});
+  const _TextPanel({
+    required this.title,
+    required this.value,
+    this.trailing,
+  });
 
   final String title;
   final String value;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1724,7 +2025,12 @@ class _TextPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: DSText.h3(context)),
+          Row(
+            children: [
+              Expanded(child: Text(title, style: DSText.h3(context))),
+              if (trailing != null) trailing!,
+            ],
+          ),
           const SizedBox(height: DSSpacing.sm),
           SelectableText(
             value,
@@ -1925,14 +2231,18 @@ String? _adminRole(Map<String, dynamic> user) {
   return user['adminRole'] == 'admin' ? 'Admin' : 'Super Admin';
 }
 
+String _adminRoleKey(Map<String, dynamic> user) {
+  return user['adminRole'] == 'admin' ? 'admin' : 'super_admin';
+}
+
 String? _adminPermissionsLabel(Map<String, dynamic> user) {
   if (user['role'] != 'admin') return null;
   if (user['adminRole'] != 'admin') return 'صلاحية كاملة';
   final raw = user['adminPermissions'];
   if (raw is! Map) return 'صلاحيات افتراضية';
-  final enabled = raw.entries
-      .where((entry) => entry.value == true)
-      .map((entry) => entry.key.toString())
+  final enabled = _assignableAdminPermissions
+      .where((permission) => raw[permission.key] == true)
+      .map((permission) => permission.label)
       .toList();
   return enabled.isEmpty ? 'لا توجد صلاحيات مفعّلة' : enabled.join('، ');
 }
