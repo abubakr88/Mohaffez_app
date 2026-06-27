@@ -1,13 +1,17 @@
 // lib/screens/mohaffez_profile_screen.dart
 
-import 'package:flutter/material.dart';
-import 'package:mohaffez_core/mohaffez_core.dart';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../shared/utils/exported_profile_image_share.dart';
 import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../providers/mohaffez_profile_providers.dart';
@@ -42,6 +46,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
   int? selectedDayOfWeek;
+  final GlobalKey _profileExportKey = GlobalKey();
+  bool _isExportingProfile = false;
 
   /// Helper to filter pricing plans by selected session type
   List<PricingPlanModel> _relevantPlans(List<PricingPlanModel> plans) {
@@ -224,6 +230,202 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  Future<List<PricingPlanModel>> _loadPlansForExport() async {
+    try {
+      return await ref
+          .read(activePricingPlansProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return <PricingPlanModel>[];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadCredentialsForExport() async {
+    try {
+      return await ref.read(credentialsProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadAvailabilityForExport() async {
+    try {
+      return await ref.read(availabilityProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadStatsForExport() async {
+    try {
+      return await ref.read(mohaffezStatsProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return {'completedSessions': 0, 'uniqueStudents': 0};
+    }
+  }
+
+  Future<void> _precacheExportImages(
+    Map<String, dynamic> profile,
+    List<Map<String, dynamic>> credentials,
+  ) async {
+    final urls = <String>[];
+    final photoUrl = (profile['photoUrl'] as String?)?.trim();
+    if (photoUrl != null && photoUrl.isNotEmpty) urls.add(photoUrl);
+
+    final videoUrl = _teacherVideoUrl(profile);
+    final youtubeId = videoUrl == null ? null : _youtubeVideoId(videoUrl);
+    if (youtubeId != null) {
+      urls.add('https://img.youtube.com/vi/$youtubeId/hqdefault.jpg');
+    }
+
+    for (final credential in credentials.take(6)) {
+      final imageUrls = List<String>.from(
+        credential['imageUrls'] as List? ?? const [],
+      ).where((url) => url.trim().isNotEmpty);
+      urls.addAll(imageUrls.take(1));
+    }
+
+    await Future.wait(
+      urls.map(
+        (url) => precacheImage(
+          CachedNetworkImageProvider(url),
+          context,
+        )
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {},
+            )
+            .catchError((_) {}),
+      ),
+    );
+  }
+
+  String _exportFileName(Map<String, dynamic> profile) {
+    final rawName = ((profile['name'] as String?) ?? 'mohaffez')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '');
+    final safeName = rawName.isEmpty ? 'mohaffez' : rawName;
+    return 'mohafezy_profile_$safeName.png';
+  }
+
+  Future<void> _exportProfileAsImage() async {
+    if (_isExportingProfile) return;
+    setState(() => _isExportingProfile = true);
+
+    final mediaQuery = MediaQuery.of(context);
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    OverlayEntry? overlayEntry;
+    try {
+      final profile = await ref.read(
+        mohaffezProfileProvider(widget.mohaffezId).future,
+      );
+      final plans = await _loadPlansForExport();
+      final credentials = await _loadCredentialsForExport();
+      final availability = await _loadAvailabilityForExport();
+      final stats = await _loadStatsForExport();
+      if (!mounted) return;
+
+      await _precacheExportImages(profile, credentials);
+      if (!mounted) return;
+
+      final screenWidth = mediaQuery.size.width;
+      final exportWidth = screenWidth < 360
+          ? 360.0
+          : screenWidth > 430
+              ? 430.0
+              : screenWidth;
+
+      overlayEntry = OverlayEntry(
+        builder: (context) => IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: OverflowBox(
+                minWidth: exportWidth,
+                maxWidth: exportWidth,
+                minHeight: 0,
+                maxHeight: double.infinity,
+                alignment: Alignment.topCenter,
+                child: Opacity(
+                  opacity: 0.01,
+                  child: SizedBox(
+                    width: exportWidth,
+                    child: RepaintBoundary(
+                      key: _profileExportKey,
+                      child: Directionality(
+                        textDirection: ui.TextDirection.rtl,
+                        child: _TeacherProfileExportCard(
+                          profile: profile,
+                          plans: plans,
+                          credentials: credentials,
+                          availability: availability,
+                          stats: stats,
+                          videoUrl: _teacherVideoUrl(profile),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      overlay.insert(overlayEntry);
+      await WidgetsBinding.instance.endOfFrame;
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await WidgetsBinding.instance.endOfFrame;
+
+      final boundary = _profileExportKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw StateError('Profile export view was not ready');
+      }
+
+      final devicePixelRatio = mediaQuery.devicePixelRatio;
+      final pixelRatio = devicePixelRatio < 2
+          ? 2.0
+          : devicePixelRatio > 3
+              ? 3.0
+              : devicePixelRatio;
+      final image = await boundary.toImage(pixelRatio: pixelRatio);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final Uint8List? bytes = byteData?.buffer.asUint8List();
+      if (bytes == null || bytes.isEmpty) {
+        throw StateError('Profile export image was empty');
+      }
+
+      await shareExportedProfileImage(
+        bytes,
+        fileName: _exportFileName(profile),
+        text: _teacherProfileShareText(profile),
+      );
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('تم تجهيز صورة الملف الشخصي'),
+          backgroundColor: AppThemeConstants.success,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('تعذر تصدير الملف كصورة. يرجى المحاولة مرة أخرى'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+    } finally {
+      overlayEntry?.remove();
+      if (mounted) setState(() => _isExportingProfile = false);
+    }
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
@@ -277,7 +479,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       children: [
                         const SizedBox(height: 16),
                         if (widget.previewMode) ...[
-                          _buildOwnerPreviewPanel(),
+                          _buildOwnerPreviewPanel(profile),
                           const SizedBox(height: 16),
                         ],
                         _buildCompactTrustStrip(ref, profile),
@@ -430,7 +632,21 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
-  Widget _buildOwnerPreviewPanel() {
+  Uri _teacherPublicProfileUri() {
+    return Uri.https(
+      'app.mohafezy.com',
+      '/mohaffez/${widget.mohaffezId}',
+    );
+  }
+
+  String _teacherProfileShareText(Map<String, dynamic> profile) {
+    final name = ((profile['name'] as String?) ?? 'محفظ').trim();
+    final specialization =
+        ((profile['specialization'] as String?) ?? 'تعليم القرآن').trim();
+    return 'تعرف على $name على تطبيق محفظي - $specialization\n${_teacherPublicProfileUri()}';
+  }
+
+  Widget _buildOwnerPreviewPanel(Map<String, dynamic> profile) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -500,6 +716,37 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   route: '/availability',
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isExportingProfile ? null : _exportProfileAsImage,
+                icon: _isExportingProfile
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.image_outlined),
+                label: Text(
+                  _isExportingProfile
+                      ? 'جاري تجهيز الصورة...'
+                      : 'تصدير الملف كصورة',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor:
+                      AppThemeConstants.primary.withValues(alpha: 0.55),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -2296,6 +2543,791 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         child: CircularProgressIndicator(),
       ),
       error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _TeacherProfileExportCard extends StatelessWidget {
+  const _TeacherProfileExportCard({
+    required this.profile,
+    required this.plans,
+    required this.credentials,
+    required this.availability,
+    required this.stats,
+    required this.videoUrl,
+  });
+
+  final Map<String, dynamic> profile;
+  final List<PricingPlanModel> plans;
+  final List<Map<String, dynamic>> credentials;
+  final List<Map<String, dynamic>> availability;
+  final Map<String, dynamic> stats;
+  final String? videoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _string(profile['name'], 'المحفظ');
+    final specialization = _string(profile['specialization'], 'معلم قرآن');
+    final bio = _string(profile['bio'], '');
+    final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
+    final reviewCount = (profile['reviewCount'] as num?)?.toInt() ?? 0;
+    final completedSessions =
+        (stats['completedSessions'] as num?)?.toInt() ?? 0;
+    final uniqueStudents = (stats['uniqueStudents'] as num?)?.toInt() ?? 0;
+    final hasFoundingBadge = profile['status'] == 'active' &&
+        UserBadges.fromJson(profile['badges']).foundingTeacher.enabled;
+    final activePlans = plans.where((plan) => plan.isActive).toList();
+    final availableSlots = _availableSlotSummaries(availability);
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: double.infinity,
+        color: AppThemeConstants.background,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ExportHero(
+              name: name,
+              specialization: specialization,
+              photoUrl: _string(profile['photoUrl'], ''),
+              hasFoundingBadge: hasFoundingBadge,
+              rating: reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد',
+              reviewCount: reviewCount,
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _ExportStat(
+                    icon: Icons.star_rounded,
+                    value: reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد',
+                    label: 'التقييم',
+                  ),
+                  _ExportStat(
+                    icon: Icons.people_alt_rounded,
+                    value: '$uniqueStudents',
+                    label: 'طالب',
+                  ),
+                  _ExportStat(
+                    icon: Icons.task_alt_rounded,
+                    value: '$completedSessions',
+                    label: 'جلسة',
+                  ),
+                  _ExportStat(
+                    icon: Icons.workspace_premium_rounded,
+                    value: '${credentials.length}',
+                    label: 'شهادة',
+                  ),
+                ],
+              ),
+            ),
+            if (videoUrl != null && videoUrl!.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'الفيديو التعريفي',
+                icon: Icons.play_circle_outline_rounded,
+                child: _ExportVideoPreview(url: videoUrl!),
+              ),
+            ],
+            if (bio.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'نبذة عن المحفظ',
+                icon: Icons.info_outline_rounded,
+                child: Text(
+                  bio,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.55,
+                    color: AppThemeConstants.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+            if (credentials.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'الإجازات والشهادات',
+                icon: Icons.workspace_premium_rounded,
+                child: Column(
+                  children: credentials
+                      .map((credential) => _ExportCredentialRow(
+                            credential: credential,
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
+            if (activePlans.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'الجلسات والأسعار',
+                icon: Icons.sell_outlined,
+                child: Column(
+                  children: activePlans
+                      .map((plan) => _ExportPlanRow(plan: plan))
+                      .toList(),
+                ),
+              ),
+            ],
+            if (availableSlots.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'مواعيد متاحة',
+                icon: Icons.calendar_month_outlined,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableSlots
+                      .take(8)
+                      .map((slot) => _ExportChip(
+                            icon: Icons.schedule_rounded,
+                            label: slot,
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'محفظي | mohafezy.com',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppThemeConstants.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _string(Object? value, String fallback) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+
+  static List<String> _availableSlotSummaries(
+    List<Map<String, dynamic>> availability,
+  ) {
+    const dayNames = [
+      'الإثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+      'الأحد',
+    ];
+    final items = <String>[];
+    for (final day in availability) {
+      final dayIndex = ((day['dayOfWeek'] as num?)?.toInt() ?? 1) - 1;
+      final dayName = dayNames[dayIndex.clamp(0, 6)];
+      final slots = List<Map<String, dynamic>>.from(day['timeSlots'] ?? []);
+      for (final slot in slots) {
+        if (slot['enabled'] != true) continue;
+        final start = _string(slot['startTime'], '');
+        final end = _string(slot['endTime'], '');
+        if (start.isEmpty || end.isEmpty) continue;
+        items.add('$dayName ${formatTimeToArabicAmPm('$start - $end')}');
+      }
+    }
+    return items;
+  }
+}
+
+class _ExportHero extends StatelessWidget {
+  const _ExportHero({
+    required this.name,
+    required this.specialization,
+    required this.photoUrl,
+    required this.hasFoundingBadge,
+    required this.rating,
+    required this.reviewCount,
+  });
+
+  final String name;
+  final String specialization;
+  final String photoUrl;
+  final bool hasFoundingBadge;
+  final String rating;
+  final int reviewCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 28, 18, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeConstants.primary,
+            AppThemeConstants.primaryVariant,
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -40,
+            left: -40,
+            child: Container(
+              width: 170,
+              height: 170,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 92,
+                height: 92,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  child: photoUrl.isNotEmpty
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: photoUrl,
+                            width: 84,
+                            height: 84,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(
+                              Icons.person_rounded,
+                              size: 42,
+                              color: AppThemeConstants.primary,
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person_rounded,
+                          size: 42,
+                          color: AppThemeConstants.primary,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ملف محفظ معتمد',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      specialization,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (hasFoundingBadge) ...[
+                      const SizedBox(height: 8),
+                      const FoundingTeacherBadge(
+                        compact: true,
+                        showLabel: true,
+                        useFullLabel: true,
+                        size: 20,
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _ExportHeroBadge(
+                          icon: Icons.star_rounded,
+                          label: rating,
+                        ),
+                        _ExportHeroBadge(
+                          icon: Icons.rate_review_rounded,
+                          label:
+                              reviewCount > 0 ? '$reviewCount تقييم' : 'جديد',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExportHeroBadge extends StatelessWidget {
+  const _ExportHeroBadge({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExportStat extends StatelessWidget {
+  const _ExportStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppThemeConstants.primary, size: 20),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppThemeConstants.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportSection extends StatelessWidget {
+  const _ExportSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppThemeConstants.grey200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: AppThemeConstants.primary, size: 19),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportVideoPreview extends StatelessWidget {
+  const _ExportVideoPreview({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final youtubeId = _youtubeVideoId(url);
+    final thumbnailUrl = youtubeId == null
+        ? null
+        : 'https://img.youtube.com/vi/$youtubeId/hqdefault.jpg';
+
+    return Container(
+      height: 150,
+      decoration: BoxDecoration(
+        color: const Color(0xFF073F37),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (thumbnailUrl != null)
+            CachedNetworkImage(
+              imageUrl: thumbnailUrl,
+              fit: BoxFit.cover,
+              color: Colors.black.withValues(alpha: 0.30),
+              colorBlendMode: BlendMode.darken,
+              errorWidget: (_, __, ___) =>
+                  const ColoredBox(color: Color(0xFF073F37)),
+            ),
+          const Center(
+            child: Icon(
+              Icons.play_circle_fill_rounded,
+              color: Colors.white,
+              size: 56,
+            ),
+          ),
+          const Positioned(
+            right: 14,
+            left: 14,
+            bottom: 12,
+            child: Text(
+              'شاهد الفيديو التعريفي قبل الحجز',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String? _youtubeVideoId(String value) {
+    final trimmed = value.trim();
+    if (RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(trimmed)) return trimmed;
+    final withScheme =
+        trimmed.startsWith('http://') || trimmed.startsWith('https://')
+            ? trimmed
+            : 'https://$trimmed';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null) return null;
+    final host = uri.host.toLowerCase().replaceFirst('www.', '');
+    if (host == 'youtu.be' && uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.first;
+    }
+    if (host.endsWith('youtube.com')) {
+      final queryId = uri.queryParameters['v'];
+      if (queryId != null && queryId.isNotEmpty) return queryId;
+      final segments = uri.pathSegments;
+      if (segments.length >= 2 &&
+          const {'embed', 'shorts', 'live'}.contains(segments.first)) {
+        return segments[1];
+      }
+    }
+    return null;
+  }
+}
+
+class _ExportCredentialRow extends StatelessWidget {
+  const _ExportCredentialRow({required this.credential});
+
+  final Map<String, dynamic> credential;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _string(credential['title'], 'شهادة معتمدة');
+    final organization = _string(credential['organization'], '');
+    final imageUrls = List<String>.from(
+      credential['imageUrls'] as List? ?? const [],
+    ).where((url) => url.trim().isNotEmpty).toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7E2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: imageUrls.isEmpty
+                ? const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Color(0xFFE8A020),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: imageUrls.first,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: Color(0xFFE8A020),
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (organization.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    organization,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppThemeConstants.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.verified_rounded,
+            color: AppThemeConstants.success,
+            size: 18,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _string(Object? value, String fallback) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+}
+
+class _ExportPlanRow extends StatelessWidget {
+  const _ExportPlanRow({required this.plan});
+
+  final PricingPlanModel plan;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppThemeConstants.grey200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppThemeConstants.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                _modeIcon(plan.mode),
+                color: AppThemeConstants.primary,
+                size: 19,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    plan.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${_modeLabel(plan.mode)} • ${plan.sessionsCount} جلسة',
+                    style: const TextStyle(
+                      color: AppThemeConstants.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              '${plan.priceEGP.toStringAsFixed(0)} ج.م',
+              style: const TextStyle(
+                color: AppThemeConstants.primary,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _modeIcon(SessionMode? mode) {
+    return switch (mode) {
+      SessionMode.online => Icons.videocam_rounded,
+      SessionMode.mosque => Icons.mosque_rounded,
+      SessionMode.home => Icons.home_rounded,
+      _ => Icons.menu_book_rounded,
+    };
+  }
+
+  String _modeLabel(SessionMode? mode) {
+    return switch (mode) {
+      SessionMode.online => 'أونلاين',
+      SessionMode.mosque => 'في المسجد',
+      SessionMode.home => 'زيارة منزلية',
+      _ => 'جلسة',
+    };
+  }
+}
+
+class _ExportChip extends StatelessWidget {
+  const _ExportChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppThemeConstants.primary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppThemeConstants.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
