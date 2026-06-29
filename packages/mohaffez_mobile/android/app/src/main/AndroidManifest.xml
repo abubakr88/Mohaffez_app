@@ -59,7 +59,7 @@
         <!-- UCropActivity required by image_cropper -->
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:theme="@style/MohaffezCropperTheme" />
     </application>
 
     <queries>
