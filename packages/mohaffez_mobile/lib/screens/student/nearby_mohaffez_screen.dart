@@ -33,11 +33,13 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       TeacherAvailabilityFilter.availableOnly;
   TeacherGenderFilter genderFilter = TeacherGenderFilter.all;
   TeacherTrialSessionFilter trialSessionFilter = TeacherTrialSessionFilter.all;
+  TeacherSessionTypeFilter sessionTypeFilter = TeacherSessionTypeFilter.all;
   double? userLat;
   double? userLng;
   bool isLoadingLocation = true;
   String? locationError;
   double radiusKm = 50.0;
+  bool distanceFilterEnabled = true;
   String searchQuery = '';
   String? selectedSpecialization;
   MohaffezModel? _selectedTeacher;
@@ -125,18 +127,25 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   double? _distanceFor(MohaffezModel teacher) =>
       teacher.getDistanceFrom(userLat, userLng);
 
+  String _searchScopeSummary(int teacherCount) {
+    if (!distanceFilterEnabled) return '$teacherCount محفظ في كل المناطق';
+    return '$teacherCount محفظ ضمن ${radiusKm.round()} كم';
+  }
+
   @override
   Widget build(BuildContext context) {
     final params = NearbyParams(
       userLat: userLat,
       userLng: userLng,
       radiusKm: radiusKm,
+      distanceFilterEnabled: distanceFilterEnabled,
       sortBy: selectedFilter,
       searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
       specialization: selectedSpecialization,
       availabilityFilter: availabilityFilter,
       genderFilter: genderFilter,
       trialSessionFilter: trialSessionFilter,
+      sessionTypeFilter: sessionTypeFilter,
     );
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
 
@@ -227,7 +236,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                       ? CancellableNetworkTileProvider()
                       : NetworkTileProvider(),
                 ),
-                if (userLat != null && userLng != null)
+                if (distanceFilterEnabled && userLat != null && userLng != null)
                   CircleLayer(
                     circles: [
                       CircleMarker(
@@ -555,7 +564,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '$teacherCount محفظ ضمن ${radiusKm.round()} كم',
+                    _searchScopeSummary(teacherCount),
                     style: TextStyle(
                       color: AppThemeConstants.white.withValues(alpha: 0.72),
                       fontSize: 12,
@@ -690,6 +699,15 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                     label: 'الحلقة التجريبية',
                   ),
                 ],
+                if (sessionTypeFilter != TeacherSessionTypeFilter.all) ...[
+                  const SizedBox(width: 8),
+                  _ActiveFilterPill(
+                    icon: sessionTypeFilter == TeacherSessionTypeFilter.online
+                        ? Icons.videocam_rounded
+                        : Icons.mosque_rounded,
+                    label: _sessionTypeLabel(sessionTypeFilter),
+                  ),
+                ],
                 if (selectedSpecialization != null) ...[
                   const SizedBox(width: 8),
                   _ActiveFilterPill(
@@ -700,7 +718,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                 const SizedBox(width: 8),
                 _ActiveFilterPill(
                   icon: Icons.radar_rounded,
-                  label: '${radiusKm.round()} كم',
+                  label: distanceFilterEnabled
+                      ? '${radiusKm.round()} كم'
+                      : 'كل المسافات',
                 ),
               ],
             ),
@@ -714,8 +734,10 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     var tempAvailabilityFilter = availabilityFilter;
     var tempGenderFilter = genderFilter;
     var tempTrialSessionFilter = trialSessionFilter;
+    var tempSessionTypeFilter = sessionTypeFilter;
     var tempSpecialization = selectedSpecialization;
     var tempRadius = radiusKm;
+    var tempDistanceFilterEnabled = distanceFilterEnabled;
 
     showModalBottomSheet<void>(
       context: context,
@@ -851,6 +873,47 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                             ),
                             const SizedBox(height: 18),
                             const _SheetSectionTitle(
+                              icon: Icons.video_camera_front_rounded,
+                              title: 'نوع الجلسة',
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _FilterOptionChip(
+                                  label: 'الكل',
+                                  icon: Icons.apps_rounded,
+                                  isSelected: tempSessionTypeFilter ==
+                                      TeacherSessionTypeFilter.all,
+                                  onTap: () => setSheetState(() {
+                                    tempSessionTypeFilter =
+                                        TeacherSessionTypeFilter.all;
+                                  }),
+                                ),
+                                _FilterOptionChip(
+                                  label: 'أونلاين',
+                                  icon: Icons.videocam_rounded,
+                                  isSelected: tempSessionTypeFilter ==
+                                      TeacherSessionTypeFilter.online,
+                                  onTap: () => setSheetState(() {
+                                    tempSessionTypeFilter =
+                                        TeacherSessionTypeFilter.online;
+                                  }),
+                                ),
+                                _FilterOptionChip(
+                                  label: 'حضوري',
+                                  icon: Icons.mosque_rounded,
+                                  isSelected: tempSessionTypeFilter ==
+                                      TeacherSessionTypeFilter.offline,
+                                  onTap: () => setSheetState(() {
+                                    tempSessionTypeFilter =
+                                        TeacherSessionTypeFilter.offline;
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            const _SheetSectionTitle(
                               icon: Icons.person_search_rounded,
                               title: 'نوع المحفظ',
                             ),
@@ -939,29 +1002,70 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                       .withValues(alpha: 0.22),
                                 ),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Text(
-                                    '${tempRadius.round()} كم',
-                                    style: const TextStyle(
-                                      color: AppThemeConstants.primary,
-                                      fontWeight: FontWeight.w900,
+                                  CheckboxListTile(
+                                    value: tempDistanceFilterEnabled,
+                                    onChanged: (value) {
+                                      setSheetState(() {
+                                        tempDistanceFilterEnabled =
+                                            value ?? true;
+                                      });
+                                    },
+                                    contentPadding: EdgeInsets.zero,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                    activeColor: AppThemeConstants.primary,
+                                    dense: true,
+                                    title: const Text(
+                                      'تفعيل فلتر المسافة',
+                                      style: TextStyle(
+                                        color: AppThemeConstants.textPrimary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    subtitle: const Text(
+                                      'عند إيقافه ستظهر النتائج من كل المناطق.',
+                                      style: TextStyle(
+                                        color: AppThemeConstants.textSecondary,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
-                                  Expanded(
-                                    child: Slider(
-                                      value: tempRadius,
-                                      min: 5,
-                                      max: 100,
-                                      divisions: 19,
-                                      label: '${tempRadius.round()} كم',
-                                      activeColor: AppThemeConstants.secondary,
-                                      inactiveColor: AppThemeConstants.outline,
-                                      onChanged: (value) {
-                                        setSheetState(() {
-                                          tempRadius = value;
-                                        });
-                                      },
+                                  Opacity(
+                                    opacity:
+                                        tempDistanceFilterEnabled ? 1 : 0.45,
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          '${tempRadius.round()} كم',
+                                          style: const TextStyle(
+                                            color: AppThemeConstants.primary,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Slider(
+                                            value: tempRadius,
+                                            min: 5,
+                                            max: 100,
+                                            divisions: 19,
+                                            label: '${tempRadius.round()} كم',
+                                            activeColor:
+                                                AppThemeConstants.secondary,
+                                            inactiveColor:
+                                                AppThemeConstants.outline,
+                                            onChanged: tempDistanceFilterEnabled
+                                                ? (value) {
+                                                    setSheetState(() {
+                                                      tempRadius = value;
+                                                    });
+                                                  }
+                                                : null,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -991,8 +1095,11 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                               tempGenderFilter = TeacherGenderFilter.all;
                               tempTrialSessionFilter =
                                   TeacherTrialSessionFilter.all;
+                              tempSessionTypeFilter =
+                                  TeacherSessionTypeFilter.all;
                               tempSpecialization = null;
                               tempRadius = 50;
+                              tempDistanceFilterEnabled = true;
                             }),
                             icon: const Icon(Icons.restart_alt_rounded),
                             label: const Text('إعادة ضبط'),
@@ -1005,8 +1112,10 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                   availability: tempAvailabilityFilter,
                                   gender: tempGenderFilter,
                                   trialSession: tempTrialSessionFilter,
+                                  sessionType: tempSessionTypeFilter,
                                   specialization: tempSpecialization,
                                   radius: tempRadius,
+                                  distanceEnabled: tempDistanceFilterEnabled,
                                 );
                                 Navigator.of(sheetContext).pop();
                               },
@@ -1118,8 +1227,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     if (availabilityFilter != TeacherAvailabilityFilter.availableOnly) count++;
     if (genderFilter != TeacherGenderFilter.all) count++;
     if (trialSessionFilter != TeacherTrialSessionFilter.all) count++;
+    if (sessionTypeFilter != TeacherSessionTypeFilter.all) count++;
     if (selectedSpecialization != null) count++;
-    if (radiusKm.round() != 50) count++;
+    if (!distanceFilterEnabled || radiusKm.round() != 50) count++;
     return count;
   }
 
@@ -1145,12 +1255,25 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     }
   }
 
+  String _sessionTypeLabel(TeacherSessionTypeFilter filter) {
+    switch (filter) {
+      case TeacherSessionTypeFilter.all:
+        return 'كل الجلسات';
+      case TeacherSessionTypeFilter.online:
+        return 'أونلاين';
+      case TeacherSessionTypeFilter.offline:
+        return 'حضوري';
+    }
+  }
+
   void _applyDetailedFilters({
     required TeacherAvailabilityFilter availability,
     required TeacherGenderFilter gender,
     required TeacherTrialSessionFilter trialSession,
+    required TeacherSessionTypeFilter sessionType,
     required String? specialization,
     required double radius,
+    required bool distanceEnabled,
   }) {
     final normalizedRadius = radius.clamp(5.0, 100.0).toDouble();
 
@@ -1158,8 +1281,10 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       availabilityFilter = availability;
       genderFilter = gender;
       trialSessionFilter = trialSession;
+      sessionTypeFilter = sessionType;
       selectedSpecialization = specialization;
       radiusKm = normalizedRadius;
+      distanceFilterEnabled = distanceEnabled;
       _selectedTeacher = null;
       _hasFitInitialBounds = false;
     });
