@@ -163,6 +163,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => PaymentReturnScreen(uri: state.uri),
       ),
       GoRoute(
+        path: '/p/t/:id',
+        name: 'public-teacher-profile',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return MohaffezProfileScreen(
+            mohaffezId: id,
+            publicMode: true,
+          );
+        },
+      ),
+      GoRoute(
         path: '/google-role-selection',
         name: 'google-role-selection',
         builder: (context, state) {

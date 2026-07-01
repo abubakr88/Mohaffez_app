@@ -1,4 +1,4 @@
-﻿// lib/config/guards/setup_guard.dart
+// lib/config/guards/setup_guard.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -31,6 +31,10 @@ class SetupGuard implements RouteGuard {
     '/pick-location',
   };
 
+  static bool _isExemptRoute(String path) {
+    return exemptRoutes.contains(path) || path.startsWith('/p/t/');
+  }
+
   @override
   String? check(Ref ref, GoRouterState state) {
     // Tour mode: synthetic user already has setupCompleted: true.
@@ -51,7 +55,7 @@ class SetupGuard implements RouteGuard {
     final currentPath = state.uri.path;
 
     // If user hasn't completed setup and isn't on an exempt route → redirect
-    if (!user.setupCompleted && !exemptRoutes.contains(currentPath)) {
+    if (!user.setupCompleted && !_isExemptRoute(currentPath)) {
       // Mohaffez who already passed the exam should go to the certificates
       // step, not back to /setup (which would show the exam/profile form again).
       if (user.role == 'mohaffez' && user.examPassed) {

@@ -43,6 +43,8 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   String searchQuery = '';
   String? selectedSpecialization;
   MohaffezModel? _selectedTeacher;
+  List<MohaffezModel> _lastTeachers = const [];
+  bool _hasLoadedTeachers = false;
   final MapController _mapController = MapController();
   bool _hasFitInitialBounds = false;
   bool _showMapView = false;
@@ -148,16 +150,31 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       sessionTypeFilter: sessionTypeFilter,
     );
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
+    final freshTeachers = mohaffezAsync.valueOrNull;
+    if (freshTeachers != null) {
+      _lastTeachers = freshTeachers;
+      _hasLoadedTeachers = true;
+    }
+    final hasCachedResults = _hasLoadedTeachers;
+    final isUpdatingResults = mohaffezAsync.isLoading && hasCachedResults;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         body: mohaffezAsync.when(
           data: (teachers) => _buildMainExperience(context, teachers),
-          loading: _buildLoading,
-          error: (_, __) => ErrorDisplay.dataLoad(
-            onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
-          ),
+          loading: () => hasCachedResults
+              ? _buildMainExperience(
+                  context,
+                  _lastTeachers,
+                  isUpdatingResults: isUpdatingResults,
+                )
+              : _buildLoading(),
+          error: (_, __) => hasCachedResults
+              ? _buildMainExperience(context, _lastTeachers)
+              : ErrorDisplay.dataLoad(
+                  onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
+                ),
         ),
       ),
     );
@@ -165,8 +182,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
 
   Widget _buildMainExperience(
     BuildContext context,
-    List<MohaffezModel> teachers,
-  ) {
+    List<MohaffezModel> teachers, {
+    bool isUpdatingResults = false,
+  }) {
     return SafeArea(
       child: Column(
         children: [
@@ -178,7 +196,11 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                   index: _showMapView ? 0 : 1,
                   children: [
                     _buildMapPane(teachers),
-                    _buildResultsPane(context, teachers),
+                    _buildResultsPane(
+                      context,
+                      teachers,
+                      isUpdatingResults: isUpdatingResults,
+                    ),
                   ],
                 ),
                 Positioned(
@@ -311,7 +333,11 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     );
   }
 
-  Widget _buildResultsPane(BuildContext context, List<MohaffezModel> teachers) {
+  Widget _buildResultsPane(
+    BuildContext context,
+    List<MohaffezModel> teachers, {
+    bool isUpdatingResults = false,
+  }) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       decoration: BoxDecoration(
@@ -330,6 +356,22 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
         children: [
           _buildSearchBar(),
           _buildFilterRail(),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: isUpdatingResults
+                ? const Padding(
+                    key: ValueKey('updating-results'),
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.all(Radius.circular(999)),
+                      child: LinearProgressIndicator(minHeight: 3),
+                    ),
+                  )
+                : const SizedBox(
+                    key: ValueKey('stable-results'),
+                    height: 0,
+                  ),
+          ),
           if (isLoadingLocation || locationError != null)
             _buildLocationBanner(),
           if (_selectedTeacher != null)
@@ -614,7 +656,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
           ),
           onChanged: (value) {
             _searchDebounce?.cancel();
-            _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+            _searchDebounce = Timer(const Duration(milliseconds: 500), () {
               if (mounted) {
                 setState(() {
                   searchQuery = value.trim();
@@ -1291,6 +1333,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   }
 
   void _clearSearch() {
+    _searchDebounce?.cancel();
     _searchController.clear();
     setState(() {
       searchQuery = '';

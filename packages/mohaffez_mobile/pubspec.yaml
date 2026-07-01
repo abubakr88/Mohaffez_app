@@ -2,7 +2,7 @@
 description: "Find and learn from Quran teachers near you."
 publish_to: 'none'
 
-version: 1.0.2+15
+version: 1.0.2+16
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -16,6 +16,8 @@ dependencies:
     path: ../mohaffez_core
 
   flutter_localizations:
+    sdk: flutter
+  flutter_web_plugins:
     sdk: flutter
 
   # Core packages

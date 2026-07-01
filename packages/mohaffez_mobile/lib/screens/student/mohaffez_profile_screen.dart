@@ -1,10 +1,10 @@
 // lib/screens/mohaffez_profile_screen.dart
 
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -24,6 +24,7 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final double? userLat;
   final double? userLng;
   final bool previewMode;
+  final bool publicMode;
 
   const MohaffezProfileScreen({
     super.key,
@@ -31,6 +32,7 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
     this.userLat,
     this.userLng,
     this.previewMode = false,
+    this.publicMode = false,
   });
 
   @override
@@ -48,6 +50,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   int? selectedDayOfWeek;
   final GlobalKey _profileExportKey = GlobalKey();
   bool _isExportingProfile = false;
+
+  bool get _isPublicView => widget.publicMode;
 
   /// Helper to filter pricing plans by selected session type
   List<PricingPlanModel> _relevantPlans(List<PricingPlanModel> plans) {
@@ -152,6 +156,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // ─── Navigation helper ────────────────────────────────────────────────────
 
   void _navigateToBookingMethod() {
+    if (_isPublicView) {
+      context.go('/login');
+      return;
+    }
     if (widget.previewMode) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -430,27 +438,41 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
-    final plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    final AsyncValue<PublicMohaffezProfileBundle>? publicBundleAsync =
+        _isPublicView
+            ? ref.watch(publicMohaffezProfileProvider(widget.mohaffezId))
+            : null;
+    final AsyncValue<Map<String, dynamic>> profileAsync;
+    final AsyncValue<List<PricingPlanModel>> plansAsync;
+    if (_isPublicView) {
+      final bundleAsync = publicBundleAsync!;
+      profileAsync = bundleAsync.whenData((bundle) => bundle.profile);
+      plansAsync = bundleAsync.whenData((bundle) => bundle.plans);
+    } else {
+      profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
+      plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    }
 
     // Reset selection if the currently-selected type loses its plan
     // (e.g. teacher deactivates it mid-session). We don't auto-pick a new
     // type — the student must tap one explicitly. Empty string = "none
     // selected"; the picker tiles render that as no-selection state.
-    ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
-      next.whenData((plans) {
-        if (selectedSessionType.isNotEmpty &&
-            !_hasPlanForType(plans, selectedSessionType) &&
-            mounted) {
-          setState(() {
-            selectedSessionType = '';
-            selectedTimeSlot = null;
-            selectedDate = null;
-            selectedDayOfWeek = null;
-          });
-        }
+    if (!_isPublicView) {
+      ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
+        next.whenData((plans) {
+          if (selectedSessionType.isNotEmpty &&
+              !_hasPlanForType(plans, selectedSessionType) &&
+              mounted) {
+            setState(() {
+              selectedSessionType = '';
+              selectedTimeSlot = null;
+              selectedDate = null;
+              selectedDayOfWeek = null;
+            });
+          }
+        });
       });
-    });
+    }
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -459,8 +481,22 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         body: profileAsync.when(
           data: (profile) {
             final videoUrl = _teacherVideoUrl(profile);
+            final publicBundle = publicBundleAsync?.valueOrNull;
             return RefreshIndicator(
               onRefresh: () async {
+                if (_isPublicView) {
+                  ref.invalidate(
+                    publicMohaffezProfileProvider(widget.mohaffezId),
+                  );
+                  await ref
+                      .read(
+                        publicMohaffezProfileProvider(widget.mohaffezId).future,
+                      )
+                      .catchError(
+                        (_) => throw Exception('public profile reload failed'),
+                      );
+                  return;
+                }
                 ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
                 ref.invalidate(activePricingPlansProvider(widget.mohaffezId));
                 ref.invalidate(credentialsProvider(widget.mohaffezId));
@@ -478,11 +514,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        if (widget.previewMode) ...[
+                        if (widget.previewMode && !_isPublicView) ...[
                           _buildOwnerPreviewPanel(profile),
                           const SizedBox(height: 16),
                         ],
-                        _buildCompactTrustStrip(ref, profile),
+                        _buildCompactTrustStrip(
+                          ref,
+                          profile,
+                          publicBundle: publicBundle,
+                        ),
                         if (videoUrl != null) ...[
                           const SizedBox(height: 20),
                           _buildPremiumVideoSection(videoUrl),
@@ -493,8 +533,12 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           _buildModernBioSection(profile['bio'] as String),
                         ],
                         const SizedBox(height: 20),
-                        _buildCredentialsSection(ref),
-                        if (profile['trialSessionEnabled'] == true) ...[
+                        _buildCredentialsSection(
+                          ref,
+                          publicCredentials: publicBundle?.credentials,
+                        ),
+                        if (!_isPublicView &&
+                            profile['trialSessionEnabled'] == true) ...[
                           const SizedBox(height: 20),
                           _buildTrialSessionSection(profile, plansAsync),
                         ],
@@ -504,7 +548,11 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         _buildModernPricingSection(plansAsync),
                         const SizedBox(height: 20),
                         _buildModernAvailabilitySection(
-                            ref, profile, plansAsync),
+                          ref,
+                          profile,
+                          plansAsync,
+                          publicAvailability: publicBundle?.availability,
+                        ),
                         const SizedBox(height: 120),
                       ],
                     ),
@@ -553,81 +601,83 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             ),
           ),
         ),
-        bottomNavigationBar: widget.previewMode
-            ? _buildPreviewBottomBar()
-            : selectedTimeSlot != null && selectedDate != null
-                ? SafeArea(
-                    child: Container(
-                      margin: const EdgeInsets.all(16),
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 30,
-                            offset: const Offset(0, 10),
-                          )
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  selectedDate != null
-                                      ? DateFormat(
-                                          'EEEE، d MMM',
-                                          'ar',
-                                        ).format(selectedDate!)
-                                      : '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
+        bottomNavigationBar: _isPublicView
+            ? _buildPublicBottomBar()
+            : widget.previewMode
+                ? _buildPreviewBottomBar()
+                : selectedTimeSlot != null && selectedDate != null
+                    ? SafeArea(
+                        child: Container(
+                          margin: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 30,
+                                offset: const Offset(0, 10),
+                              )
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      selectedDate != null
+                                          ? DateFormat(
+                                              'EEEE، d MMM',
+                                              'ar',
+                                            ).format(selectedDate!)
+                                          : '',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      formatTimeToArabicAmPm(
+                                        selectedTimeSlot!['startTime'],
+                                      ),
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: _navigateToBookingMethod,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1D9E75),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 28,
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  formatTimeToArabicAmPm(
-                                    selectedTimeSlot!['startTime'],
-                                  ),
-                                  style: const TextStyle(
-                                    color: Colors.grey,
+                                child: const Text(
+                                  'تأكيد الحجز',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          ElevatedButton(
-                            onPressed: _navigateToBookingMethod,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1D9E75),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 28,
-                                vertical: 16,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                            child: const Text(
-                              'تأكيد الحجز',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : null,
+                        ),
+                      )
+                    : null,
       ),
     );
   }
@@ -635,7 +685,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   Uri _teacherPublicProfileUri() {
     return Uri.https(
       'app.mohafezy.com',
-      '/mohaffez/${widget.mohaffezId}',
+      '/p/t/${widget.mohaffezId}',
     );
   }
 
@@ -748,9 +798,37 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _copyPublicProfileLink,
+                icon: const Icon(Icons.link_rounded),
+                label: const Text('نسخ رابط الملف العام'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppThemeConstants.primary,
+                  side: BorderSide(
+                    color: AppThemeConstants.primary.withValues(alpha: 0.35),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _copyPublicProfileLink() async {
+    await Clipboard.setData(
+      ClipboardData(text: _teacherPublicProfileUri().toString()),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ رابط الملف العام')),
     );
   }
 
@@ -809,6 +887,50 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 onPressed: () => context.push('/profile'),
                 icon: const Icon(Icons.edit_outlined),
                 label: const Text('تعديل الملف'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPublicBottomBar() {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: const Border(
+            top: BorderSide(color: AppThemeConstants.grey200),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.go('/login'),
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('تسجيل الدخول'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => context.go('/register'),
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('إنشاء حساب للحجز'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppThemeConstants.primary,
                   foregroundColor: Colors.white,
@@ -1254,19 +1376,32 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   Widget _buildCompactTrustStrip(
     WidgetRef ref,
-    Map<String, dynamic> profile,
-  ) {
+    Map<String, dynamic> profile, {
+    PublicMohaffezProfileBundle? publicBundle,
+  }) {
     final rating = profile['rating'] as num? ?? 0.0;
     final reviewCount = (profile['reviewCount'] as num?)?.toInt() ?? 0;
-    final stats = ref.watch(mohaffezStatsProvider(widget.mohaffezId));
-    final credentials = ref.watch(credentialsProvider(widget.mohaffezId));
-    final completedSessions =
-        stats.valueOrNull?['completedSessions'] as int? ?? 0;
-    final uniqueStudents = stats.valueOrNull?['uniqueStudents'] as int? ?? 0;
-    final approvedCredentials = credentials.valueOrNull?.length ?? 0;
-    final statsAreLoading = stats.isLoading && !stats.hasValue;
-    final credentialsAreLoading =
-        credentials.isLoading && !credentials.hasValue;
+    final stats = publicBundle == null
+        ? ref.watch(mohaffezStatsProvider(widget.mohaffezId))
+        : null;
+    final credentials = publicBundle == null
+        ? ref.watch(credentialsProvider(widget.mohaffezId))
+        : null;
+    final completedSessions = publicBundle != null
+        ? (publicBundle.stats['completedSessions'] as num?)?.toInt() ?? 0
+        : stats?.valueOrNull?['completedSessions'] as int? ?? 0;
+    final uniqueStudents = publicBundle != null
+        ? (publicBundle.stats['uniqueStudents'] as num?)?.toInt() ?? 0
+        : stats?.valueOrNull?['uniqueStudents'] as int? ?? 0;
+    final approvedCredentials = publicBundle?.credentials.length ??
+        credentials?.valueOrNull?.length ??
+        0;
+    final statsAreLoading = publicBundle == null &&
+        (stats?.isLoading ?? false) &&
+        !(stats?.hasValue ?? false);
+    final credentialsAreLoading = publicBundle == null &&
+        (credentials?.isLoading ?? false) &&
+        !(credentials?.hasValue ?? false);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1609,8 +1744,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   // ─── Credentials Gallery ──────────────────────────────────────────────────
 
-  Widget _buildCredentialsSection(WidgetRef ref) {
-    final credsAsync = ref.watch(credentialsProvider(widget.mohaffezId));
+  Widget _buildCredentialsSection(
+    WidgetRef ref, {
+    List<Map<String, dynamic>>? publicCredentials,
+  }) {
+    final credsAsync = publicCredentials != null
+        ? AsyncValue<List<Map<String, dynamic>>>.data(publicCredentials)
+        : ref.watch(credentialsProvider(widget.mohaffezId));
 
     return credsAsync.when(
       data: (creds) {
@@ -1878,6 +2018,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   DateTime? _credentialDate(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
     try {
       return value.toDate() as DateTime;
     } catch (_) {
@@ -2174,15 +2315,18 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   Widget _buildModernAvailabilitySection(
     WidgetRef ref,
     Map<String, dynamic> profile,
-    AsyncValue<List<PricingPlanModel>> plansAsync,
-  ) {
+    AsyncValue<List<PricingPlanModel>> plansAsync, {
+    List<Map<String, dynamic>>? publicAvailability,
+  }) {
     if (selectedSessionType.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final availability = ref.watch(
-      availabilityProvider(widget.mohaffezId),
-    );
+    final availability = publicAvailability != null
+        ? AsyncValue<List<Map<String, dynamic>>>.data(publicAvailability)
+        : ref.watch(
+            availabilityProvider(widget.mohaffezId),
+          );
 
     return availability.when(
       data: (slots) {

@@ -82,6 +82,7 @@ export { onUserUnsuspended } from "./onUserUnsuspended";
 
 // Student count function
 export { getMohaffezStudentCount } from "./getMohaffezStudentCount";
+export { getPublicTeacherProfile } from "./publicTeacherProfile";
 
 // Online sessions (teacher's personal Zoom / Meet / Teams link)
 export {

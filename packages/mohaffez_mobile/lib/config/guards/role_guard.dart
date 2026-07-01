@@ -67,6 +67,10 @@ class RoleGuard implements RouteGuard {
     '/admin',
   ];
 
+  static bool _isPublicRoute(String path) {
+    return path.startsWith('/p/t/');
+  }
+
   @override
   String? check(Ref ref, GoRouterState state) {
     final authState = ref.read(authStateProvider);
@@ -74,6 +78,8 @@ class RoleGuard implements RouteGuard {
     final config = ref.read(systemConfigProvider).valueOrNull;
     final currentPath = state.uri.path;
     final inTour = ref.read(tourModeProvider).active;
+
+    if (_isPublicRoute(currentPath)) return null;
 
     // Only process if authenticated (AuthGuard handles unauth).
     // Tour mode supplies a synthetic user via overrides — treat as authenticated.

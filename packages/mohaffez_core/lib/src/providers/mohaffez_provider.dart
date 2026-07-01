@@ -15,7 +15,6 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
         .where('role', isEqualTo: 'mohaffez')
         .where('status', isEqualTo: 'active')
         .where('addressLat', isNotEqualTo: null)
-        .limit(50) // حد أقصى للنتائج
         .get()
         .timeout(const Duration(seconds: 15));
 
@@ -39,9 +38,9 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
 
     // تصفية حسب البحث بالاسم
     if (params.searchQuery != null && params.searchQuery!.isNotEmpty) {
-      final query = params.searchQuery!.toLowerCase();
+      final query = _normalizeSearchText(params.searchQuery!);
       mohaffezList = mohaffezList.where((mohaffez) {
-        return mohaffez.name.toLowerCase().contains(query);
+        return _normalizeSearchText(mohaffez.name).contains(query);
       }).toList();
     }
 
@@ -270,6 +269,21 @@ int _compareDistance(MohaffezModel a, MohaffezModel b, NearbyParams params) {
   final distB =
       b.getDistanceFrom(params.userLat, params.userLng) ?? double.infinity;
   return distA.compareTo(distB);
+}
+
+String _normalizeSearchText(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '')
+      .replaceAll('أ', 'ا')
+      .replaceAll('إ', 'ا')
+      .replaceAll('آ', 'ا')
+      .replaceAll('ى', 'ي')
+      .replaceAll('ؤ', 'و')
+      .replaceAll('ئ', 'ي')
+      .replaceAll('ة', 'ه')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
 
 class NearbyParams {
