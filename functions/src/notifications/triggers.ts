@@ -16,6 +16,42 @@ const asNumber = (value: unknown, fallback = 0): number =>
 const asBoolean = (value: unknown, fallback = false): boolean =>
   typeof value === 'boolean' ? value : fallback;
 
+async function syncCompletedTrialRequest(
+  sessionId: string,
+  session: Record<string, unknown>,
+) {
+  const trialRequestId = asString(
+    session.trialRequestId,
+    asString(session.requestId),
+  );
+  if (!trialRequestId) {
+    functions.logger.warn('Completed trial session is missing trial request id', {
+      sessionId,
+    });
+    return;
+  }
+
+  try {
+    await db.collection('trialSessionRequests').doc(trialRequestId).set(
+      {
+        status: session.studentNoShow === true ? 'student_no_show' : 'completed',
+        sessionId,
+        completedAt: session.completedAt ?? FieldValue.serverTimestamp(),
+        studentNoShow: session.studentNoShow === true,
+        closedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (error) {
+    functions.logger.error('Failed to sync completed trial request', {
+      sessionId,
+      trialRequestId,
+      error,
+    });
+  }
+}
+
 /**
  * Firestore trigger: Send notifications when session request status changes
  * Handles: payment_required, bundle_awaiting_payment, accepted, and free session flows
@@ -403,6 +439,10 @@ export const onSessionCompleted = functions.firestore
     // Only send notifications when status becomes 'completed'
     if (afterStatus !== 'completed') return;
     const isTrial = after.isTrial === true || after.bookingKind === 'trial';
+
+    if (isTrial) {
+      await syncCompletedTrialRequest(sessionId, after);
+    }
 
     // ── Refresh this teacher's commission tier in real-time ──────────
     // The bi-weekly cron (`recomputeTeacherTiers`) still owns the global

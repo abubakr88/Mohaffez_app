@@ -14,7 +14,7 @@ import 'auth_provider.dart';
 DateTime? _parseSessionDateTime(DateTime? date, String? timeSlot) {
   if (date == null) return null;
   if (timeSlot == null || timeSlot.isEmpty) return date;
-  
+
   try {
     // Extract start time from "15:30 - 16:15" format
     final startTimeStr = timeSlot.split('-').first.trim();
@@ -43,6 +43,12 @@ enum UpcomingFilter {
 final upcomingSessionsFilterProvider = StateProvider<UpcomingFilter>((ref) {
   return UpcomingFilter.all;
 });
+
+bool _isVisibleUpcomingSession(Map<String, dynamic> data) {
+  return data['isPaid'] == true ||
+      data['isTrial'] == true ||
+      data['bookingKind'] == 'trial';
+}
 
 // ============================================================================
 // COUNTERS
@@ -91,34 +97,31 @@ final acceptedStudentSessionsProvider =
         .snapshots()
         .map((snapshot) {
       final seen = <String>{};
-      return snapshot.docs
-          .where((doc) => seen.add(doc.id))
-          .map((doc) {
-            final data = doc.data();
-            return {
-              'id': doc.id,
-              'mohaffezName': data['mohaffezName'] as String? ?? '',
-              'location': data['location'] as String? ??
-                  data['imamAddressText'] as String? ??
-                  '',
-              'sessionType': data['sessionType'] as String? ?? '',
-              'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-                  data['timeSlot'] as String? ??
-                  '08:00',
-              'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
-              'hifzAssignment': data['hifzAssignment'] as String?,
-              'murajaAssignment': data['murajaAssignment'] as String?,
-              'sessionRating': data['sessionRating'] as int? ?? 0,
-              'sessionNotes': data['sessionNotes'] as String?,
-              'status': data['status'] as String? ?? 'accepted',
-              'createdAt': data['createdAt'] as Timestamp?,
-              'mohaffezId': data['mohaffezId'] as String? ?? '',
-              'studentId': data['studentId'] as String? ?? '',
-              'studentName': data['studentName'] as String? ?? '',
-              'isPaid': data['isPaid'] as bool? ?? false,
-            };
-          })
-          .toList();
+      return snapshot.docs.where((doc) => seen.add(doc.id)).map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'mohaffezName': data['mohaffezName'] as String? ?? '',
+          'location': data['location'] as String? ??
+              data['imamAddressText'] as String? ??
+              '',
+          'sessionType': data['sessionType'] as String? ?? '',
+          'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+              data['timeSlot'] as String? ??
+              '08:00',
+          'sessionDate': (data['sessionDate'] as Timestamp?)?.toDate(),
+          'hifzAssignment': data['hifzAssignment'] as String?,
+          'murajaAssignment': data['murajaAssignment'] as String?,
+          'sessionRating': data['sessionRating'] as int? ?? 0,
+          'sessionNotes': data['sessionNotes'] as String?,
+          'status': data['status'] as String? ?? 'accepted',
+          'createdAt': data['createdAt'] as Timestamp?,
+          'mohaffezId': data['mohaffezId'] as String? ?? '',
+          'studentId': data['studentId'] as String? ?? '',
+          'studentName': data['studentName'] as String? ?? '',
+          'isPaid': data['isPaid'] as bool? ?? false,
+        };
+      }).toList();
     });
   },
 );
@@ -163,13 +166,14 @@ final upcomingSessionsProvider =
         .collection('hafizSessions')
         .where('mohaffezId', isEqualTo: mohaffezId)
         .where('status', isEqualTo: 'accepted')
-        .where('isPaid', isEqualTo: true)
         .where('sessionDate', isGreaterThanOrEqualTo: startOfDay)
         .orderBy('sessionDate', descending: false)
         .limit(100)
         .snapshots()
         .map((snapshot) {
-      final list = snapshot.docs.map((doc) {
+      final list = snapshot.docs.where((doc) {
+        return _isVisibleUpcomingSession(doc.data());
+      }).map((doc) {
         final data = doc.data();
         return <String, dynamic>{
           'id': doc.id,
@@ -193,6 +197,8 @@ final upcomingSessionsProvider =
           'status': data['status'] as String? ?? 'accepted',
           'studentId': data['studentId'] as String?,
           'isPaid': data['isPaid'] as bool? ?? false,
+          'isTrial': data['isTrial'] as bool? ?? false,
+          'bookingKind': data['bookingKind'] as String?,
           'subscriptionId': data['subscriptionId'] as String?,
         };
       }).toList();
@@ -227,20 +233,25 @@ final studentUpcomingSessionsProvider =
         .collection('hafizSessions')
         .where('studentId', isEqualTo: studentId)
         .where('status', isEqualTo: 'accepted')
-        .where('isPaid', isEqualTo: true)
         .where('sessionDate', isGreaterThanOrEqualTo: startOfDay)
         .orderBy('sessionDate', descending: false)
         .limit(20)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) {
+        .map((snapshot) => snapshot.docs.where((doc) {
+              return _isVisibleUpcomingSession(doc.data());
+            }).map((doc) {
               final data = doc.data();
               return <String, dynamic>{
                 'id': doc.id,
                 'sessionDate': _parseSessionDateTime(
                   (data['sessionDate'] as Timestamp?)?.toDate(),
-                  data['preferredTimeSlot'] as String? ?? data['timeSlot'] as String?,
+                  data['preferredTimeSlot'] as String? ??
+                      data['timeSlot'] as String?,
                 ),
                 'mohaffezName': data['mohaffezName'] as String? ?? '',
+                'isPaid': data['isPaid'] as bool? ?? false,
+                'isTrial': data['isTrial'] as bool? ?? false,
+                'bookingKind': data['bookingKind'] as String?,
               };
             }).toList());
   },
@@ -258,8 +269,7 @@ final filteredUpcomingSessionsProvider =
           case UpcomingFilter.all:
             return sessions;
           case UpcomingFilter.today:
-            final startOfTomorrow =
-                DateTime(now.year, now.month, now.day + 1);
+            final startOfTomorrow = DateTime(now.year, now.month, now.day + 1);
             return sessions.where((session) {
               final date = session['sessionDate'] as DateTime?;
               return date != null && date.isBefore(startOfTomorrow);
@@ -271,8 +281,7 @@ final filteredUpcomingSessionsProvider =
               return date != null && date.isBefore(endOfWeek);
             }).toList();
           case UpcomingFilter.thisMonth:
-            final startOfNextMonth =
-                DateTime(now.year, now.month + 1, 1);
+            final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
             return sessions.where((session) {
               final date = session['sessionDate'] as DateTime?;
               return date != null && date.isBefore(startOfNextMonth);
@@ -583,8 +592,8 @@ class StudentSessionsNotifier extends StateNotifier<StudentSessionsState> {
   }
 }
 
-final paginatedStudentSessionsProvider = StateNotifierProvider.autoDispose.family<
-    StudentSessionsNotifier, StudentSessionsState, String>(
+final paginatedStudentSessionsProvider = StateNotifierProvider.autoDispose
+    .family<StudentSessionsNotifier, StudentSessionsState, String>(
   (ref, studentId) {
     return StudentSessionsNotifier(studentId);
   },
@@ -625,39 +634,41 @@ final studentRequestsFirstPageProvider =
       return Stream.value(const <Map<String, dynamic>>[]);
     }
     return FirebaseFirestore.instance
-      .collection('sessionRequests')
-      .where('studentId', isEqualTo: studentId)
-      .where('status', whereIn: RequestStatus.studentVisible)
-      .orderBy('createdAt', descending: true)
-      .limit(20)
-      .snapshots()
-      .map((snapshot) => snapshot.docs
-          // ✅ FIX: same guard as watchStudentRequests —
-          //    hide accepted requests that already have a hafizSession
-          .where((doc) =>
-              doc.data()['status'] != RequestStatus.accepted ||
-              doc.data()['sessionId'] == null)
-          .map((doc) {
-            final data = doc.data();
-            return {
-              'id': doc.id,
-              'mohaffezName': data['mohaffezName'] as String? ?? '',
-              'mohaffezId': data['mohaffezId'] as String?,
-              'sessionType': data['sessionType'] as String? ?? '',
-              'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
-                  data['timeSlot'] as String? ?? '08:00',
-              'status': data['status'] as String? ?? 'pending',
-              'createdAt': data['createdAt'] as Timestamp?,
-              'slotDate': data['slotDate'] as Timestamp?,
-              'paymentDeadline': data['paymentDeadline'] as Timestamp?,
-              'reminderSent': data['reminderSent'] as bool? ?? false,
-              'sessionId': data['sessionId'] as String?,
-              'planType': data['planType'] as String?,
-              'planTitle': data['planTitle'] as String?,
-              'sessionsCount': data['sessionsCount'],
-              'directPaymentRequestId': data['directPaymentRequestId'] as String?,
-            };
-          }).toList());
+        .collection('sessionRequests')
+        .where('studentId', isEqualTo: studentId)
+        .where('status', whereIn: RequestStatus.studentVisible)
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+                // ✅ FIX: same guard as watchStudentRequests —
+                //    hide accepted requests that already have a hafizSession
+                .where((doc) =>
+                    doc.data()['status'] != RequestStatus.accepted ||
+                    doc.data()['sessionId'] == null)
+                .map((doc) {
+              final data = doc.data();
+              return {
+                'id': doc.id,
+                'mohaffezName': data['mohaffezName'] as String? ?? '',
+                'mohaffezId': data['mohaffezId'] as String?,
+                'sessionType': data['sessionType'] as String? ?? '',
+                'preferredTimeSlot': data['preferredTimeSlot'] as String? ??
+                    data['timeSlot'] as String? ??
+                    '08:00',
+                'status': data['status'] as String? ?? 'pending',
+                'createdAt': data['createdAt'] as Timestamp?,
+                'slotDate': data['slotDate'] as Timestamp?,
+                'paymentDeadline': data['paymentDeadline'] as Timestamp?,
+                'reminderSent': data['reminderSent'] as bool? ?? false,
+                'sessionId': data['sessionId'] as String?,
+                'planType': data['planType'] as String?,
+                'planTitle': data['planTitle'] as String?,
+                'sessionsCount': data['sessionsCount'],
+                'directPaymentRequestId':
+                    data['directPaymentRequestId'] as String?,
+              };
+            }).toList());
   },
 );
 
@@ -875,7 +886,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> cancelSession(String sessionId, {required String cancelledBy}) async {
+  Future<void> cancelSession(String sessionId,
+      {required String cancelledBy}) async {
     if (sessionId.trim().isEmpty) {
       throw ArgumentError('Session ID cannot be empty');
     }
@@ -908,8 +920,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
         final requestId = data['requestId'] as String?;
         final slotLockId = data['slotLockId'] as String?;
-        final timeSlot = data['timeSlot'] as String? ??
-            data['preferredTimeSlot'] as String?;
+        final timeSlot =
+            data['timeSlot'] as String? ?? data['preferredTimeSlot'] as String?;
         final sessionType = data['sessionType'] as String?;
         final mohaffezId = data['mohaffezId'] as String?;
 
@@ -1128,7 +1140,8 @@ class SessionActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  Future<DocumentReference<Map<String, dynamic>>?> _findAvailabilityRefTransaction({
+  Future<DocumentReference<Map<String, dynamic>>?>
+      _findAvailabilityRefTransaction({
     required Transaction transaction,
     required String mohaffezId,
     required Timestamp slotDate,
@@ -1412,7 +1425,8 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
   final studentIds = students.keys.toList();
   final Map<String, String?> photoUrls = {};
   for (int i = 0; i < studentIds.length; i += 30) {
-    final chunk = studentIds.sublist(i, i + 30 > studentIds.length ? studentIds.length : i + 30);
+    final chunk = studentIds.sublist(
+        i, i + 30 > studentIds.length ? studentIds.length : i + 30);
     final userDocs = await FirebaseFirestore.instance
         .collection('users')
         .where(FieldPath.documentId, whereIn: chunk)
@@ -1448,8 +1462,9 @@ final bundleByIdProvider = FutureProvider.autoDispose
 // watchActiveBundle() exists in SessionRepository but had no Riverpod
 // provider — any widget calling activeBundleProvider would throw
 // ProviderNotFoundException at runtime.
-final activeBundleProvider = StreamProvider.autoDispose
-    .family<ActiveBundleInfo?, ({String studentId, String mohaffezId, String sessionType})>(
+final activeBundleProvider = StreamProvider.autoDispose.family<
+    ActiveBundleInfo?,
+    ({String studentId, String mohaffezId, String sessionType})>(
   (ref, args) {
     return ref.watch(sessionRepositoryProvider).watchActiveBundle(
           studentId: args.studentId,
