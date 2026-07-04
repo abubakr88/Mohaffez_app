@@ -169,6 +169,26 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
 
     final isMohaffez = ref.read(currentUserProvider).value?.role == 'mohaffez';
 
+    if (isMohaffez == true) {
+      final teacherRegistrationEnabled = ref
+              .read(systemConfigProvider)
+              .valueOrNull
+              ?.teacherRegistrationEnabled ??
+          true;
+      if (!teacherRegistrationEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تسجيل المحفظين الجدد متوقف حالياً. يرجى المحاولة لاحقاً.',
+            ),
+            backgroundColor: AppThemeConstants.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
     if (isMohaffez == true && !_isAtLeast18(_dateOfBirth!)) {
       showDialog(
         context: context,

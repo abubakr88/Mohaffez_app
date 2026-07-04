@@ -155,6 +155,78 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   // ─── Navigation helper ────────────────────────────────────────────────────
 
+  void _openTeacherPhotoPreview(String imageUrl, String teacherName) {
+    final trimmedUrl = imageUrl.trim();
+    if (trimmedUrl.isEmpty) return;
+
+    showDialog<void>(
+      context: context,
+      barrierColor: AppThemeConstants.black.withValues(alpha: 0.86),
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: Dialog.fullscreen(
+            backgroundColor: AppThemeConstants.black,
+            child: SafeArea(
+              child: Stack(
+                children: [
+                  Center(
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 4,
+                      child: CachedNetworkImage(
+                        imageUrl: trimmedUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: CircularProgressIndicator(
+                            color: AppThemeConstants.secondary,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.broken_image_rounded,
+                          color: AppThemeConstants.white70,
+                          size: 64,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: IconButton.filledTonal(
+                      tooltip: 'إغلاق',
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 18,
+                    child: Text(
+                      teacherName,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppThemeConstants.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _navigateToBookingMethod() {
     if (_isPublicView) {
       context.go('/login');
@@ -1492,6 +1564,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     final specialization = (profile['specialization'] as String?)?.trim();
     final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
     final reviewCount = profile['reviewCount'] as int? ?? 0;
+    final photoUrl = (profile['photoUrl'] as String?)?.trim();
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return SliverAppBar(
       expandedHeight: 248,
@@ -1647,45 +1721,89 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: 14),
-                    Container(
-                      width: 96,
-                      height: 96,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color:
-                              AppThemeConstants.white.withValues(alpha: 0.42),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                AppThemeConstants.black.withValues(alpha: 0.20),
-                            blurRadius: 16,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: CircleAvatar(
-                        backgroundColor: AppThemeConstants.white,
-                        child: profile['photoUrl'] != null &&
-                                (profile['photoUrl'] as String).isNotEmpty
-                            ? ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: profile['photoUrl'],
-                                  width: 88,
-                                  height: 88,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.person, size: 42),
+                    GestureDetector(
+                      onTap: hasPhoto
+                          ? () => _openTeacherPhotoPreview(photoUrl, name)
+                          : null,
+                      child: MouseRegion(
+                        cursor: hasPhoto
+                            ? SystemMouseCursors.click
+                            : SystemMouseCursors.basic,
+                        child: Semantics(
+                          button: hasPhoto,
+                          label: hasPhoto ? 'تكبير صورة المحفظ' : null,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 96,
+                                height: 96,
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.42),
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppThemeConstants.black
+                                          .withValues(alpha: 0.20),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
                                 ),
-                              )
-                            : const Icon(
-                                Icons.person_rounded,
-                                size: 42,
-                                color: AppThemeConstants.primary,
+                                child: CircleAvatar(
+                                  backgroundColor: AppThemeConstants.white,
+                                  child: hasPhoto
+                                      ? ClipOval(
+                                          child: CachedNetworkImage(
+                                            imageUrl: photoUrl,
+                                            width: 88,
+                                            height: 88,
+                                            fit: BoxFit.cover,
+                                            errorWidget:
+                                                (context, url, error) =>
+                                                    const Icon(
+                                              Icons.person,
+                                              size: 42,
+                                            ),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.person_rounded,
+                                          size: 42,
+                                          color: AppThemeConstants.primary,
+                                        ),
+                                ),
                               ),
+                              if (hasPhoto)
+                                Positioned(
+                                  left: -2,
+                                  bottom: -2,
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: AppThemeConstants.secondary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppThemeConstants.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.zoom_out_map_rounded,
+                                      size: 14,
+                                      color: AppThemeConstants.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],

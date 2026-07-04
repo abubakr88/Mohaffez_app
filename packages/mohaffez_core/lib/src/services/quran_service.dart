@@ -13,21 +13,15 @@ class QuranService {
   bool _isLoaded = false;
   bool _usingMockData = false;
 
-  // ✅ CDN base URL for Quran images (quran.com CDN)
-  // ignore: unused_field
-  static const String _imageCdnBase = 'https://cdn.quran.com/images/w';
-  // ignore: unused_field
-  static const int _imageWidth = 1024; // Resolution: 1024px width
+  // Quran page images. Keep web and native on the same working source.
+  static const String _pageImageBase =
+      'https://quran.islam-db.com/data/pages/quranpages_1024/images';
 
   /// Get page image URL.
-  /// Mobile: quran.islam-db.com (no CORS restriction on native).
-  /// Web: quran.ksu.edu.sa (sends CORS headers, required by browsers).
+  /// The old web-only quran.ksu.edu.sa path currently returns 404.
   String getPageImageUrl(int pageNumber) {
     final padded = pageNumber.toString().padLeft(3, '0');
-    if (kIsWeb) {
-      return 'https://quran.ksu.edu.sa/images/png/$padded.png';
-    }
-    return 'https://quran.islam-db.com/data/pages/quranpages_1024/images/page$padded.png';
+    return '$_pageImageBase/page$padded.png';
   }
 
   Future<Map<String, dynamic>> getPageData(int pageNumber) async {
@@ -48,7 +42,7 @@ class QuranService {
 
   Future<Map<String, dynamic>> getPageInfo(int pageNumber) async {
     final pageData = await getPageData(pageNumber);
-    
+
     return {
       ...pageData,
       'imageUrl': getPageImageUrl(pageNumber), // CDN URL
@@ -223,5 +217,4 @@ class QuranService {
     11:201,12:221,13:242,14:262,15:282,16:302,17:322,18:342,19:362,20:382,
     21:402,22:422,23:442,24:462,25:482,26:502,27:522,28:542,29:562,30:582,
   };
-
 }

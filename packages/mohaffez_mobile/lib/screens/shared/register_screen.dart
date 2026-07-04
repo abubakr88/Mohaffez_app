@@ -69,6 +69,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
     if (!_formKey.currentState!.validate()) return;
 
+    final teacherRegistrationEnabled = ref
+            .read(systemConfigProvider)
+            .valueOrNull
+            ?.teacherRegistrationEnabled ??
+        true;
+    if (_selectedRole == 'mohaffez' && !teacherRegistrationEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('تسجيل المحفظين الجدد متوقف حالياً. يرجى المحاولة لاحقاً.'),
+          backgroundColor: AppThemeConstants.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final notifier = ref.read(authNotifierProvider.notifier);
     await notifier.signUp(
       email: _emailController.text.trim(),
@@ -98,6 +115,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(authNotifierProvider);
     final isLoading = state.isLoading;
+    final teacherRegistrationEnabled = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.teacherRegistrationEnabled ??
+        true;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -152,6 +174,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 subtitle: 'معلم القرآن',
                                 color: AppThemeConstants.primary,
                                 isSelected: _selectedRole == 'mohaffez',
+                                enabled: teacherRegistrationEnabled,
                                 onTap: () {
                                   setState(() {
                                     _selectedRole = 'mohaffez';
@@ -440,6 +463,7 @@ class _RoleCard extends StatelessWidget {
   final String subtitle;
   final Color color;
   final bool isSelected;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _RoleCard({
@@ -448,51 +472,55 @@ class _RoleCard extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.isSelected,
+    this.enabled = true,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: 0.1)
-              : AppThemeConstants.background,
-          borderRadius: AppThemeConstants.borderRadiusMd,
-          border: Border.all(
-            color: isSelected ? color : AppThemeConstants.divider,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 48,
-              color: isSelected ? color : AppThemeConstants.textDisabled,
+      onTap: enabled ? onTap : null,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? color.withValues(alpha: 0.1)
+                : AppThemeConstants.background,
+            borderRadius: AppThemeConstants.borderRadiusMd,
+            border: Border.all(
+              color: isSelected ? color : AppThemeConstants.divider,
+              width: isSelected ? 2 : 1,
             ),
-            Spacing.vSm,
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 48,
                 color: isSelected ? color : AppThemeConstants.textSecondary,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppThemeConstants.textSecondary,
+              Spacing.vSm,
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? color : AppThemeConstants.textSecondary,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppThemeConstants.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

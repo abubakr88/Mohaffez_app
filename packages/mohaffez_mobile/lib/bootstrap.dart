@@ -16,6 +16,18 @@ import 'services/notification_service.dart';
 import 'services/sound_service.dart';
 import 'shared/widgets/dev_mode_overlay.dart';
 
+Future<void> _runStartupStep(
+  String name,
+  Future<void> Function() action,
+) async {
+  try {
+    await action();
+  } catch (e, stackTrace) {
+    debugPrint('Startup step "$name" skipped: $e');
+    if (kDebugMode) debugPrint('$stackTrace');
+  }
+}
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (kIsWeb) return;
@@ -79,19 +91,23 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
       });
     }
 
-    await initializeDateFormatting('ar', null);
-    await initializeDateFormatting('ar_SA', null);
-    await initializeDateFormatting('ar_EG', null);
+    await _runStartupStep('date-formatting', () async {
+      await initializeDateFormatting('ar', null);
+      await initializeDateFormatting('ar_SA', null);
+      await initializeDateFormatting('ar_EG', null);
+    });
 
-    await CacheService.initialize();
-    await SoundService.initialize();
+    await _runStartupStep('cache-service', CacheService.initialize);
+    await _runStartupStep('sound-service', SoundService.initialize);
 
-    final hasStaleData = CacheService.getUserId() != null &&
-        FirebaseAuth.instance.currentUser == null;
-    if (hasStaleData) {
-      debugPrint('⚠️ Stale cache detected — clearing...');
-      await CacheService.clearAll();
-    }
+    await _runStartupStep('stale-cache-cleanup', () async {
+      final hasStaleData = CacheService.getUserId() != null &&
+          FirebaseAuth.instance.currentUser == null;
+      if (hasStaleData) {
+        debugPrint('⚠️ Stale cache detected — clearing...');
+        await CacheService.clearAll();
+      }
+    });
 
     if (!kIsWeb) {
       SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(

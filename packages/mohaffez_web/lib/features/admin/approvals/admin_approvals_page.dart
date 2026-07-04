@@ -64,10 +64,160 @@ class AdminApprovalsPage extends ConsumerWidget {
   }
 }
 
-class _PendingCredentialsQueue extends StatelessWidget {
+class _PendingCredentialsQueue extends ConsumerStatefulWidget {
   const _PendingCredentialsQueue({required this.async});
 
   final AsyncValue<List<Map<String, dynamic>>> async;
+
+  @override
+  ConsumerState<_PendingCredentialsQueue> createState() =>
+      _PendingCredentialsQueueState();
+}
+
+enum _AttachmentFilter { all, withImages, missingImages }
+
+enum _CredentialSort { oldest, newest }
+
+class _PendingCredentialsQueueState
+    extends ConsumerState<_PendingCredentialsQueue> {
+  static const _missingImageRejectReason =
+      'نعتذر، لا يمكن قبول شهادة بدون صورة مرفقة. يرجى إعادة رفع الشهادة مع صورة واضحة للمستند.';
+
+  final _searchController = TextEditingController();
+  final _selectedCredentialKeys = <String>{};
+  String _query = '';
+  String _selectedType = 'all';
+  _AttachmentFilter _attachmentFilter = _AttachmentFilter.all;
+  _CredentialSort _sort = _CredentialSort.oldest;
+  bool _bulkRejecting = false;
+
+  bool get _hasActiveFilters =>
+      _query.trim().isNotEmpty ||
+      _selectedType != 'all' ||
+      _attachmentFilter != _AttachmentFilter.all ||
+      _sort != _CredentialSort.oldest;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _searchController.clear();
+      _query = '';
+      _selectedType = 'all';
+      _attachmentFilter = _AttachmentFilter.all;
+      _sort = _CredentialSort.oldest;
+      _selectedCredentialKeys.clear();
+    });
+  }
+
+  void _selectMissingImageCredentials(List<Map<String, dynamic>> items) {
+    setState(() {
+      _selectedCredentialKeys
+        ..clear()
+        ..addAll(
+            items.map(_credentialSelectionKey).where((key) => key.isNotEmpty));
+      _attachmentFilter = _AttachmentFilter.missingImages;
+    });
+  }
+
+  void _toggleCredentialSelection(
+    Map<String, dynamic> credential,
+    bool selected,
+  ) {
+    final key = _credentialSelectionKey(credential);
+    if (key.isEmpty) return;
+
+    setState(() {
+      if (selected) {
+        _selectedCredentialKeys.add(key);
+      } else {
+        _selectedCredentialKeys.remove(key);
+      }
+    });
+  }
+
+  Future<void> _rejectSelectedMissingImages(
+    BuildContext context,
+    List<Map<String, dynamic>> selectedItems,
+  ) async {
+    if (_bulkRejecting || selectedItems.isEmpty) return;
+
+    final ok = await DSDialog.confirm(
+      context,
+      title: 'رفض الشهادات بدون صور',
+      message:
+          'سيتم رفض ${selectedItems.length} شهادة لا تحتوي على صور، وإرسال الرسالة التالية لكل محفظ:\n\n$_missingImageRejectReason',
+      confirmLabel: 'رفض وإرسال الرسالة',
+      destructive: true,
+    );
+    if (!ok || !mounted || !context.mounted) return;
+
+    setState(() => _bulkRejecting = true);
+
+    final notifier = ref.read(adminActionsProvider.notifier);
+    final affectedUsers = <String>{};
+    final succeededKeys = <String>{};
+    var failed = 0;
+
+    for (final item in selectedItems) {
+      final userId = item['userId'] as String? ?? '';
+      final credentialId = item['id'] as String? ?? '';
+      if (userId.isEmpty || credentialId.isEmpty) {
+        failed++;
+        continue;
+      }
+
+      try {
+        await notifier.rejectCredential(
+          userId,
+          credentialId,
+          _missingImageRejectReason,
+        );
+
+        final actionState = ref.read(adminActionsProvider);
+        if (actionState.hasError) {
+          failed++;
+          continue;
+        }
+      } catch (_) {
+        failed++;
+        continue;
+      }
+
+      affectedUsers.add(userId);
+      succeededKeys.add(_credentialSelectionKey(item));
+    }
+
+    ref.invalidate(pendingCredentialsProvider);
+    for (final userId in affectedUsers) {
+      ref.invalidate(teacherCredentialsProvider(userId));
+    }
+
+    if (!mounted || !context.mounted) return;
+    setState(() {
+      _bulkRejecting = false;
+      _selectedCredentialKeys.removeAll(succeededKeys);
+    });
+
+    final succeeded = succeededKeys.length;
+    if (failed == 0) {
+      DSToast.show(
+        context,
+        'تم رفض $succeeded شهادة بدون صور وإرسال الرسالة',
+        type: DSToastType.success,
+      );
+    } else {
+      DSToast.show(
+        context,
+        'تم رفض $succeeded شهادة، وتعذر رفض $failed شهادة',
+        type: DSToastType.error,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +226,7 @@ class _PendingCredentialsQueue extends StatelessWidget {
       children: [
         const SectionHeader(title: 'مراجعة الشهادات'),
         const SizedBox(height: DSSpacing.md),
-        async.when(
+        widget.async.when(
           loading: () => const DSSkeletonCard(),
           error: (e, _) => DSBanner(
             message: 'تعذر تحميل الشهادات المعلقة: $e',
@@ -103,20 +253,107 @@ class _PendingCredentialsQueue extends StatelessWidget {
               );
             }
 
+            final teachersById = <String, Map<String, dynamic>?>{};
+            for (final item in items) {
+              final userId = item['userId'] as String? ?? '';
+              if (userId.isEmpty || teachersById.containsKey(userId)) continue;
+              teachersById[userId] =
+                  ref.watch(adminUserProvider(userId)).valueOrNull;
+            }
+
+            final types = _credentialTypes(items);
+            final filteredItems = _filteredItems(items, teachersById);
+            final missingImageItems =
+                items.where(_isActionableMissingImageCredential).toList();
+            final selectedMissingImageItems = missingImageItems
+                .where(
+                  (item) => _selectedCredentialKeys
+                      .contains(_credentialSelectionKey(item)),
+                )
+                .toList();
+            final missingImages =
+                items.where((item) => _credentialImages(item).isEmpty).length;
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${items.length} شهادة بانتظار الاعتماد',
-                  style: DSText.caption(context, color: DSColors.text3),
+                _CredentialReviewToolbar(
+                  searchController: _searchController,
+                  query: _query,
+                  selectedType: _selectedType,
+                  availableTypes: types,
+                  attachmentFilter: _attachmentFilter,
+                  sort: _sort,
+                  totalCount: items.length,
+                  visibleCount: filteredItems.length,
+                  missingImagesCount: missingImages,
+                  missingImagesActionableCount: missingImageItems.length,
+                  selectedMissingImagesCount: selectedMissingImageItems.length,
+                  hasActiveFilters: _hasActiveFilters,
+                  isBulkRejecting: _bulkRejecting,
+                  onQueryChanged: (value) => setState(() => _query = value),
+                  onTypeChanged: (value) =>
+                      setState(() => _selectedType = value),
+                  onAttachmentFilterChanged: (value) =>
+                      setState(() => _attachmentFilter = value),
+                  onSortChanged: (value) => setState(() => _sort = value),
+                  onReset: _resetFilters,
+                  onSelectMissingImages: missingImageItems.isEmpty
+                      ? null
+                      : () => _selectMissingImageCredentials(missingImageItems),
+                  onClearSelection: _selectedCredentialKeys.isEmpty
+                      ? null
+                      : () => setState(_selectedCredentialKeys.clear),
+                  onRejectSelectedMissingImages:
+                      selectedMissingImageItems.isEmpty || _bulkRejecting
+                          ? null
+                          : () => _rejectSelectedMissingImages(
+                                context,
+                                selectedMissingImageItems,
+                              ),
                 ),
                 const SizedBox(height: DSSpacing.md),
-                ...items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: DSSpacing.md),
-                    child: _PendingCredentialCard(credential: item),
+                if (filteredItems.isEmpty)
+                  DSCard(
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.manage_search_outlined,
+                          color: DSColors.text3,
+                        ),
+                        const SizedBox(width: DSSpacing.md),
+                        Expanded(
+                          child: Text(
+                            'لا توجد شهادات مطابقة للفلاتر الحالية',
+                            style: DSText.body(context, color: DSColors.text2),
+                          ),
+                        ),
+                        DSButton(
+                          label: 'إعادة ضبط',
+                          size: DSButtonSize.sm,
+                          variant: DSButtonVariant.secondary,
+                          leading: const Icon(Icons.refresh_rounded, size: 16),
+                          onPressed: _resetFilters,
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...filteredItems.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: DSSpacing.md),
+                      child: _PendingCredentialCard(
+                        credential: item,
+                        selected: _selectedCredentialKeys
+                            .contains(_credentialSelectionKey(item)),
+                        onSelectedChanged:
+                            _isActionableMissingImageCredential(item)
+                                ? (selected) =>
+                                    _toggleCredentialSelection(item, selected)
+                                : null,
+                      ),
+                    ),
                   ),
-                ),
               ],
             );
           },
@@ -124,12 +361,410 @@ class _PendingCredentialsQueue extends StatelessWidget {
       ],
     );
   }
+
+  List<Map<String, dynamic>> _filteredItems(
+    List<Map<String, dynamic>> items,
+    Map<String, Map<String, dynamic>?> teachersById,
+  ) {
+    final normalizedQuery = _query.trim().toLowerCase();
+    final result = items.where((item) {
+      if (_selectedType != 'all' &&
+          _credentialTypeValue(item) != _selectedType) {
+        return false;
+      }
+
+      final hasImages = _credentialImages(item).isNotEmpty;
+      if (_attachmentFilter == _AttachmentFilter.withImages && !hasImages) {
+        return false;
+      }
+      if (_attachmentFilter == _AttachmentFilter.missingImages && hasImages) {
+        return false;
+      }
+
+      if (normalizedQuery.isEmpty) return true;
+
+      final userId = item['userId'] as String? ?? '';
+      final teacher = teachersById[userId];
+      final haystack = [
+        item['id']?.toString(),
+        userId,
+        _text(item, const ['title', 'name'], ''),
+        _nullableText(item, const ['organization', 'issuer', 'source']),
+        _nullableText(item, const ['description', 'notes']),
+        _credentialTypeLabel(_credentialTypeValue(item)),
+        if (teacher != null) ...[
+          _text(teacher, const ['name', 'displayName'], ''),
+          _nullableText(teacher, const ['email']),
+          _nullableText(teacher, const ['phoneNumber', 'phone']),
+          _nullableText(teacher, const ['city', 'addressText']),
+        ],
+      ]
+          .whereType<String>()
+          .where((value) => value.trim().isNotEmpty)
+          .join(' ')
+          .toLowerCase();
+      return haystack.contains(normalizedQuery);
+    }).toList();
+
+    result.sort((a, b) {
+      final compared = _compareCredentialDates(a, b);
+      return _sort == _CredentialSort.oldest ? compared : -compared;
+    });
+    return result;
+  }
+}
+
+class _CredentialReviewToolbar extends StatelessWidget {
+  const _CredentialReviewToolbar({
+    required this.searchController,
+    required this.query,
+    required this.selectedType,
+    required this.availableTypes,
+    required this.attachmentFilter,
+    required this.sort,
+    required this.totalCount,
+    required this.visibleCount,
+    required this.missingImagesCount,
+    required this.missingImagesActionableCount,
+    required this.selectedMissingImagesCount,
+    required this.hasActiveFilters,
+    required this.isBulkRejecting,
+    required this.onQueryChanged,
+    required this.onTypeChanged,
+    required this.onAttachmentFilterChanged,
+    required this.onSortChanged,
+    required this.onReset,
+    required this.onSelectMissingImages,
+    required this.onClearSelection,
+    required this.onRejectSelectedMissingImages,
+  });
+
+  final TextEditingController searchController;
+  final String query;
+  final String selectedType;
+  final List<String> availableTypes;
+  final _AttachmentFilter attachmentFilter;
+  final _CredentialSort sort;
+  final int totalCount;
+  final int visibleCount;
+  final int missingImagesCount;
+  final int missingImagesActionableCount;
+  final int selectedMissingImagesCount;
+  final bool hasActiveFilters;
+  final bool isBulkRejecting;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String> onTypeChanged;
+  final ValueChanged<_AttachmentFilter> onAttachmentFilterChanged;
+  final ValueChanged<_CredentialSort> onSortChanged;
+  final VoidCallback onReset;
+  final VoidCallback? onSelectMissingImages;
+  final VoidCallback? onClearSelection;
+  final VoidCallback? onRejectSelectedMissingImages;
+
+  @override
+  Widget build(BuildContext context) {
+    return DSCard(
+      padding: const EdgeInsets.all(DSSpacing.lg),
+      elevation: false,
+      color: DSColors.surfaceMuted,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: DSSpacing.sm,
+            runSpacing: DSSpacing.sm,
+            children: [
+              _QueueMetric(
+                icon: Icons.workspace_premium_outlined,
+                label: 'معلق',
+                value: '$totalCount',
+              ),
+              _QueueMetric(
+                icon: Icons.visibility_outlined,
+                label: 'ظاهر',
+                value: '$visibleCount',
+              ),
+              _QueueMetric(
+                icon: Icons.image_not_supported_outlined,
+                label: 'بدون مرفقات',
+                value: '$missingImagesCount',
+              ),
+              _QueueMetric(
+                icon: Icons.checklist_rtl_rounded,
+                label: 'محدد',
+                value: '$selectedMissingImagesCount',
+              ),
+            ],
+          ),
+          if (missingImagesActionableCount > 0) ...[
+            const SizedBox(height: DSSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(DSSpacing.md),
+              decoration: BoxDecoration(
+                color: DSColors.warningBg,
+                borderRadius: DSRadius.lgAll,
+                border: Border.all(
+                  color: DSColors.warning.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Wrap(
+                spacing: DSSpacing.sm,
+                runSpacing: DSSpacing.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.image_not_supported_outlined,
+                    color: DSColors.warning,
+                    size: 18,
+                  ),
+                  Text(
+                    'يوجد $missingImagesActionableCount شهادة بدون صور. يمكن تحديدها ورفضها برسالة موحدة.',
+                    style: DSText.caption(context, color: DSColors.text2),
+                  ),
+                  DSButton(
+                    label: 'تحديد الشهادات بدون صور',
+                    size: DSButtonSize.sm,
+                    variant: DSButtonVariant.secondary,
+                    leading: const Icon(Icons.select_all_rounded, size: 16),
+                    onPressed: onSelectMissingImages,
+                  ),
+                  DSButton(
+                    label: 'إلغاء التحديد',
+                    size: DSButtonSize.sm,
+                    variant: DSButtonVariant.ghost,
+                    leading: const Icon(Icons.clear_all_rounded, size: 16),
+                    onPressed: onClearSelection,
+                  ),
+                  DSButton(
+                    label: 'رفض المحدد بدون صور',
+                    size: DSButtonSize.sm,
+                    variant: DSButtonVariant.destructive,
+                    loading: isBulkRejecting,
+                    leading: const Icon(Icons.close_rounded, size: 16),
+                    onPressed: onRejectSelectedMissingImages,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: DSSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final searchWidth =
+                  constraints.maxWidth < 720 ? constraints.maxWidth : 420.0;
+              return Wrap(
+                spacing: DSSpacing.md,
+                runSpacing: DSSpacing.md,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: searchWidth,
+                    child: DSTextField(
+                      controller: searchController,
+                      hint: 'ابحث باسم المحفظ أو عنوان الشهادة أو الجهة...',
+                      leading: const Icon(Icons.search_rounded),
+                      trailing: query.trim().isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'مسح البحث',
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () {
+                                searchController.clear();
+                                onQueryChanged('');
+                              },
+                            ),
+                      onChanged: onQueryChanged,
+                    ),
+                  ),
+                  DSButton(
+                    label: 'إعادة ضبط',
+                    size: DSButtonSize.sm,
+                    variant: DSButtonVariant.secondary,
+                    leading: const Icon(Icons.refresh_rounded, size: 16),
+                    onPressed: hasActiveFilters ? onReset : null,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: DSSpacing.md),
+          _FilterGroup(
+            label: 'نوع الشهادة',
+            children: [
+              _QueueFilterChip(
+                label: 'الكل',
+                selected: selectedType == 'all',
+                onTap: () => onTypeChanged('all'),
+              ),
+              for (final type in availableTypes)
+                _QueueFilterChip(
+                  label: _credentialTypeLabel(type),
+                  selected: selectedType == type,
+                  onTap: () => onTypeChanged(type),
+                ),
+            ],
+          ),
+          const SizedBox(height: DSSpacing.sm),
+          _FilterGroup(
+            label: 'المرفقات',
+            children: [
+              _QueueFilterChip(
+                label: 'الكل',
+                selected: attachmentFilter == _AttachmentFilter.all,
+                onTap: () => onAttachmentFilterChanged(_AttachmentFilter.all),
+              ),
+              _QueueFilterChip(
+                label: 'بصور',
+                selected: attachmentFilter == _AttachmentFilter.withImages,
+                onTap: () =>
+                    onAttachmentFilterChanged(_AttachmentFilter.withImages),
+              ),
+              _QueueFilterChip(
+                label: 'بدون صور',
+                selected: attachmentFilter == _AttachmentFilter.missingImages,
+                onTap: () =>
+                    onAttachmentFilterChanged(_AttachmentFilter.missingImages),
+              ),
+            ],
+          ),
+          const SizedBox(height: DSSpacing.sm),
+          _FilterGroup(
+            label: 'الترتيب',
+            children: [
+              _QueueFilterChip(
+                label: 'الأقدم أولاً',
+                selected: sort == _CredentialSort.oldest,
+                onTap: () => onSortChanged(_CredentialSort.oldest),
+              ),
+              _QueueFilterChip(
+                label: 'الأحدث أولاً',
+                selected: sort == _CredentialSort.newest,
+                onTap: () => onSortChanged(_CredentialSort.newest),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterGroup extends StatelessWidget {
+  const _FilterGroup({required this.label, required this.children});
+
+  final String label;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: DSSpacing.sm,
+      runSpacing: DSSpacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: DSSpacing.xs),
+          child: Text(
+            label,
+            style: DSText.caption(context, color: DSColors.text3),
+          ),
+        ),
+        ...children,
+      ],
+    );
+  }
+}
+
+class _QueueMetric extends StatelessWidget {
+  const _QueueMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DSSpacing.md,
+        vertical: DSSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: DSColors.surface,
+        borderRadius: DSRadius.fullAll,
+        border: Border.all(color: DSColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: DSColors.primary),
+          const SizedBox(width: DSSpacing.xs),
+          Text(value, style: DSText.bodyMedium(context)),
+          const SizedBox(width: DSSpacing.xs),
+          Text(label, style: DSText.caption(context, color: DSColors.text3)),
+        ],
+      ),
+    );
+  }
+}
+
+class _QueueFilterChip extends StatelessWidget {
+  const _QueueFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: DSDuration.fast,
+          padding: const EdgeInsets.symmetric(
+            horizontal: DSSpacing.lg,
+            vertical: DSSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? DSColors.primary : DSColors.surface,
+            borderRadius: DSRadius.fullAll,
+            border: Border.all(
+              color: selected ? DSColors.primary : DSColors.border,
+            ),
+          ),
+          child: Text(
+            label,
+            style: DSText.caption(
+              context,
+              color: selected ? Colors.white : DSColors.text2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _PendingCredentialCard extends ConsumerWidget {
-  const _PendingCredentialCard({required this.credential});
+  const _PendingCredentialCard({
+    required this.credential,
+    required this.selected,
+    required this.onSelectedChanged,
+  });
 
   final Map<String, dynamic> credential;
+  final bool selected;
+  final ValueChanged<bool>? onSelectedChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -157,10 +792,16 @@ class _PendingCredentialCard extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.workspace_premium_outlined,
-                color: DSColors.primary,
-              ),
+              if (onSelectedChanged == null)
+                const Icon(
+                  Icons.workspace_premium_outlined,
+                  color: DSColors.primary,
+                )
+              else
+                Checkbox(
+                  value: selected,
+                  onChanged: (value) => onSelectedChanged!(value ?? false),
+                ),
               const SizedBox(width: DSSpacing.md),
               Expanded(
                 child: Column(
@@ -1871,6 +2512,18 @@ String _downloadFileName(String url) {
   return fileName;
 }
 
+String _credentialSelectionKey(Map<String, dynamic> credential) {
+  final userId = credential['userId'] as String? ?? '';
+  final credentialId = credential['id'] as String? ?? '';
+  if (userId.isEmpty || credentialId.isEmpty) return '';
+  return '$userId/$credentialId';
+}
+
+bool _isActionableMissingImageCredential(Map<String, dynamic> credential) {
+  return _credentialSelectionKey(credential).isNotEmpty &&
+      _credentialImages(credential).isEmpty;
+}
+
 List<String> _credentialImages(Map<String, dynamic> credential) {
   final urls = <String>{
     ..._stringList(credential['imageUrls']),
@@ -2038,6 +2691,61 @@ String _slotLabel(Map<String, dynamic> slot) {
   final end = _nullableText(slot, const ['endTime', 'end']);
   if (start != null && end != null) return '$start - $end';
   return start ?? end ?? 'موعد';
+}
+
+List<String> _credentialTypes(List<Map<String, dynamic>> items) {
+  final types = items.map(_credentialTypeValue).toSet().toList();
+  types.sort(
+    (a, b) => _credentialTypeLabel(a).compareTo(_credentialTypeLabel(b)),
+  );
+  return types;
+}
+
+String _credentialTypeValue(Map<String, dynamic> credential) {
+  final type = _nullableText(credential, const ['type']) ?? 'ijazah';
+  return type.trim().isEmpty ? 'ijazah' : type.trim();
+}
+
+String _credentialTypeLabel(String type) {
+  return switch (type) {
+    'education' => 'مؤهل تعليمي',
+    'license' => 'ترخيص',
+    'ijazah' => 'إجازة',
+    _ => type,
+  };
+}
+
+int _compareCredentialDates(
+  Map<String, dynamic> a,
+  Map<String, dynamic> b,
+) {
+  final ad = _credentialDateTime(a);
+  final bd = _credentialDateTime(b);
+  if (ad == null && bd == null) return 0;
+  if (ad == null) return 1;
+  if (bd == null) return -1;
+  return ad.compareTo(bd);
+}
+
+DateTime? _credentialDateTime(Map<String, dynamic> credential) {
+  for (final key in const [
+    'uploadedAt',
+    'createdAt',
+    'submittedAt',
+    'updatedAt',
+  ]) {
+    final value = credential[key];
+    if (value == null) continue;
+    if (value is DateTime) return value;
+    if (value is String) {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    try {
+      return (value as dynamic).toDate() as DateTime;
+    } catch (_) {}
+  }
+  return null;
 }
 
 String _credentialStatusLabel(String status) {

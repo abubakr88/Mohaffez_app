@@ -58,6 +58,35 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // Previous Flutter web builds may have registered a service worker. Some
+    // iOS Safari sessions keep serving that old cached app even after a fresh
+    // deploy, so explicitly remove stale workers and Flutter caches before the
+    // app boots. The app is intentionally built with --pwa-strategy none.
+    (function () {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations()
+          .then(function (registrations) {
+            registrations.forEach(function (registration) {
+              registration.unregister();
+            });
+          })
+          .catch(function () {});
+      }
+
+      if ('caches' in window) {
+        caches.keys()
+          .then(function (keys) {
+            keys.forEach(function (key) {
+              if (key.indexOf('flutter') !== -1 || key.indexOf('mohaffez') !== -1) {
+                caches.delete(key);
+              }
+            });
+          })
+          .catch(function () {});
+      }
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

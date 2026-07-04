@@ -46,6 +46,24 @@ class _GoogleRoleSelectionScreenState
       return;
     }
 
+    final teacherRegistrationEnabled = ref
+            .read(systemConfigProvider)
+            .valueOrNull
+            ?.teacherRegistrationEnabled ??
+        true;
+    if (_selectedRole == 'mohaffez' && !teacherRegistrationEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تسجيل المحفظين الجدد متوقف حالياً. يرجى المحاولة لاحقاً.',
+          ),
+          backgroundColor: AppThemeConstants.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final notifier = ref.read(authNotifierProvider.notifier);
@@ -71,6 +89,12 @@ class _GoogleRoleSelectionScreenState
 
   @override
   Widget build(BuildContext context) {
+    final teacherRegistrationEnabled = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.teacherRegistrationEnabled ??
+        true;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -158,6 +182,7 @@ class _GoogleRoleSelectionScreenState
                           icon: Icons.menu_book_rounded,
                           value: 'mohaffez',
                           selectedValue: _selectedRole,
+                          enabled: teacherRegistrationEnabled,
                           onSelected: (v) => setState(() => _selectedRole = v),
                         ),
                         const SizedBox(height: 24),
@@ -248,6 +273,7 @@ class _RoleCard extends StatelessWidget {
   final IconData icon;
   final String value;
   final String? selectedValue;
+  final bool enabled;
   final ValueChanged<String> onSelected;
 
   const _RoleCard({
@@ -256,6 +282,7 @@ class _RoleCard extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.selectedValue,
+    this.enabled = true,
     required this.onSelected,
   });
 
@@ -263,66 +290,70 @@ class _RoleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isSelected = selectedValue == value;
     return InkWell(
-      onTap: () => onSelected(value),
+      onTap: enabled ? () => onSelected(value) : null,
       borderRadius: AppThemeConstants.borderRadiusMd,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppThemeConstants.primary.withValues(alpha: 0.1)
-              : AppThemeConstants.background,
-          border: Border.all(
-            color:
-                isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppThemeConstants.primary.withValues(alpha: 0.1)
+                : AppThemeConstants.background,
+            border: Border.all(
+              color:
+                  isSelected ? AppThemeConstants.primary : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
+            ),
+            borderRadius: AppThemeConstants.borderRadiusMd,
           ),
-          borderRadius: AppThemeConstants.borderRadiusMd,
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppThemeConstants.primary
-                    : Colors.grey.shade200,
-                shape: BoxShape.circle,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppThemeConstants.primary
+                      : Colors.grey.shade200,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? Colors.white : Colors.grey.shade600,
+                ),
               ),
-              child: Icon(
-                icon,
-                color: isSelected ? Colors.white : Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected
-                          ? AppThemeConstants.primary
-                          : Colors.black87,
-                      fontFamily: 'Cairo',
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected
+                            ? AppThemeConstants.primary
+                            : Colors.black87,
+                        fontFamily: 'Cairo',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (isSelected)
-              const Icon(Icons.check_circle, color: AppThemeConstants.primary),
-          ],
+              if (isSelected)
+                const Icon(Icons.check_circle,
+                    color: AppThemeConstants.primary),
+            ],
+          ),
         ),
       ),
     );
