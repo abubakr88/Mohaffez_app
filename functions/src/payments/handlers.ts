@@ -56,6 +56,7 @@ const sessionFallbackFields = [
   'imamAddressLat',
   'imamAddressLng',
   'mohaffezPhone',
+  'studentPhone',
   'preferredProvider',
 ];
 

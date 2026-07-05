@@ -1,4 +1,4 @@
-﻿// screens/session_completion_screen.dart
+// screens/session_completion_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -117,17 +117,21 @@ class _SessionCompletionScreenState
                 ? null
                 : newMurajaController.text.trim(),
             // Ayah range for new hifz (null when "all surah" is selected)
-            newHifzFromAyah: newHifzAllSurah || newHifzFromAyahController.text.trim().isEmpty
-                ? null
-                : newHifzFromAyahController.text.trim(),
-            newHifzToAyah: newHifzAllSurah || newHifzToAyahController.text.trim().isEmpty
-                ? null
-                : newHifzToAyahController.text.trim(),
+            newHifzFromAyah:
+                newHifzAllSurah || newHifzFromAyahController.text.trim().isEmpty
+                    ? null
+                    : newHifzFromAyahController.text.trim(),
+            newHifzToAyah:
+                newHifzAllSurah || newHifzToAyahController.text.trim().isEmpty
+                    ? null
+                    : newHifzToAyahController.text.trim(),
             // Ayah range for new muraja (null when "all surah" is selected)
-            newMurajaFromAyah: newMurajaAllSurah || newMurajaFromAyahController.text.trim().isEmpty
+            newMurajaFromAyah: newMurajaAllSurah ||
+                    newMurajaFromAyahController.text.trim().isEmpty
                 ? null
                 : newMurajaFromAyahController.text.trim(),
-            newMurajaToAyah: newMurajaAllSurah || newMurajaToAyahController.text.trim().isEmpty
+            newMurajaToAyah: newMurajaAllSurah ||
+                    newMurajaToAyahController.text.trim().isEmpty
                 ? null
                 : newMurajaToAyahController.text.trim(),
             // General rating
@@ -155,8 +159,9 @@ class _SessionCompletionScreenState
                 ? 'تم إكمال الجلسة المتأخرة بنجاح ✓'
                 : 'تم إكمال الجلسة بنجاح ✓',
           ),
-          backgroundColor:
-              widget.isLateCompletion ? AppThemeConstants.warning : AppThemeConstants.secondary,
+          backgroundColor: widget.isLateCompletion
+              ? AppThemeConstants.warning
+              : AppThemeConstants.secondary,
         ),
       );
     } catch (e) {
@@ -229,8 +234,9 @@ class _SessionCompletionScreenState
           title: Text(
             widget.isLateCompletion ? 'إكمال جلسة متأخرة' : 'إكمال الجلسة',
           ),
-          backgroundColor:
-              widget.isLateCompletion ? AppThemeConstants.warning : AppThemeConstants.secondary,
+          backgroundColor: widget.isLateCompletion
+              ? AppThemeConstants.warning
+              : AppThemeConstants.secondary,
         ),
         body: Form(
           key: _formKey,
@@ -251,7 +257,9 @@ class _SessionCompletionScreenState
                   decoration: BoxDecoration(
                     color: AppThemeConstants.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.4)),
+                    border: Border.all(
+                        color:
+                            AppThemeConstants.primary.withValues(alpha: 0.4)),
                   ),
                   child: const Row(
                     children: [
@@ -281,7 +289,8 @@ class _SessionCompletionScreenState
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppThemeConstants.secondary.withValues(alpha: 0.1),
+                          color: AppThemeConstants.secondary
+                              .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -341,7 +350,8 @@ class _SessionCompletionScreenState
                             decoration: BoxDecoration(
                               color: AppThemeConstants.successLight,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppThemeConstants.accentGreenAlt),
+                              border: Border.all(
+                                  color: AppThemeConstants.accentGreenAlt),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,18 +359,19 @@ class _SessionCompletionScreenState
                                 const Row(
                                   children: [
                                     Icon(Icons.menu_book,
-                                        size: 18, color: AppThemeConstants.success),
+                                        size: 18,
+                                        color: AppThemeConstants.success),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                      'الحفظ المطلوب كان:',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                        'الحفظ المطلوب كان:',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
                                       ),
-                                    ),
                                     ),
                                   ],
                                 ),
@@ -375,7 +386,8 @@ class _SessionCompletionScreenState
                                   Row(
                                     children: [
                                       const Icon(Icons.format_list_numbered,
-                                          size: 14, color: AppThemeConstants.success),
+                                          size: 14,
+                                          color: AppThemeConstants.success),
                                       const SizedBox(width: 4),
                                       Text(
                                         'من آية ${widget.previousHifzFromAyah} إلى آية ${widget.previousHifzToAyah}',
@@ -424,7 +436,9 @@ class _SessionCompletionScreenState
                             decoration: BoxDecoration(
                               color: AppThemeConstants.surface,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color: AppThemeConstants.primary
+                                      .withValues(alpha: 0.3)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,18 +446,19 @@ class _SessionCompletionScreenState
                                 const Row(
                                   children: [
                                     Icon(Icons.history_edu,
-                                        size: 18, color: AppThemeConstants.accentBlue),
+                                        size: 18,
+                                        color: AppThemeConstants.accentBlue),
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                      'المراجعة المطلوبة كانت:',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
+                                        'المراجعة المطلوبة كانت:',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
                                       ),
-                                    ),
                                     ),
                                   ],
                                 ),
@@ -458,7 +473,8 @@ class _SessionCompletionScreenState
                                   Row(
                                     children: [
                                       const Icon(Icons.format_list_numbered,
-                                          size: 14, color: AppThemeConstants.accentBlue),
+                                          size: 14,
+                                          color: AppThemeConstants.accentBlue),
                                       const SizedBox(width: 4),
                                       Text(
                                         'من آية ${widget.previousMurajaFromAyah} إلى آية ${widget.previousMurajaToAyah}',
@@ -559,12 +575,14 @@ class _SessionCompletionScreenState
                         decoration: BoxDecoration(
                           color: sessionMistakes.isEmpty
                               ? AppThemeConstants.successLight
-                              : AppThemeConstants.primary.withValues(alpha: 0.08),
+                              : AppThemeConstants.primary
+                                  .withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: sessionMistakes.isEmpty
                                 ? AppThemeConstants.accentGreenAlt
-                                : AppThemeConstants.primary.withValues(alpha: 0.4),
+                                : AppThemeConstants.primary
+                                    .withValues(alpha: 0.4),
                           ),
                         ),
                         child: Row(
@@ -608,7 +626,8 @@ class _SessionCompletionScreenState
                             subtitle:
                                 m.wordText != null ? Text(m.wordText!) : null,
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: AppThemeConstants.error),
+                              icon: const Icon(Icons.delete,
+                                  color: AppThemeConstants.error),
                               onPressed: () {
                                 setState(() {
                                   sessionMistakes.remove(m);
@@ -675,7 +694,8 @@ class _SessionCompletionScreenState
                         activeColor: AppThemeConstants.success,
                         title: const Text(
                           'كل السورة (بدون تحديد آيات)',
-                          style: TextStyle(fontSize: 13, color: AppThemeConstants.success),
+                          style: TextStyle(
+                              fontSize: 13, color: AppThemeConstants.success),
                         ),
                         controlAffinity: ListTileControlAffinity.leading,
                       ),
@@ -702,7 +722,8 @@ class _SessionCompletionScreenState
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                            const Icon(Icons.arrow_forward,
+                                color: AppThemeConstants.grey400),
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextFormField(
@@ -752,7 +773,9 @@ class _SessionCompletionScreenState
                         activeColor: AppThemeConstants.accentBlue,
                         title: const Text(
                           'كل السورة (بدون تحديد آيات)',
-                          style: TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: AppThemeConstants.accentBlue),
                         ),
                         controlAffinity: ListTileControlAffinity.leading,
                       ),
@@ -779,7 +802,8 @@ class _SessionCompletionScreenState
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+                            const Icon(Icons.arrow_forward,
+                                color: AppThemeConstants.grey400),
                             const SizedBox(width: 12),
                             Expanded(
                               child: TextFormField(
@@ -1134,6 +1158,7 @@ class _OnlineSessionPanel extends ConsumerWidget {
     final infoAsync = ref.watch(meetingInfoProvider(sessionId));
     final info = infoAsync.valueOrNull;
     final url = info?.url ?? '';
+    final isPhoneCall = info?.isPhoneCall ?? false;
     final studentJoined = info?.studentJoinedAt != null;
 
     return Container(
@@ -1157,8 +1182,11 @@ class _OnlineSessionPanel extends ConsumerWidget {
                   color: AppThemeConstants.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.videocam_rounded,
-                    color: AppThemeConstants.white, size: 22),
+                child: Icon(
+                  isPhoneCall ? Icons.phone_rounded : Icons.videocam_rounded,
+                  color: AppThemeConstants.white,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -1225,19 +1253,41 @@ class _OnlineSessionPanel extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: url.isEmpty
+              onPressed: (!isPhoneCall && url.isEmpty)
                   ? null
-                  : () => MeetingLauncherService.launch(
+                  : () async {
+                      if (isPhoneCall) {
+                        final launched =
+                            await MeetingLauncherService.launchPhoneCall(
+                          phone: info?.studentPhone ?? '',
+                          sessionId: sessionId,
+                          role: 'mohaffez',
+                        );
+                        if (!launched && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('رقم الطالب غير متاح لهذه الجلسة'),
+                              backgroundColor: AppThemeConstants.error,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      await MeetingLauncherService.launch(
                         context: context,
                         ref: ref,
                         info: info!,
                         sessionId: sessionId,
                         role: 'mohaffez',
-                      ),
-              icon: const Icon(Icons.open_in_new, size: 18),
-              label: const Text(
-                'افتح الاجتماع',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                      );
+                    },
+              icon: Icon(
+                isPhoneCall ? Icons.phone_in_talk_rounded : Icons.open_in_new,
+                size: 18,
+              ),
+              label: Text(
+                isPhoneCall ? 'اتصل بالطالب' : 'افتح الاجتماع',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppThemeConstants.white,
@@ -1254,4 +1304,3 @@ class _OnlineSessionPanel extends ConsumerWidget {
     );
   }
 }
-

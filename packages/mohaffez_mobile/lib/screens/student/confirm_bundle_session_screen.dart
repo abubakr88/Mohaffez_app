@@ -287,6 +287,7 @@ class _ConfirmBundleSessionScreenState
         imamAddressLat: slotContext.imamAddressLat,
         imamAddressLng: slotContext.imamAddressLng,
         mohaffezPhone: slotContext.mohaffezPhone,
+        studentPhone: currentUser.phoneNumber,
         subscriptionId: sub.id,
         slotLockId: slotLockId, // Use the newly created slot lock
         // INTENTIONALLY false: no new payment needed — student already owns

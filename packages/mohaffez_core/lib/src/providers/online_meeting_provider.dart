@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show FirebaseFirestore, Timestamp;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_provider.dart';
@@ -8,8 +9,13 @@ class MeetingInfo {
   final String provider;
   final String roomId;
   final String url;
+  final String preferredProvider;
+  final String studentPhone;
+  final String mohaffezPhone;
+
   /// Day-only date (midnight). Use `slotStart` for time-of-day comparisons.
   final DateTime? sessionDate;
+
   /// Actual session start datetime (includes hour + minute). Preferred over
   /// `sessionDate` for all stale-guard and lead-time calculations.
   final DateTime? slotStart;
@@ -19,6 +25,7 @@ class MeetingInfo {
   final DateTime? endedAt;
   final DateTime? studentJoinedAt;
   final DateTime? teacherJoinedAt;
+
   /// Root-level session status (`pending`, `accepted`, `completed`, …).
   /// Once `completed`, the meeting button must render the ended state
   /// regardless of meetingEndedAt/sessionTime — see `_computeState`.
@@ -28,6 +35,9 @@ class MeetingInfo {
     required this.provider,
     required this.roomId,
     required this.url,
+    this.preferredProvider = '',
+    this.studentPhone = '',
+    this.mohaffezPhone = '',
     this.sessionDate,
     this.slotStart,
     this.joinWindowOpensAt,
@@ -47,11 +57,17 @@ class MeetingInfo {
       if (v is String) return DateTime.tryParse(v);
       return null;
     }
+
     final meeting = doc['meeting'] as Map<String, dynamic>? ?? const {};
+    final preferredProvider = doc['preferredProvider'] as String? ?? '';
     return MeetingInfo(
-      provider: meeting['provider'] as String? ?? 'custom',
+      provider: meeting['provider'] as String? ??
+          (preferredProvider == 'phoneCall' ? 'phoneCall' : 'custom'),
       roomId: meeting['roomId'] as String? ?? '',
       url: meeting['url'] as String? ?? '',
+      preferredProvider: preferredProvider,
+      studentPhone: doc['studentPhone'] as String? ?? '',
+      mohaffezPhone: doc['mohaffezPhone'] as String? ?? '',
       sessionDate: ts(doc['sessionDate']),
       slotStart: ts(doc['slotStart']),
       joinWindowOpensAt: ts(meeting['joinWindowOpensAt']),
@@ -63,16 +79,19 @@ class MeetingInfo {
       status: doc['status'] as String? ?? '',
     );
   }
+
+  bool get isPhoneCall =>
+      provider == 'phoneCall' || preferredProvider == 'phoneCall';
 }
 
 enum MeetingButtonState {
   hidden,
   pendingMeetingLink,
-  tooEarly,           // both roles: now < slotStart − leadTimeMinutes
-  waitingForTeacher,  // student: window open, teacher hasn't started yet
-  teacherLate,        // student: teacher hasn't started 5+ min after slotStart
-  ready,              // teacher-only: can click "ابدأ الجلسة"
-  inProgress,         // teacher started; both roles can interact with the meeting
+  tooEarly, // both roles: now < slotStart − leadTimeMinutes
+  waitingForTeacher, // student: window open, teacher hasn't started yet
+  teacherLate, // student: teacher hasn't started 5+ min after slotStart
+  ready, // teacher-only: can click "ابدأ الجلسة"
+  inProgress, // teacher started; both roles can interact with the meeting
   ended,
 }
 
@@ -98,7 +117,13 @@ final meetingInfoProvider =
     final hasActivity = data['meetingStartedAt'] != null ||
         data['meetingStudentJoinedAt'] != null ||
         data['meetingTeacherJoinedAt'] != null;
-    if (data['meeting'] == null && !hasActivity && !isTerminal) return null;
+    final isPhoneCall = data['preferredProvider'] == 'phoneCall';
+    if (data['meeting'] == null &&
+        !hasActivity &&
+        !isTerminal &&
+        !isPhoneCall) {
+      return null;
+    }
     return MeetingInfo.fromDoc(data);
   });
 });
@@ -118,20 +143,20 @@ final meetingButtonStateProvider =
     ref.watch(_meetingClockProvider);
     final systemConfig = ref.watch(systemConfigProvider).valueOrNull;
     final leadTimeMinutes = systemConfig?.meetingStartLeadTimeMinutes ?? 60;
-  // NTP correction disabled — the `ntp` package returns unreliable offsets
-  // on some devices. Device clock is used directly.
-  // final offset = ref.watch(serverClockProvider).offset ?? Duration.zero;
+    // NTP correction disabled — the `ntp` package returns unreliable offsets
+    // on some devices. Device clock is used directly.
+    // final offset = ref.watch(serverClockProvider).offset ?? Duration.zero;
 
-  return infoAsync.when(
-    data: (info) => _computeState(
-      info: info,
-      role: key.role,
-      leadTimeMinutes: leadTimeMinutes,
-      now: DateTime.now(),
-    ),
-    loading: () => MeetingButtonState.pendingMeetingLink,
-    error: (_, __) => MeetingButtonState.hidden,
-  );
+    return infoAsync.when(
+      data: (info) => _computeState(
+        info: info,
+        role: key.role,
+        leadTimeMinutes: leadTimeMinutes,
+        now: DateTime.now(),
+      ),
+      loading: () => MeetingButtonState.pendingMeetingLink,
+      error: (_, __) => MeetingButtonState.hidden,
+    );
   },
   dependencies: [meetingInfoProvider],
 );
@@ -150,7 +175,7 @@ MeetingButtonState _computeState({
     return MeetingButtonState.ended;
   }
 
-  if (info == null || info.url.isEmpty) {
+  if (info == null || (!info.isPhoneCall && info.url.isEmpty)) {
     return MeetingButtonState.pendingMeetingLink;
   }
 

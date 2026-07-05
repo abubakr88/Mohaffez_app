@@ -123,6 +123,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
     const preferredTimeSlot = dp.preferredTimeSlot as string | undefined;
     const slotSessionType = dp.sessionType as string | undefined;
     const mohaffezPhone = dp.mohaffezPhone as string | undefined;
+    const studentPhone = dp.studentPhone as string | undefined;
     const imamAddressText = dp.imamAddressText as string | undefined;
     const imamAddressLat = dp.imamAddressLat as number | undefined;
     const imamAddressLng = dp.imamAddressLng as number | undefined;
@@ -447,6 +448,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             paymentTransactionId: transactionTag,
             requestId: dpTx.sessionRequestId ?? newRequestRef?.id ?? null,
             mohaffezPhone: mohaffezPhone ?? null,
+            studentPhone: studentPhone ?? null,
             imamAddressText: imamAddressText ?? null,
             imamAddressLat: imamAddressLat ?? null,
             imamAddressLng: imamAddressLng ?? null,

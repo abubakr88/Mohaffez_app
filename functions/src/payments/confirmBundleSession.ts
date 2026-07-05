@@ -107,6 +107,7 @@ export const confirmBundleSession = functions.https.onCall(
       const imamAddressLat    = (requestData.imamAddressLat   as number  | null)  ?? null;
       const imamAddressLng    = (requestData.imamAddressLng   as number  | null)  ?? null;
       const mohaffezPhone     = (requestData.mohaffezPhone    as string  | null)  ?? null;
+      const studentPhone      = (requestData.studentPhone     as string  | null)  ?? null;
 
       const rawAmount = requestData.paymentAmount;
       let amount: number =
@@ -267,6 +268,7 @@ export const confirmBundleSession = functions.https.onCall(
         imamAddressLat:   imamAddressLat   ?? null,
         imamAddressLng:   imamAddressLng   ?? null,
         mohaffezPhone:    mohaffezPhone    ?? null,
+        studentPhone:     studentPhone     ?? null,
         isPaid:           true,
         paymentMethod:    'subscription',
         // Per-session price (bundlePrice / totalSessions). Without this,

@@ -87,8 +87,7 @@ class _BookingConfirmationScreenState
   bool _isSubmitting = false;
 
   bool get _isUsingSubscription =>
-      widget.bookingDetails.paymentMethod ==
-      BookingPaymentMethod.bundleCredit;
+      widget.bookingDetails.paymentMethod == BookingPaymentMethod.bundleCredit;
 
   @override
   Widget build(BuildContext context) {
@@ -452,6 +451,8 @@ class _BookingConfirmationScreenState
             imamAddressLat: d.locationLat,
             imamAddressLng: d.locationLng,
             mohaffezPhone: d.mohaffezPhone,
+            studentPhone:
+                ref.read(currentUserProvider).valueOrNull?.phoneNumber,
             subscriptionId: _isUsingSubscription ? d.subscriptionId : null,
             isPaid: false,
             requiresPaymentOnAcceptance:

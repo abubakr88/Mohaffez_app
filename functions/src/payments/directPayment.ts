@@ -52,6 +52,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       imamAddressLat,
       imamAddressLng,
       mohaffezPhone,
+      studentPhone,
       planType,
       planId,
       planTitle,
@@ -206,6 +207,10 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           directPaymentRequestId: null,
           slotLockId: newLockRef.id,
           paymentAmount: amount,
+          studentPhone:
+            typeof studentPhone === 'string' && studentPhone.trim().length > 0
+              ? studentPhone.trim()
+              : null,
           requiresPaymentOnAcceptance: false,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
@@ -250,6 +255,10 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         imamAddressLat:  imamAddressLat  ?? null,
         imamAddressLng:  imamAddressLng  ?? null,
         mohaffezPhone:   mohaffezPhone   ?? null,
+        studentPhone:
+          typeof studentPhone === 'string' && studentPhone.trim().length > 0
+            ? studentPhone.trim()
+            : null,
         paymentMethod,
         studentNote: studentNote ?? null,
         status: 'pendingconfirmation',
@@ -486,6 +495,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           paymentType:         'directpayment',
           directPaymentRequestId,
           mohaffezPhone:       dp.mohaffezPhone       ?? null,
+          studentPhone:        dp.studentPhone        ?? null,
           imamAddressText:     dp.imamAddressText      ?? null,
           imamAddressLat:      dp.imamAddressLat       ?? null,
           imamAddressLng:      dp.imamAddressLng       ?? null,

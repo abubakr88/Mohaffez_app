@@ -106,6 +106,8 @@ class _DirectBookingRequestScreenState
           'imamAddressLng': slotContext.imamAddressLng,
         if (slotContext.mohaffezPhone?.isNotEmpty == true)
           'mohaffezPhone': slotContext.mohaffezPhone,
+        if (currentUser.phoneNumber?.trim().isNotEmpty == true)
+          'studentPhone': currentUser.phoneNumber!.trim(),
         // Tells the CF this is a direct-payment request (not free, not Paymob).
         // The CF will create the doc with status 'pending' so the teacher sees it
         // in PendingRequestsScreen and can accept/reject before the student is

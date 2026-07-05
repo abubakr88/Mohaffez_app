@@ -52,6 +52,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     imamAddressLat,
     imamAddressLng,
     mohaffezPhone,
+    studentPhone,
     promoCode,
     requestId,
     paymentId,
@@ -399,6 +400,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         imamAddressLat: imamAddressLat || null,
         imamAddressLng: imamAddressLng || null,
         mohaffezPhone: mohaffezPhone || null,
+        studentPhone:
+          typeof studentPhone === 'string' && studentPhone.trim().length > 0
+            ? studentPhone.trim()
+            : null,
         requiresPaymentOnAcceptance: false,
         selectedPaymentMethod: "freesession",
         createdAt: FieldValue.serverTimestamp(),
@@ -423,6 +428,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           : null,
       location: imamAddressText || "",
       mohaffezPhone: mohaffezPhone || null,
+      studentPhone:
+        typeof studentPhone === 'string' && studentPhone.trim().length > 0
+          ? studentPhone.trim()
+          : null,
       imamAddressLat: imamAddressLat || null,
       imamAddressLng: imamAddressLng || null,
       imamAddressText: imamAddressText || null,

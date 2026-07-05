@@ -89,6 +89,7 @@ export const createSessionRequest = functions.https.onCall(
       imamAddressLat,
       imamAddressLng,
       mohaffezPhone,
+      studentPhone,
       subscriptionId,          // FIX-TS6133: now consumed below (log + Firestore write)
       requiresPaymentOnAcceptance,
       selectedPaymentMethod,
@@ -425,6 +426,10 @@ export const createSessionRequest = functions.https.onCall(
         imamAddressLat: imamAddressLat ?? null,
         imamAddressLng: imamAddressLng ?? null,
         mohaffezPhone: mohaffezPhone ?? null,
+        studentPhone:
+          typeof studentPhone === 'string' && studentPhone.trim().length > 0
+            ? studentPhone.trim()
+            : null,
         subscriptionId: subscriptionId ?? null,   // FIX-TS6133: was (data.subscriptionId as string) ?? null
         planId: (data.planId as string) ?? null,
         planTitle: (data.planTitle as string) ?? null,

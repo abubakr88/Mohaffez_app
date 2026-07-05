@@ -186,6 +186,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     double? imamAddressLat,
     double? imamAddressLng,
     String? mohaffezPhone,
+    String? studentPhone,
     String? subscriptionId,
     bool isPaid = false,
     bool requiresPaymentOnAcceptance = false,
@@ -222,6 +223,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         imamAddressLat: imamAddressLat,
         imamAddressLng: imamAddressLng,
         mohaffezPhone: mohaffezPhone,
+        studentPhone: studentPhone,
         subscriptionId: methodSubscriptionId,
         isPaid: isPaid,
         requiresPaymentOnAcceptance:
@@ -487,6 +489,7 @@ class BookingService {
     double? imamAddressLat,
     double? imamAddressLng,
     String? mohaffezPhone,
+    String? studentPhone,
     String? subscriptionId,
     bool isPaid = false,
     bool requiresPaymentOnAcceptance = false,
@@ -552,6 +555,8 @@ class BookingService {
         'imamAddressLat': imamAddressLat,
         'imamAddressLng': imamAddressLng,
         'mohaffezPhone': mohaffezPhone,
+        if (studentPhone != null && studentPhone.trim().isNotEmpty)
+          'studentPhone': studentPhone.trim(),
         'subscriptionId': subscriptionId,
         'requiresPaymentOnAcceptance': requiresPaymentOnAcceptance,
         // ── Value is always a plain string via the .value extension ─────────

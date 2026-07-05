@@ -15,7 +15,7 @@ class SessionRequestModel {
   final String mohaffezName;
   final String sessionType;
   final String?
-      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (online only)
+      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' | 'phoneCall'
   final String preferredTimeSlot;
   final Timestamp? slotDate;
   final Timestamp? slotStart;
@@ -24,6 +24,7 @@ class SessionRequestModel {
   final double? imamAddressLat;
   final double? imamAddressLng;
   final String? mohaffezPhone;
+  final String? studentPhone;
   final String status;
   final String? selectedPaymentMethod;
   final String? subscriptionId;
@@ -82,6 +83,7 @@ class SessionRequestModel {
     this.imamAddressLat,
     this.imamAddressLng,
     this.mohaffezPhone,
+    this.studentPhone,
     required this.status,
     this.selectedPaymentMethod,
     this.subscriptionId,
@@ -141,6 +143,7 @@ class SessionRequestModel {
       imamAddressLat: toDouble(map['imamAddressLat']),
       imamAddressLng: toDouble(map['imamAddressLng']),
       mohaffezPhone: map['mohaffezPhone'] as String?,
+      studentPhone: map['studentPhone'] as String?,
       status: map['status'] as String? ?? 'pending',
       selectedPaymentMethod: map['selectedPaymentMethod'] as String?,
       subscriptionId: map['subscriptionId'] as String?,
@@ -183,6 +186,7 @@ class SessionRequestModel {
         if (imamAddressLat != null) 'imamAddressLat': imamAddressLat,
         if (imamAddressLng != null) 'imamAddressLng': imamAddressLng,
         if (mohaffezPhone != null) 'mohaffezPhone': mohaffezPhone,
+        if (studentPhone != null) 'studentPhone': studentPhone,
         'status': status,
         if (selectedPaymentMethod != null)
           'selectedPaymentMethod': selectedPaymentMethod,
@@ -239,6 +243,7 @@ class SessionRequestModel {
         imamAddressLat: imamAddressLat,
         imamAddressLng: imamAddressLng,
         mohaffezPhone: mohaffezPhone,
+        studentPhone: studentPhone,
         status: status ?? this.status,
         selectedPaymentMethod:
             selectedPaymentMethod ?? this.selectedPaymentMethod,

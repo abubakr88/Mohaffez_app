@@ -1,4 +1,4 @@
-﻿// screens/upcoming_sessions_screen.dart
+// screens/upcoming_sessions_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -28,7 +28,8 @@ class UpcomingSessionsScreen extends ConsumerStatefulWidget {
       _UpcomingSessionsScreenState();
 }
 
-class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen> {
+class _UpcomingSessionsScreenState
+    extends ConsumerState<UpcomingSessionsScreen> {
   @override
   void initState() {
     super.initState();
@@ -91,7 +92,8 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: AppThemeConstants.white.withValues(alpha: 0.2),
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
@@ -184,8 +186,8 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                   .read(upcomingSessionsFilterProvider.notifier)
                                   .state = UpcomingFilter.all;
                             },
-                            selectedColor:
-                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            selectedColor: AppThemeConstants.secondary
+                                .withValues(alpha: 0.2),
                             checkmarkColor: AppThemeConstants.secondary,
                           ),
                           FilterChip(
@@ -196,8 +198,8 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                   .read(upcomingSessionsFilterProvider.notifier)
                                   .state = UpcomingFilter.today;
                             },
-                            selectedColor:
-                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            selectedColor: AppThemeConstants.secondary
+                                .withValues(alpha: 0.2),
                             checkmarkColor: AppThemeConstants.secondary,
                           ),
                           FilterChip(
@@ -208,8 +210,8 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                   .read(upcomingSessionsFilterProvider.notifier)
                                   .state = UpcomingFilter.thisWeek;
                             },
-                            selectedColor:
-                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            selectedColor: AppThemeConstants.secondary
+                                .withValues(alpha: 0.2),
                             checkmarkColor: AppThemeConstants.secondary,
                           ),
                           FilterChip(
@@ -220,8 +222,8 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                                   .read(upcomingSessionsFilterProvider.notifier)
                                   .state = UpcomingFilter.thisMonth;
                             },
-                            selectedColor:
-                                AppThemeConstants.secondary.withValues(alpha: 0.2),
+                            selectedColor: AppThemeConstants.secondary
+                                .withValues(alpha: 0.2),
                             checkmarkColor: AppThemeConstants.secondary,
                           ),
                         ],
@@ -252,7 +254,8 @@ class _UpcomingSessionsScreenState extends ConsumerState<UpcomingSessionsScreen>
                         animated: true,
                         action: TextButton.icon(
                           onPressed: () {
-                            ref.invalidate(upcomingSessionsProvider(mohaffezId));
+                            ref.invalidate(
+                                upcomingSessionsProvider(mohaffezId));
                           },
                           icon: const Icon(Icons.refresh),
                           label: const Text('تحديث'),
@@ -337,7 +340,8 @@ class SessionCard extends ConsumerWidget {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('أضف رابط الاجتماع أولاً',
               style: TextStyle(fontWeight: FontWeight.w700)),
           content: const Text(
@@ -368,7 +372,8 @@ class SessionCard extends ConsumerWidget {
   }
 
   // ✅ Check if session can be completed (30 min before → 24 hours after)
-  bool _canCompleteSession(DateTime sessionDate, String timeSlot, int earlyMinutes, WidgetRef ref) {
+  bool _canCompleteSession(
+      DateTime sessionDate, String timeSlot, int earlyMinutes, WidgetRef ref) {
     try {
       final now = serverNow(ref);
 
@@ -387,8 +392,9 @@ class SessionCard extends ConsumerWidget {
       );
 
       // Window: 30 min before → 24 hours after
-      final canStartFrom = sessionTime.subtract(Duration(minutes: earlyMinutes));
-      final canCompleteUntil = sessionTime.add(const  Duration(hours: 24));
+      final canStartFrom =
+          sessionTime.subtract(Duration(minutes: earlyMinutes));
+      final canCompleteUntil = sessionTime.add(const Duration(hours: 24));
 
       return now.isAfter(canStartFrom) && now.isBefore(canCompleteUntil);
     } catch (e) {
@@ -465,11 +471,15 @@ class SessionCard extends ConsumerWidget {
             'هل أنت متأكد أن الطالب لم يحضر؟ سيُسجَّل تحذير على حسابه وتحتسب الجلسة كمكتملة لك.',
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('تراجع')),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.warning),
-              child: const Text('تأكيد الغياب', style: TextStyle(color: AppThemeConstants.white)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.warning),
+              child: const Text('تأكيد الغياب',
+                  style: TextStyle(color: AppThemeConstants.white)),
             ),
           ],
         ),
@@ -542,7 +552,8 @@ class SessionCard extends ConsumerWidget {
         child: AlertDialog(
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: AppThemeConstants.warning, size: 28),
+              Icon(Icons.warning_amber_rounded,
+                  color: AppThemeConstants.warning, size: 28),
               SizedBox(width: 12),
               Text(ArabicLabels.cancelSession),
             ],
@@ -604,12 +615,14 @@ class SessionCard extends ConsumerWidget {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline, size: 20, color: AppThemeConstants.accentBlue),
+                    Icon(Icons.info_outline,
+                        size: 20, color: AppThemeConstants.accentBlue),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'سيتم إعادة الوقت للمحفظ ليتمكن طلاب آخرون من الحجز',
-                        style: TextStyle(fontSize: 13, color: AppThemeConstants.accentBlue),
+                        style: TextStyle(
+                            fontSize: 13, color: AppThemeConstants.accentBlue),
                       ),
                     ),
                   ],
@@ -677,7 +690,9 @@ class SessionCard extends ConsumerWidget {
     }
 
     try {
-      await ref.read(sessionActionsProvider.notifier).cancelSession(sessionId, cancelledBy: 'teacher');
+      await ref
+          .read(sessionActionsProvider.notifier)
+          .cancelSession(sessionId, cancelledBy: 'teacher');
 
       dismissLoading();
       messenger.showSnackBar(
@@ -706,7 +721,8 @@ class SessionCard extends ConsumerWidget {
             children: [
               Icon(Icons.error_outline, color: AppThemeConstants.white),
               SizedBox(width: 12),
-              Expanded(child: Text('تعذّر إلغاء الجلسة. يرجى المحاولة مرة أخرى')),
+              Expanded(
+                  child: Text('تعذّر إلغاء الجلسة. يرجى المحاولة مرة أخرى')),
             ],
           ),
           backgroundColor: AppThemeConstants.error,
@@ -778,9 +794,10 @@ class SessionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final earlyMinutes = ref
-        .watch(systemConfigProvider)
-        .valueOrNull
-        ?.meetingStartLeadTimeMinutes ?? 60;
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.meetingStartLeadTimeMinutes ??
+        60;
     final studentName = session['studentName'] as String? ?? 'غير معروف';
     final sessionDate = session['sessionDate'] as DateTime?;
     final timeSlot = session['preferredTimeSlot'] as String? ?? '08:00';
@@ -792,8 +809,8 @@ class SessionCard extends ConsumerWidget {
     final locationAddress =
         session['imamAddressText'] as String? ?? session['location'] as String?;
 
-    final bool canComplete =
-        sessionDate != null && _canCompleteSession(sessionDate, timeSlot, earlyMinutes, ref);
+    final bool canComplete = sessionDate != null &&
+        _canCompleteSession(sessionDate, timeSlot, earlyMinutes, ref);
     final bool isLate =
         sessionDate != null && _isSessionLate(sessionDate, timeSlot, ref);
     final hoursUntilSession =
@@ -893,8 +910,10 @@ class SessionCard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: canComplete
-                              ? AppThemeConstants.secondary.withValues(alpha: 0.3)
-                              : AppThemeConstants.primary.withValues(alpha: 0.3),
+                              ? AppThemeConstants.secondary
+                                  .withValues(alpha: 0.3)
+                              : AppThemeConstants.primary
+                                  .withValues(alpha: 0.3),
                         ),
                       ),
                       child: Text(
@@ -980,7 +999,8 @@ class SessionCard extends ConsumerWidget {
                                 : () => _openWhatsApp(context, mohaffezPhone),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppThemeConstants.success,
-                          side: const BorderSide(color: AppThemeConstants.success),
+                          side: const BorderSide(
+                              color: AppThemeConstants.success),
                         ),
                       ),
                     ),
@@ -996,7 +1016,8 @@ class SessionCard extends ConsumerWidget {
                                 : () => _callTeacher(context, mohaffezPhone),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppThemeConstants.accentBlue,
-                          side: const BorderSide(color: AppThemeConstants.accentBlue),
+                          side: const BorderSide(
+                              color: AppThemeConstants.accentBlue),
                         ),
                       ),
                     ),
@@ -1009,7 +1030,8 @@ class SessionCard extends ConsumerWidget {
                         onPressed: () => _openMaps(context, locationAddress),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppThemeConstants.error,
-                          side: const BorderSide(color: AppThemeConstants.error),
+                          side:
+                              const BorderSide(color: AppThemeConstants.error),
                         ),
                       ),
                     ),
@@ -1060,10 +1082,13 @@ class SessionCard extends ConsumerWidget {
                         'studentName': studentName,
                         'previousHifz': previousAssignment['hifz'],
                         'previousMuraja': previousAssignment['muraja'],
-                        'previousHifzFromAyah': previousAssignment['hifzFromAyah'],
+                        'previousHifzFromAyah':
+                            previousAssignment['hifzFromAyah'],
                         'previousHifzToAyah': previousAssignment['hifzToAyah'],
-                        'previousMurajaFromAyah': previousAssignment['murajaFromAyah'],
-                        'previousMurajaToAyah': previousAssignment['murajaToAyah'],
+                        'previousMurajaFromAyah':
+                            previousAssignment['murajaFromAyah'],
+                        'previousMurajaToAyah':
+                            previousAssignment['murajaToAyah'],
                         'isLateCompletion': isLate,
                         'sessionType': sessionType,
                       },
@@ -1088,7 +1113,8 @@ class SessionCard extends ConsumerWidget {
                           label: const Text('لم يحضر'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppThemeConstants.warning,
-                            side: const BorderSide(color: AppThemeConstants.warning),
+                            side: const BorderSide(
+                                color: AppThemeConstants.warning),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
@@ -1111,10 +1137,14 @@ class SessionCard extends ConsumerWidget {
                               'studentName': studentName,
                               'previousHifz': previousAssignment['hifz'],
                               'previousMuraja': previousAssignment['muraja'],
-                              'previousHifzFromAyah': previousAssignment['hifzFromAyah'],
-                              'previousHifzToAyah': previousAssignment['hifzToAyah'],
-                              'previousMurajaFromAyah': previousAssignment['murajaFromAyah'],
-                              'previousMurajaToAyah': previousAssignment['murajaToAyah'],
+                              'previousHifzFromAyah':
+                                  previousAssignment['hifzFromAyah'],
+                              'previousHifzToAyah':
+                                  previousAssignment['hifzToAyah'],
+                              'previousMurajaFromAyah':
+                                  previousAssignment['murajaFromAyah'],
+                              'previousMurajaToAyah':
+                                  previousAssignment['murajaToAyah'],
                               'isLateCompletion': isLate,
                             },
                           );
@@ -1136,8 +1166,9 @@ class SessionCard extends ConsumerWidget {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              isLate ? AppThemeConstants.warning : AppThemeConstants.secondary,
+                          backgroundColor: isLate
+                              ? AppThemeConstants.warning
+                              : AppThemeConstants.secondary,
                           foregroundColor: AppThemeConstants.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -1175,7 +1206,6 @@ class SessionCard extends ConsumerWidget {
                   ),
                 ),
               ],
-
             ],
           ),
         ),
@@ -1205,10 +1235,11 @@ class _TeacherStartSessionButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(meetingButtonStateProvider(
-        (sessionId: sessionId, role: 'mohaffez')));
+    final state = ref.watch(
+        meetingButtonStateProvider((sessionId: sessionId, role: 'mohaffez')));
     final infoAsync = ref.watch(meetingInfoProvider(sessionId));
     final info = infoAsync.valueOrNull;
+    final isPhoneCall = info?.isPhoneCall ?? false;
     final leadTimeMinutes = ref
             .watch(systemConfigProvider)
             .valueOrNull
@@ -1224,8 +1255,7 @@ class _TeacherStartSessionButton extends ConsumerWidget {
         final sd = info?.slotStart ?? info?.sessionDate;
         String countdown = '';
         if (sd != null) {
-          final earliestStart =
-              sd.subtract(Duration(minutes: leadTimeMinutes));
+          final earliestStart = sd.subtract(Duration(minutes: leadTimeMinutes));
           final diff = earliestStart.difference(DateTime.now());
           if (diff.inHours > 0) {
             countdown =
@@ -1257,6 +1287,15 @@ class _TeacherStartSessionButton extends ConsumerWidget {
         icon = Icons.videocam_rounded;
         enabled = state != MeetingButtonState.pendingMeetingLink;
         break;
+    }
+
+    if (isPhoneCall && enabled) {
+      icon = state == MeetingButtonState.inProgress
+          ? Icons.phone_in_talk_rounded
+          : Icons.phone_rounded;
+      label = state == MeetingButtonState.inProgress
+          ? 'تم بدء المكالمة — متابعة'
+          : 'ابدأ المكالمة';
     }
 
     return SizedBox(

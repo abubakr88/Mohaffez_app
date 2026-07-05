@@ -7,7 +7,7 @@ class SlotContext {
   final bool isFoundingTeacher;
   final String sessionType; // 'online', 'home', 'mosque'
   final String?
-      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (only for online)
+      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' | 'phoneCall'
   final String preferredTimeSlot; // e.g. "10:00-11:00"
   final String slotDate; // ISO8601 string
   final String slotStart; // ISO8601 string
