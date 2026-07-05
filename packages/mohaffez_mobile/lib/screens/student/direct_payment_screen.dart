@@ -1,5 +1,6 @@
 // lib/screens/direct_payment_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -430,6 +431,25 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   Text(result['message']?.toString() ?? 'فشل إرسال الإشعار')),
         );
       }
+    } on FirebaseFunctionsException catch (e) {
+      // Surface server-side business-rule failures, e.g. when a teacher has
+      // platform dues above the configured direct-payment threshold.
+      debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: '
+          'code=${e.code}, message=${e.message}');
+      if (!mounted) return;
+
+      final message = e.message?.trim();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          duration: const Duration(seconds: 7),
+          content: Text(
+            message == null || message.isEmpty
+                ? 'Payment cannot be completed now. Please try another method.'
+                : message,
+          ),
+        ),
+      );
     } on Exception catch (e) {
       // 🔍 DIAG Step 3: CF error
       debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: error=$e');
