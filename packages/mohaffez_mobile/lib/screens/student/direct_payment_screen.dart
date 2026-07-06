@@ -31,6 +31,14 @@ class DirectPaymentScreen extends ConsumerStatefulWidget {
   final String? planTitle;
   final int? sessionsCount;
   final int? validityDays;
+  final String? studentCountryCode;
+  final String? studentCountryName;
+  final String? displayCurrencyCode;
+  final String? displayCurrencyLabel;
+  final double? displayAmount;
+  final double? fxRateToEGP;
+  final double? chargedAmountEGP;
+  final int? sessionDurationMinutes;
   final bool autoBookFirstSession;
 
   const DirectPaymentScreen({
@@ -56,6 +64,14 @@ class DirectPaymentScreen extends ConsumerStatefulWidget {
     this.planTitle,
     this.sessionsCount,
     this.validityDays,
+    this.studentCountryCode,
+    this.studentCountryName,
+    this.displayCurrencyCode,
+    this.displayCurrencyLabel,
+    this.displayAmount,
+    this.fxRateToEGP,
+    this.chargedAmountEGP,
+    this.sessionDurationMinutes,
     this.autoBookFirstSession = false,
   });
 
@@ -94,6 +110,14 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   String? _hydratedPlanType;
   int? _hydratedSessions;
   int? _hydratedValidity;
+  String? _hydratedStudentCountryCode;
+  String? _hydratedStudentCountryName;
+  String? _hydratedDisplayCurrencyCode;
+  String? _hydratedDisplayCurrencyLabel;
+  double? _hydratedDisplayAmount;
+  double? _hydratedFxRateToEGP;
+  double? _hydratedChargedAmountEGP;
+  int? _hydratedSessionDurationMinutes;
 
   @override
   void initState() {
@@ -232,11 +256,22 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         resolvedSlotEnd ??= parse(d['slotEnd']);
         resolvedTimeSlot ??= d['preferredTimeSlot'] as String?;
         resolvedSessionType ??= d['sessionType'] as String?;
+        resolvedAmount ??= (d['paymentAmount'] as num?)?.toDouble();
         _hydratedPlanId ??= d['planId'] as String?;
         _hydratedPlanTitle ??= d['planTitle'] as String?;
         _hydratedPlanType ??= d['planType'] as String?;
         _hydratedSessions ??= (d['sessionsCount'] as num?)?.toInt();
         _hydratedValidity ??= (d['validityDays'] as num?)?.toInt();
+        _hydratedStudentCountryCode ??= d['studentCountryCode'] as String?;
+        _hydratedStudentCountryName ??= d['studentCountryName'] as String?;
+        _hydratedDisplayCurrencyCode ??= d['displayCurrencyCode'] as String?;
+        _hydratedDisplayCurrencyLabel ??= d['displayCurrencyLabel'] as String?;
+        _hydratedDisplayAmount ??= (d['displayAmount'] as num?)?.toDouble();
+        _hydratedFxRateToEGP ??= (d['fxRateToEGP'] as num?)?.toDouble();
+        _hydratedChargedAmountEGP ??=
+            (d['chargedAmountEGP'] as num?)?.toDouble();
+        _hydratedSessionDurationMinutes ??=
+            (d['sessionDurationMinutes'] as num?)?.toInt();
       });
 
       if (resolvedAmount == null && resolvedMohaffezId != null) {
@@ -261,12 +296,19 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     try {
       final repository = ref.read(pricingRepositoryProvider);
       final plans = await repository.getPlansForTeacher(mohaffezId);
-      final sessionMode = SessionMode.values.firstWhere(
-        (m) => m.name == sessionType,
-        orElse: () => SessionMode.online,
+      final studentCountry = PricingCountryUtils.inferUserCountry(
+          ref.read(currentUserProvider).valueOrNull);
+      final matchingPlans = plans
+          .where((plan) =>
+              plan.type == PlanType.single &&
+              PricingCountryUtils.matchesMode(plan, sessionType))
+          .toList();
+      final visiblePlans = PricingCountryUtils.preferCountryPlans(
+        matchingPlans,
+        studentCountry.code,
       );
-      final singlePlan = plans.firstWhere(
-        (plan) => plan.type == PlanType.single && plan.mode == sessionMode,
+      final singlePlan = visiblePlans.firstWhere(
+        (plan) => plan.type == PlanType.single,
         orElse: () => throw Exception('No single session plan found'),
       );
       if (!mounted) return;
@@ -403,6 +445,19 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         planTitle: widget.planTitle ?? _hydratedPlanTitle,
         sessionsCount: widget.sessionsCount ?? _hydratedSessions,
         validityDays: widget.validityDays ?? _hydratedValidity,
+        studentCountryCode:
+            widget.studentCountryCode ?? _hydratedStudentCountryCode,
+        studentCountryName:
+            widget.studentCountryName ?? _hydratedStudentCountryName,
+        displayCurrencyCode:
+            widget.displayCurrencyCode ?? _hydratedDisplayCurrencyCode,
+        displayCurrencyLabel:
+            widget.displayCurrencyLabel ?? _hydratedDisplayCurrencyLabel,
+        displayAmount: widget.displayAmount ?? _hydratedDisplayAmount,
+        fxRateToEGP: widget.fxRateToEGP ?? _hydratedFxRateToEGP,
+        chargedAmountEGP: widget.chargedAmountEGP ?? _hydratedChargedAmountEGP,
+        sessionDurationMinutes:
+            widget.sessionDurationMinutes ?? _hydratedSessionDurationMinutes,
       );
 
       // 🔍 DIAG Step 3: CF response

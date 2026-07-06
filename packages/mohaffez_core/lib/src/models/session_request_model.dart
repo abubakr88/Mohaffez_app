@@ -62,6 +62,15 @@ class SessionRequestModel {
   /// null when the plan has no expiry (or for single sessions).
   final int? validityDays;
 
+  final String? studentCountryCode;
+  final String? studentCountryName;
+  final String? displayCurrencyCode;
+  final String? displayCurrencyLabel;
+  final double? displayAmount;
+  final double? fxRateToEGP;
+  final double? chargedAmountEGP;
+  final int? sessionDurationMinutes;
+
   /// Direct payment request ID for pending confirmations.
   final String? directPaymentRequestId;
   // ──────────────────────────────────────────────────────────────────────────
@@ -105,6 +114,14 @@ class SessionRequestModel {
     this.planTitle = '',
     this.sessionsCount = 1,
     this.validityDays,
+    this.studentCountryCode,
+    this.studentCountryName,
+    this.displayCurrencyCode,
+    this.displayCurrencyLabel,
+    this.displayAmount,
+    this.fxRateToEGP,
+    this.chargedAmountEGP,
+    this.sessionDurationMinutes,
     this.directPaymentRequestId,
   });
 
@@ -166,6 +183,14 @@ class SessionRequestModel {
       planTitle: map['planTitle'] as String? ?? '',
       sessionsCount: (map['sessionsCount'] as num?)?.toInt() ?? 1,
       validityDays: (map['validityDays'] as num?)?.toInt(),
+      studentCountryCode: map['studentCountryCode'] as String?,
+      studentCountryName: map['studentCountryName'] as String?,
+      displayCurrencyCode: map['displayCurrencyCode'] as String?,
+      displayCurrencyLabel: map['displayCurrencyLabel'] as String?,
+      displayAmount: toDouble(map['displayAmount']),
+      fxRateToEGP: toDouble(map['fxRateToEGP']),
+      chargedAmountEGP: toDouble(map['chargedAmountEGP']),
+      sessionDurationMinutes: (map['sessionDurationMinutes'] as num?)?.toInt(),
       directPaymentRequestId: map['directPaymentRequestId'] as String?,
     );
   }
@@ -210,6 +235,19 @@ class SessionRequestModel {
         'planTitle': planTitle,
         'sessionsCount': sessionsCount,
         'validityDays': validityDays,
+        if (studentCountryCode != null)
+          'studentCountryCode': studentCountryCode,
+        if (studentCountryName != null)
+          'studentCountryName': studentCountryName,
+        if (displayCurrencyCode != null)
+          'displayCurrencyCode': displayCurrencyCode,
+        if (displayCurrencyLabel != null)
+          'displayCurrencyLabel': displayCurrencyLabel,
+        if (displayAmount != null) 'displayAmount': displayAmount,
+        if (fxRateToEGP != null) 'fxRateToEGP': fxRateToEGP,
+        if (chargedAmountEGP != null) 'chargedAmountEGP': chargedAmountEGP,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
         if (directPaymentRequestId != null)
           'directPaymentRequestId': directPaymentRequestId,
       };
@@ -265,6 +303,14 @@ class SessionRequestModel {
         planTitle: planTitle,
         sessionsCount: sessionsCount,
         validityDays: validityDays,
+        studentCountryCode: studentCountryCode,
+        studentCountryName: studentCountryName,
+        displayCurrencyCode: displayCurrencyCode,
+        displayCurrencyLabel: displayCurrencyLabel,
+        displayAmount: displayAmount,
+        fxRateToEGP: fxRateToEGP,
+        chargedAmountEGP: chargedAmountEGP,
+        sessionDurationMinutes: sessionDurationMinutes,
         directPaymentRequestId: directPaymentRequestId,
       );
 }

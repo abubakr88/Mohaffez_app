@@ -387,6 +387,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'booking-direct-payment',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
+              double? asDouble(Object? value) =>
+                  value is num ? value.toDouble() : null;
+              int? asInt(Object? value) => value is num ? value.toInt() : null;
               return DirectPaymentScreen(
                 requestId: extra?['requestId'],
                 mohaffezId: extra?['mohaffezId'],
@@ -394,21 +397,29 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 studentName: extra?['studentName'],
                 studentEmail: extra?['studentEmail'] ?? '',
                 studentPhone: extra?['studentPhone'] ?? '',
-                amount: extra?['amount'],
+                amount: asDouble(extra?['amount']),
                 sessionType: extra?['sessionType'],
                 preferredTimeSlot: extra?['preferredTimeSlot'],
                 slotDate: extra?['slotDate'],
                 slotStart: extra?['slotStart'],
                 slotEnd: extra?['slotEnd'],
                 imamAddressText: extra?['imamAddressText'],
-                imamAddressLat: extra?['imamAddressLat'],
-                imamAddressLng: extra?['imamAddressLng'],
+                imamAddressLat: asDouble(extra?['imamAddressLat']),
+                imamAddressLng: asDouble(extra?['imamAddressLng']),
                 mohaffezPhone: extra?['mohaffezPhone'],
                 planType: extra?['planType'],
                 planId: extra?['planId'],
                 planTitle: extra?['planTitle'],
-                sessionsCount: extra?['sessionsCount'],
-                validityDays: extra?['validityDays'],
+                sessionsCount: asInt(extra?['sessionsCount']),
+                validityDays: asInt(extra?['validityDays']),
+                studentCountryCode: extra?['studentCountryCode'],
+                studentCountryName: extra?['studentCountryName'],
+                displayCurrencyCode: extra?['displayCurrencyCode'],
+                displayCurrencyLabel: extra?['displayCurrencyLabel'],
+                displayAmount: asDouble(extra?['displayAmount']),
+                fxRateToEGP: asDouble(extra?['fxRateToEGP']),
+                chargedAmountEGP: asDouble(extra?['chargedAmountEGP']),
+                sessionDurationMinutes: asInt(extra?['sessionDurationMinutes']),
                 autoBookFirstSession: extra?['autoBookFirstSession'] ?? false,
               );
             },

@@ -58,6 +58,14 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       planTitle,
       sessionsCount,
       validityDays,
+      studentCountryCode,
+      studentCountryName,
+      displayCurrencyCode,
+      displayCurrencyLabel,
+      displayAmount,
+      fxRateToEGP,
+      chargedAmountEGP,
+      sessionDurationMinutes,
     } = data;
 
     if (typeof requestId !== 'string' || requestId.trim().length === 0) {
@@ -71,6 +79,26 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       typeof sessionsCount === 'number' ? sessionsCount : null;
     const finalValidityDays: number | null =
       typeof validityDays === 'number' ? validityDays : null;
+    const pricingSnapshot = {
+      studentCountryCode:
+        typeof studentCountryCode === 'string' ? studentCountryCode : null,
+      studentCountryName:
+        typeof studentCountryName === 'string' ? studentCountryName : null,
+      displayCurrencyCode:
+        typeof displayCurrencyCode === 'string' ? displayCurrencyCode : null,
+      displayCurrencyLabel:
+        typeof displayCurrencyLabel === 'string' ? displayCurrencyLabel : null,
+      displayAmount:
+        typeof displayAmount === 'number' ? displayAmount : null,
+      fxRateToEGP:
+        typeof fxRateToEGP === 'number' ? fxRateToEGP : null,
+      chargedAmountEGP:
+        typeof chargedAmountEGP === 'number' ? chargedAmountEGP : null,
+      sessionDurationMinutes:
+        typeof sessionDurationMinutes === 'number'
+          ? sessionDurationMinutes
+          : null,
+    };
     const isBundleOrSubscription =
       finalPlanType === 'bundle' || finalPlanType === 'subscription';
 
@@ -202,6 +230,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           planTitle:      finalPlanTitle,
           sessionsCount:  finalSessionsCount,
           validityDays:   finalValidityDays,
+          ...pricingSnapshot,
           isPaid: false,
           selectedPaymentMethod: 'directpayment',
           directPaymentRequestId: null,
@@ -272,6 +301,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         planTitle:     finalPlanTitle,
         sessionsCount: finalSessionsCount,
         validityDays:  finalValidityDays,
+        ...pricingSnapshot,
       });
 
       // WRITE D: update existing sessionRequest

@@ -80,6 +80,20 @@ class _DirectBookingRequestScreenState
     setState(() => _submitting = true);
 
     try {
+      final selectedPlan = await _singleSessionPlanForRequest(slotContext);
+      if (selectedPlan == null) {
+        if (!mounted) return;
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'لا توجد خطة سعر متاحة لهذا النوع من الجلسات في بلدك حالياً',
+            ),
+            backgroundColor: AppThemeConstants.error,
+          ),
+        );
+        return;
+      }
+
       final result = await FirebaseFunctions.instance
           .httpsCallable(
         'createSessionRequest',
@@ -108,6 +122,13 @@ class _DirectBookingRequestScreenState
           'mohaffezPhone': slotContext.mohaffezPhone,
         if (currentUser.phoneNumber?.trim().isNotEmpty == true)
           'studentPhone': currentUser.phoneNumber!.trim(),
+        'planType': selectedPlan.type.name,
+        'planId': selectedPlan.id,
+        'planTitle': selectedPlan.title,
+        'sessionsCount': selectedPlan.sessionsCount,
+        'validityDays': selectedPlan.validityDays,
+        'paymentAmount': selectedPlan.priceEGP,
+        ...PricingCountryUtils.paymentSnapshot(selectedPlan),
         // Tells the CF this is a direct-payment request (not free, not Paymob).
         // The CF will create the doc with status 'pending' so the teacher sees it
         // in PendingRequestsScreen and can accept/reject before the student is
@@ -171,6 +192,28 @@ class _DirectBookingRequestScreenState
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<PricingPlanModel?> _singleSessionPlanForRequest(
+    SlotContext slotContext,
+  ) async {
+    final repository = ref.read(pricingRepositoryProvider);
+    final plans = await repository.getPlansForTeacher(slotContext.mohaffezId);
+    final studentCountry = PricingCountryUtils.inferUserCountry(
+        ref.read(currentUserProvider).valueOrNull);
+    final matchingPlans = plans
+        .where((plan) =>
+            plan.isActive &&
+            plan.type == PlanType.single &&
+            PricingCountryUtils.matchesMode(plan, slotContext.sessionType))
+        .toList();
+    final visiblePlans = PricingCountryUtils.preferCountryPlans(
+      matchingPlans,
+      studentCountry.code,
+    );
+    if (visiblePlans.isEmpty) return null;
+    visiblePlans.sort((a, b) => a.priceEGP.compareTo(b.priceEGP));
+    return visiblePlans.first;
   }
 
   String _functionsErrorMessage(FirebaseFunctionsException e) =>

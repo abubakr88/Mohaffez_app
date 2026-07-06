@@ -27,6 +27,8 @@ class UserModel with _$UserModel {
     String? addressText,
     double? addressLat,
     double? addressLng,
+    String? country,
+    String? countryCode,
     @TimestampConverter() DateTime? createdAt,
     // ── Setup Account Fields ─────────────────────────────────
     @Default(false) bool setupCompleted,

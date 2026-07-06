@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -201,16 +201,24 @@ class PricingPlanCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${plan.priceEGP.toStringAsFixed(0)} ${ArabicLabels.currency}',
+                      PricingCountryUtils.displayPriceText(plan),
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: AppThemeConstants.secondary,
                       ),
                     ),
+                    if (plan.currencyCode != 'EGP')
+                      Text(
+                        'تحصيل ${PricingCountryUtils.egpPriceText(plan)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppThemeConstants.textSecondary,
+                        ),
+                      ),
                     if (plan.sessionsCount > 1)
                       Text(
-                        '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} ${ArabicLabels.currency}/${ArabicLabels.singleSession}',
+                        '${(PricingCountryUtils.displayAmount(plan) / plan.sessionsCount).toStringAsFixed(0)} ${plan.currencyLabel}/${ArabicLabels.singleSession}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppThemeConstants.textSecondary,
@@ -229,6 +237,15 @@ class PricingPlanCard extends ConsumerWidget {
                   '${plan.sessionsCount} جلسة',
                   Icons.event_available,
                 ),
+                _buildChip(
+                  plan.countryName,
+                  Icons.public,
+                ),
+                if (plan.sessionDurationMinutes != null)
+                  _buildChip(
+                    '${plan.sessionDurationMinutes} دقيقة',
+                    Icons.timer_outlined,
+                  ),
                 if (plan.sessionsPerWeek != null)
                   _buildChip(
                     '${plan.sessionsPerWeek}x أسبوعياً',
@@ -277,7 +294,8 @@ class PricingPlanCard extends ConsumerWidget {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, size: 20, color: AppThemeConstants.error),
+                  icon: const Icon(Icons.delete,
+                      size: 20, color: AppThemeConstants.error),
                   onPressed: () {
                     if (guardWriteInTour(ref, context)) return;
                     _deletePlan(context, ref);
@@ -362,7 +380,8 @@ class PricingPlanCard extends ConsumerWidget {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppThemeConstants.error),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.error),
               child: const Text('حذف'),
             ),
           ],

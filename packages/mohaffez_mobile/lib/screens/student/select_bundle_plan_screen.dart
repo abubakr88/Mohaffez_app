@@ -1,4 +1,4 @@
-﻿// lib/screens/select_bundle_plan_screen.dart
+// lib/screens/select_bundle_plan_screen.dart
 //
 // NET-NEW screen (replaces BundlePlanSelectionWrapper which navigated directly
 // to payment). Now follows the teacher-first rule:
@@ -94,9 +94,17 @@ class _SelectBundlePlanScreenState
           .orderBy('sessionsCount')
           .get();
 
-      final plans = snap.docs
+      final loadedPlans = snap.docs
           .map((d) => PricingPlanModel.fromJson({...d.data(), 'id': d.id}))
           .toList();
+      final studentCountry = PricingCountryUtils.inferUserCountry(
+          ref.read(currentUserProvider).valueOrNull);
+      final modePlans = loadedPlans
+          .where((plan) =>
+              PricingCountryUtils.matchesMode(plan, slotContext?.sessionType))
+          .toList();
+      final plans = PricingCountryUtils.preferCountryPlans(
+          modePlans, studentCountry.code);
 
       debugPrint('✅ [BUNDLE_FLOW] Step2_PlansLoaded: count=${plans.length}, '
           'plans=${plans.map((p) => 'id=${p.id}, title=${p.title}, type=${p.type.name}, sessions=${p.sessionsCount}, price=${p.priceEGP}').toList()}');
@@ -184,6 +192,7 @@ class _SelectBundlePlanScreenState
         'sessionsCount': plan.sessionsCount,
         'validityDays': plan.validityDays,
         'paymentAmount': plan.priceEGP,
+        ...PricingCountryUtils.paymentSnapshot(plan),
         // FIX: This flag tells SessionRepository.acceptRequest() to take
         // PATH B (status → awaitingPayment) instead of PATH A (immediate
         // session creation). Without it the teacher's accept creates a
@@ -211,7 +220,8 @@ class _SelectBundlePlanScreenState
         });
       }
     } on FirebaseFunctionsException catch (e) {
-      debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: code=${e.code}, message=${e.message}');
+      debugPrint(
+          '❌ [BUNDLE_FLOW] Step3_CF_ERROR: code=${e.code}, message=${e.message}');
       if (mounted) {
         setState(() {
           _submitting = false;
@@ -285,12 +295,13 @@ class _SelectBundlePlanScreenState
   Widget _buildPlanCard(PricingPlanModel plan) {
     final isSelected = _selectedPlan?.id == plan.id;
     final color = _badgeFg(plan.type.name);
-    final priceStr = NumberFormat('#,##0', 'ar').format(plan.priceEGP);
+    final localAmount = PricingCountryUtils.displayAmount(plan);
+    final priceStr = NumberFormat('#,##0.##', 'ar').format(localAmount);
     final hasValidity = plan.validityDays != null && plan.validityDays! > 0;
-    final pricePerSession = plan.sessionsCount > 0
-        ? plan.priceEGP / plan.sessionsCount
-        : 0.0;
-    final pricePerSessionStr = NumberFormat('#,##0', 'ar').format(pricePerSession);
+    final pricePerSession =
+        plan.sessionsCount > 0 ? localAmount / plan.sessionsCount : 0.0;
+    final pricePerSessionStr =
+        NumberFormat('#,##0', 'ar').format(pricePerSession);
 
     return InkWell(
       onTap: () {
@@ -308,7 +319,9 @@ class _SelectBundlePlanScreenState
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.06) : AppThemeConstants.surface,
+          color: isSelected
+              ? color.withValues(alpha: 0.06)
+              : AppThemeConstants.surface,
           borderRadius: AppThemeConstants.borderRadiusLg,
           border: Border.all(
             color: isSelected ? color : AppThemeConstants.outline,
@@ -349,7 +362,8 @@ class _SelectBundlePlanScreenState
                   color: isSelected ? color : AppThemeConstants.transparent,
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check, size: 13, color: AppThemeConstants.onPrimary)
+                    ? const Icon(Icons.check,
+                        size: 13, color: AppThemeConstants.onPrimary)
                     : null,
               ),
 
@@ -368,7 +382,9 @@ class _SelectBundlePlanScreenState
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: isSelected ? color : AppThemeConstants.textPrimary,
+                              color: isSelected
+                                  ? color
+                                  : AppThemeConstants.textPrimary,
                             ),
                           ),
                         ),
@@ -377,7 +393,8 @@ class _SelectBundlePlanScreenState
                     const SizedBox(height: 8),
 
                     // Plan description
-                    if (plan.description != null && plan.description!.isNotEmpty) ...[
+                    if (plan.description != null &&
+                        plan.description!.isNotEmpty) ...[
                       Text(
                         plan.description!,
                         style: const TextStyle(
@@ -406,6 +423,14 @@ class _SelectBundlePlanScreenState
                             color: AppThemeConstants.textSecondary,
                           ),
                         ],
+                        if (plan.sessionDurationMinutes != null) ...[
+                          const SizedBox(width: 8),
+                          _InfoChip(
+                            icon: Icons.timer_outlined,
+                            label: '${plan.sessionDurationMinutes} دقيقة',
+                            color: AppThemeConstants.textSecondary,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -413,7 +438,7 @@ class _SelectBundlePlanScreenState
                     Row(
                       children: [
                         Text(
-                          '$priceStr ج.م',
+                          '$priceStr ${plan.currencyLabel}',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -421,9 +446,19 @@ class _SelectBundlePlanScreenState
                           ),
                         ),
                         const SizedBox(width: 8),
+                        if (plan.currencyCode != 'EGP') ...[
+                          Text(
+                            'يعادل ${PricingCountryUtils.egpPriceText(plan)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppThemeConstants.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         if (plan.sessionsCount > 0) ...[
                           Text(
-                            '($pricePerSessionStr ج.م/جلسة)',
+                            '($pricePerSessionStr ${plan.currencyLabel}/جلسة)',
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppThemeConstants.textSecondary,
@@ -456,7 +491,8 @@ class _SelectBundlePlanScreenState
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   _error!,
-                  style: const TextStyle(color: AppThemeConstants.error, fontSize: 13),
+                  style: const TextStyle(
+                      color: AppThemeConstants.error, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -476,7 +512,8 @@ class _SelectBundlePlanScreenState
                           color: AppThemeConstants.onPrimary,
                         ),
                       )
-                    : const Icon(Icons.send_rounded, color: AppThemeConstants.onPrimary),
+                    : const Icon(Icons.send_rounded,
+                        color: AppThemeConstants.onPrimary),
                 label: Text(
                   _submitting ? 'جارٍ الإرسال...' : 'إرسال الطلب للمعلم',
                   style: const TextStyle(
@@ -519,8 +556,8 @@ class _SelectBundlePlanScreenState
                   decoration: BoxDecoration(
                     color: AppThemeConstants.secondary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: AppThemeConstants.secondary, width: 2),
+                    border: Border.all(
+                        color: AppThemeConstants.secondary, width: 2),
                   ),
                   child: const Icon(
                     Icons.hourglass_top_rounded,
@@ -607,7 +644,8 @@ class _SelectBundlePlanScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 56, color: AppThemeConstants.error),
+            const Icon(Icons.error_outline,
+                size: 56, color: AppThemeConstants.error),
             const SizedBox(height: 16),
             Text(
               _error ?? 'خطأ غير معروف',

@@ -17,7 +17,8 @@ class AddPricingPlanSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<AddPricingPlanSheet> createState() => _AddPricingPlanSheetState();
+  ConsumerState<AddPricingPlanSheet> createState() =>
+      _AddPricingPlanSheetState();
 }
 
 // Paymob gateway fee constants (Egypt). Confirmed with the user:
@@ -27,7 +28,8 @@ class AddPricingPlanSheet extends ConsumerStatefulWidget {
 const double _kPaymobPercent = 0.0275;
 const double _kPaymobFlat = 3.0;
 const double _kVatRate = 0.14;
-const double _kDefaultCommission = 0.15; // starter-tier fallback when config is null
+const double _kDefaultCommission =
+    0.15; // starter-tier fallback when config is null
 
 class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   final _formKey = GlobalKey<FormState>();
@@ -43,7 +45,9 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
 
   PlanType _selectedType = PlanType.single;
   SessionMode _selectedMode = SessionMode.online;
+  late PricingCountryOption _selectedCountry;
   int _sessionsCount = 1;
+  int? _sessionDurationMinutes;
   int? _validityDays;
   int? _sessionsPerWeek;
 
@@ -52,17 +56,24 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
     super.initState();
     final plan = widget.existingPlan;
 
+    _selectedCountry = PricingCountryUtils.byCode(plan?.countryCode);
+
     _titleController = TextEditingController(text: plan?.title ?? '');
     _priceController = TextEditingController(
-      text: plan?.priceEGP.toString() ?? '',
+      text: plan == null
+          ? ''
+          : PricingCountryUtils.displayAmount(plan).toStringAsFixed(2),
     );
     _netController = TextEditingController();
-    _descriptionController = TextEditingController(text: plan?.description ?? '');
+    _descriptionController =
+        TextEditingController(text: plan?.description ?? '');
 
     if (plan != null) {
       _selectedType = plan.type;
       _selectedMode = plan.mode ?? SessionMode.online;
+      _selectedCountry = PricingCountryUtils.byCode(plan.countryCode);
       _sessionsCount = plan.sessionsCount;
+      _sessionDurationMinutes = plan.sessionDurationMinutes;
       _validityDays = plan.validityDays;
       _sessionsPerWeek = plan.sessionsPerWeek;
     }
@@ -78,9 +89,8 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   /// scheduled tier recompute) wins over the global rate. Falls back to
   /// the hardcoded default while either source is still loading.
   double get _commissionRate {
-    final teacherInfo = ref
-        .read(teacherCommissionInfoProvider(widget.mohaffezId))
-        .valueOrNull;
+    final teacherInfo =
+        ref.read(teacherCommissionInfoProvider(widget.mohaffezId)).valueOrNull;
     final config = ref.read(systemConfigProvider).valueOrNull;
     final starterRate = config == null
         ? _kDefaultCommission
@@ -94,14 +104,16 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   void _onPriceChanged() {
     if (_syncingFromNet) return;
     _syncingFromPrice = true;
-    final price = double.tryParse(_priceController.text);
-    if (price == null || price <= 0) {
+    final localPrice = double.tryParse(_priceController.text);
+    if (localPrice == null || localPrice <= 0) {
       _netController.text = '';
     } else {
-      final breakdown = _calcFromPrice(price, _commissionRate);
-      _netController.text = breakdown.net <= 0
-          ? '0'
-          : breakdown.net.toStringAsFixed(2);
+      final breakdown = _calcFromPrice(
+        _selectedCountry.toEgp(localPrice),
+        _commissionRate,
+      );
+      _netController.text =
+          breakdown.net <= 0 ? '0' : breakdown.net.toStringAsFixed(2);
     }
     _syncingFromPrice = false;
     if (mounted) setState(() {}); // refresh breakdown card
@@ -117,8 +129,9 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       // price = (net + flat * (1+vat)) / (1 - pct*(1+vat) - commission)
       final denom = 1 - _kPaymobPercent * (1 + _kVatRate) - _commissionRate;
       if (denom > 0) {
-        final price = (net + _kPaymobFlat * (1 + _kVatRate)) / denom;
-        _priceController.text = price.toStringAsFixed(2);
+        final egpPrice = (net + _kPaymobFlat * (1 + _kVatRate)) / denom;
+        final localPrice = _selectedCountry.fromEgp(egpPrice);
+        _priceController.text = localPrice.toStringAsFixed(2);
       }
     }
     _syncingFromNet = false;
@@ -152,6 +165,14 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
     );
   }
 
+  double? get _localPrice => double.tryParse(_priceController.text);
+
+  double? get _chargedPriceEgp {
+    final localPrice = _localPrice;
+    if (localPrice == null || localPrice <= 0) return null;
+    return _selectedCountry.toEgp(localPrice);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -180,9 +201,10 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Plan Type Selection
-                const Text('نوع الخطة', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('نوع الخطة',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<PlanType>(
                   // FIX: Use initialValue instead of value
@@ -212,9 +234,10 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Session Mode
-                const Text('نوع الجلسة', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('نوع الجلسة',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<SessionMode>(
                   initialValue: _selectedMode,
@@ -239,7 +262,58 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   onChanged: (val) => setState(() => _selectedMode = val!),
                 ),
                 const SizedBox(height: 16),
-                
+
+                // Country / currency
+                const Text('دولة الطالب والسعر المحلي',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<PricingCountryOption>(
+                  initialValue: _selectedCountry,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.public),
+                  ),
+                  items: PricingCountryUtils.countries
+                      .map(
+                        (country) => DropdownMenuItem(
+                          value: country,
+                          child: Text(
+                            '${country.nameAr} (${country.currencyCode})',
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setState(() => _selectedCountry = val);
+                    _onPriceChanged();
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                const Text('مدة الجلسة داخل هذه الخطة',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: _sessionDurationMinutes ?? 30,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.timer_outlined),
+                    suffixText: 'دقيقة',
+                  ),
+                  items: const [30, 45, 60, 75, 90, 120]
+                      .map(
+                        (minutes) => DropdownMenuItem(
+                          value: minutes,
+                          child: Text('$minutes دقيقة'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (val) =>
+                      setState(() => _sessionDurationMinutes = val),
+                ),
+                const SizedBox(height: 16),
+
                 // Title
                 TextFormField(
                   controller: _titleController,
@@ -254,10 +328,11 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                       : null,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Sessions Count (for bundle/subscription)
                 if (_selectedType != PlanType.single) ...[
-                  const Text('عدد الجلسات', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('عدد الجلسات',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -268,14 +343,17 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                           max: 30,
                           divisions: 29,
                           label: '$_sessionsCount جلسة',
-                          onChanged: (val) => setState(() => _sessionsCount = val.toInt()),
+                          onChanged: (val) =>
+                              setState(() => _sessionsCount = val.toInt()),
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           // FIX: Use withValues instead of withOpacity
-                          color: AppThemeConstants.primary.withValues(alpha: 0.1),
+                          color:
+                              AppThemeConstants.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -290,7 +368,31 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                
+
+                if (_selectedType == PlanType.bundle) ...[
+                  const Text('صلاحية الباقة',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    initialValue: _validityDays ?? 30,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.schedule),
+                      suffixText: 'يوم',
+                    ),
+                    items: const [14, 30, 45, 60, 90, 120]
+                        .map(
+                          (days) => DropdownMenuItem(
+                            value: days,
+                            child: Text('$days يوم'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) => setState(() => _validityDays = val),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // Price
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,11 +400,11 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                     Expanded(
                       child: TextFormField(
                         controller: _priceController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'السعر للطالب',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.payments),
-                          suffixText: 'ج.م',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.payments),
+                          suffixText: _selectedCountry.currencyLabel,
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
@@ -336,7 +438,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                 const SizedBox(height: 12),
                 _buildBreakdownCard(),
                 const SizedBox(height: 16),
-                
+
                 // Description (optional)
                 TextFormField(
                   controller: _descriptionController,
@@ -349,9 +451,9 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 16),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Action Buttons
                 Row(
                   children: [
@@ -366,7 +468,8 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                       flex: 2,
                       child: ElevatedButton(
                         onPressed: _savePlan,
-                        child: Text(widget.existingPlan == null ? 'إضافة' : 'حفظ'),
+                        child:
+                            Text(widget.existingPlan == null ? 'إضافة' : 'حفظ'),
                       ),
                     ),
                   ],
@@ -384,10 +487,12 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
     switch (_selectedType) {
       case PlanType.single:
         _sessionsCount = 1;
+        _validityDays = null;
         _titleController.text = 'جلسة واحدة';
         break;
       case PlanType.bundle:
         _sessionsCount = 5;
+        _validityDays ??= 30;
         _titleController.text = 'باقة 5 جلسات';
         break;
     }
@@ -398,11 +503,12 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   /// if the user dismisses the prompt without adding any link — in which case
   /// the caller must abort plan creation.
   Future<bool> _ensureTeacherHasMeetingLink() async {
-    final teacher = await ref.read(getUserOnceProvider(widget.mohaffezId).future);
+    final teacher =
+        await ref.read(getUserOnceProvider(widget.mohaffezId).future);
     final hasMap = teacher != null &&
         teacher.meetingLinks.values.any((v) => v.trim().isNotEmpty);
-    final hasLegacy = teacher != null &&
-        (teacher.meetingLink?.trim().isNotEmpty ?? false);
+    final hasLegacy =
+        teacher != null && (teacher.meetingLink?.trim().isNotEmpty ?? false);
     if (hasMap || hasLegacy) return true;
 
     if (!mounted) return false;
@@ -411,7 +517,8 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('أضف رابط اجتماع أولاً'),
           content: const Text(
             'لتفعيل الجلسات أونلاين، أضف رابط Zoom أو Google Meet أو Teams من ملفك الشخصي. الطالب سيختار المنصة عند الحجز.',
@@ -463,15 +570,28 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       if (!allowed) return;
     }
 
+    final localPrice = double.parse(_priceController.text);
+    final chargedPriceEgp = _selectedCountry.toEgp(localPrice);
+    final sessionDuration = _sessionDurationMinutes ?? 30;
+
     final plan = PricingPlanModel(
       id: widget.existingPlan?.id,
       mohaffezId: widget.mohaffezId,
       title: _titleController.text.trim(),
       type: _selectedType,
       mode: _selectedMode,
-      priceEGP: double.parse(_priceController.text),
+      priceEGP: chargedPriceEgp,
+      countryCode: _selectedCountry.code,
+      countryName: _selectedCountry.nameAr,
+      currencyCode: _selectedCountry.currencyCode,
+      currencyLabel: _selectedCountry.currencyLabel,
+      displayPrice: localPrice,
+      fxRateToEGP: _selectedCountry.egpRate,
       sessionsCount: _sessionsCount,
-      validityDays: _validityDays,
+      sessionDurationMinutes: sessionDuration,
+      validityDays: _selectedType == PlanType.bundle
+          ? (_validityDays ?? 30)
+          : _validityDays,
       sessionsPerWeek: _sessionsPerWeek,
       isFreeTrialAvailable: false,
       description: _descriptionController.text.trim().isEmpty
@@ -488,7 +608,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
       } else {
         await ref.read(pricingActionsProvider.notifier).updatePlan(plan);
       }
-      
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -516,8 +636,9 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
   }
 
   Widget _buildBreakdownCard() {
-    final price = double.tryParse(_priceController.text);
-    if (price == null || price <= 0) {
+    final localPrice = double.tryParse(_priceController.text);
+    final price = _chargedPriceEgp;
+    if (localPrice == null || localPrice <= 0 || price == null) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -533,8 +654,8 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
             Expanded(
               child: Text(
                 'أدخل السعر أو ما تريد استلامه لرؤية تفاصيل الخصومات',
-                style: TextStyle(
-                    fontSize: 13, color: AppThemeConstants.grey700),
+                style:
+                    TextStyle(fontSize: 13, color: AppThemeConstants.grey700),
               ),
             ),
           ],
@@ -579,11 +700,25 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
             ],
           ),
           const SizedBox(height: 10),
-          _breakdownRow('السعر للطالب', b.price, isPositive: true),
+          _breakdownRow(
+            'السعر للطالب (${localPrice.toStringAsFixed(2)} ${_selectedCountry.currencyLabel})',
+            b.price,
+            isPositive: true,
+          ),
+          if (_selectedCountry.code != PricingCountryUtils.egypt.code)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                'سيتم تحصيل ما يعادل ${b.price.toStringAsFixed(2)} ج.م',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppThemeConstants.grey700,
+                ),
+              ),
+            ),
           _breakdownRow('رسوم بوابة الدفع (2.75% + 3 ج.م)', -b.gatewayFee),
           _breakdownRow('ضريبة قيمة مضافة 14%', -b.vat),
-          _breakdownRow(
-              'عمولة التطبيق (${_formatPercent(_commissionRate)})',
+          _breakdownRow('عمولة التطبيق (${_formatPercent(_commissionRate)})',
               -b.commission),
           const Divider(height: 16),
           Row(

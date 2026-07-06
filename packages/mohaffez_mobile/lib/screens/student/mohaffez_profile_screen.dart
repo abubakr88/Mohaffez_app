@@ -55,18 +55,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   /// Helper to filter pricing plans by selected session type
   List<PricingPlanModel> _relevantPlans(List<PricingPlanModel> plans) {
-    return plans.where((plan) {
-      if (selectedSessionType == 'home') {
-        return plan.mode == SessionMode.home;
-      }
-      if (selectedSessionType == 'mosque') {
-        return plan.mode == SessionMode.mosque;
-      }
-      if (selectedSessionType == 'online') {
-        return plan.mode == SessionMode.online;
-      }
-      return false;
-    }).toList();
+    final modePlans = plans
+        .where((plan) =>
+            selectedSessionType.isNotEmpty &&
+            PricingCountryUtils.matchesMode(plan, selectedSessionType))
+        .toList();
+    final studentCountry = PricingCountryUtils.inferUserCountry(
+        ref.read(currentUserProvider).valueOrNull);
+    return PricingCountryUtils.preferCountryPlans(
+      modePlans,
+      studentCountry.code,
+    );
   }
 
   String? _teacherVideoUrl(Map<String, dynamic> profile) {
@@ -1205,7 +1204,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 child: Text(plan.title,
                     style: const TextStyle(
                         fontSize: 15, fontWeight: FontWeight.bold))),
-            Text('${plan.priceEGP.toStringAsFixed(0)} جنيه',
+            Text(PricingCountryUtils.displayPriceText(plan),
                 style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1214,11 +1213,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 6, children: [
             _profileChip('${plan.sessionsCount} جلسة', Icons.event_available),
+            _profileChip(plan.countryName, Icons.public),
+            if (plan.sessionDurationMinutes != null)
+              _profileChip(
+                  '${plan.sessionDurationMinutes} دقيقة', Icons.timer_outlined),
             if (plan.validityDays != null && plan.validityDays! > 0)
               _profileChip('${plan.validityDays} يوم', Icons.schedule),
             if (isBundle)
               _profileChip(
-                '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} جنيه/جلسة',
+                '${(PricingCountryUtils.displayAmount(plan) / plan.sessionsCount).toStringAsFixed(0)} ${plan.currencyLabel}/جلسة',
                 Icons.payments_outlined,
               ),
           ]),
@@ -3526,7 +3529,7 @@ class _ExportPlanRow extends StatelessWidget {
               ),
             ),
             Text(
-              '${plan.priceEGP.toStringAsFixed(0)} ج.م',
+              PricingCountryUtils.displayPriceText(plan),
               style: const TextStyle(
                 color: AppThemeConstants.primary,
                 fontSize: 15,

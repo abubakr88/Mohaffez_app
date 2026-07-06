@@ -32,8 +32,7 @@ class DirectPaymentService {
   static Future<Map<String, String?>> getMohaffezWalletNumbers(
       String mohaffezId) async {
     final doc = await _db.collection('users').doc(mohaffezId).get();
-    final wallets =
-        doc.data()?['walletNumbers'] as Map<String, dynamic>? ?? {};
+    final wallets = doc.data()?['walletNumbers'] as Map<String, dynamic>? ?? {};
     return {
       'instapay': wallets['instapay'] as String?,
       // Backward compatible: read both old underscored keys and new canonical keys.
@@ -76,6 +75,14 @@ class DirectPaymentService {
     String? planTitle,
     int? sessionsCount,
     int? validityDays,
+    String? studentCountryCode,
+    String? studentCountryName,
+    String? displayCurrencyCode,
+    String? displayCurrencyLabel,
+    double? displayAmount,
+    double? fxRateToEGP,
+    double? chargedAmountEGP,
+    int? sessionDurationMinutes,
   }) async {
     assert(requestId.isNotEmpty, 'requestId must not be empty');
     if (kDebugMode) {
@@ -87,36 +94,49 @@ class DirectPaymentService {
     try {
       final result = await _functions
           .httpsCallable(
-            'studentMarkedDirectPayment',
-            options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
-          )
+        'studentMarkedDirectPayment',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      )
           .call({
-        'requestId':                 requestId,
-        'mohaffezId':                 mohaffezId,
-        'mohaffezName':               mohaffezName,
-        'studentName':                studentName,
-        if (studentEmail.isNotEmpty)  'studentEmail': studentEmail,
-        if (studentPhone.isNotEmpty)  'studentPhone': studentPhone,
-        'amount':                     amount,
-        'sessionType':                sessionType,
-        'preferredTimeSlot':          preferredTimeSlot,
+        'requestId': requestId,
+        'mohaffezId': mohaffezId,
+        'mohaffezName': mohaffezName,
+        'studentName': studentName,
+        if (studentEmail.isNotEmpty) 'studentEmail': studentEmail,
+        if (studentPhone.isNotEmpty) 'studentPhone': studentPhone,
+        'amount': amount,
+        'sessionType': sessionType,
+        'preferredTimeSlot': preferredTimeSlot,
         // Always send UTC. The server (parseFlutterDate) assumes any string
         // missing a timezone is UTC, so a naive local toIso8601String() ends
         // up stored as `+UTC_offset` hours into the future. Egypt = +3h shift.
-        if (slotDate != null)         'slotDate': slotDate.toUtc().toIso8601String(),
-        if (slotStart != null)        'slotStart': slotStart.toUtc().toIso8601String(),
-        if (slotEnd != null)          'slotEnd': slotEnd.toUtc().toIso8601String(),
-        'paymentMethod':              paymentMethod,
-        if (studentNote != null)      'studentNote':    studentNote,
-        if (imamAddressText != null)  'imamAddressText': imamAddressText,
-        if (imamAddressLat != null)   'imamAddressLat':  imamAddressLat,
-        if (imamAddressLng != null)   'imamAddressLng':  imamAddressLng,
-        if (mohaffezPhone != null)    'mohaffezPhone':   mohaffezPhone,
-        if (planType != null)         'planType':        planType,
-        if (planId != null)           'planId':          planId,
-        if (planTitle != null)        'planTitle':       planTitle,
-        if (sessionsCount != null)    'sessionsCount':   sessionsCount,
-        if (validityDays != null)     'validityDays':    validityDays,
+        if (slotDate != null) 'slotDate': slotDate.toUtc().toIso8601String(),
+        if (slotStart != null) 'slotStart': slotStart.toUtc().toIso8601String(),
+        if (slotEnd != null) 'slotEnd': slotEnd.toUtc().toIso8601String(),
+        'paymentMethod': paymentMethod,
+        if (studentNote != null) 'studentNote': studentNote,
+        if (imamAddressText != null) 'imamAddressText': imamAddressText,
+        if (imamAddressLat != null) 'imamAddressLat': imamAddressLat,
+        if (imamAddressLng != null) 'imamAddressLng': imamAddressLng,
+        if (mohaffezPhone != null) 'mohaffezPhone': mohaffezPhone,
+        if (planType != null) 'planType': planType,
+        if (planId != null) 'planId': planId,
+        if (planTitle != null) 'planTitle': planTitle,
+        if (sessionsCount != null) 'sessionsCount': sessionsCount,
+        if (validityDays != null) 'validityDays': validityDays,
+        if (studentCountryCode != null)
+          'studentCountryCode': studentCountryCode,
+        if (studentCountryName != null)
+          'studentCountryName': studentCountryName,
+        if (displayCurrencyCode != null)
+          'displayCurrencyCode': displayCurrencyCode,
+        if (displayCurrencyLabel != null)
+          'displayCurrencyLabel': displayCurrencyLabel,
+        if (displayAmount != null) 'displayAmount': displayAmount,
+        if (fxRateToEGP != null) 'fxRateToEGP': fxRateToEGP,
+        if (chargedAmountEGP != null) 'chargedAmountEGP': chargedAmountEGP,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
       });
 
       if (kDebugMode) {
@@ -154,19 +174,19 @@ class DirectPaymentService {
     try {
       final result = await FirebaseFunctions.instance
           .httpsCallable(
-            'mohaffezConfirmDirectPayment',
-            options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
-          )
+        'mohaffezConfirmDirectPayment',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      )
           .call({'directPaymentRequestId': directPaymentRequestId});
 
       if (result.data is Map) {
         return Map<String, dynamic>.from(result.data as Map);
       }
       return {'success': true};
-
     } on FirebaseFunctionsException catch (e) {
       if (kDebugMode) {
-        debugPrint('DirectPaymentService mohaffezConfirm: code=${e.code}, message=${e.message}');
+        debugPrint(
+            'DirectPaymentService mohaffezConfirm: code=${e.code}, message=${e.message}');
       }
       if (e.code == 'already-exists') {
         return {'success': true, 'message': e.message};
@@ -174,7 +194,6 @@ class DirectPaymentService {
       rethrow;
     }
   }
-
 
   // ── Mohaffez: confirm bundle/subscription payment ────────────────────────
   // WHY: CF reads ALL plan/slot/student fields directly from the
@@ -186,9 +205,9 @@ class DirectPaymentService {
     try {
       await _functions
           .httpsCallable(
-            'confirmBundleDirectPayment',
-            options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
-          )
+        'confirmBundleDirectPayment',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      )
           .call({'paymentId': paymentId});
     } on FirebaseFunctionsException catch (e) {
       if (kDebugMode) {
@@ -206,9 +225,9 @@ class DirectPaymentService {
     try {
       await _functions
           .httpsCallable(
-            'mohaffezRejectDirectPayment',
-            options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
-          )
+        'mohaffezRejectDirectPayment',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      )
           .call({
         'directPaymentRequestId': directPaymentRequestId,
         if (reason != null && reason.isNotEmpty) 'rejectionReason': reason,
@@ -249,9 +268,9 @@ class DirectPaymentService {
     final data = doc.data() ?? {};
     final wallets = data['adminWallets'] as Map<String, dynamic>? ?? {};
     return {
-      'instapay':     wallets['instapay']     as String?,
+      'instapay': wallets['instapay'] as String?,
       'vodafonecash': wallets['vodafonecash'] as String?,
-      'orangemoney':  wallets['orangemoney']  as String?,
+      'orangemoney': wallets['orangemoney'] as String?,
     };
   }
 
