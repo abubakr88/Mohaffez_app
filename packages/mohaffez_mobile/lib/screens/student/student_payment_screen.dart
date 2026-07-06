@@ -269,6 +269,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               }
               return p.mode == SessionMode.online;
             }).toList();
+            final studentCountry = PricingCountryUtils.inferUserCountry(
+                ref.read(currentUserProvider).valueOrNull);
+            filteredPlans = PricingCountryUtils.preferCountryPlans(
+              filteredPlans,
+              studentCountry.code,
+            );
 
             if (widget.showSubscriptionsOnly) {
               filteredPlans = filteredPlans
@@ -820,6 +826,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           'planType': planType?.name ?? PlanType.bundle.name,
           'sessionsCount': selectedPlan!.sessionsCount,
           'validityDays': selectedPlan!.validityDays,
+          ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
           'autoBookFirstSession': widget.autoBookFirstSession,
         },
       );
@@ -1053,7 +1060,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             ),
           ),
           Text(
-            '${plan.priceEGP.toStringAsFixed(0)} ${ArabicLabels.egp}',
+            PricingCountryUtils.displayPriceText(plan),
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ]),
@@ -1081,7 +1088,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 Text(plan.title,
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text(
-                  '${plan.priceEGP.toStringAsFixed(0)} جنيه',
+                  PricingCountryUtils.displayPriceText(plan),
                   style: const TextStyle(color: AppThemeConstants.secondary),
                 ),
               ],
@@ -1436,7 +1443,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             'preferredTimeSlot': timeSlot,
             'sessionType': sessionType,
             'location': location,
+            'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
           },
+          ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
         },
       );
 
@@ -1552,7 +1561,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 lockedDate != null ? Timestamp.fromDate(lockedDate!) : null,
             'preferredTimeSlot': lockedTimeSlot,
             'location': widget.location,
+            'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
           },
+        ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
         if (appliedPromoCode != null) 'promoCode': appliedPromoCode!.code,
       };
 

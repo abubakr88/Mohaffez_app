@@ -484,6 +484,10 @@ class SessionRepository {
     final mohaffezPhone = requestData['mohaffezPhone'] as String?;
     final studentPhone = requestData['studentPhone'] as String?;
     final preferredProvider = requestData['preferredProvider'] as String?;
+    final sessionDurationMinutes =
+        (requestData['sessionDurationMinutes'] as num?)?.toInt();
+    final lockedPaymentAmount =
+        (requestData['paymentAmount'] as num?)?.toDouble();
     final requiresPaymentOnAcceptance =
         requestData['requiresPaymentOnAcceptance'] as bool? ?? false;
 
@@ -582,7 +586,23 @@ class SessionRepository {
         'studentPhone': studentPhone,
         'status': RequestStatus.accepted,
         'isPaid': true, // no payment needed = paid
-        'sessionPrice': sessionPrice,
+        'sessionPrice': lockedPaymentAmount ?? sessionPrice,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
+        if (requestData['studentCountryCode'] != null)
+          'studentCountryCode': requestData['studentCountryCode'],
+        if (requestData['studentCountryName'] != null)
+          'studentCountryName': requestData['studentCountryName'],
+        if (requestData['displayCurrencyCode'] != null)
+          'displayCurrencyCode': requestData['displayCurrencyCode'],
+        if (requestData['displayCurrencyLabel'] != null)
+          'displayCurrencyLabel': requestData['displayCurrencyLabel'],
+        if (requestData['displayAmount'] != null)
+          'displayAmount': requestData['displayAmount'],
+        if (requestData['fxRateToEGP'] != null)
+          'fxRateToEGP': requestData['fxRateToEGP'],
+        if (requestData['chargedAmountEGP'] != null)
+          'chargedAmountEGP': requestData['chargedAmountEGP'],
         'createdAt': FieldValue.serverTimestamp(),
         'acceptedAt': FieldValue.serverTimestamp(),
         'reminder24hSent': false,
@@ -625,7 +645,7 @@ class SessionRepository {
         'acceptedAt': FieldValue.serverTimestamp(),
         'paymentDeadline': Timestamp.fromDate(deadline),
         'reminderSent': false,
-        'paymentAmount': sessionPrice,
+        'paymentAmount': lockedPaymentAmount ?? sessionPrice,
         // NOTE: sessionId intentionally omitted — no session doc exists yet.
         'updatedAt': FieldValue.serverTimestamp(),
       });

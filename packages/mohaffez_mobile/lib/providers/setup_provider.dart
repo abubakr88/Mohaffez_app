@@ -1,9 +1,8 @@
-﻿// lib/providers/setup_provider.dart
+// lib/providers/setup_provider.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 
 // ─── Exam Questions Provider ────────────────────────────────────
 // Fetches random active questions from Firestore.
@@ -50,6 +49,8 @@ class SetupService {
     required String phoneNumber,
     required DateTime dateOfBirth,
     required String city,
+    String? country,
+    String? countryCode,
     required String addressText,
     required double addressLat,
     required double addressLng,
@@ -58,6 +59,10 @@ class SetupService {
       'phoneNumber': phoneNumber,
       'dateOfBirth': Timestamp.fromDate(dateOfBirth),
       'city': city,
+      if (country != null && country.trim().isNotEmpty)
+        'country': country.trim(),
+      if (countryCode != null && countryCode.trim().isNotEmpty)
+        'countryCode': countryCode.trim(),
       'addressText': addressText,
       'addressLat': addressLat,
       'addressLng': addressLng,
@@ -73,6 +78,8 @@ class SetupService {
     required String phoneNumber,
     required DateTime dateOfBirth,
     required String city,
+    String? country,
+    String? countryCode,
     required String addressText,
     required double addressLat,
     required double addressLng,
@@ -93,7 +100,8 @@ class SetupService {
     final now = DateTime.now();
 
     final bool passed = examScore >= passingScore;
-    final int newRetryCount = passed ? currentRetryCount : currentRetryCount + 1;
+    final int newRetryCount =
+        passed ? currentRetryCount : currentRetryCount + 1;
     final DateTime? nextRetryAt = passed
         ? null
         : newRetryCount < maxRetries
@@ -104,6 +112,10 @@ class SetupService {
       'phoneNumber': phoneNumber,
       'dateOfBirth': Timestamp.fromDate(dateOfBirth),
       'city': city,
+      if (country != null && country.trim().isNotEmpty)
+        'country': country.trim(),
+      if (countryCode != null && countryCode.trim().isNotEmpty)
+        'countryCode': countryCode.trim(),
       'addressText': addressText,
       'addressLat': addressLat,
       'addressLng': addressLng,
@@ -113,7 +125,8 @@ class SetupService {
       'examCorrectCount': correctAnswers,
       'examPassed': passed,
       'examRetryCount': newRetryCount,
-      'examNextRetryAt': nextRetryAt != null ? Timestamp.fromDate(nextRetryAt) : null,
+      'examNextRetryAt':
+          nextRetryAt != null ? Timestamp.fromDate(nextRetryAt) : null,
       // setupCompleted remains false after exam — it is set to true in
       // TeacherCertificatesScreen after the teacher uploads certificates.
       // status remains 'active' here; it becomes 'pending_approval' in

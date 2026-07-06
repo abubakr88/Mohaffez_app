@@ -1,4 +1,4 @@
-﻿// lib/screens/booking/booking_method_screen.dart
+// lib/screens/booking/booking_method_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -139,7 +139,8 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         body: activeBundleAsync.when(
           data: (activeBundle) => teacherPlansAsync.when(
             data: (plans) => _buildOptionsList(context, activeBundle, plans),
-            loading: () => const Center(child: Column(
+            loading: () => const Center(
+                child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircularProgressIndicator(),
@@ -147,10 +148,11 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
                 Text('جاري تحميل خطط التسعير...'),
               ],
             )),
-            error: (err, stack) =>
-                _buildErrorWidget('فشل في تحميل خطط التسعير', studentId, slotContext),
+            error: (err, stack) => _buildErrorWidget(
+                'فشل في تحميل خطط التسعير', studentId, slotContext),
           ),
-          loading: () => const Center(child: Column(
+          loading: () => const Center(
+              child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircularProgressIndicator(),
@@ -158,8 +160,8 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
               Text('جاري تحميل الباقة النشطة...'),
             ],
           )),
-          error: (err, stack) =>
-              _buildErrorWidget('فشل في تحميل الباقة النشطة', studentId, slotContext),
+          error: (err, stack) => _buildErrorWidget(
+              'فشل في تحميل الباقة النشطة', studentId, slotContext),
         ),
       ),
     );
@@ -172,16 +174,31 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     ActiveBundleInfo? activeBundle,
     List<PricingPlanModel> plans,
   ) {
-    final hasBundlePlans = plans.any((plan) => plan.type == PlanType.bundle);
+    final flow = ref.read(bookingFlowProvider);
+    final studentCountry = PricingCountryUtils.inferUserCountry(
+        ref.read(currentUserProvider).valueOrNull);
+    final modePlans = plans
+        .where((plan) =>
+            plan.isActive &&
+            PricingCountryUtils.matchesMode(
+              plan,
+              flow.slotContext?.sessionType,
+            ))
+        .toList();
+    final visiblePlans =
+        PricingCountryUtils.preferCountryPlans(modePlans, studentCountry.code);
+
+    final hasBundlePlans =
+        visiblePlans.any((plan) => plan.type == PlanType.bundle);
     final canBuyNewBundle = hasBundlePlans && activeBundle == null;
 
-    final singleSessionPrices = plans
-        .where((p) => p.type == PlanType.single)
-        .map((p) => p.priceEGP)
-        .toList();
-    final lowestPrice = singleSessionPrices.isEmpty
+    final singleSessionPlans =
+        visiblePlans.where((p) => p.type == PlanType.single).toList();
+    final lowestPlan = singleSessionPlans.isEmpty
         ? null
-        : singleSessionPrices.reduce((a, b) => a < b ? a : b);
+        : singleSessionPlans.reduce(
+            (a, b) => a.priceEGP < b.priceEGP ? a : b,
+          );
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -221,8 +238,8 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           iconColor: AppThemeConstants.primary,
           borderColor: AppThemeConstants.primary,
           title: 'إرسال طلب حجز جديد',
-          subtitle: lowestPrice != null
-              ? 'دفع مباشر لجلسة واحدة • ${lowestPrice.toInt()} جنيه'
+          subtitle: lowestPlan != null
+              ? 'دفع مباشر لجلسة واحدة • ${PricingCountryUtils.displayPriceText(lowestPlan)}'
               : 'دفع مباشر لجلسة واحدة',
           isEnabled: true,
           onTap: _onNewDirectRequest,
@@ -246,14 +263,16 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     );
   }
 
-  Widget _buildErrorWidget(String message, String? studentId, dynamic slotContext) {
+  Widget _buildErrorWidget(
+      String message, String? studentId, dynamic slotContext) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
+            const Icon(Icons.error_outline,
+                size: 48, color: AppThemeConstants.error),
             const SizedBox(height: 12),
             Text(
               message,
@@ -278,7 +297,8 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
                         mohaffezId: slotContext.mohaffezId,
                         sessionType: slotContext.sessionType,
                       )));
-                      ref.invalidate(teacherPlansProvider(slotContext.mohaffezId));
+                      ref.invalidate(
+                          teacherPlansProvider(slotContext.mohaffezId));
                     }
                   },
                   icon: const Icon(Icons.refresh),
@@ -328,7 +348,7 @@ class _BookingOptionCard extends StatelessWidget {
         color: backgroundColor ?? AppThemeConstants.surface,
         shape: RoundedRectangleBorder(
           borderRadius: AppThemeConstants.borderRadiusMd,
-          side: borderColor != null 
+          side: borderColor != null
               ? BorderSide(color: borderColor!, width: 1.5)
               : BorderSide.none,
         ),
@@ -342,13 +362,14 @@ class _BookingOptionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: (iconColor ?? AppThemeConstants.primary).withValues(alpha: 0.1),
+                    color: (iconColor ?? AppThemeConstants.primary)
+                        .withValues(alpha: 0.1),
                     borderRadius: AppThemeConstants.borderRadiusSm,
                   ),
                   child: Icon(
                     icon,
                     size: 28,
-                    color: isEnabled 
+                    color: isEnabled
                         ? (iconColor ?? AppThemeConstants.primary)
                         : AppThemeConstants.textDisabled,
                   ),
@@ -361,7 +382,7 @@ class _BookingOptionCard extends StatelessWidget {
                       Text(
                         title,
                         style: AppThemeConstants.titleMedium.copyWith(
-                          color: isEnabled 
+                          color: isEnabled
                               ? AppThemeConstants.textPrimary
                               : AppThemeConstants.textDisabled,
                         ),
@@ -390,8 +411,8 @@ class _BookingOptionCard extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  Icons.chevron_right_rounded, 
-                  color: isEnabled 
+                  Icons.chevron_right_rounded,
+                  color: isEnabled
                       ? AppThemeConstants.textSecondary
                       : AppThemeConstants.textDisabled,
                 ),

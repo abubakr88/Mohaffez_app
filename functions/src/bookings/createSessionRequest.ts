@@ -103,6 +103,16 @@ export const createSessionRequest = functions.https.onCall(
       rawPlanType === 'bundle' || rawPlanType === 'subscription';
     const validityDays: number | null =
       typeof data.validityDays === 'number' ? data.validityDays : null;
+    const sessionDurationMinutes: number | null =
+      typeof data.sessionDurationMinutes === 'number'
+        ? data.sessionDurationMinutes
+        : null;
+    const displayAmount: number | null =
+      typeof data.displayAmount === 'number' ? data.displayAmount : null;
+    const fxRateToEGP: number | null =
+      typeof data.fxRateToEGP === 'number' ? data.fxRateToEGP : null;
+    const chargedAmountEGP: number | null =
+      typeof data.chargedAmountEGP === 'number' ? data.chargedAmountEGP : null;
 
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (
@@ -439,6 +449,26 @@ export const createSessionRequest = functions.https.onCall(
         sessionsCount:
           typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
         validityDays: validityDays,
+        sessionDurationMinutes,
+        studentCountryCode:
+          typeof data.studentCountryCode === 'string'
+            ? data.studentCountryCode
+            : null,
+        studentCountryName:
+          typeof data.studentCountryName === 'string'
+            ? data.studentCountryName
+            : null,
+        displayCurrencyCode:
+          typeof data.displayCurrencyCode === 'string'
+            ? data.displayCurrencyCode
+            : null,
+        displayCurrencyLabel:
+          typeof data.displayCurrencyLabel === 'string'
+            ? data.displayCurrencyLabel
+            : null,
+        displayAmount,
+        fxRateToEGP,
+        chargedAmountEGP,
         requiresPaymentOnAcceptance:
           selectedPaymentMethod === 'directpayment' && !isBundlePlan
             ? true
