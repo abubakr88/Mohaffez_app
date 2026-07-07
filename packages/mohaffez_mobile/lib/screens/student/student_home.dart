@@ -18,31 +18,31 @@ import '../../shared/widgets/error_widgets.dart';
 // DESIGN TOKENS (consistent with mohaffez_home)
 // ═══════════════════════════════════════════════════════════════════════════════
 class _DS {
-  static const teal800   = Color(0xFF095752);
-  static const teal700   = Color(0xFF0C6F6A);
-  static const teal600   = Color(0xFF0E8278);
-  static const teal500   = Color(0xFF1A9E84);
-  static const teal100   = Color(0xFFD4EDE7);
-  static const teal50    = Color(0xFFEAF6F3);
+  static const teal800 = Color(0xFF095752);
+  static const teal700 = Color(0xFF0C6F6A);
+  static const teal600 = Color(0xFF0E8278);
+  static const teal500 = Color(0xFF1A9E84);
+  static const teal100 = Color(0xFFD4EDE7);
+  static const teal50 = Color(0xFFEAF6F3);
 
-  static const amber     = Color(0xFFE67E22);
-  static const amberBg   = Color(0xFFFFF3E0);
-  static const purple    = Color(0xFF7A5AF8);
-  static const purpleBg  = Color(0xFFF0EEFF);
-  static const green     = Color(0xFF2E8B57);
-  static const greenBg   = Color(0xFFE8F5E9);
-  static const gold      = Color(0xFFB7791F);
-  static const goldBg    = Color(0xFFFFF8E1);
-  static const darkTeal  = Color(0xFF0F766E);
-  static const darkTealBg= Color(0xFFE0F2F1);
+  static const amber = Color(0xFFE67E22);
+  static const amberBg = Color(0xFFFFF3E0);
+  static const purple = Color(0xFF7A5AF8);
+  static const purpleBg = Color(0xFFF0EEFF);
+  static const green = Color(0xFF2E8B57);
+  static const greenBg = Color(0xFFE8F5E9);
+  static const gold = Color(0xFFB7791F);
+  static const goldBg = Color(0xFFFFF8E1);
+  static const darkTeal = Color(0xFF0F766E);
+  static const darkTealBg = Color(0xFFE0F2F1);
 
-  static const bg      = Color(0xFFF4F7F6);
-  static const text1   = Color(0xFF111827);
-  static const text2   = Color(0xFF4B5563);
-  static const text3   = Color(0xFF9CA3AF);
-  static const border  = Color(0xFFE5EDE9);
+  static const bg = Color(0xFFF4F7F6);
+  static const text1 = Color(0xFF111827);
+  static const text2 = Color(0xFF4B5563);
+  static const text3 = Color(0xFF9CA3AF);
+  static const border = Color(0xFFE5EDE9);
 
-  static const r8  = BorderRadius.all(Radius.circular(8));
+  static const r8 = BorderRadius.all(Radius.circular(8));
   static const r12 = BorderRadius.all(Radius.circular(12));
   static const r16 = BorderRadius.all(Radius.circular(16));
 
@@ -93,13 +93,16 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
     return userAsync.when(
       data: (user) {
         if (user == null) {
-          return const Scaffold(body: Center(child: Text('لم يتم تسجيل الدخول')));
+          return const Scaffold(
+              body: Center(child: Text('لم يتم تسجيل الدخول')));
         }
         return StudentHomeContent(studentId: user.uid);
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        body: ErrorDisplay.dataLoad(onRetry: () => ref.invalidate(currentUserProvider)),
+        body: ErrorDisplay.dataLoad(
+            onRetry: () => ref.invalidate(currentUserProvider)),
       ),
     );
   }
@@ -114,11 +117,15 @@ class StudentHomeContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user              = ref.watch(currentUserProvider).value;
-    final requestsAsync     = ref.watch(studentRequestsFirstPageProvider(studentId));
-    final subscriptionsAsync = ref.watch(activeSubscriptionsProvider(studentId));
-    final studentUpcomingAsync = ref.watch(studentUpcomingSessionsProvider(studentId));
-    final now               = serverNow(ref);
+    final user = ref.watch(currentUserProvider).value;
+    final activeProfile = ref.watch(activeStudentProfileProvider).valueOrNull;
+    final requestsAsync =
+        ref.watch(studentRequestsFirstPageProvider(studentId));
+    final subscriptionsAsync =
+        ref.watch(activeSubscriptionsProvider(studentId));
+    final studentUpcomingAsync =
+        ref.watch(studentUpcomingSessionsProvider(studentId));
+    final now = serverNow(ref);
 
     final nextSessionDate = studentUpcomingAsync.when(
       data: (sessions) {
@@ -126,16 +133,16 @@ class StudentHomeContent extends ConsumerWidget {
         // midnight, which incorrectly excludes today's later sessions from
         // "upcoming" (00:00 today is already before `now`).
         final future = sessions.where((s) {
-          final start = (s['slotStart'] as DateTime?) ??
-              (s['sessionDate'] as DateTime?);
+          final start =
+              (s['slotStart'] as DateTime?) ?? (s['sessionDate'] as DateTime?);
           return start != null && start.isAfter(now);
         }).toList();
         if (future.isEmpty) return null;
         future.sort((a, b) {
-          final sa = (a['slotStart'] as DateTime?) ??
-              (a['sessionDate'] as DateTime?);
-          final sb = (b['slotStart'] as DateTime?) ??
-              (b['sessionDate'] as DateTime?);
+          final sa =
+              (a['slotStart'] as DateTime?) ?? (a['sessionDate'] as DateTime?);
+          final sb =
+              (b['slotStart'] as DateTime?) ?? (b['sessionDate'] as DateTime?);
           if (sa == null || sb == null) return 0;
           return sa.compareTo(sb);
         });
@@ -156,16 +163,14 @@ class StudentHomeContent extends ConsumerWidget {
       error: (_, __) => 0,
     );
     final trialRequests = ref.watch(trialSessionRequestsProvider);
-    final activeTrialRequestsCount = trialRequests.valueOrNull
-            ?.where((request) {
+    final activeTrialRequestsCount =
+        trialRequests.valueOrNull?.where((request) {
               final status = request['status'] as String? ?? '';
               return status == 'pending_teacher' ||
                   status == 'awaiting_student_confirmation';
-            })
-            .length ??
-        0;
-    final totalActiveRequests =
-        activeRequestsCount + activeTrialRequestsCount;
+            }).length ??
+            0;
+    final totalActiveRequests = activeRequestsCount + activeTrialRequestsCount;
 
     final awaitingPaymentCount = requestsAsync.when(
       data: (requests) => requests.where((r) {
@@ -184,8 +189,8 @@ class StudentHomeContent extends ConsumerWidget {
 
     final upcomingSessionsCount = studentUpcomingAsync.when(
       data: (sessions) => sessions.where((s) {
-        final start = (s['slotStart'] as DateTime?) ??
-            (s['sessionDate'] as DateTime?);
+        final start =
+            (s['slotStart'] as DateTime?) ?? (s['sessionDate'] as DateTime?);
         return start != null && start.isAfter(now);
       }).length,
       loading: () => 0,
@@ -233,7 +238,7 @@ class StudentHomeContent extends ConsumerWidget {
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
                     background: _HomeHeader(
-                      name:     user?.name ?? 'الطالب',
+                      name: activeProfile?.name ?? user?.name ?? 'الطالب',
                       photoUrl: user?.photoUrl,
                       dateText: DateFormat('EEEE، d MMMM', 'ar').format(now),
                       greeting: _greeting(now, nextSessionDate),
@@ -244,15 +249,26 @@ class StudentHomeContent extends ConsumerWidget {
                 // ─── Stats row ───────────────────────────────────────────
                 SliverToBoxAdapter(
                   child: _StatsRow(
-                    activeRequests:    totalActiveRequests,
+                    activeRequests: totalActiveRequests,
                     subscriptionsCount: subscriptionsCount,
-                    upcomingSessions:  upcomingSessionsCount,
-                    requestsLoading:     requestsLoading,
+                    upcomingSessions: upcomingSessionsCount,
+                    requestsLoading: requestsLoading,
                     subscriptionsLoading: subscriptionsLoading,
                   ),
                 ),
 
                 // ─── Body ────────────────────────────────────────────────
+                if (user != null && activeProfile != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                      child: _ActiveLearnerCard(
+                        profile: activeProfile,
+                        onTap: () => context.push('/student-profiles'),
+                      ),
+                    ),
+                  ),
+
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 36),
                   sliver: SliverList(
@@ -291,7 +307,8 @@ class StudentHomeContent extends ConsumerWidget {
   static String _greeting(DateTime now, DateTime? nextSession) {
     if (nextSession != null) {
       final today = DateTime(now.year, now.month, now.day);
-      final sessionDay = DateTime(nextSession.year, nextSession.month, nextSession.day);
+      final sessionDay =
+          DateTime(nextSession.year, nextSession.month, nextSession.day);
       final diff = sessionDay.difference(today).inDays;
       if (diff == 0) {
         final timeStr = DateFormat('h:mm a', 'ar').format(nextSession);
@@ -301,8 +318,8 @@ class StudentHomeContent extends ConsumerWidget {
       if (diff <= 3) return 'جلستك بعد $diff أيام — واصل المراجعة اليومية';
     }
     final h = now.hour;
-    if (h < 4)  return 'ختم يومك بتلاوة قبل النوم';
-    if (h < 7)  return 'وقت الفجر — ابدأ يومك بالحفظ';
+    if (h < 4) return 'ختم يومك بتلاوة قبل النوم';
+    if (h < 7) return 'وقت الفجر — ابدأ يومك بالحفظ';
     if (h < 12) return 'صباح الخير — جاهز لرحلة الحفظ اليوم؟';
     if (h < 14) return 'وقت الظهر — قليل من المراجعة يثبّت الحفظ';
     if (h < 17) return 'بعد الظهر وقت مثالي للمراجعة';
@@ -341,9 +358,11 @@ class _HomeHeader extends StatelessWidget {
         children: [
           // Decorative circles
           Positioned(
-            top: -50, left: -50,
+            top: -50,
+            left: -50,
             child: Container(
-              width: 220, height: 220,
+              width: 220,
+              height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppThemeConstants.white.withValues(alpha: 0.04),
@@ -351,9 +370,11 @@ class _HomeHeader extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: -20, right: -20,
+            bottom: -20,
+            right: -20,
             child: Container(
-              width: 130, height: 130,
+              width: 130,
+              height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppThemeConstants.white.withValues(alpha: 0.03),
@@ -380,18 +401,25 @@ class _HomeHeader extends StatelessWidget {
                             Text(
                               name,
                               style: const TextStyle(
-                                fontSize: 22, fontWeight: FontWeight.w800,
-                                color: AppThemeConstants.white, letterSpacing: -0.3,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppThemeConstants.white,
+                                letterSpacing: -0.3,
                               ),
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppThemeConstants.white.withValues(alpha: 0.15),
+                                color: AppThemeConstants.white
+                                    .withValues(alpha: 0.15),
                                 borderRadius: _DS.r8,
-                                border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.25)),
+                                border: Border.all(
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.25)),
                               ),
                               child: const Text(
                                 'طالب',
@@ -405,14 +433,17 @@ class _HomeHeader extends StatelessWidget {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(Icons.calendar_today_rounded, size: 12,
-                                    color: AppThemeConstants.white.withValues(alpha: 0.7)),
+                                Icon(Icons.calendar_today_rounded,
+                                    size: 12,
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.7)),
                                 const SizedBox(width: 5),
                                 Text(
                                   dateText,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: AppThemeConstants.white.withValues(alpha: 0.75),
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.75),
                                   ),
                                 ),
                               ],
@@ -425,26 +456,32 @@ class _HomeHeader extends StatelessWidget {
                   const SizedBox(height: 12),
                   // Compact greeting chip
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppThemeConstants.white.withValues(alpha: 0.13),
                       borderRadius: _DS.r12,
-                      border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.18)),
+                      border: Border.all(
+                          color:
+                              AppThemeConstants.white.withValues(alpha: 0.18)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.auto_awesome_rounded, color: AppThemeConstants.white, size: 12),
+                        const Icon(Icons.auto_awesome_rounded,
+                            color: AppThemeConstants.white, size: 12),
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
                             greeting,
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppThemeConstants.white.withValues(alpha: 0.95),
+                              color: AppThemeConstants.white
+                                  .withValues(alpha: 0.95),
                               fontWeight: FontWeight.w500,
                             ),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -482,7 +519,8 @@ class _PaymentAlertBanner extends StatelessWidget {
           decoration: BoxDecoration(
             color: _DS.amberBg,
             borderRadius: _DS.r16,
-            border: Border.all(color: _DS.amber.withValues(alpha: 0.35), width: 1.5),
+            border: Border.all(
+                color: _DS.amber.withValues(alpha: 0.35), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: _DS.amber.withValues(alpha: 0.08),
@@ -496,12 +534,14 @@ class _PaymentAlertBanner extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 42, height: 42,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: _DS.amber.withValues(alpha: 0.15),
                     borderRadius: _DS.r12,
                   ),
-                  child: const Icon(Icons.payment_rounded, color: _DS.amber, size: 22),
+                  child: const Icon(Icons.payment_rounded,
+                      color: _DS.amber, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -511,7 +551,9 @@ class _PaymentAlertBanner extends StatelessWidget {
                       Text(
                         'لديك $count ${count == 1 ? "طلب بانتظار الدفع" : "طلبات بانتظار الدفع"}',
                         style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700, color: _DS.text1,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _DS.text1,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -523,7 +565,8 @@ class _PaymentAlertBanner extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.arrow_back_ios_new_rounded, size: 14, color: _DS.amber),
+                const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 14, color: _DS.amber),
               ],
             ),
           ),
@@ -536,6 +579,101 @@ class _PaymentAlertBanner extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 // STATS ROW
 // ═══════════════════════════════════════════════════════════════════════════════
+class _ActiveLearnerCard extends StatelessWidget {
+  final StudentProfileModel profile;
+  final VoidCallback onTap;
+
+  const _ActiveLearnerCard({
+    required this.profile,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelf = profile.relationship == 'self' || profile.id == 'self';
+    final subtitle = isSelf
+        ? 'الحجوزات باسم الحساب الحالي'
+        : 'الحجوزات القادمة ستظهر باسم هذا الطالب';
+
+    return Material(
+      color: AppThemeConstants.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: _DS.r12,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppThemeConstants.white,
+            borderRadius: _DS.r12,
+            border: Border.all(color: _DS.teal100),
+            boxShadow: _DS.subtleShadow,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: _DS.teal50,
+                  borderRadius: _DS.r12,
+                ),
+                child: Icon(
+                  isSelf ? Icons.person_rounded : Icons.family_restroom_rounded,
+                  color: _DS.teal500,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'الطالب النشط للحجز',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _DS.text3,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      profile.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: _DS.text1,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: _DS.text2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.swap_horiz_rounded,
+                color: _DS.teal500,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StatsRow extends StatelessWidget {
   final int activeRequests;
   final int subscriptionsCount;
@@ -650,7 +788,9 @@ class _StatCard extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
-                color: data.isAlert ? data.color.withValues(alpha: 0.45) : _DS.border,
+                color: data.isAlert
+                    ? data.color.withValues(alpha: 0.45)
+                    : _DS.border,
                 width: data.isAlert ? 1.5 : 1,
               ),
               borderRadius: _DS.r16,
@@ -662,7 +802,8 @@ class _StatCard extends StatelessWidget {
                 Container(
                   height: 3,
                   decoration: BoxDecoration(
-                    color: data.color.withValues(alpha: data.isAlert ? 1.0 : 0.5),
+                    color:
+                        data.color.withValues(alpha: data.isAlert ? 1.0 : 0.5),
                   ),
                 ),
                 Padding(
@@ -671,8 +812,10 @@ class _StatCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 32, height: 32,
-                        decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r8),
+                        width: 32,
+                        height: 32,
+                        decoration:
+                            BoxDecoration(color: data.bg, borderRadius: _DS.r8),
                         child: Icon(data.icon, color: data.color, size: 18),
                       ),
                       const SizedBox(height: 10),
@@ -689,9 +832,12 @@ class _StatCard extends StatelessWidget {
                       Text(
                         data.label,
                         style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600, color: _DS.text2,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _DS.text2,
                         ),
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -716,24 +862,42 @@ class _ActionsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       // ── Row 1: Daily actions ──
-      _ActionData(icon: Icons.calendar_month_rounded, label: 'احجز جلسة',
-          color: _DS.teal500, bg: _DS.teal50,
+      _ActionData(
+          icon: Icons.calendar_month_rounded,
+          label: 'احجز جلسة',
+          color: _DS.teal500,
+          bg: _DS.teal50,
           onTap: () => context.push('/nearby')),
-      _ActionData(icon: Icons.local_library_rounded, label: 'جلساتي',
-          color: _DS.green, bg: _DS.greenBg,
+      _ActionData(
+          icon: Icons.local_library_rounded,
+          label: 'جلساتي',
+          color: _DS.green,
+          bg: _DS.greenBg,
           onTap: () => context.push('/my-sessions')),
-      _ActionData(icon: Icons.task_alt_rounded, label: 'واجباتي',
-          color: _DS.amber, bg: _DS.amberBg,
+      _ActionData(
+          icon: Icons.task_alt_rounded,
+          label: 'واجباتي',
+          color: _DS.amber,
+          bg: _DS.amberBg,
           onTap: () => context.push('/assignments')),
       // ── Row 2: Occasional ──
-      _ActionData(icon: Icons.event_note_rounded, label: 'جدولي',
-          color: _DS.darkTeal, bg: _DS.darkTealBg,
+      _ActionData(
+          icon: Icons.event_note_rounded,
+          label: 'جدولي',
+          color: _DS.darkTeal,
+          bg: _DS.darkTealBg,
           onTap: () => context.push('/my-schedule')),
-      _ActionData(icon: Icons.wallet_rounded, label: 'اشتراكاتي',
-          color: _DS.gold, bg: _DS.goldBg,
+      _ActionData(
+          icon: Icons.wallet_rounded,
+          label: 'اشتراكاتي',
+          color: _DS.gold,
+          bg: _DS.goldBg,
           onTap: () => context.push('/active-subscriptions')),
-      _ActionData(icon: Icons.account_balance_wallet_rounded, label: 'محفظتي',
-          color: _DS.teal600, bg: _DS.teal100,
+      _ActionData(
+          icon: Icons.account_balance_wallet_rounded,
+          label: 'محفظتي',
+          color: _DS.teal600,
+          bg: _DS.teal100,
           onTap: () => context.push('/student-wallet')),
     ];
 
@@ -779,8 +943,11 @@ class _ActionData {
   final VoidCallback onTap;
 
   const _ActionData({
-    required this.icon, required this.label, required this.color,
-    required this.bg, required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.bg,
+    required this.onTap,
   });
 }
 
@@ -811,19 +978,24 @@ class _ActionCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 48, height: 48,
-                  decoration: BoxDecoration(color: data.bg, borderRadius: _DS.r12),
+                  width: 48,
+                  height: 48,
+                  decoration:
+                      BoxDecoration(color: data.bg, borderRadius: _DS.r12),
                   child: Icon(data.icon, color: data.color, size: 26),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   data.label,
                   style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700,
-                    color: _DS.text1, height: 1.4,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: _DS.text1,
+                    height: 1.4,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -885,18 +1057,19 @@ class _QuizAccessCard extends ConsumerWidget {
             borderRadius: _DS.r16,
             child: Ink(
               decoration: BoxDecoration(
-                color: isUnlocked ? const Color(0xFF0E8278) : AppThemeConstants.white,
+                color: isUnlocked
+                    ? const Color(0xFF0E8278)
+                    : AppThemeConstants.white,
                 borderRadius: _DS.r16,
                 border: Border.all(
-                  color: isUnlocked
-                      ? const Color(0xFF0E8278)
-                      : _DS.border,
+                  color: isUnlocked ? const Color(0xFF0E8278) : _DS.border,
                   width: isUnlocked ? 0 : 1,
                 ),
                 boxShadow: isUnlocked
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF0E8278).withValues(alpha: 0.25),
+                          color:
+                              const Color(0xFF0E8278).withValues(alpha: 0.25),
                           blurRadius: 14,
                           offset: const Offset(0, 5),
                         ),
@@ -904,7 +1077,8 @@ class _QuizAccessCard extends ConsumerWidget {
                     : _DS.subtleShadow,
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   children: [
                     Container(
@@ -930,11 +1104,15 @@ class _QuizAccessCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isUnlocked ? 'تحديات الجلسة — مفعّلة!' : 'تحديات الجلسة',
+                            isUnlocked
+                                ? 'تحديات الجلسة — مفعّلة!'
+                                : 'تحديات الجلسة',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
-                              color: isUnlocked ? AppThemeConstants.white : _DS.text1,
+                              color: isUnlocked
+                                  ? AppThemeConstants.white
+                                  : _DS.text1,
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -945,7 +1123,8 @@ class _QuizAccessCard extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 12,
                               color: isUnlocked
-                                  ? AppThemeConstants.white.withValues(alpha: 0.8)
+                                  ? AppThemeConstants.white
+                                      .withValues(alpha: 0.8)
                                   : _DS.text3,
                             ),
                           ),
@@ -982,7 +1161,8 @@ class _AssignmentsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(studentId));
+    final sessionsAsync =
+        ref.watch(studentSessionsFirstPageProvider(studentId));
 
     final subtitle = sessionsAsync.when(
       data: (sessions) {
@@ -1012,7 +1192,8 @@ class _AssignmentsSection extends ConsumerWidget {
             style: TextButton.styleFrom(
               foregroundColor: _DS.teal500,
               padding: EdgeInsets.zero,
-              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              textStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -1108,9 +1289,9 @@ class _AssignmentCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const colors = [_DS.teal500, _DS.green, _DS.purple];
-    const bgs    = [_DS.teal50,  _DS.greenBg, _DS.purpleBg];
-    final color  = colors[colorIndex % colors.length];
-    final bg     = bgs[colorIndex % bgs.length];
+    const bgs = [_DS.teal50, _DS.greenBg, _DS.purpleBg];
+    final color = colors[colorIndex % colors.length];
+    final bg = bgs[colorIndex % bgs.length];
 
     final relDate = _relativeDate(sessionDate, serverNow(ref));
 
@@ -1153,24 +1334,31 @@ class _AssignmentCard extends ConsumerWidget {
                         Row(
                           children: [
                             Container(
-                              width: 36, height: 36,
-                              decoration: BoxDecoration(color: bg, borderRadius: _DS.r12),
-                              child: Icon(Icons.person_rounded, color: color, size: 20),
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                  color: bg, borderRadius: _DS.r12),
+                              child: Icon(Icons.person_rounded,
+                                  color: color, size: 20),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 mohaffezName,
                                 style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w700, color: _DS.text1,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: _DS.text1,
                                 ),
-                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (relDate.isNotEmpty) ...[
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: _DS.teal50,
                                   borderRadius: _DS.r8,
@@ -1179,7 +1367,9 @@ class _AssignmentCard extends ConsumerWidget {
                                 child: Text(
                                   relDate,
                                   style: const TextStyle(
-                                    fontSize: 10, fontWeight: FontWeight.w700, color: _DS.teal600,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: _DS.teal600,
                                   ),
                                 ),
                               ),
@@ -1190,9 +1380,13 @@ class _AssignmentCard extends ConsumerWidget {
                         if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           if (hifz.isNotEmpty)
-                            _AssignmentRow(label: 'حفظ', text: hifz, color: _DS.teal500),
+                            _AssignmentRow(
+                                label: 'حفظ', text: hifz, color: _DS.teal500),
                           if (muraja.isNotEmpty)
-                            _AssignmentRow(label: 'مراجعة', text: muraja, color: _DS.green),
+                            _AssignmentRow(
+                                label: 'مراجعة',
+                                text: muraja,
+                                color: _DS.green),
                         ],
                       ],
                     ),
@@ -1242,15 +1436,18 @@ class _AssignmentRow extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: color),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 14, color: _DS.text1, height: 1.4),
-              maxLines: 2, overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontSize: 14, color: _DS.text1, height: 1.4),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -1267,7 +1464,8 @@ class _NextSessionCountdown extends ConsumerStatefulWidget {
   const _NextSessionCountdown({required this.nextSessionDate});
 
   @override
-  ConsumerState<_NextSessionCountdown> createState() => _NextSessionCountdownState();
+  ConsumerState<_NextSessionCountdown> createState() =>
+      _NextSessionCountdownState();
 }
 
 class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
@@ -1297,13 +1495,24 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
 
   void _recalculate() {
     final d = widget.nextSessionDate;
-    if (d == null) { _remaining = Duration.zero; return; }
+    if (d == null) {
+      _remaining = Duration.zero;
+      return;
+    }
     final diff = d.difference(serverNow(ref));
     _remaining = diff.isNegative ? Duration.zero : diff;
   }
 
   String _formatSessionDate(DateTime date) {
-    final weekdays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    final weekdays = [
+      'الأحد',
+      'الاثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت'
+    ];
     final dayName = weekdays[date.weekday % 7];
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final period = date.hour >= 12 ? 'م' : 'ص';
@@ -1318,9 +1527,7 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: isUrgent
-                ? const Color(0xFFFEE2E2)
-                : const Color(0xFFFDF5E6),
+            color: isUrgent ? const Color(0xFFFEE2E2) : const Color(0xFFFDF5E6),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isUrgent
@@ -1363,9 +1570,8 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
     final isUrgent = _remaining.inHours < 1 && days == 0;
     final accentColor = isUrgent ? const Color(0xFFDC2626) : _DS.gold;
     final bgColor = isUrgent ? const Color(0xFFFEF2F2) : _DS.goldBg;
-    final borderColor = isUrgent
-        ? const Color(0xFFFCA5A5)
-        : _DS.gold.withValues(alpha: 0.35);
+    final borderColor =
+        isUrgent ? const Color(0xFFFCA5A5) : _DS.gold.withValues(alpha: 0.35);
 
     return Container(
       decoration: BoxDecoration(
@@ -1430,15 +1636,19 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               if (days > 0) ...[
-                _buildTimeUnit(days.toString().padLeft(2, '0'), 'يوم', isUrgent),
+                _buildTimeUnit(
+                    days.toString().padLeft(2, '0'), 'يوم', isUrgent),
                 _buildSeparator(isUrgent),
               ],
-              _buildTimeUnit(hours.toString().padLeft(2, '0'), 'ساعة', isUrgent),
+              _buildTimeUnit(
+                  hours.toString().padLeft(2, '0'), 'ساعة', isUrgent),
               _buildSeparator(isUrgent),
-              _buildTimeUnit(minutes.toString().padLeft(2, '0'), 'دقيقة', isUrgent),
+              _buildTimeUnit(
+                  minutes.toString().padLeft(2, '0'), 'دقيقة', isUrgent),
               if (days == 0) ...[
                 _buildSeparator(isUrgent),
-                _buildTimeUnit(seconds.toString().padLeft(2, '0'), 'ثانية', isUrgent),
+                _buildTimeUnit(
+                    seconds.toString().padLeft(2, '0'), 'ثانية', isUrgent),
               ],
             ],
           ),
@@ -1470,7 +1680,8 @@ class _SectionLabel extends StatelessWidget {
   final String subtitle;
   final Widget? trailing;
 
-  const _SectionLabel({required this.title, required this.subtitle, this.trailing});
+  const _SectionLabel(
+      {required this.title, required this.subtitle, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -1485,7 +1696,8 @@ class _SectionLabel extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 5, left: 8),
                 child: Container(
-                  width: 6, height: 6,
+                  width: 6,
+                  height: 6,
                   decoration: const BoxDecoration(
                     color: _DS.teal500,
                     shape: BoxShape.circle,
@@ -1499,12 +1711,16 @@ class _SectionLabel extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w800,
-                        color: _DS.text1, letterSpacing: -0.3,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: _DS.text1,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.4)),
+                    Text(subtitle,
+                        style: const TextStyle(
+                            fontSize: 13, color: _DS.text2, height: 1.4)),
                   ],
                 ),
               ),
@@ -1524,7 +1740,10 @@ class _EmptyCard extends StatelessWidget {
   final bool isError;
 
   const _EmptyCard({
-    required this.icon, required this.title, required this.subtitle, this.isError = false,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.isError = false,
   });
 
   @override
@@ -1541,20 +1760,24 @@ class _EmptyCard extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 52, height: 52,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: AppThemeConstants.white, borderRadius: _DS.r16,
+              color: AppThemeConstants.white,
+              borderRadius: _DS.r16,
               border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Icon(icon, color: color, size: 26),
           ),
           const SizedBox(height: 12),
           Text(title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _DS.text1),
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: _DS.text1),
               textAlign: TextAlign.center),
           const SizedBox(height: 4),
           Text(subtitle,
-              style: const TextStyle(fontSize: 13, color: _DS.text2, height: 1.5),
+              style:
+                  const TextStyle(fontSize: 13, color: _DS.text2, height: 1.5),
               textAlign: TextAlign.center),
         ],
       ),
@@ -1574,7 +1797,8 @@ class _LevelStripCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync = ref.watch(studentCompletedSessionsProvider(studentId));
+    final sessionsAsync =
+        ref.watch(studentCompletedSessionsProvider(studentId));
 
     return sessionsAsync.when(
       loading: () => Container(
@@ -1620,8 +1844,7 @@ class _LevelStripCard extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Text(level.emoji,
-                          style: const TextStyle(fontSize: 28)),
+                      Text(level.emoji, style: const TextStyle(fontSize: 28)),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -1715,11 +1938,13 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final initials = name.trim().isEmpty ? 'ط' : name.trim().substring(0, 1);
     return Container(
-      width: size, height: size,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: AppThemeConstants.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(size / 2),
-        border: Border.all(color: AppThemeConstants.white.withValues(alpha: 0.45), width: 2),
+        border: Border.all(
+            color: AppThemeConstants.white.withValues(alpha: 0.45), width: 2),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(size / 2),
@@ -1729,7 +1954,9 @@ class _Avatar extends StatelessWidget {
                 child: Text(
                   initials,
                   style: TextStyle(
-                    fontSize: size * 0.38, fontWeight: FontWeight.w800, color: AppThemeConstants.white,
+                    fontSize: size * 0.38,
+                    fontWeight: FontWeight.w800,
+                    color: AppThemeConstants.white,
                   ),
                 ),
               ),

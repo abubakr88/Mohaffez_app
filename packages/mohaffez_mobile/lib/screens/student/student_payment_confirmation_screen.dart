@@ -241,6 +241,8 @@ class _StudentPaymentConfirmationScreenState
           const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')));
       return;
     }
+    final activeProfile = ref.read(activeStudentProfileProvider).valueOrNull ??
+        StudentProfileModel.fromUser(user);
 
     var loadingDialogOpen = true;
     BuildContext? loadingDialogContext;
@@ -266,7 +268,7 @@ class _StudentPaymentConfirmationScreenState
     try {
       final basePayment = PaymentModel(
         studentId: user.uid,
-        studentName: user.name,
+        studentName: activeProfile.name,
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
@@ -290,7 +292,9 @@ class _StudentPaymentConfirmationScreenState
           'preferredTimeSlot': _timeSlot,
           'location': _location,
           'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
+          ...activeProfile.toBookingSnapshot(user),
         },
+        ...activeProfile.toBookingSnapshot(user),
         ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
       };
 
@@ -314,7 +318,7 @@ class _StudentPaymentConfirmationScreenState
       var paymentUrl = result.paymentUrl;
       if (paymentUrl.isEmpty && selectedPlan!.priceEGP > 0.01) {
         final studentPhone = user.phoneNumber?.trim();
-        final studentName = user.name.trim();
+        final studentName = activeProfile.name.trim();
         final paymobResult =
             await ref.read(paymentServiceProvider).initiatePayment(
                   paymentId: result.paymentId,

@@ -29,6 +29,8 @@ class UserModel with _$UserModel {
     double? addressLng,
     String? country,
     String? countryCode,
+    @Default('individual') String accountType,
+    String? activeStudentProfileId,
     @TimestampConverter() DateTime? createdAt,
     // ── Setup Account Fields ─────────────────────────────────
     @Default(false) bool setupCompleted,

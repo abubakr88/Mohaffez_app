@@ -122,6 +122,13 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     required String promoCode,
     String? requestId,
     String? paymentId,
+    String? guardianId,
+    String? guardianName,
+    String? studentProfileId,
+    String? studentProfileName,
+    String? studentProfileGender,
+    DateTime? studentProfileBirthDate,
+    int? studentAge,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -143,6 +150,13 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         promoCode: promoCode,
         requestId: requestId,
         paymentId: paymentId,
+        guardianId: guardianId,
+        guardianName: guardianName,
+        studentProfileId: studentProfileId,
+        studentProfileName: studentProfileName,
+        studentProfileGender: studentProfileGender,
+        studentProfileBirthDate: studentProfileBirthDate,
+        studentAge: studentAge,
       );
 
       if (result.isSuccess) {
@@ -198,6 +212,13 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     int? sessionsCount,
     String? planType,
     String? preferredProvider,
+    String? guardianId,
+    String? guardianName,
+    String? studentProfileId,
+    String? studentProfileName,
+    String? studentProfileGender,
+    DateTime? studentProfileBirthDate,
+    int? studentAge,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -236,6 +257,13 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         sessionsCount: sessionsCount,
         planType: planType,
         preferredProvider: preferredProvider,
+        guardianId: guardianId,
+        guardianName: guardianName,
+        studentProfileId: studentProfileId,
+        studentProfileName: studentProfileName,
+        studentProfileGender: studentProfileGender,
+        studentProfileBirthDate: studentProfileBirthDate,
+        studentAge: studentAge,
       );
 
       if (result.isSuccess) {
@@ -360,6 +388,13 @@ class BookingService {
     required String promoCode,
     String? requestId,
     String? paymentId,
+    String? guardianId,
+    String? guardianName,
+    String? studentProfileId,
+    String? studentProfileName,
+    String? studentProfileGender,
+    DateTime? studentProfileBirthDate,
+    int? studentAge,
   }) async {
     try {
       final authError = await _ensureAuthenticatedForCallable('FREE SESSION');
@@ -388,6 +423,17 @@ class BookingService {
         'mohaffezName': mohaffezName,
         'studentId': studentId,
         'studentName': studentName,
+        if (guardianId != null) 'guardianId': guardianId,
+        if (guardianName != null) 'guardianName': guardianName,
+        if (studentProfileId != null) 'studentProfileId': studentProfileId,
+        if (studentProfileName != null)
+          'studentProfileName': studentProfileName,
+        if (studentProfileGender != null)
+          'studentProfileGender': studentProfileGender,
+        if (studentProfileBirthDate != null)
+          'studentProfileBirthDate':
+              studentProfileBirthDate.toUtc().toIso8601String(),
+        if (studentAge != null) 'studentAge': studentAge,
         'sessionType': sessionType,
         'preferredTimeSlot': preferredTimeSlot,
         'slotDate': slotDate.toUtc().toIso8601String(),
@@ -501,6 +547,13 @@ class BookingService {
     int? sessionsCount,
     String? planType,
     String? preferredProvider,
+    String? guardianId,
+    String? guardianName,
+    String? studentProfileId,
+    String? studentProfileName,
+    String? studentProfileGender,
+    DateTime? studentProfileBirthDate,
+    int? studentAge,
   }) async {
     final SlotLockResult? lockResult = slotLockId != null
         ? SlotLockResult(success: true, lockId: slotLockId)
@@ -543,6 +596,17 @@ class BookingService {
         'mohaffezId': mohaffezId,
         'studentId': studentId,
         'studentName': studentName,
+        if (guardianId != null) 'guardianId': guardianId,
+        if (guardianName != null) 'guardianName': guardianName,
+        if (studentProfileId != null) 'studentProfileId': studentProfileId,
+        if (studentProfileName != null)
+          'studentProfileName': studentProfileName,
+        if (studentProfileGender != null)
+          'studentProfileGender': studentProfileGender,
+        if (studentProfileBirthDate != null)
+          'studentProfileBirthDate':
+              studentProfileBirthDate.toUtc().toIso8601String(),
+        if (studentAge != null) 'studentAge': studentAge,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
         if (sessionType == 'online' && preferredProvider != null)

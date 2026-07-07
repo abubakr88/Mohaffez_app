@@ -11,6 +11,12 @@ class SessionRequestModel {
   final String studentId;
   final String studentName;
   final int? studentAge;
+  final String? guardianId;
+  final String? guardianName;
+  final String? studentProfileId;
+  final String? studentProfileName;
+  final String? studentProfileGender;
+  final Timestamp? studentProfileBirthDate;
   final String mohaffezId;
   final String mohaffezName;
   final String sessionType;
@@ -80,6 +86,12 @@ class SessionRequestModel {
     required this.studentId,
     required this.studentName,
     this.studentAge,
+    this.guardianId,
+    this.guardianName,
+    this.studentProfileId,
+    this.studentProfileName,
+    this.studentProfileGender,
+    this.studentProfileBirthDate,
     required this.mohaffezId,
     required this.mohaffezName,
     required this.sessionType,
@@ -148,6 +160,12 @@ class SessionRequestModel {
       studentId: map['studentId'] as String? ?? '',
       studentName: map['studentName'] as String? ?? '',
       studentAge: (map['studentAge'] as num?)?.toInt(),
+      guardianId: map['guardianId'] as String?,
+      guardianName: map['guardianName'] as String?,
+      studentProfileId: map['studentProfileId'] as String?,
+      studentProfileName: map['studentProfileName'] as String?,
+      studentProfileGender: map['studentProfileGender'] as String?,
+      studentProfileBirthDate: map['studentProfileBirthDate'] as Timestamp?,
       mohaffezId: map['mohaffezId'] as String? ?? '',
       mohaffezName: map['mohaffezName'] as String? ?? '',
       sessionType: map['sessionType'] as String? ?? 'online',
@@ -199,6 +217,15 @@ class SessionRequestModel {
         'studentId': studentId,
         'studentName': studentName,
         if (studentAge != null) 'studentAge': studentAge,
+        if (guardianId != null) 'guardianId': guardianId,
+        if (guardianName != null) 'guardianName': guardianName,
+        if (studentProfileId != null) 'studentProfileId': studentProfileId,
+        if (studentProfileName != null)
+          'studentProfileName': studentProfileName,
+        if (studentProfileGender != null)
+          'studentProfileGender': studentProfileGender,
+        if (studentProfileBirthDate != null)
+          'studentProfileBirthDate': studentProfileBirthDate,
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
@@ -269,6 +296,12 @@ class SessionRequestModel {
         studentId: studentId,
         studentName: studentName,
         studentAge: studentAge,
+        guardianId: guardianId,
+        guardianName: guardianName,
+        studentProfileId: studentProfileId,
+        studentProfileName: studentProfileName,
+        studentProfileGender: studentProfileGender,
+        studentProfileBirthDate: studentProfileBirthDate,
         mohaffezId: mohaffezId,
         mohaffezName: mohaffezName,
         sessionType: sessionType,

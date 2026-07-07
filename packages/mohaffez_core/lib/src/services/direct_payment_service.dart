@@ -83,6 +83,13 @@ class DirectPaymentService {
     double? fxRateToEGP,
     double? chargedAmountEGP,
     int? sessionDurationMinutes,
+    String? guardianId,
+    String? guardianName,
+    String? studentProfileId,
+    String? studentProfileName,
+    String? studentProfileGender,
+    DateTime? studentProfileBirthDate,
+    int? studentAge,
   }) async {
     assert(requestId.isNotEmpty, 'requestId must not be empty');
     if (kDebugMode) {
@@ -102,6 +109,17 @@ class DirectPaymentService {
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
         'studentName': studentName,
+        if (guardianId != null) 'guardianId': guardianId,
+        if (guardianName != null) 'guardianName': guardianName,
+        if (studentProfileId != null) 'studentProfileId': studentProfileId,
+        if (studentProfileName != null)
+          'studentProfileName': studentProfileName,
+        if (studentProfileGender != null)
+          'studentProfileGender': studentProfileGender,
+        if (studentProfileBirthDate != null)
+          'studentProfileBirthDate':
+              studentProfileBirthDate.toUtc().toIso8601String(),
+        if (studentAge != null) 'studentAge': studentAge,
         if (studentEmail.isNotEmpty) 'studentEmail': studentEmail,
         if (studentPhone.isNotEmpty) 'studentPhone': studentPhone,
         'amount': amount,

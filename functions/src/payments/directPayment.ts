@@ -23,6 +23,63 @@ const STATUS = {
   CANCELLED: 'cancelled',
 } as const;
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function optionalTimestamp(
+  value: unknown
+): FirebaseFirestore.Timestamp | null {
+  if (value instanceof admin.firestore.Timestamp) return value;
+  if (value instanceof Date) return admin.firestore.Timestamp.fromDate(value);
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return admin.firestore.Timestamp.fromDate(parsed);
+    }
+  }
+  return null;
+}
+
+function buildLearnerSnapshot(
+  primary: Record<string, unknown>,
+  fallback: Record<string, unknown> | null | undefined,
+  studentId: string
+): Record<string, unknown> {
+  return {
+    guardianId:
+      optionalString(primary['guardianId']) ??
+      optionalString(fallback?.['guardianId']) ??
+      studentId,
+    guardianName:
+      optionalString(primary['guardianName']) ??
+      optionalString(fallback?.['guardianName']),
+    studentProfileId:
+      optionalString(primary['studentProfileId']) ??
+      optionalString(fallback?.['studentProfileId']),
+    studentProfileName:
+      optionalString(primary['studentProfileName']) ??
+      optionalString(fallback?.['studentProfileName']) ??
+      optionalString(primary['studentName']) ??
+      optionalString(fallback?.['studentName']),
+    studentProfileGender:
+      optionalString(primary['studentProfileGender']) ??
+      optionalString(fallback?.['studentProfileGender']),
+    studentProfileBirthDate:
+      optionalTimestamp(primary['studentProfileBirthDate']) ??
+      optionalTimestamp(fallback?.['studentProfileBirthDate']),
+    studentAge:
+      optionalNumber(primary['studentAge']) ??
+      optionalNumber(fallback?.['studentAge']),
+  };
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. studentMarkedDirectPayment
@@ -115,6 +172,15 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       }
 
       const reqData = reqSnap.data()!;
+      const learnerSnapshot = buildLearnerSnapshot(
+        data as Record<string, unknown>,
+        reqData,
+        studentId
+      );
+      const effectiveStudentName =
+        optionalString(learnerSnapshot['studentProfileName']) ??
+        optionalString(studentName) ??
+        'الطالب';
 
       if (reqData.status === STATUS.ACCEPTED) {
         throw new functions.https.HttpsError(
@@ -213,7 +279,8 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           id: newReqRef.id,
           status: STATUS.AWAITING_DIRECT,
           studentId,
-          studentName,
+          studentName: effectiveStudentName,
+          ...learnerSnapshot,
           mohaffezId,
           mohaffezName,
           sessionType,
@@ -265,7 +332,8 @@ export const studentMarkedDirectPayment = functions.https.onCall(
 
         originalSessionRequestId: requestId,
         studentId,
-        studentName,
+        studentName: effectiveStudentName,
+        ...learnerSnapshot,
         mohaffezId,
         mohaffezName,
         amount,
@@ -461,6 +529,15 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           );
         }
         const sessionDate = dp.sessionDate as admin.firestore.Timestamp;
+        const learnerSnapshot = buildLearnerSnapshot(
+          dp as Record<string, unknown>,
+          reqData,
+          dp.studentId as string
+        );
+        const effectiveStudentName =
+          optionalString(learnerSnapshot['studentProfileName']) ??
+          optionalString(dp.studentName) ??
+          'الطالب';
 
         // Compute commission before writes so we can pre-read wallet state.
         const commissionAmount =
@@ -512,7 +589,8 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
           mohaffezId,
           studentId:           dp.studentId,
           mohaffezName:        dp.mohaffezName,
-          studentName:         dp.studentName,
+          studentName:         effectiveStudentName,
+          ...learnerSnapshot,
           sessionType:         dp.sessionType,
           preferredProvider:   (reqData.preferredProvider as string | undefined) ?? null,
           preferredTimeSlot:   dp.preferredTimeSlot,

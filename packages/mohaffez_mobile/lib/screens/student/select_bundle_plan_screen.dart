@@ -157,6 +157,9 @@ class _SelectBundlePlanScreenState
     });
 
     try {
+      final activeProfile =
+          ref.read(activeStudentProfileProvider).valueOrNull ??
+              StudentProfileModel.fromUser(user);
       final callable =
           FirebaseFunctions.instance.httpsCallable('createSessionRequest');
 
@@ -170,7 +173,8 @@ class _SelectBundlePlanScreenState
       final result = await callable.call({
         'mohaffezId': slotCtx.mohaffezId,
         'mohaffezName': slotCtx.mohaffezName,
-        'studentName': user.name,
+        'studentName': activeProfile.name,
+        ...activeProfile.toCallableBookingSnapshot(user),
         'sessionType': slotCtx.sessionType,
         'preferredTimeSlot': slotCtx.preferredTimeSlot,
         'slotDate': slotCtx.slotDate,

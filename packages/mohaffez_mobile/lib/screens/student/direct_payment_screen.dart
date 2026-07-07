@@ -103,6 +103,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   double? resolvedImamAddressLat;
   double? resolvedImamAddressLng;
   String? resolvedMohaffezPhone;
+  String? resolvedGuardianId;
+  String? resolvedGuardianName;
+  String? resolvedStudentProfileId;
+  String? resolvedStudentProfileName;
+  String? resolvedStudentProfileGender;
+  DateTime? resolvedStudentProfileBirthDate;
+  int? resolvedStudentAge;
 
   // App-kill recovery — populated from sessionRequests doc when provider is empty
   String? _hydratedPlanId;
@@ -129,6 +136,10 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     final flow = ref.read(bookingFlowProvider);
     final slotContext = flow.slotContext;
     final currentUser = ref.read(currentUserProvider).value;
+    final activeProfile = currentUser == null
+        ? null
+        : ref.read(activeStudentProfileProvider).valueOrNull ??
+            StudentProfileModel.fromUser(currentUser);
 
     // 🔍 DIAG Step 3: DirectPaymentScreen building, print all incoming params
     debugPrint('🔵 [BUNDLE_FLOW] Step3_DirectPaymentScreen_BUILD: '
@@ -168,7 +179,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     // Resolve values: widget params win over provider context
     resolvedMohaffezId = widget.mohaffezId ?? slotContext?.mohaffezId;
     resolvedMohaffezName = widget.mohaffezName ?? slotContext?.mohaffezName;
-    resolvedStudentName = widget.studentName ?? currentUser?.name ?? '';
+    resolvedStudentName =
+        widget.studentName ?? activeProfile?.name ?? currentUser?.name ?? '';
     resolvedStudentEmail = widget.studentEmail.isNotEmpty
         ? widget.studentEmail
         : currentUser?.email ?? '';
@@ -185,6 +197,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     resolvedImamAddressLng =
         widget.imamAddressLng ?? slotContext?.imamAddressLng;
     resolvedMohaffezPhone = widget.mohaffezPhone ?? slotContext?.mohaffezPhone;
+    resolvedGuardianId = currentUser?.uid;
+    resolvedGuardianName = currentUser?.name;
+    resolvedStudentProfileId = activeProfile?.id;
+    resolvedStudentProfileName = activeProfile?.name;
+    resolvedStudentProfileGender = activeProfile?.gender;
+    resolvedStudentProfileBirthDate = activeProfile?.dateOfBirth;
+    resolvedStudentAge = activeProfile?.age;
 
     // Slot dates: prefer widget DateTime params first, then parse from provider
     if (widget.slotDate != null) {
@@ -251,6 +270,18 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           resolvedMohaffezName,
           d['mohaffezName'] as String?,
         ]);
+        resolvedStudentName = _firstNonEmpty([
+          d['studentProfileName'] as String?,
+          d['studentName'] as String?,
+          resolvedStudentName,
+        ]);
+        resolvedGuardianId ??= d['guardianId'] as String?;
+        resolvedGuardianName ??= d['guardianName'] as String?;
+        resolvedStudentProfileId ??= d['studentProfileId'] as String?;
+        resolvedStudentProfileName ??= d['studentProfileName'] as String?;
+        resolvedStudentProfileGender ??= d['studentProfileGender'] as String?;
+        resolvedStudentProfileBirthDate ??= parse(d['studentProfileBirthDate']);
+        resolvedStudentAge ??= (d['studentAge'] as num?)?.toInt();
         resolvedSlotDate ??= parse(d['slotDate']);
         resolvedSlotStart ??= parse(d['slotStart']);
         resolvedSlotEnd ??= parse(d['slotEnd']);
@@ -424,6 +455,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         mohaffezId: resolvedMohaffezId!,
         mohaffezName: resolvedMohaffezName ?? '',
         studentName: resolvedStudentName ?? '',
+        guardianId: resolvedGuardianId,
+        guardianName: resolvedGuardianName,
+        studentProfileId: resolvedStudentProfileId,
+        studentProfileName: resolvedStudentProfileName,
+        studentProfileGender: resolvedStudentProfileGender,
+        studentProfileBirthDate: resolvedStudentProfileBirthDate,
+        studentAge: resolvedStudentAge,
         studentEmail: resolvedStudentEmail ?? '',
         studentPhone: resolvedStudentPhone ?? '',
         amount: resolvedAmount!,

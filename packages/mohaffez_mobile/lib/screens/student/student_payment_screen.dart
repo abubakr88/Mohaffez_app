@@ -776,6 +776,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     dynamic user,
     PricingResult pricing,
   ) {
+    final userModel = user as UserModel;
+    final activeProfile = ref.read(activeStudentProfileProvider).valueOrNull ??
+        StudentProfileModel.fromUser(userModel);
+
     // ── BUNDLE/SUBSCRIPTION: no slot or requestId needed upfront ──────────
     // WHY: Bundles are paid first; sessions are booked separately afterward.
     // Only single-session plans require a slot and a requestId at this stage.
@@ -805,9 +809,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           'requestId': null,
           'mohaffezId': widget.mohaffezId,
           'mohaffezName': effectiveMohaffezName,
-          'studentName': user.name,
-          'studentEmail': user.email ?? '',
-          'studentPhone': user.phoneNumber ?? '',
+          'studentName': activeProfile.name,
+          'studentEmail': userModel.email,
+          'studentPhone': userModel.phoneNumber ?? '',
           'amount': pricing.finalPrice,
           'sessionType': slotData?['sessionType'] ?? lockedSessionType,
           'preferredTimeSlot': slotData?['preferredTimeSlot'] ?? '',
@@ -826,6 +830,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           'planType': planType?.name ?? PlanType.bundle.name,
           'sessionsCount': selectedPlan!.sessionsCount,
           'validityDays': selectedPlan!.validityDays,
+          ...activeProfile.toBookingSnapshot(userModel),
           ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
           'autoBookFirstSession': widget.autoBookFirstSession,
         },
@@ -872,9 +877,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         'requestId': requestId,
         'mohaffezId': widget.mohaffezId,
         'mohaffezName': effectiveMohaffezName,
-        'studentName': user.name,
-        'studentEmail': user.email ?? '',
-        'studentPhone': user.phoneNumber ?? '',
+        'studentName': activeProfile.name,
+        'studentEmail': userModel.email,
+        'studentPhone': userModel.phoneNumber ?? '',
         'amount': pricing.finalPrice,
         'sessionType': lockedSessionType,
         'preferredTimeSlot': lockedTimeSlot,
@@ -887,6 +892,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         'imamAddressLng': widget.mohaffezLng,
         'mohaffezPhone':
             widget.mohaffezPhone ?? widget.lockedRequest?['mohaffezPhone'],
+        ...activeProfile.toBookingSnapshot(userModel),
       },
     );
   }
@@ -1341,6 +1347,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   // ── Existing: handleFreeSession (unchanged) ───────────────────────────────
   Future<void> handleFreeSession(
       BuildContext context, WidgetRef ref, dynamic user) async {
+    final userModel = user as UserModel;
+    final activeProfile = ref.read(activeStudentProfileProvider).valueOrNull ??
+        StudentProfileModel.fromUser(userModel);
+
     // Guard against using context after async gaps
     if (!mounted) return;
     setState(() => isProcessingPayment = true);
@@ -1421,7 +1431,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
       final basePayment = PaymentModel(
         studentId: user.uid,
-        studentName: user.name,
+        studentName: activeProfile.name,
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
@@ -1444,7 +1454,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             'sessionType': sessionType,
             'location': location,
             'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
+            ...activeProfile.toBookingSnapshot(userModel),
           },
+          ...activeProfile.toBookingSnapshot(userModel),
           ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
         },
       );
@@ -1463,7 +1475,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 mohaffezId: widget.mohaffezId,
                 mohaffezName: effectiveMohaffezName,
                 studentId: user.uid,
-                studentName: user.name,
+                studentName: activeProfile.name,
+                guardianId: user.uid,
+                guardianName: user.name,
+                studentProfileId: activeProfile.id,
+                studentProfileName: activeProfile.name,
+                studentProfileGender: activeProfile.gender,
+                studentProfileBirthDate: activeProfile.dateOfBirth,
+                studentAge: activeProfile.age,
                 sessionType: sessionType,
                 preferredTimeSlot: timeSlot,
                 slotDate: slotDate,
@@ -1514,6 +1533,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     dynamic user,
     PricingResult pricing,
   ) async {
+    final userModel = user as UserModel;
+    final activeProfile = ref.read(activeStudentProfileProvider).valueOrNull ??
+        StudentProfileModel.fromUser(userModel);
+
     setState(() => isProcessingPayment = true);
     var loadingDialogOpen = true;
     BuildContext? loadingDialogContext;
@@ -1537,7 +1560,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     try {
       final basePayment = PaymentModel(
         studentId: user.uid,
-        studentName: user.name,
+        studentName: activeProfile.name,
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
@@ -1562,7 +1585,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             'preferredTimeSlot': lockedTimeSlot,
             'location': widget.location,
             'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
+            ...activeProfile.toBookingSnapshot(userModel),
           },
+        ...activeProfile.toBookingSnapshot(userModel),
         ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
         if (appliedPromoCode != null) 'promoCode': appliedPromoCode!.code,
       };
@@ -1586,8 +1611,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
       var paymentUrl = result.paymentUrl;
       if (paymentUrl.isEmpty) {
-        final studentPhone = (user.phoneNumber as String?)?.trim();
-        final studentName = (user.name as String).trim();
+        final studentPhone = user.phoneNumber?.trim();
+        final studentName = activeProfile.name.trim();
         final paymobResult =
             await ref.read(paymentServiceProvider).initiatePayment(
                   paymentId: result.paymentId,

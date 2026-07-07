@@ -273,10 +273,14 @@ class _ConfirmBundleSessionScreenState
         'sessionRequestId': null, // Will be updated by createSessionRequest CF
       });
 
+      final activeProfile =
+          ref.read(activeStudentProfileProvider).valueOrNull ??
+              StudentProfileModel.fromUser(currentUser);
+
       final result = await bookingService.createSessionRequest(
         mohaffezId: slotContext.mohaffezId,
         studentId: currentUser.uid,
-        studentName: currentUser.name,
+        studentName: activeProfile.name,
         mohaffezName: slotContext.mohaffezName,
         sessionType: slotContext.sessionType,
         preferredTimeSlot: slotContext.preferredTimeSlot,
@@ -302,6 +306,13 @@ class _ConfirmBundleSessionScreenState
         paymentAmount: 0,
         preferredProvider:
             slotContext.sessionType == 'online' ? _selectedProvider : null,
+        guardianId: currentUser.uid,
+        guardianName: currentUser.name,
+        studentProfileId: activeProfile.id,
+        studentProfileName: activeProfile.name,
+        studentProfileGender: activeProfile.gender,
+        studentProfileBirthDate: activeProfile.dateOfBirth,
+        studentAge: activeProfile.age,
       );
 
       if (!mounted) return;

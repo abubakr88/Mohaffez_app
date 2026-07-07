@@ -117,6 +117,8 @@ service cloud.firestore {
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
             'setupCompleted', 'dateOfBirth', 'city',
+            'country', 'countryCode',
+            'accountType', 'activeStudentProfileId',
             'examScore', 'examTakenAt',
             'examQuestionCount', 'examCorrectCount',
             'examPassed', 'examRetryCount', 'examNextRetryAt',
@@ -209,6 +211,21 @@ service cloud.firestore {
       }
 
       // ── Availability schedules ──
+      match /studentProfiles/{profileId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                      request.resource.data.ownerId == userId &&
+                      request.resource.data.name is string &&
+                      request.resource.data.name.size() > 0 &&
+                      request.resource.data.relationship in ['self', 'child', 'student'];
+        allow update: if isOwner(userId) &&
+                      request.resource.data.ownerId == userId &&
+                      request.resource.data.name is string &&
+                      request.resource.data.name.size() > 0 &&
+                      request.resource.data.relationship in ['self', 'child', 'student'];
+        allow delete: if isOwner(userId);
+      }
+
       match /availability/{availabilityId} {
         allow read: if isAuthenticated();
 

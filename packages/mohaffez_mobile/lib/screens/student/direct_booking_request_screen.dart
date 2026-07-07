@@ -93,6 +93,9 @@ class _DirectBookingRequestScreenState
         );
         return;
       }
+      final activeProfile =
+          ref.read(activeStudentProfileProvider).valueOrNull ??
+              StudentProfileModel.fromUser(currentUser);
 
       final result = await FirebaseFunctions.instance
           .httpsCallable(
@@ -104,7 +107,8 @@ class _DirectBookingRequestScreenState
           .call({
         'mohaffezId': slotContext.mohaffezId,
         'mohaffezName': slotContext.mohaffezName,
-        'studentName': currentUser.name,
+        'studentName': activeProfile.name,
+        ...activeProfile.toCallableBookingSnapshot(currentUser),
         'sessionType': slotContext.sessionType,
         if (slotContext.sessionType == 'online' && _selectedProvider != null)
           'preferredProvider': _selectedProvider,

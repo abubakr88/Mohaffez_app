@@ -571,6 +571,20 @@ class SessionRepository {
         'studentId': studentId,
         'mohaffezName': mohaffezName,
         'studentName': studentName,
+        if (requestData['guardianId'] != null)
+          'guardianId': requestData['guardianId'],
+        if (requestData['guardianName'] != null)
+          'guardianName': requestData['guardianName'],
+        if (requestData['studentProfileId'] != null)
+          'studentProfileId': requestData['studentProfileId'],
+        if (requestData['studentProfileName'] != null)
+          'studentProfileName': requestData['studentProfileName'],
+        if (requestData['studentProfileGender'] != null)
+          'studentProfileGender': requestData['studentProfileGender'],
+        if (requestData['studentProfileBirthDate'] != null)
+          'studentProfileBirthDate': requestData['studentProfileBirthDate'],
+        if (requestData['studentAge'] != null)
+          'studentAge': requestData['studentAge'],
         'sessionType': sessionType,
         if (preferredProvider != null) 'preferredProvider': preferredProvider,
         'preferredTimeSlot': preferredTimeSlot,

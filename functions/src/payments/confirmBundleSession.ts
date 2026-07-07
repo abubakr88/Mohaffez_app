@@ -253,6 +253,13 @@ export const confirmBundleSession = functions.https.onCall(
         studentId,
         mohaffezName,
         studentName,
+        guardianId: requestData.guardianId ?? studentId,
+        guardianName: requestData.guardianName ?? null,
+        studentProfileId: requestData.studentProfileId ?? null,
+        studentProfileName: requestData.studentProfileName ?? studentName,
+        studentProfileGender: requestData.studentProfileGender ?? null,
+        studentProfileBirthDate: requestData.studentProfileBirthDate ?? null,
+        studentAge: requestData.studentAge ?? null,
         sessionType,
         preferredProvider:
           sessionType === 'online' && reqPreferredProvider

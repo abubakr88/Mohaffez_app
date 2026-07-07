@@ -789,6 +789,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             const SizedBox(height: 12),
                             _StudentWalletCard(userId: user.uid),
                             const SizedBox(height: 12),
+                            _SectionCard(
+                              title: 'إدارة الطلاب',
+                              icon: Icons.family_restroom_rounded,
+                              color: _DS.teal500,
+                              child: Column(
+                                children: [
+                                  _ActionTile(
+                                    icon: Icons.switch_account_rounded,
+                                    title: 'ملفات الطلاب',
+                                    subtitle:
+                                        'أضف أبناءك واختر الطالب النشط للحجز',
+                                    color: _DS.teal500,
+                                    isLast: true,
+                                    onTap: () =>
+                                        context.push('/student-profiles'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
                           ],
 
                           if (isMohaffez) ...[

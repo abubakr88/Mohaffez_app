@@ -34,6 +34,7 @@ import '../screens/student/student_assignments_screen.dart';
 import '../screens/student/student_requests_screen.dart';
 import '../screens/student/student_sessions_screen.dart';
 import '../screens/student/student_schedule_screen.dart';
+import '../screens/student/student_profiles_screen.dart';
 import '../screens/student/student_payment_screen.dart';
 import '../screens/student/nearby_mohaffez_screen.dart';
 import '../screens/student/mohaffez_profile_screen.dart';
@@ -314,6 +315,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/student-wallet',
             name: 'student-wallet',
             builder: (context, state) => const StudentWalletScreen(),
+          ),
+          GoRoute(
+            path: '/student-profiles',
+            name: 'student-profiles',
+            builder: (context, state) => const StudentProfilesScreen(),
           ),
           GoRoute(
             path: '/wallet-topup',
