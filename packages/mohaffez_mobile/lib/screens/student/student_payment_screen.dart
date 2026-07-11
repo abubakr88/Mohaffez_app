@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../services/payment_service.dart';
 
@@ -777,8 +778,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     PricingResult pricing,
   ) {
     final userModel = user as UserModel;
-    final activeProfile = ref.read(activeStudentProfileProvider).valueOrNull ??
-        StudentProfileModel.fromUser(userModel);
+    final activeProfile = resolveBookingLearner(context, ref, userModel);
+    if (activeProfile == null) return;
 
     // ── BUNDLE/SUBSCRIPTION: no slot or requestId needed upfront ──────────
     // WHY: Bundles are paid first; sessions are booked separately afterward.
@@ -1348,8 +1349,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   Future<void> handleFreeSession(
       BuildContext context, WidgetRef ref, dynamic user) async {
     final userModel = user as UserModel;
-    final activeProfile = ref.read(activeStudentProfileProvider).valueOrNull ??
-        StudentProfileModel.fromUser(userModel);
+    final activeProfile = resolveBookingLearner(context, ref, userModel);
+    if (activeProfile == null) return;
 
     // Guard against using context after async gaps
     if (!mounted) return;
@@ -1534,8 +1535,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     PricingResult pricing,
   ) async {
     final userModel = user as UserModel;
-    final activeProfile = ref.read(activeStudentProfileProvider).valueOrNull ??
-        StudentProfileModel.fromUser(userModel);
+    final activeProfile = resolveBookingLearner(context, ref, userModel);
+    if (activeProfile == null) return;
 
     setState(() => isProcessingPayment = true);
     var loadingDialogOpen = true;

@@ -41,6 +41,8 @@ final currentUserProvider = StreamProvider<UserModel?>((ref) {
     return prev.uid == next.uid &&
         prev.name == next.name &&
         prev.role == next.role &&
+        prev.accountType == next.accountType &&
+        prev.activeStudentProfileId == next.activeStudentProfileId &&
         prev.status == next.status &&
         prev.photoUrl == next.photoUrl &&
         prev.badges.foundingTeacher.enabled ==
@@ -157,7 +159,13 @@ final isMohaffezProvider = Provider<bool>(
 );
 
 final isStudentProvider = Provider<bool>(
-  (ref) => ref.watch(currentUserProvider).value?.role == 'student',
+  (ref) => isLearnerAccountRole(ref.watch(currentUserProvider).value?.role),
+  dependencies: [currentUserProvider],
+);
+
+final isParentProvider = Provider<bool>(
+  (ref) =>
+      normalizeRole(ref.watch(currentUserProvider).value?.role) == roleParent,
   dependencies: [currentUserProvider],
 );
 

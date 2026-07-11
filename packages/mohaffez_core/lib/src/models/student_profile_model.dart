@@ -120,6 +120,8 @@ class StudentProfileModel {
       'studentProfileId': id,
       'studentProfileName': name,
       if (gender != null) 'studentProfileGender': gender,
+      if (photoUrl != null && photoUrl!.trim().isNotEmpty)
+        'studentProfilePhotoUrl': photoUrl!.trim(),
       if (dateOfBirth != null)
         'studentProfileBirthDate': Timestamp.fromDate(dateOfBirth!),
       if (age != null) 'studentAge': age,
@@ -171,8 +173,17 @@ class StudentProfileModel {
     UserModel user,
     List<StudentProfileModel> profiles,
   ) {
+    return resolveActiveOrNull(user, profiles) ??
+        StudentProfileModel.fromUser(user);
+  }
+
+  static StudentProfileModel? resolveActiveOrNull(
+    UserModel user,
+    List<StudentProfileModel> profiles, {
+    bool allowSelfFallback = true,
+  }) {
     if (user.activeStudentProfileId == 'self') {
-      return StudentProfileModel.fromUser(user);
+      return allowSelfFallback ? StudentProfileModel.fromUser(user) : null;
     }
 
     StudentProfileModel? firstWhereOrNull(
@@ -196,6 +207,7 @@ class StudentProfileModel {
     if (defaultProfile != null) return defaultProfile;
 
     final first = firstWhereOrNull((profile) => profile.isActive);
-    return first ?? StudentProfileModel.fromUser(user);
+    return first ??
+        (allowSelfFallback ? StudentProfileModel.fromUser(user) : null);
   }
 }

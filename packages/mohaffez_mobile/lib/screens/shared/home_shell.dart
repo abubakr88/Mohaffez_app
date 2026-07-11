@@ -1,4 +1,4 @@
-﻿// lib/screens/home_shell.dart
+// lib/screens/home_shell.dart
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +20,7 @@ class _ShellDS {
   static const teal500 = Color(0xFF1A9E84);
 
   // Student / Admin use the original amber palette
-  static const amberLight= Color(0xFFF5A623);
+  static const amberLight = Color(0xFFF5A623);
 
   // Neutral
   static const white70 = Color(0xB3FFFFFF);
@@ -63,7 +63,8 @@ class HomeShell extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
+                const Icon(Icons.error_outline,
+                    size: 48, color: AppThemeConstants.error),
                 const SizedBox(height: 16),
                 const Text('حدث خطأ في تحميل البيانات'),
                 const SizedBox(height: 8),
@@ -78,18 +79,80 @@ class HomeShell extends ConsumerWidget {
         ),
       ),
       data: (user) {
-        if (authUser == null || user == null || authUser.uid != user.uid) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        if (authUser == null) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
 
-        final currentIndex    = ref.watch(bottomNavIndexProvider);
-        final isMohaffez      = user.role == 'mohaffez';
-        final isAdmin         = user.role == 'admin';
+        if (user == null || authUser.uid != user.uid) {
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              backgroundColor: const Color(0xFFF4F7F6),
+              body: SafeArea(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppThemeConstants.spaceLg),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.person_off_outlined,
+                          size: 48,
+                          color: AppThemeConstants.error,
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceMd),
+                        const Text(
+                          'تعذر تحميل بيانات الحساب',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppThemeConstants.textPrimary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceSm),
+                        const Text(
+                          'تأكد من الاتصال أو سجل الدخول مرة أخرى.',
+                          style:
+                              TextStyle(color: AppThemeConstants.textSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceLg),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                ref.invalidate(currentUserProvider),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('إعادة المحاولة'),
+                          ),
+                        ),
+                        const SizedBox(height: AppThemeConstants.spaceSm),
+                        TextButton.icon(
+                          onPressed: () async {
+                            await ref.read(authServiceProvider).logout();
+                            if (context.mounted) context.go('/login');
+                          },
+                          icon: const Icon(Icons.logout),
+                          label: const Text('تسجيل الخروج'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        final currentIndex = ref.watch(bottomNavIndexProvider);
+        final isMohaffez = user.role == 'mohaffez';
+        final isAdmin = user.role == 'admin';
         final isDevModeActive = ref.watch(isDevModeActiveProvider);
 
-        final unreadCount = ref
-            .watch(unreadNotificationsCountProvider(user.uid))
-            .value ?? 0;
+        final unreadCount =
+            ref.watch(unreadNotificationsCountProvider(user.uid)).value ?? 0;
 
         // WHY: wizard is inside the ShellRoute to avoid cross-navigator push
         // crashes, but it must appear full-screen (no chrome).
@@ -106,29 +169,34 @@ class HomeShell extends ConsumerWidget {
           '/pricing-management',
         ];
         final wizardMode = ref.watch(wizardModeProvider);
-        final isInWizardFlow = isMohaffez &&
-            wizardMode &&
-            wizardStepRoutes.contains(currentPath);
+        final isInWizardFlow =
+            isMohaffez && wizardMode && wizardStepRoutes.contains(currentPath);
         final wizardStepIdx =
             isInWizardFlow ? wizardStepRoutes.indexOf(currentPath) : -1;
 
         final shellScaffold = Scaffold(
           backgroundColor: const Color(0xFFF4F7F6),
-          appBar: isWizard ? null : _buildAppBar(
-            context, ref,
-            isMohaffez: isMohaffez,
-            isAdmin: isAdmin,
-            currentIndex: currentIndex,
-            userId: user.uid,
-            unreadCount: unreadCount,
-          ),
-          drawer: (isWizard || isInWizardFlow) ? null : _buildDrawer(
-            context, ref,
-            isMohaffez: isMohaffez,
-            isAdmin: isAdmin,
-            isDevModeActive: isDevModeActive,
-            user: user,
-          ),
+          appBar: isWizard
+              ? null
+              : _buildAppBar(
+                  context,
+                  ref,
+                  isMohaffez: isMohaffez,
+                  isAdmin: isAdmin,
+                  currentIndex: currentIndex,
+                  userId: user.uid,
+                  unreadCount: unreadCount,
+                ),
+          drawer: (isWizard || isInWizardFlow)
+              ? null
+              : _buildDrawer(
+                  context,
+                  ref,
+                  isMohaffez: isMohaffez,
+                  isAdmin: isAdmin,
+                  isDevModeActive: isDevModeActive,
+                  user: user,
+                ),
           body: Column(
             children: [
               const OfflineBanner(),
@@ -140,12 +208,14 @@ class HomeShell extends ConsumerWidget {
               ? null
               : isInWizardFlow
                   ? _buildWizardNavBar(
-                      context, ref,
+                      context,
+                      ref,
                       stepIdx: wizardStepIdx,
                       stepRoutes: wizardStepRoutes,
                     )
                   : _buildBottomNavBar(
-                      context, ref,
+                      context,
+                      ref,
                       isMohaffez: isMohaffez,
                       isAdmin: isAdmin,
                       currentIndex: currentIndex,
@@ -186,8 +256,11 @@ PreferredSizeWidget _buildAppBar(
 }) {
   final currentPath = GoRouterState.of(context).uri.path;
   const rootShellPaths = {
-    '/home', '/notifications', '/profile',
-    '/mohaffez-home', '/admin-home',
+    '/home',
+    '/notifications',
+    '/profile',
+    '/mohaffez-home',
+    '/admin-home',
   };
   final showBackButton = !rootShellPaths.contains(currentPath);
 
@@ -245,18 +318,19 @@ PreferredSizeWidget _buildAppBar(
               decoration: BoxDecoration(
                 color: _ShellDS.white40,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: _ShellDS.white70, width: 1),
+                border: Border.all(color: _ShellDS.white70, width: 1),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(7),
                 child: Image.asset(
                   'assets/images/icon.png',
-                  height: 32, width: 32,
+                  height: 32,
+                  width: 32,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(
                     Icons.menu_book_rounded,
-                    color: _ShellDS.white70, size: 20,
+                    color: _ShellDS.white70,
+                    size: 20,
                   ),
                 ),
               ),
@@ -265,11 +339,11 @@ PreferredSizeWidget _buildAppBar(
             Text(
               _screenTitle(isMohaffez, isAdmin, currentIndex),
               style: const TextStyle(
-                  color: _ShellDS.white70,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
+                color: _ShellDS.white70,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
             ),
           ],
         ),
@@ -282,13 +356,21 @@ PreferredSizeWidget _buildAppBar(
 
 String _screenTitle(bool isMohaffez, bool isAdmin, int currentIndex) {
   if (isMohaffez) {
-    const t = [ArabicLabels.home, ArabicLabels.notifications, ArabicLabels.profile];
+    const t = [
+      ArabicLabels.home,
+      ArabicLabels.notifications,
+      ArabicLabels.profile
+    ];
     return currentIndex < t.length ? t[currentIndex] : ArabicLabels.home;
   } else if (isAdmin) {
     const t = ['لوحة التحكم', 'الإشعارات', 'الملف الشخصي'];
     return currentIndex < t.length ? t[currentIndex] : 'لوحة التحكم';
   } else {
-    const t = [ArabicLabels.home, ArabicLabels.notifications, ArabicLabels.profile];
+    const t = [
+      ArabicLabels.home,
+      ArabicLabels.notifications,
+      ArabicLabels.profile
+    ];
     return currentIndex < t.length ? t[currentIndex] : ArabicLabels.home;
   }
 }
@@ -334,7 +416,8 @@ Widget _buildWizardNavBar(
     decoration: const BoxDecoration(
       color: Color(0xFF095752),
       boxShadow: [
-        BoxShadow(color: Color(0x33000000), blurRadius: 8, offset: Offset(0, -2)),
+        BoxShadow(
+            color: Color(0x33000000), blurRadius: 8, offset: Offset(0, -2)),
       ],
     ),
     child: SafeArea(
@@ -346,7 +429,8 @@ Widget _buildWizardNavBar(
             // Close button
             IconButton(
               onPressed: exitWizard,
-              icon: const Icon(Icons.close_rounded, color: AppThemeConstants.white70, size: 22),
+              icon: const Icon(Icons.close_rounded,
+                  color: AppThemeConstants.white70, size: 22),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               tooltip: 'إغلاق',
@@ -403,12 +487,12 @@ Widget _buildWizardNavBar(
             ElevatedButton(
               onPressed: goNext,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isLast
-                    ? const Color(0xFF2E8B57)
-                    : const Color(0xFFD4A44A),
+                backgroundColor:
+                    isLast ? const Color(0xFF2E8B57) : const Color(0xFFD4A44A),
                 foregroundColor: AppThemeConstants.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -674,55 +758,85 @@ Widget _buildDrawer(
             padding: const EdgeInsets.only(top: 8, bottom: 24),
             children: [
               // ── Common ──────────────────────────────────────────────────
-              _drawerTile(context, title: ArabicLabels.profile,
-                  icon: Icons.person_rounded, route: 'profile',
+              _drawerTile(context,
+                  title: ArabicLabels.profile,
+                  icon: Icons.person_rounded,
+                  route: 'profile',
                   color: _ShellDS.teal500),
-              _drawerTile(context, title: 'الإعدادات',
-                  icon: Icons.settings_rounded, route: 'settings',
+              _drawerTile(context,
+                  title: 'الإعدادات',
+                  icon: Icons.settings_rounded,
+                  route: 'settings',
                   color: AppThemeConstants.textSecondary),
-              _drawerTile(context, title: 'إعدادات الخصوصية',
-                  icon: Icons.privacy_tip_rounded, route: 'privacy-settings',
+              _drawerTile(context,
+                  title: 'إعدادات الخصوصية',
+                  icon: Icons.privacy_tip_rounded,
+                  route: 'privacy-settings',
                   color: AppThemeConstants.textSecondary),
 
               // ── Admin ────────────────────────────────────────────────────
               if (isAdmin) ...[
                 _drawerSection('إدارة النظام'),
-                _drawerTile(context, title: 'لوحة التحكم',
-                    icon: Icons.dashboard_rounded, route: 'admin-home',
+                _drawerTile(context,
+                    title: 'لوحة التحكم',
+                    icon: Icons.dashboard_rounded,
+                    route: 'admin-home',
                     color: _ShellDS.teal500),
-                _drawerTile(context, title: 'المستخدمون',
-                    icon: Icons.people_alt_rounded, route: 'admin/users',
+                _drawerTile(context,
+                    title: 'المستخدمون',
+                    icon: Icons.people_alt_rounded,
+                    route: 'admin/users',
                     color: _ShellDS.teal500),
-                _drawerTile(context, title: 'الاعتمادات',
-                    icon: Icons.verified_rounded, route: 'admin/credentials',
+                _drawerTile(context,
+                    title: 'الاعتمادات',
+                    icon: Icons.verified_rounded,
+                    route: 'admin/credentials',
                     color: _ShellDS.teal500),
-                _drawerTile(context, title: 'العمليات الفاشلة',
-                    icon: Icons.warning_amber_rounded, route: 'admin/failed-ops',
+                _drawerTile(context,
+                    title: 'العمليات الفاشلة',
+                    icon: Icons.warning_amber_rounded,
+                    route: 'admin/failed-ops',
                     color: AppThemeConstants.warning),
-                _drawerTile(context, title: 'أكواد الخصم',
-                    icon: Icons.discount_rounded, route: 'admin/promo-codes',
+                _drawerTile(context,
+                    title: 'أكواد الخصم',
+                    icon: Icons.discount_rounded,
+                    route: 'admin/promo-codes',
                     color: _ShellDS.teal600),
-                _drawerTile(context, title: 'قفل المواعيد',
-                    icon: Icons.lock_clock_rounded, route: 'admin/slot-locks',
+                _drawerTile(context,
+                    title: 'قفل المواعيد',
+                    icon: Icons.lock_clock_rounded,
+                    route: 'admin/slot-locks',
                     color: AppThemeConstants.textSecondary),
-                _drawerTile(context, title: 'أحداث الدفع',
-                    icon: Icons.payment_rounded, route: 'admin/payment-events',
+                _drawerTile(context,
+                    title: 'أحداث الدفع',
+                    icon: Icons.payment_rounded,
+                    route: 'admin/payment-events',
                     color: _ShellDS.teal600),
-                _drawerTile(context, title: 'الإشعارات الجماعية',
-                    icon: Icons.campaign_rounded, route: 'admin/broadcast',
+                _drawerTile(context,
+                    title: 'الإشعارات الجماعية',
+                    icon: Icons.campaign_rounded,
+                    route: 'admin/broadcast',
                     color: AppThemeConstants.warning),
-                _drawerTile(context, title: 'إعدادات النظام',
-                    icon: Icons.settings_rounded, route: 'admin/settings',
+                _drawerTile(context,
+                    title: 'إعدادات النظام',
+                    icon: Icons.settings_rounded,
+                    route: 'admin/settings',
                     color: AppThemeConstants.textSecondary),
                 if (isDevModeActive)
-                  _drawerTile(context, title: 'وضع المطوّر',
-                      icon: Icons.bug_report_rounded, route: 'admin/dev-mode',
+                  _drawerTile(context,
+                      title: 'وضع المطوّر',
+                      icon: Icons.bug_report_rounded,
+                      route: 'admin/dev-mode',
                       color: AppThemeConstants.error),
-                _drawerTile(context, title: 'أرقام محافظ المنصة',
+                _drawerTile(context,
+                    title: 'أرقام محافظ المنصة',
                     icon: Icons.account_balance_wallet_rounded,
-                    route: 'admin/wallet-numbers', color: _ShellDS.teal500),
-                _drawerTile(context, title: 'سجل العمليات',
-                    icon: Icons.history_rounded, route: 'admin/audit-log',
+                    route: 'admin/wallet-numbers',
+                    color: _ShellDS.teal500),
+                _drawerTile(context,
+                    title: 'سجل العمليات',
+                    icon: Icons.history_rounded,
+                    route: 'admin/audit-log',
                     color: AppThemeConstants.textSecondary),
               ],
 
@@ -731,25 +845,38 @@ Widget _buildDrawer(
                 _drawerSection('دليل الإعداد'),
                 _SetupGuideDrawerTile(uid: user.uid),
                 _drawerSection('أدوات المحفظ'),
-                _drawerTile(context, title: 'بيانات الاعتماد',
-                    icon: Icons.verified_user_rounded, route: 'credentials',
+                _drawerTile(context,
+                    title: 'بيانات الاعتماد',
+                    icon: Icons.verified_user_rounded,
+                    route: 'credentials',
                     color: _ShellDS.teal500),
-                _drawerTile(context, title: 'إدارة الجدول',
-                    icon: Icons.schedule_rounded, route: 'availability',
+                _drawerTile(context,
+                    title: 'إدارة الجدول',
+                    icon: Icons.schedule_rounded,
+                    route: 'availability',
                     color: _ShellDS.teal600),
-                _drawerTile(context, title: 'إدارة الأسعار',
-                    icon: Icons.sell_rounded, route: 'pricing-management',
+                _drawerTile(context,
+                    title: 'إدارة الأسعار',
+                    icon: Icons.sell_rounded,
+                    route: 'pricing-management',
                     color: _ShellDS.teal500),
-                _drawerTile(context, title: 'الحلقات التجريبية',
-                    icon: Icons.science_outlined, route: 'trial-requests',
+                _drawerTile(context,
+                    title: 'الحلقات التجريبية',
+                    icon: Icons.science_outlined,
+                    route: 'trial-requests',
                     color: _ShellDS.teal600),
-                _drawerTile(context, title: 'إعدادات المحفظة',
+                _drawerTile(context,
+                    title: 'إعدادات المحفظة',
                     icon: Icons.account_balance_wallet_rounded,
-                    route: 'wallet-settings', color: _ShellDS.teal600),
-                _drawerTile(context, title: 'تأكيد المدفوعات',
-                    icon: Icons.payments_rounded, route: 'direct-payment-confirmations',
+                    route: 'wallet-settings',
+                    color: _ShellDS.teal600),
+                _drawerTile(context,
+                    title: 'تأكيد المدفوعات',
+                    icon: Icons.payments_rounded,
+                    route: 'direct-payment-confirmations',
                     color: AppThemeConstants.warning),
-                _drawerTileWithUid(context, title: 'الجلسات المنتهية',
+                _drawerTileWithUid(context,
+                    title: 'الجلسات المنتهية',
                     icon: Icons.history_rounded,
                     route: '/completed-sessions',
                     uid: user.uid,
@@ -759,14 +886,20 @@ Widget _buildDrawer(
               // ── Student extras ────────────────────────────────────────────
               if (!isMohaffez && !isAdmin) ...[
                 _drawerSection('باقاتي'),
-                _drawerTile(context, title: 'باقاتي النشطة',
-                    icon: Icons.collections_bookmark_rounded, route: 'active-subscriptions',
+                _drawerTile(context,
+                    title: 'باقاتي النشطة',
+                    icon: Icons.collections_bookmark_rounded,
+                    route: 'active-subscriptions',
                     color: _ShellDS.teal500),
-                _drawerTile(context, title: 'طلباتي',
-                    icon: Icons.pending_actions_rounded, route: 'requests',
+                _drawerTile(context,
+                    title: 'طلباتي',
+                    icon: Icons.pending_actions_rounded,
+                    route: 'requests',
                     color: AppThemeConstants.warning),
-                _drawerTile(context, title: 'الحلقات التجريبية',
-                    icon: Icons.science_outlined, route: 'trial-requests',
+                _drawerTile(context,
+                    title: 'الحلقات التجريبية',
+                    icon: Icons.science_outlined,
+                    route: 'trial-requests',
                     color: _ShellDS.teal600),
               ],
 
@@ -780,7 +913,8 @@ Widget _buildDrawer(
                     color: AppThemeConstants.errorBackground,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.logout_rounded, color: AppThemeConstants.error, size: 20),
+                  child: const Icon(Icons.logout_rounded,
+                      color: AppThemeConstants.error, size: 20),
                 ),
                 title: const Text(
                   'تسجيل الخروج',
@@ -798,7 +932,8 @@ Widget _buildDrawer(
                       textDirection: TextDirection.rtl,
                       child: AlertDialog(
                         title: const Text('تسجيل الخروج'),
-                        content: const Text('هل أنت متأكد أنك تريد تسجيل الخروج؟'),
+                        content:
+                            const Text('هل أنت متأكد أنك تريد تسجيل الخروج؟'),
                         actions: [
                           TextButton(
                             onPressed: () => context.pop(false),
@@ -837,17 +972,20 @@ class _DrawerHeader extends StatelessWidget {
   final bool isMohaffez;
   final bool isAdmin;
 
-  const _DrawerHeader({required this.user, required this.isMohaffez, required this.isAdmin});
+  const _DrawerHeader(
+      {required this.user, required this.isMohaffez, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
-    final name  = user.name;
+    final name = user.name;
     final email = user.email;
     final roleLabel = isAdmin
         ? 'مدير النظام'
         : isMohaffez
             ? 'محفظ معتمد'
-            : 'طالب';
+            : normalizeRole(user.role) == roleParent
+                ? 'ولي أمر'
+                : 'طالب';
 
     return Container(
       width: double.infinity,
@@ -867,18 +1005,20 @@ class _DrawerHeader extends StatelessWidget {
             children: [
               // Avatar
               Container(
-                width: 56, height: 56,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: _ShellDS.white40,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: _ShellDS.white70, width: 2),
+                  border: Border.all(color: _ShellDS.white70, width: 2),
                 ),
                 child: Center(
                   child: Text(
                     _getAvatarInitial(name),
                     style: const TextStyle(
-                        color: _ShellDS.white70, fontSize: 24, fontWeight: FontWeight.w800),
+                        color: _ShellDS.white70,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -890,32 +1030,38 @@ class _DrawerHeader extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          color: _ShellDS.white70, fontSize: 17, fontWeight: FontWeight.w800),
+                          color: _ShellDS.white70,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800),
                     ),
                     if (email.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         email,
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             color: _ShellDS.white70, fontSize: 11),
                       ),
                     ],
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: _ShellDS.white15,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: _ShellDS.white40, width: 1),
+                        border: Border.all(color: _ShellDS.white40, width: 1),
                       ),
                       child: Text(
                         roleLabel,
                         style: const TextStyle(
-                            color: _ShellDS.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                            color: _ShellDS.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -963,7 +1109,9 @@ Widget _drawerTile(
     title: Text(
       title,
       style: const TextStyle(
-          fontSize: 14, fontWeight: FontWeight.w500, color: AppThemeConstants.textPrimary),
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: AppThemeConstants.textPrimary),
     ),
     trailing: const Icon(Icons.arrow_back_ios_new_rounded,
         size: 13, color: AppThemeConstants.textMuted),
@@ -999,7 +1147,9 @@ Widget _drawerTileWithUid(
     title: Text(
       title,
       style: const TextStyle(
-          fontSize: 14, fontWeight: FontWeight.w500, color: AppThemeConstants.textPrimary),
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: AppThemeConstants.textPrimary),
     ),
     trailing: const Icon(Icons.arrow_back_ios_new_rounded,
         size: 13, color: AppThemeConstants.textMuted),
@@ -1038,9 +1188,7 @@ class _SetupGuideDrawerTile extends ConsumerWidget {
     final completed = progressAsync.value?.completedCount ?? 0;
     final allDone = progressAsync.value?.allDone ?? false;
     final color = allDone ? const Color(0xFF2E8B57) : _ShellDS.teal500;
-    final bgColor = allDone
-        ? const Color(0xFFE8F5E9)
-        : const Color(0xFFEAF6F3);
+    final bgColor = allDone ? const Color(0xFFE8F5E9) : const Color(0xFFEAF6F3);
 
     return ListTile(
       dense: true,
@@ -1062,7 +1210,8 @@ class _SetupGuideDrawerTile extends ConsumerWidget {
       ),
       trailing: progressAsync.isLoading
           ? const SizedBox(
-              width: 18, height: 18,
+              width: 18,
+              height: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : Container(

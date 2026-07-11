@@ -271,9 +271,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         if (debtPiastres > thresholdPiastres) {
           throw new functions.https.HttpsError(
             'failed-precondition',
-            `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
-              `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
-              `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+            'الدفع المباشر غير متاح لهذا المحفظ حاليًا. يرجى اختيار الدفع الإلكتروني أو المحاولة لاحقًا.',
           );
         }
 

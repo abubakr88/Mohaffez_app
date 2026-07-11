@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/meeting_provider_picker.dart';
 
@@ -222,6 +223,9 @@ class _ConfirmBundleSessionScreenState
       return;
     }
 
+    final activeProfile = resolveBookingLearner(context, ref, currentUser);
+    if (activeProfile == null) return;
+
     setState(() => _isLoading = true);
 
     String? slotLockId;
@@ -272,10 +276,6 @@ class _ConfirmBundleSessionScreenState
         'released': false,
         'sessionRequestId': null, // Will be updated by createSessionRequest CF
       });
-
-      final activeProfile =
-          ref.read(activeStudentProfileProvider).valueOrNull ??
-              StudentProfileModel.fromUser(currentUser);
 
       final result = await bookingService.createSessionRequest(
         mohaffezId: slotContext.mohaffezId,

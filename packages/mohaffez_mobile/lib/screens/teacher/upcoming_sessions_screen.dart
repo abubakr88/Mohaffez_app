@@ -426,22 +426,42 @@ class SessionCard extends ConsumerWidget {
   }
 
   // ✅ Get previous assignment
-  Future<Map<String, dynamic>> _getPreviousAssignment(String studentId) async {
+  String? _cleanProfileId(dynamic value) {
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed == 'self') return null;
+    return trimmed;
+  }
+
+  Future<Map<String, dynamic>> _getPreviousAssignment(
+    String studentId, {
+    String? studentProfileId,
+  }) async {
     try {
+      final profileId = _cleanProfileId(studentProfileId);
       final previousSessions = await FirebaseFirestore.instance
           .collection('hafizSessions')
           .where('studentId', isEqualTo: studentId)
           .where('mohaffezId', isEqualTo: mohaffezId)
           .where('status', isEqualTo: 'completed')
           .orderBy('completedAt', descending: true)
-          .limit(1)
+          .limit(profileId == null ? 10 : 50)
           .get();
 
-      if (previousSessions.docs.isEmpty) {
+      final matchingDocs = previousSessions.docs.where((doc) {
+        final sessionProfileId =
+            _cleanProfileId(doc.data()['studentProfileId']);
+        if (profileId == null) {
+          return sessionProfileId == null;
+        }
+        return sessionProfileId == profileId;
+      }).toList();
+
+      if (matchingDocs.isEmpty) {
         return {'hifz': null, 'muraja': null};
       }
 
-      final data = previousSessions.docs.first.data();
+      final data = matchingDocs.first.data();
       return {
         'hifz': data['hifzAssignment'] as String?,
         'muraja': data['murajaAssignment'] as String?,
@@ -1073,8 +1093,10 @@ class SessionCard extends ConsumerWidget {
                   sessionId: session['id'] as String,
                   mohaffezId: mohaffezId,
                   onAfterStart: () async {
-                    final previousAssignment =
-                        await _getPreviousAssignment(studentId);
+                    final previousAssignment = await _getPreviousAssignment(
+                      studentId,
+                      studentProfileId: session['studentProfileId'] as String?,
+                    );
                     if (!context.mounted) return;
                     final result = await context.push<bool>(
                       '/complete-session/${session['id'] as String}',
@@ -1127,7 +1149,11 @@ class SessionCard extends ConsumerWidget {
                         onPressed: () async {
                           // Fetch previous assignment
                           final previousAssignment =
-                              await _getPreviousAssignment(studentId);
+                              await _getPreviousAssignment(
+                            studentId,
+                            studentProfileId:
+                                session['studentProfileId'] as String?,
+                          );
                           if (!context.mounted) return;
 
                           // Open completion screen

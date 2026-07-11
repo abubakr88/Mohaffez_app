@@ -84,6 +84,35 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/userSuspensions/$(request.auth.uid));
     }
 
+    function isOrganizationMember(orgId) {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    function isOrganizationOwner(orgId) {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/organizations/$(orgId)) &&
+             get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid;
+    }
+
+    // ============================================
+    // FUTURE ORGANIZATIONS / SCHOOLS
+    // ============================================
+
+    match /organizations/{orgId} {
+      allow read: if isAdmin() || isOrganizationOwner(orgId) || isOrganizationMember(orgId);
+      allow create: if isAuthenticated() &&
+                    request.resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.type in ['school', 'academy'];
+      allow update: if isAdmin() || isOrganizationOwner(orgId);
+      allow delete: if isAdmin();
+
+      match /members/{memberId} {
+        allow read: if isAdmin() || isOrganizationOwner(orgId) || isOrganizationMember(orgId);
+        allow create, update, delete: if isAdmin() || isOrganizationOwner(orgId);
+      }
+    }
+
     // ============================================
     // USER PROFILES & SETTINGS
     // ============================================
@@ -98,7 +127,7 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
                     request.auth.uid == userId &&
                     request.resource.data.uid == userId &&
-                    request.resource.data.role in ['student', 'mohaffez'] &&
+                    request.resource.data.role in ['student', 'parent', 'mohaffez'] &&
                     request.resource.data.status in ['active', 'pending_approval'] &&
                     !request.resource.data.keys().hasAny(['badges']);
 
@@ -224,6 +253,14 @@ service cloud.firestore {
                       request.resource.data.name.size() > 0 &&
                       request.resource.data.relationship in ['self', 'child', 'student'];
         allow delete: if isOwner(userId);
+
+        match /memorizedSurahs/{surahNumber} {
+          allow read: if isAuthenticated();
+          allow create, update: if isAuthenticated() &&
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mohaffez';
+          allow delete: if isAuthenticated() &&
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mohaffez';
+        }
       }
 
       match /availability/{availabilityId} {

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/student_profile_model.dart';
+import '../models/user_model.dart';
 import '../repositories/student_profile_repository.dart';
 import 'user_provider.dart';
 
@@ -18,13 +19,17 @@ final activeStudentProfileProvider =
 
   return userAsync.when(
     data: (user) {
-      if (user == null || user.role != 'student') {
+      if (user == null || !isLearnerAccountRole(user.role)) {
         return const AsyncData(null);
       }
 
       final profilesAsync = ref.watch(studentProfilesProvider(user.uid));
       return profilesAsync.whenData(
-        (profiles) => StudentProfileModel.resolveActive(user, profiles),
+        (profiles) => StudentProfileModel.resolveActiveOrNull(
+          user,
+          profiles,
+          allowSelfFallback: normalizeRole(user.role) == roleStudent,
+        ),
       );
     },
     loading: () => const AsyncLoading(),

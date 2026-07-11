@@ -71,6 +71,58 @@ class _DS {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
+String? _cleanNonEmptyString(dynamic value) {
+  if (value is! String) return null;
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+String? _sessionLearnerName(Map<String, dynamic>? session) {
+  if (session == null) return null;
+
+  final profileName = _cleanNonEmptyString(session['studentProfileName']);
+  if (profileName != null) return profileName;
+
+  // Older parent-created sessions may only have studentName with a profile id.
+  final profileId = _cleanNonEmptyString(session['studentProfileId']);
+  if (profileId != null) return _cleanNonEmptyString(session['studentName']);
+
+  return null;
+}
+
+String? _sessionLearnerNameWithActiveFallback(
+  Map<String, dynamic>? session,
+  StudentProfileModel? activeProfile,
+) {
+  if (session == null) return null;
+
+  final profileName = _cleanNonEmptyString(session['studentProfileName']);
+  if (profileName != null) return profileName;
+
+  final activeProfileId =
+      activeProfile?.isPersisted == true ? activeProfile!.id : null;
+  final sessionProfileId = _cleanNonEmptyString(session['studentProfileId']);
+  if (activeProfileId != null &&
+      activeProfileId != 'self' &&
+      sessionProfileId == activeProfileId) {
+    return _cleanNonEmptyString(activeProfile?.name);
+  }
+
+  return _sessionLearnerName(session);
+}
+
+List<Map<String, dynamic>> _filterSessionsForProfile(
+  List<Map<String, dynamic>> sessions,
+  String? studentProfileId,
+) {
+  final profileId = _cleanNonEmptyString(studentProfileId);
+  if (profileId == null || profileId == 'self') return sessions;
+  return sessions
+      .where((session) =>
+          _cleanNonEmptyString(session['studentProfileId']) == profileId)
+      .toList();
+}
+
 class StudentHome extends ConsumerStatefulWidget {
   const StudentHome({super.key});
 
@@ -111,6 +163,78 @@ class _StudentHomeState extends ConsumerState<StudentHome> {
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONTENT
 // ═══════════════════════════════════════════════════════════════════════════════
+class _ParentNeedsChildProfile extends StatelessWidget {
+  const _ParentNeedsChildProfile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: _DS.bg,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: _DS.r16,
+                  border: Border.all(color: _DS.border),
+                  boxShadow: _DS.cardShadow,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.family_restroom_rounded,
+                      size: 54,
+                      color: _DS.teal600,
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'أضف بيانات ابنك أولاً',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: _DS.text1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'بعد إضافة طفل واختياره ستتمكن من البحث والحجز والدفع ومتابعة الجلسات باسمه.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _DS.text2,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: () => context.go('/student-profiles'),
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('إضافة ابن/طالب'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _DS.teal600,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class StudentHomeContent extends ConsumerWidget {
   final String studentId;
   const StudentHomeContent({super.key, required this.studentId});
@@ -118,7 +242,15 @@ class StudentHomeContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider).value;
-    final activeProfile = ref.watch(activeStudentProfileProvider).valueOrNull;
+    final activeProfileAsync = ref.watch(activeStudentProfileProvider);
+    final activeProfile = activeProfileAsync.valueOrNull;
+    if (normalizeRole(user?.role) == roleParent &&
+        !activeProfileAsync.isLoading &&
+        activeProfile == null) {
+      return const _ParentNeedsChildProfile();
+    }
+    final activeLearnerProfileId =
+        activeProfile?.isPersisted == true ? activeProfile!.id : null;
     final requestsAsync =
         ref.watch(studentRequestsFirstPageProvider(studentId));
     final subscriptionsAsync =
@@ -127,7 +259,7 @@ class StudentHomeContent extends ConsumerWidget {
         ref.watch(studentUpcomingSessionsProvider(studentId));
     final now = serverNow(ref);
 
-    final nextSessionDate = studentUpcomingAsync.when(
+    final nextSession = studentUpcomingAsync.when<Map<String, dynamic>?>(
       data: (sessions) {
         // Use slotStart (precise start time) — sessionDate normalizes to
         // midnight, which incorrectly excludes today's later sessions from
@@ -146,13 +278,17 @@ class StudentHomeContent extends ConsumerWidget {
           if (sa == null || sb == null) return 0;
           return sa.compareTo(sb);
         });
-        final next = future.first;
-        return (next['slotStart'] as DateTime?) ??
-            (next['sessionDate'] as DateTime?);
+        return future.first;
       },
       loading: () => null,
       error: (_, __) => null,
     );
+    final nextSessionDate = nextSession == null
+        ? null
+        : (nextSession['slotStart'] as DateTime?) ??
+            (nextSession['sessionDate'] as DateTime?);
+    final nextSessionLearnerName =
+        _sessionLearnerNameWithActiveFallback(nextSession, activeProfile);
 
     final activeRequestsCount = requestsAsync.when(
       data: (requests) => requests.where((r) {
@@ -239,7 +375,7 @@ class StudentHomeContent extends ConsumerWidget {
                     collapseMode: CollapseMode.pin,
                     background: _HomeHeader(
                       name: activeProfile?.name ?? user?.name ?? 'الطالب',
-                      photoUrl: user?.photoUrl,
+                      photoUrl: activeProfile?.photoUrl ?? user?.photoUrl,
                       dateText: DateFormat('EEEE، d MMMM', 'ar').format(now),
                       greeting: _greeting(now, nextSessionDate),
                     ),
@@ -282,16 +418,24 @@ class StudentHomeContent extends ConsumerWidget {
                       ],
                       _LevelStripCard(
                         studentId: studentId,
-                        dateOfBirth: user?.dateOfBirth,
+                        studentProfileId: activeLearnerProfileId,
+                        dateOfBirth:
+                            activeProfile?.dateOfBirth ?? user?.dateOfBirth,
                       ),
                       const SizedBox(height: 20),
-                      _NextSessionCountdown(nextSessionDate: nextSessionDate),
+                      _NextSessionCountdown(
+                        nextSessionDate: nextSessionDate,
+                        learnerName: nextSessionLearnerName,
+                      ),
                       if (nextSessionDate != null) const SizedBox(height: 20),
                       _ActionsSection(studentId: studentId),
                       const SizedBox(height: 20),
                       _QuizAccessCard(studentId: studentId),
                       const SizedBox(height: 28),
-                      _AssignmentsSection(studentId: studentId),
+                      _AssignmentsSection(
+                        studentId: studentId,
+                        studentProfileId: activeLearnerProfileId,
+                      ),
                       const SizedBox(height: 16),
                     ]),
                   ),
@@ -1157,7 +1301,11 @@ class _QuizAccessCard extends ConsumerWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 class _AssignmentsSection extends ConsumerWidget {
   final String studentId;
-  const _AssignmentsSection({required this.studentId});
+  final String? studentProfileId;
+  const _AssignmentsSection({
+    required this.studentId,
+    this.studentProfileId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1166,7 +1314,11 @@ class _AssignmentsSection extends ConsumerWidget {
 
     final subtitle = sessionsAsync.when(
       data: (sessions) {
-        final count = sessions
+        final scopedSessions = _filterSessionsForProfile(
+          sessions,
+          studentProfileId,
+        );
+        final count = scopedSessions
             .where((s) =>
                 ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
                 ((s['murajaAssignment'] as String?) ?? '').isNotEmpty)
@@ -1200,7 +1352,10 @@ class _AssignmentsSection extends ConsumerWidget {
         const SizedBox(height: 14),
         sessionsAsync.when(
           data: (sessions) {
-            final assignments = sessions
+            final assignments = _filterSessionsForProfile(
+              sessions,
+              studentProfileId,
+            )
                 .where((s) =>
                     ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
                     ((s['murajaAssignment'] as String?) ?? '').isNotEmpty)
@@ -1461,7 +1616,11 @@ class _AssignmentRow extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 class _NextSessionCountdown extends ConsumerStatefulWidget {
   final DateTime? nextSessionDate;
-  const _NextSessionCountdown({required this.nextSessionDate});
+  final String? learnerName;
+  const _NextSessionCountdown({
+    required this.nextSessionDate,
+    this.learnerName,
+  });
 
   @override
   ConsumerState<_NextSessionCountdown> createState() =>
@@ -1626,6 +1785,31 @@ class _NextSessionCountdownState extends ConsumerState<_NextSessionCountdown> {
                         color: _DS.text3,
                       ),
                     ),
+                    if (widget.learnerName != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.school_rounded,
+                            size: 14,
+                            color: accentColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              'الطالب: ${widget.learnerName}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: accentColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1792,13 +1976,19 @@ class _EmptyCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 class _LevelStripCard extends ConsumerWidget {
   final String studentId;
+  final String? studentProfileId;
   final DateTime? dateOfBirth;
-  const _LevelStripCard({required this.studentId, required this.dateOfBirth});
+  const _LevelStripCard({
+    required this.studentId,
+    this.studentProfileId,
+    required this.dateOfBirth,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsAsync =
-        ref.watch(studentCompletedSessionsProvider(studentId));
+    final sessionsAsync = ref.watch(learnerCompletedSessionsProvider(
+      (studentId: studentId, studentProfileId: studentProfileId),
+    ));
 
     return sessionsAsync.when(
       loading: () => Container(

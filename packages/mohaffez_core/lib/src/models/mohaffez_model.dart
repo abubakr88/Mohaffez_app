@@ -16,6 +16,7 @@ class MohaffezModel {
   final String? phoneNumber;
   final String? gender;
   final bool trialSessionEnabled;
+  final String? pricingSearchText;
   final UserBadges badges;
 
   MohaffezModel({
@@ -32,6 +33,7 @@ class MohaffezModel {
     this.phoneNumber,
     this.gender,
     this.trialSessionEnabled = false,
+    this.pricingSearchText,
     this.badges = const UserBadges(),
   });
 
@@ -55,6 +57,7 @@ class MohaffezModel {
       phoneNumber: data['phoneNumber'] as String?,
       gender: data['gender'] as String?,
       trialSessionEnabled: data['trialSessionEnabled'] == true,
+      pricingSearchText: data['pricingSearchText'] as String?,
       badges: UserBadges.fromJson(data['badges']),
     );
   }

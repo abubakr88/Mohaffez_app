@@ -196,6 +196,11 @@ final upcomingSessionsProvider =
           'sessionNotes': data['sessionNotes'] as String?,
           'status': data['status'] as String? ?? 'accepted',
           'studentId': data['studentId'] as String?,
+          'studentProfileId': data['studentProfileId'] as String?,
+          'studentProfileName': data['studentProfileName'] as String?,
+          'studentProfilePhotoUrl': data['studentProfilePhotoUrl'] as String?,
+          'guardianId': data['guardianId'] as String?,
+          'guardianName': data['guardianName'] as String?,
           'isPaid': data['isPaid'] as bool? ?? false,
           'isTrial': data['isTrial'] as bool? ?? false,
           'bookingKind': data['bookingKind'] as String?,
@@ -1395,13 +1400,32 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
     final data = doc.data();
     final studentId = data['studentId'] as String?;
     if (studentId == null) continue;
+    final rawProfileId = (data['studentProfileId'] as String?)?.trim();
+    final studentProfileId = rawProfileId != null &&
+            rawProfileId.isNotEmpty &&
+            rawProfileId != 'self'
+        ? rawProfileId
+        : null;
+    final groupKey =
+        studentProfileId == null ? studentId : '$studentId::$studentProfileId';
+    final profileName = (data['studentProfileName'] as String?)?.trim();
+    final rawProfilePhotoUrl =
+        (data['studentProfilePhotoUrl'] as String?)?.trim();
+    final profilePhotoUrl =
+        rawProfilePhotoUrl != null && rawProfilePhotoUrl.isNotEmpty
+            ? rawProfilePhotoUrl
+            : null;
 
-    counts[studentId] = (counts[studentId] ?? 0) + 1;
+    counts[groupKey] = (counts[groupKey] ?? 0) + 1;
 
-    if (!students.containsKey(studentId)) {
-      students[studentId] = MohaffezStudentSummary(
+    if (!students.containsKey(groupKey)) {
+      students[groupKey] = MohaffezStudentSummary(
         studentId: studentId,
-        studentName: data['studentName'] as String? ?? '',
+        studentName: profileName != null && profileName.isNotEmpty
+            ? profileName
+            : data['studentName'] as String? ?? '',
+        studentProfileId: studentProfileId,
+        photoUrl: profilePhotoUrl,
         lastSessionDate: (data['sessionDate'] as Timestamp?)?.toDate(),
         lastSessionStatus: data['status'] as String? ?? 'accepted',
         hifzAssignment: data['hifzAssignment'] as String? ?? '',
@@ -1422,7 +1446,7 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
   }
 
   // Batch-fetch photoUrl from users collection (chunked to respect Firestore whereIn limit of 30)
-  final studentIds = students.keys.toList();
+  final studentIds = students.values.map((s) => s.studentId).toSet().toList();
   final Map<String, String?> photoUrls = {};
   for (int i = 0; i < studentIds.length; i += 30) {
     final chunk = studentIds.sublist(
@@ -1441,8 +1465,11 @@ final mohaffezStudentsProvider = FutureProvider.autoDispose
 
   return students.values
       .map((s) => s.copyWith(
-            sessionCount: counts[s.studentId] ?? 1,
-            photoUrl: photoUrls[s.studentId],
+            sessionCount: counts[s.studentProfileId == null
+                    ? s.studentId
+                    : '${s.studentId}::${s.studentProfileId}'] ??
+                1,
+            photoUrl: s.photoUrl ?? photoUrls[s.studentId],
           ))
       .toList();
 });

@@ -17,6 +17,23 @@ DateTime? _toDateTime(dynamic value) {
   return null;
 }
 
+String? _cleanNonEmptyString(dynamic value) {
+  if (value is! String) return null;
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+String? _sessionLearnerName(Map<String, dynamic> session) {
+  final profileName = _cleanNonEmptyString(session['studentProfileName']);
+  if (profileName != null) return profileName;
+
+  // Older parent-created sessions may only have studentName with a profile id.
+  final profileId = _cleanNonEmptyString(session['studentProfileId']);
+  if (profileId != null) return _cleanNonEmptyString(session['studentName']);
+
+  return null;
+}
+
 class StudentSessionsScreen extends ConsumerStatefulWidget {
   const StudentSessionsScreen({super.key});
 
@@ -25,8 +42,7 @@ class StudentSessionsScreen extends ConsumerStatefulWidget {
       _StudentSessionsScreenState();
 }
 
-class _StudentSessionsScreenState
-    extends ConsumerState<StudentSessionsScreen>
+class _StudentSessionsScreenState extends ConsumerState<StudentSessionsScreen>
     with SingleTickerProviderStateMixin {
   String _selectedFilter = 'all';
   String? _studentId;
@@ -141,7 +157,8 @@ class _StudentSessionsScreenState
   // FILTER DATA HELPER
   // ─────────────────────────────────────────────────
 
-  Map<String, dynamic> _computeFilteredData(List<Map<String, dynamic>> sessions) {
+  Map<String, dynamic> _computeFilteredData(
+      List<Map<String, dynamic>> sessions) {
     final now = serverNow(ref);
     final todayStart = DateTime(now.year, now.month, now.day);
     final all = sessions.where((s) {
@@ -154,12 +171,15 @@ class _StudentSessionsScreenState
       // Use slotStart so today's later sessions are still counted as upcoming
       // (sessionDate is midnight, so a 23:10 session at 20:00 would otherwise
       // fall into "completed" because midnight is "in the past today").
-      final start = _toDateTime(s['slotStart']) ?? _toDateTime(s['sessionDate']);
+      final start =
+          _toDateTime(s['slotStart']) ?? _toDateTime(s['sessionDate']);
       return st == 'accepted' && start != null && start.isAfter(serverNow(ref));
     }).toList()
       ..sort((a, b) {
-        final aDate = _toDateTime(a['slotStart']) ?? _toDateTime(a['sessionDate']);
-        final bDate = _toDateTime(b['slotStart']) ?? _toDateTime(b['sessionDate']);
+        final aDate =
+            _toDateTime(a['slotStart']) ?? _toDateTime(a['sessionDate']);
+        final bDate =
+            _toDateTime(b['slotStart']) ?? _toDateTime(b['sessionDate']);
         if (aDate == null && bDate == null) return 0;
         if (aDate == null) return 1;
         if (bDate == null) return -1;
@@ -172,9 +192,11 @@ class _StudentSessionsScreenState
       return st == 'completed' || (d != null && d.isBefore(todayStart));
     }).toList();
 
-    final withAssignments = all.where((s) =>
-        ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
-        ((s['murajaAssignment'] as String?) ?? '').isNotEmpty).toList();
+    final withAssignments = all
+        .where((s) =>
+            ((s['hifzAssignment'] as String?) ?? '').isNotEmpty ||
+            ((s['murajaAssignment'] as String?) ?? '').isNotEmpty)
+        .toList();
 
     return {
       'all': all,
@@ -227,7 +249,8 @@ class _StudentSessionsScreenState
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppThemeConstants.onPrimary.withValues(alpha: 0.2),
+                          color: AppThemeConstants.onPrimary
+                              .withValues(alpha: 0.2),
                           borderRadius: AppThemeConstants.borderRadiusMd,
                         ),
                         child: const Icon(Icons.event_available_rounded,
@@ -251,7 +274,8 @@ class _StudentSessionsScreenState
                               'إدارة جلساتك المؤكدة',
                               style: TextStyle(
                                   fontSize: 13,
-                                  color: AppThemeConstants.onPrimary.withValues(alpha: 0.7)),
+                                  color: AppThemeConstants.onPrimary
+                                      .withValues(alpha: 0.7)),
                             ),
                           ],
                         ),
@@ -261,10 +285,12 @@ class _StudentSessionsScreenState
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: AppThemeConstants.onPrimary.withValues(alpha: 0.2),
+                            color: AppThemeConstants.onPrimary
+                                .withValues(alpha: 0.2),
                             borderRadius: AppThemeConstants.borderRadiusXl,
                             border: Border.all(
-                                color: AppThemeConstants.onPrimary.withValues(alpha: 0.4)),
+                                color: AppThemeConstants.onPrimary
+                                    .withValues(alpha: 0.4)),
                           ),
                           child: Text(
                             '$totalCount جلسة',
@@ -294,7 +320,8 @@ class _StudentSessionsScreenState
     final all = filteredData['all'] as List<Map<String, dynamic>>;
     final upcoming = filteredData['upcoming'] as List<Map<String, dynamic>>;
     final completed = filteredData['completed'] as List<Map<String, dynamic>>;
-    final withAssignments = filteredData['withAssignments'] as List<Map<String, dynamic>>;
+    final withAssignments =
+        filteredData['withAssignments'] as List<Map<String, dynamic>>;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -312,19 +339,27 @@ class _StudentSessionsScreenState
       ),
       child: Row(
         children: [
-          _StatItem(count: all.length, label: 'المجموع',
+          _StatItem(
+              count: all.length,
+              label: 'المجموع',
               color: AppThemeConstants.secondary,
               icon: Icons.grid_view_rounded),
           _StatDivider(),
-          _StatItem(count: upcoming.length, label: 'القادمة',
+          _StatItem(
+              count: upcoming.length,
+              label: 'القادمة',
               color: AppThemeConstants.info,
               icon: Icons.upcoming_rounded),
           _StatDivider(),
-          _StatItem(count: completed.length, label: 'المنتهية',
+          _StatItem(
+              count: completed.length,
+              label: 'المنتهية',
               color: AppThemeConstants.textSecondary,
               icon: Icons.history_rounded),
           _StatDivider(),
-          _StatItem(count: withAssignments.length, label: 'بواجبات',
+          _StatItem(
+              count: withAssignments.length,
+              label: 'بواجبات',
               color: AppThemeConstants.primary,
               icon: Icons.assignment_rounded),
         ],
@@ -347,11 +382,11 @@ class _StudentSessionsScreenState
         children: [
           _buildChip('all', 'الكل', Icons.grid_view_rounded, all.length),
           const SizedBox(width: 8),
-          _buildChip('upcoming', 'القادمة', Icons.upcoming_rounded,
-              upcoming.length),
+          _buildChip(
+              'upcoming', 'القادمة', Icons.upcoming_rounded, upcoming.length),
           const SizedBox(width: 8),
-          _buildChip('completed', 'المنتهية', Icons.history_rounded,
-              completed.length),
+          _buildChip(
+              'completed', 'المنتهية', Icons.history_rounded, completed.length),
         ],
       ),
     );
@@ -385,8 +420,7 @@ class _StudentSessionsScreenState
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: AppThemeConstants.secondary
-                          .withValues(alpha: 0.3),
+                      color: AppThemeConstants.secondary.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     )
@@ -406,8 +440,7 @@ class _StudentSessionsScreenState
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight:
-                      isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? AppThemeConstants.onPrimary
                       : AppThemeConstants.textSecondary,
@@ -416,13 +449,12 @@ class _StudentSessionsScreenState
               if (count > 0) ...[
                 const SizedBox(height: 2),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: isSelected
                         ? AppThemeConstants.onPrimary.withValues(alpha: 0.3)
-                        : AppThemeConstants.secondary
-                            .withValues(alpha: 0.15),
+                        : AppThemeConstants.secondary.withValues(alpha: 0.15),
                     borderRadius: AppThemeConstants.borderRadiusRound,
                   ),
                   child: Text(
@@ -533,8 +565,7 @@ class _StudentSessionsScreenState
     return EmptyState(
       icon: cfg?.$3 ?? Icons.event_busy_rounded,
       title: cfg?.$1 ?? 'لا توجد جلسات',
-      message:
-          cfg?.$2 ?? 'ابدأ بحجز جلستك الأولى مع أحد المحفظين',
+      message: cfg?.$2 ?? 'ابدأ بحجز جلستك الأولى مع أحد المحفظين',
       animated: true,
     );
   }
@@ -545,8 +576,7 @@ class _StudentSessionsScreenState
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.error_outline_rounded,
-              size: 56,
-              color: AppThemeConstants.error.withValues(alpha: 0.6)),
+              size: 56, color: AppThemeConstants.error.withValues(alpha: 0.6)),
           const SizedBox(height: 16),
           const Text(
             'حدث خطأ أثناء التحميل',
@@ -608,8 +638,7 @@ class _StatItem extends StatelessWidget {
                   height: 1.1)),
           Text(label,
               style: const TextStyle(
-                  fontSize: 11,
-                  color: AppThemeConstants.textSecondary)),
+                  fontSize: 11, color: AppThemeConstants.textSecondary)),
         ],
       ),
     );
@@ -618,8 +647,8 @@ class _StatItem extends StatelessWidget {
 
 class _StatDivider extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Container(
-      width: 1, height: 48, color: AppThemeConstants.divider);
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 48, color: AppThemeConstants.divider);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -634,6 +663,7 @@ class _SessionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mohaffezName = (session['mohaffezName'] as String?) ?? 'محفظ';
+    final learnerName = _sessionLearnerName(session);
     final sessionType = (session['sessionType'] as String?) ?? 'home';
     final location = (session['imamAddressText'] as String?) ?? '';
     final timeSlot = (session['preferredTimeSlot'] as String?) ?? '';
@@ -643,8 +673,7 @@ class _SessionCard extends ConsumerWidget {
 
     final now = serverNow(ref);
     final todayStart = DateTime(now.year, now.month, now.day);
-    final isUpcoming =
-        sessionDate != null && !sessionDate.isBefore(todayStart);
+    final isUpcoming = sessionDate != null && !sessionDate.isBefore(todayStart);
     final isToday = sessionDate != null &&
         sessionDate.year == now.year &&
         sessionDate.month == now.month &&
@@ -662,7 +691,8 @@ class _SessionCard extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        final sessionId = (session['id'] as String?) ?? (session['sessionId'] as String?);
+        final sessionId =
+            (session['id'] as String?) ?? (session['sessionId'] as String?);
         if (sessionId != null && sessionId.isNotEmpty) {
           try {
             final sessionModel = SessionModel.fromJson(session);
@@ -708,136 +738,161 @@ class _SessionCard extends ConsumerWidget {
                 // Left accent bar
                 Container(width: 5, color: accentColor),
 
-              // Content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Row(
-                        children: [
-                          _SessionTypeAvatar(
-                              sessionType: sessionType,
-                              isCompleted: !isUpcoming),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(mohaffezName,
-                                    style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppThemeConstants.textPrimary)),
-                                const SizedBox(height: 2),
-                                Text(_getSessionTypeLabel(sessionType),
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color:
-                                            AppThemeConstants.textSecondary)),
-                              ],
-                            ),
-                          ),
-                          _StatusBadge(
-                              isToday: isToday,
-                              isUpcoming: isUpcoming,
-                              daysUntil: daysUntil),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-                      const Divider(
-                          height: 1, color: AppThemeConstants.divider),
-                      const SizedBox(height: 10),
-
-                      // Info chips
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 6,
-                        children: [
-                          if (sessionDate != null)
-                            _InfoChip(
-                              icon: Icons.calendar_today_rounded,
-                              text: _smartDate(sessionDate, todayStart),
-                              color: isUpcoming
-                                  ? AppThemeConstants.secondary
-                                  : AppThemeConstants.textSecondary,
-                            ),
-                          if (timeSlot.isNotEmpty)
-                            _InfoChip(
-                              icon: Icons.access_time_rounded,
-                              text: formatTimeToArabicAmPm(timeSlot),
-                              color: AppThemeConstants.info,
-                            ),
-                          if (location.isNotEmpty)
-                            _InfoChip(
-                              icon: Icons.location_on_rounded,
-                              text: location,
-                              color: AppThemeConstants.primary,
-                              maxWidth: 150,
-                            ),
-                        ],
-                      ),
-
-                      // Assignments
-                      if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        const Divider(
-                            height: 1, color: AppThemeConstants.divider),
-                        const SizedBox(height: 8),
-                        const Row(
+                // Content
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header
+                        Row(
                           children: [
-                            Icon(Icons.assignment_rounded,
-                                size: 13,
-                                color: AppThemeConstants.primary),
-                            SizedBox(width: 5),
-                            Text('الواجبات',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppThemeConstants.primary)),
+                            _SessionTypeAvatar(
+                                sessionType: sessionType,
+                                isCompleted: !isUpcoming),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(mohaffezName,
+                                      style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color:
+                                              AppThemeConstants.textPrimary)),
+                                  const SizedBox(height: 2),
+                                  Text(_getSessionTypeLabel(sessionType),
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color:
+                                              AppThemeConstants.textSecondary)),
+                                  if (learnerName != null) ...[
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.school_rounded,
+                                          size: 13,
+                                          color: AppThemeConstants.secondary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'الطالب: $learnerName',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color:
+                                                  AppThemeConstants.secondary,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            _StatusBadge(
+                                isToday: isToday,
+                                isUpcoming: isUpcoming,
+                                daysUntil: daysUntil),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        if (hifz.isNotEmpty)
-                          _AssignmentRow(
-                              label: 'حفظ',
-                              text: hifz,
-                              color: AppThemeConstants.secondary),
-                        if (muraja.isNotEmpty)
-                          _AssignmentRow(
-                              label: 'مراجعة',
-                              text: muraja,
-                              color: AppThemeConstants.info),
-                      ],
 
-                      // Online meeting join button (visible only when sessionType
-                      // is online + a meeting exists; widget hides itself otherwise)
-                      if (sessionType == 'online') ...[
                         const SizedBox(height: 12),
-                        Builder(builder: (ctx) {
-                          final sid =
-                              (session['id'] as String?) ??
-                              (session['sessionId'] as String?) ??
-                              '';
-                          if (sid.isEmpty) return const SizedBox.shrink();
-                          return OnlineMeetingButton(
-                            sessionId: sid,
-                            sessionType: sessionType,
-                            role: 'student',
-                          );
-                        }),
+                        const Divider(
+                            height: 1, color: AppThemeConstants.divider),
+                        const SizedBox(height: 10),
+
+                        // Info chips
+                        Wrap(
+                          spacing: 16,
+                          runSpacing: 6,
+                          children: [
+                            if (sessionDate != null)
+                              _InfoChip(
+                                icon: Icons.calendar_today_rounded,
+                                text: _smartDate(sessionDate, todayStart),
+                                color: isUpcoming
+                                    ? AppThemeConstants.secondary
+                                    : AppThemeConstants.textSecondary,
+                              ),
+                            if (timeSlot.isNotEmpty)
+                              _InfoChip(
+                                icon: Icons.access_time_rounded,
+                                text: formatTimeToArabicAmPm(timeSlot),
+                                color: AppThemeConstants.info,
+                              ),
+                            if (location.isNotEmpty)
+                              _InfoChip(
+                                icon: Icons.location_on_rounded,
+                                text: location,
+                                color: AppThemeConstants.primary,
+                                maxWidth: 150,
+                              ),
+                          ],
+                        ),
+
+                        // Assignments
+                        if (hifz.isNotEmpty || muraja.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          const Divider(
+                              height: 1, color: AppThemeConstants.divider),
+                          const SizedBox(height: 8),
+                          const Row(
+                            children: [
+                              Icon(Icons.assignment_rounded,
+                                  size: 13, color: AppThemeConstants.primary),
+                              SizedBox(width: 5),
+                              Text('الواجبات',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppThemeConstants.primary)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          if (hifz.isNotEmpty)
+                            _AssignmentRow(
+                                label: 'حفظ',
+                                text: hifz,
+                                color: AppThemeConstants.secondary),
+                          if (muraja.isNotEmpty)
+                            _AssignmentRow(
+                                label: 'مراجعة',
+                                text: muraja,
+                                color: AppThemeConstants.info),
+                        ],
+
+                        // Online meeting join button (visible only when sessionType
+                        // is online + a meeting exists; widget hides itself otherwise)
+                        if (sessionType == 'online') ...[
+                          const SizedBox(height: 12),
+                          Builder(builder: (ctx) {
+                            final sid = (session['id'] as String?) ??
+                                (session['sessionId'] as String?) ??
+                                '';
+                            if (sid.isEmpty) return const SizedBox.shrink();
+                            return OnlineMeetingButton(
+                              sessionId: sid,
+                              sessionType: sessionType,
+                              role: 'student',
+                            );
+                          }),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -936,19 +991,15 @@ class _StatusBadge extends StatelessWidget {
     }
 
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: AppThemeConstants.borderRadiusRound,
-        border:
-            Border.all(color: color.withValues(alpha: 0.4), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
       ),
       child: Text(label,
           style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: color)),
+              fontSize: 11, fontWeight: FontWeight.bold, color: color)),
     );
   }
 }
@@ -1005,19 +1056,15 @@ class _AssignmentRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: AppThemeConstants.borderRadiusXs,
-              border:
-                  Border.all(color: color.withValues(alpha: 0.3)),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
             child: Text(label,
                 style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: color)),
+                    fontSize: 11, fontWeight: FontWeight.bold, color: color)),
           ),
           const SizedBox(width: 8),
           Expanded(

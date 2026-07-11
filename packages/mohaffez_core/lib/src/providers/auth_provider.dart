@@ -17,6 +17,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../services/cache_service.dart';
 import '../models/commission_tier_model.dart';
+import '../models/user_model.dart';
 import 'booking_flow_provider.dart';
 
 /// Thrown when a new Google user has authenticated but has no Firestore doc yet.
@@ -201,6 +202,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'setupCompleted': false,
           'dateOfBirth': null,
           'city': null,
+          'accountType': role == roleParent ? 'guardian' : 'individual',
+          'activeStudentProfileId': role == roleParent ? null : 'self',
           'examScore': null,
           'examTakenAt': null,
           'examRetryCount': 0,
@@ -324,6 +327,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'setupCompleted': false,
           'dateOfBirth': null,
           'city': null,
+          'accountType': role == roleParent ? 'guardian' : 'individual',
+          'activeStudentProfileId': role == roleParent ? null : 'self',
           'examScore': null,
           'examTakenAt': null,
           'examRetryCount': 0,
@@ -417,6 +422,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       'setupCompleted': false,
       'dateOfBirth': null,
       'city': null,
+      'accountType': 'individual',
       'examScore': null,
       'examTakenAt': null,
       'examRetryCount': 0,
@@ -429,6 +435,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       if (!existingData.containsKey(entry.key)) {
         updates[entry.key] = entry.value;
       }
+    }
+    final role = existingData['role']?.toString().trim().toLowerCase();
+    if (!existingData.containsKey('activeStudentProfileId') &&
+        role == roleStudent) {
+      updates['activeStudentProfileId'] = 'self';
     }
 
     // Only update if there are missing fields

@@ -7,7 +7,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/pay_from_wallet_card.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
+
+const _directPaymentUnavailableMessage =
+    'الدفع المباشر غير متاح لهذا المحفظ حاليًا. يرجى اختيار الدفع الإلكتروني أو المحاولة لاحقًا.';
+
+String _studentSafeDirectPaymentError(FirebaseFunctionsException error) {
+  final message = error.message?.trim();
+  if (error.code == 'failed-precondition' ||
+      message == null ||
+      message.isEmpty ||
+      message.contains('مستحقات') ||
+      message.contains('الحد المسموح')) {
+    return _directPaymentUnavailableMessage;
+  }
+  return message;
+}
 
 class DirectPaymentScreen extends ConsumerStatefulWidget {
   final String? requestId;
@@ -138,8 +154,10 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     final currentUser = ref.read(currentUserProvider).value;
     final activeProfile = currentUser == null
         ? null
-        : ref.read(activeStudentProfileProvider).valueOrNull ??
-            StudentProfileModel.fromUser(currentUser);
+        : resolveBookingLearner(context, ref, currentUser);
+    if (currentUser != null && activeProfile == null) {
+      return;
+    }
 
     // 🔍 DIAG Step 3: DirectPaymentScreen building, print all incoming params
     debugPrint('🔵 [BUNDLE_FLOW] Step3_DirectPaymentScreen_BUILD: '
@@ -531,16 +549,11 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           'code=${e.code}, message=${e.message}');
       if (!mounted) return;
 
-      final message = e.message?.trim();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppThemeConstants.error,
           duration: const Duration(seconds: 7),
-          content: Text(
-            message == null || message.isEmpty
-                ? 'Payment cannot be completed now. Please try another method.'
-                : message,
-          ),
+          content: Text(_studentSafeDirectPaymentError(e)),
         ),
       );
     } on Exception catch (e) {

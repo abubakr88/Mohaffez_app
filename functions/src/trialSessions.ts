@@ -36,8 +36,35 @@ function requireAuth(context: functions.https.CallableContext): string {
   return uid;
 }
 
-function requestIdFor(mohaffezId: string, studentId: string): string {
-  return `${mohaffezId}_${studentId}`;
+function optionalString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function optionalTimestamp(value: unknown): admin.firestore.Timestamp | null {
+  if (!value) return null;
+  if (value instanceof admin.firestore.Timestamp) return value;
+  if (typeof value !== 'string') return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return admin.firestore.Timestamp.fromDate(parsed);
+}
+
+function isLearnerRole(role: unknown): boolean {
+  return role === 'student' || role === 'parent';
+}
+
+function requestIdFor(
+  mohaffezId: string,
+  studentId: string,
+  studentProfileId?: string | null,
+): string {
+  const profileId = (studentProfileId ?? '').trim();
+  if (!profileId || profileId === 'self') {
+    return `${mohaffezId}_${studentId}`;
+  }
+  return `${mohaffezId}_${studentId}_${profileId}`;
 }
 
 function parseIsoDate(value: unknown, field: string): Date {
@@ -266,6 +293,14 @@ export const createTrialSessionRequest = functions.https.onCall(
       typeof data?.mohaffezId === 'string' ? data.mohaffezId.trim() : '';
     const sessionType =
       typeof data?.sessionType === 'string' ? data.sessionType.trim() : '';
+    const studentProfileId = optionalString(data?.studentProfileId);
+    const studentProfileName = optionalString(data?.studentProfileName);
+    const studentProfileGender = optionalString(data?.studentProfileGender);
+    const studentProfileBirthDate = optionalTimestamp(
+      data?.studentProfileBirthDate,
+    );
+    const guardianName = optionalString(data?.guardianName);
+    const requestedStudentName = optionalString(data?.studentName);
 
     if (!mohaffezId || !['online', 'home', 'mosque'].includes(sessionType)) {
       throw new functions.https.HttpsError(
@@ -280,7 +315,7 @@ export const createTrialSessionRequest = functions.https.onCall(
       );
     }
 
-    const requestId = requestIdFor(mohaffezId, studentId);
+    const requestId = requestIdFor(mohaffezId, studentId, studentProfileId);
     const requestRef = db.collection('trialSessionRequests').doc(requestId);
     const studentRef = db.collection('users').doc(studentId);
     const teacherRef = db.collection('users').doc(mohaffezId);
@@ -298,10 +333,10 @@ export const createTrialSessionRequest = functions.https.onCall(
           'You have already requested a trial session with this teacher',
         );
       }
-      if (!studentSnap.exists || studentSnap.data()?.role !== 'student') {
+      if (!studentSnap.exists || !isLearnerRole(studentSnap.data()?.role)) {
         throw new functions.https.HttpsError(
           'permission-denied',
-          'Only students can request trial sessions',
+          'Only learner accounts can request trial sessions',
         );
       }
       const teacher = teacherSnap.data();
@@ -333,10 +368,22 @@ export const createTrialSessionRequest = functions.https.onCall(
         offsetMinutes,
       );
       const student = studentSnap.data() ?? {};
+      const displayStudentName =
+        studentProfileName ||
+        requestedStudentName ||
+        optionalString(student.name) ||
+        optionalString(student.displayName) ||
+        '';
 
       transaction.create(requestRef, {
         studentId,
-        studentName: student.name ?? student.displayName ?? '',
+        studentName: displayStudentName,
+        guardianId: studentId,
+        guardianName: guardianName ?? optionalString(student.name),
+        studentProfileId: studentProfileId ?? null,
+        studentProfileName: studentProfileName ?? displayStudentName,
+        studentProfileGender: studentProfileGender ?? null,
+        studentProfileBirthDate: studentProfileBirthDate ?? null,
         mohaffezId,
         mohaffezName: teacher.name ?? teacher.displayName ?? '',
         sessionType,
@@ -356,7 +403,7 @@ export const createTrialSessionRequest = functions.https.onCall(
         senderId: studentId,
         type: 'trial_session_requested',
         title: 'طلب حلقة تجريبية جديد',
-        body: `${student.name ?? 'طالب'} أرسل أوقاتًا مقترحة لحلقة تجريبية.`,
+        body: `${displayStudentName || 'طالب'} أرسل أوقاتًا مقترحة لحلقة تجريبية.`,
         requestId,
       }));
 
@@ -564,6 +611,12 @@ export const confirmTrialSessionTime = functions.https.onCall(
         studentId,
         mohaffezName: request.mohaffezName ?? '',
         studentName: request.studentName ?? '',
+        guardianId: request.guardianId ?? studentId,
+        guardianName: request.guardianName ?? null,
+        studentProfileId: request.studentProfileId ?? null,
+        studentProfileName: request.studentProfileName ?? request.studentName ?? '',
+        studentProfileGender: request.studentProfileGender ?? null,
+        studentProfileBirthDate: request.studentProfileBirthDate ?? null,
         sessionType: request.sessionType,
         preferredTimeSlot: timeSlot,
         timeSlot,

@@ -5,6 +5,35 @@ import 'teacher_badge.dart';
 part 'user_model.freezed.dart';
 part 'user_model.g.dart';
 
+const String roleStudent = 'student';
+const String roleParent = 'parent';
+const String roleMohaffez = 'mohaffez';
+const String roleAdmin = 'admin';
+const String roleOrganizationAdmin = 'organization_admin';
+const String roleOrganizationTeacher = 'organization_teacher';
+const String roleOrganizationStudent = 'organization_student';
+
+const Set<String> learnerAccountRoles = {
+  roleStudent,
+  roleParent,
+};
+
+const Set<String> selfSelectableSignupRoles = {
+  roleStudent,
+  roleParent,
+  roleMohaffez,
+};
+
+String normalizeRole(String? role) => (role ?? '').trim().toLowerCase();
+
+bool isLearnerAccountRole(String? role) {
+  return learnerAccountRoles.contains(normalizeRole(role));
+}
+
+bool isSelfSelectableSignupRole(String? role) {
+  return selfSelectableSignupRoles.contains(normalizeRole(role));
+}
+
 @freezed
 class UserModel with _$UserModel {
   const factory UserModel({

@@ -135,7 +135,7 @@ class _UserProfileState extends ConsumerState<_UserProfile> {
     final canViewSessions = access.can(AdminPermission.manageUsers) ||
         access.can(AdminPermission.manageFinance);
     final canViewWallet = access.can(AdminPermission.manageFinance) &&
-        (role == 'student' || role == 'mohaffez');
+        (isLearnerAccountRole(role) || role == 'mohaffez');
 
     return [
       _DetailTab.account,

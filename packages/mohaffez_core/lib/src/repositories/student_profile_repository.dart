@@ -85,7 +85,7 @@ class StudentProfileRepository {
     await _firestore.collection('users').doc(ownerId).set({
       'activeStudentProfileId':
           remaining.isNotEmpty ? remaining.first.id : null,
-      'accountType': remaining.length > 1 ? 'guardian' : 'individual',
+      'accountType': remaining.isNotEmpty ? 'guardian' : 'individual',
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }

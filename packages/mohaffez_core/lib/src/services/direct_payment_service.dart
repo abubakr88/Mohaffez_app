@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../models/direct_payment_model.dart';
 
 class DirectPaymentService {
@@ -190,6 +191,13 @@ class DirectPaymentService {
   static Future<Map<String, dynamic>> mohaffezConfirm(
       String directPaymentRequestId) async {
     try {
+      if (kDebugMode) {
+        final options = Firebase.app().options;
+        debugPrint(
+          'DirectPaymentService mohaffezConfirm project=${options.projectId}, '
+          'appId=${options.appId}, requestId=$directPaymentRequestId',
+        );
+      }
       final result = await FirebaseFunctions.instance
           .httpsCallable(
         'mohaffezConfirmDirectPayment',

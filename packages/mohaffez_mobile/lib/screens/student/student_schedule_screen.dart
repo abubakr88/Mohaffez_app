@@ -1,4 +1,4 @@
-﻿// FILE: lib/screens/student_schedule_screen.dart
+// FILE: lib/screens/student_schedule_screen.dart
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'dart:ui' as ui;
@@ -8,6 +8,27 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/utils/time_formatter.dart';
+
+String? _cleanNonEmptyString(dynamic value) {
+  if (value is! String) return null;
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+String? _sessionLearnerName(
+  Map<String, dynamic> session,
+  Map<String, String> profileNamesById,
+) {
+  final profileName = _cleanNonEmptyString(session['studentProfileName']);
+  if (profileName != null) return profileName;
+
+  final profileId = _cleanNonEmptyString(session['studentProfileId']);
+  if (profileId != null) {
+    return profileNamesById[profileId];
+  }
+
+  return null;
+}
 
 /// Dedicated screen for calendar/timeline view of all sessions
 class StudentScheduleScreen extends ConsumerStatefulWidget {
@@ -44,6 +65,7 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
     }
 
     final sessionsAsync = ref.watch(studentSessionsFirstPageProvider(user.uid));
+    final profilesAsync = ref.watch(studentProfilesProvider(user.uid));
     _studentId = user.uid;
 
     return Directionality(
@@ -51,6 +73,15 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
       child: Scaffold(
         body: sessionsAsync.when(
           data: (sessions) {
+            final profileNamesById = profilesAsync.maybeWhen(
+              data: (profiles) => {
+                for (final profile in profiles)
+                  if (profile.id.trim().isNotEmpty &&
+                      profile.name.trim().isNotEmpty)
+                    profile.id: profile.name.trim(),
+              },
+              orElse: () => <String, String>{},
+            );
             final acceptedSessions = sessions.where((s) {
               final status = (s['status'] as String?)?.toLowerCase();
               return status == 'accepted';
@@ -60,7 +91,9 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
             final sessionsByDate = <DateTime, List<Map<String, dynamic>>>{};
             for (final session in acceptedSessions) {
               final dateRaw = session['sessionDate'];
-              final date = dateRaw is Timestamp ? dateRaw.toDate() : dateRaw as DateTime?;
+              final date = dateRaw is Timestamp
+                  ? dateRaw.toDate()
+                  : dateRaw as DateTime?;
               if (date != null) {
                 final dateKey = DateTime(date.year, date.month, date.day);
                 sessionsByDate.putIfAbsent(dateKey, () => []).add(session);
@@ -110,8 +143,8 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                         },
                         calendarStyle: CalendarStyle(
                           todayDecoration: BoxDecoration(
-                            color:
-                                AppThemeConstants.primary.withValues(alpha: 0.5),
+                            color: AppThemeConstants.primary
+                                .withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           selectedDecoration: const BoxDecoration(
@@ -134,13 +167,14 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
                   ),
 
                   // Sessions for selected day
-                  _buildSessionsList(sessionsByDate),
+                  _buildSessionsList(sessionsByDate, profileNamesById),
                 ],
               ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
+          error: (_, __) =>
+              const Center(child: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
         ),
       ),
     );
@@ -218,7 +252,9 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
   }
 
   Widget _buildSessionsList(
-      Map<DateTime, List<Map<String, dynamic>>> sessionsByDate) {
+    Map<DateTime, List<Map<String, dynamic>>> sessionsByDate,
+    Map<String, String> profileNamesById,
+  ) {
     if (_selectedDay == null) {
       return const SliverFillRemaining(
         child: EmptyState(
@@ -264,7 +300,10 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
             }
 
             final session = sessions[index - 1];
-            return _SessionCard(session: session);
+            return _SessionCard(
+              session: session,
+              learnerName: _sessionLearnerName(session, profileNamesById),
+            );
           },
           childCount: sessions.length + 1,
         ),
@@ -275,8 +314,12 @@ class _StudentScheduleScreenState extends ConsumerState<StudentScheduleScreen> {
 
 class _SessionCard extends StatelessWidget {
   final Map<String, dynamic> session;
+  final String? learnerName;
 
-  const _SessionCard({required this.session});
+  const _SessionCard({
+    required this.session,
+    this.learnerName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -315,9 +358,19 @@ class _SessionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
+            if (learnerName != null)
+              Text(
+                'الطالب: $learnerName',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppThemeConstants.primary,
+                ),
+              ),
             Text(_getSessionTypeLabel(sessionType)),
             if (timeSlot.isNotEmpty)
-              Text('الوقت: ${formatTimeToArabicAmPm(timeSlot)}', style: const TextStyle(fontSize: 12)),
+              Text('الوقت: ${formatTimeToArabicAmPm(timeSlot)}',
+                  style: const TextStyle(fontSize: 12)),
             if (location.isNotEmpty)
               Text('الموقع: $location', style: const TextStyle(fontSize: 12)),
           ],

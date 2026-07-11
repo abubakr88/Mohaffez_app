@@ -768,6 +768,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           name: user.name,
                           photoUrl: user.photoUrl,
                           isMohaffez: isMohaffez,
+                          isParent: normalizeRole(user.role) == roleParent,
                           followerCount: isMohaffez ? user.followerCount : 0,
                           rating: isMohaffez ? user.rating : 0,
                           onEditPhoto: () => _showPhotoOptionsSheet(user),
@@ -1051,6 +1052,7 @@ class _ProfileHeader extends StatelessWidget {
   final String name;
   final String? photoUrl;
   final bool isMohaffez;
+  final bool isParent;
   final int followerCount;
   final double rating;
   final VoidCallback onEditPhoto;
@@ -1060,6 +1062,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.name,
     required this.photoUrl,
     required this.isMohaffez,
+    required this.isParent,
     required this.followerCount,
     required this.rating,
     required this.onEditPhoto,
@@ -1068,6 +1071,12 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final roleLabel = isMohaffez
+        ? 'محفّظ'
+        : isParent
+            ? 'ولي أمر'
+            : 'طالب';
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -1211,7 +1220,7 @@ class _ProfileHeader extends StatelessWidget {
                                   .withValues(alpha: 0.2)),
                         ),
                         child: Text(
-                          isMohaffez ? 'محفّظ' : 'طالب',
+                          roleLabel,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

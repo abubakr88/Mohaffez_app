@@ -28,17 +28,19 @@ class _AdminBroadcastPageState extends ConsumerState<AdminBroadcastPage> {
     final title = _title.text.trim();
     final body = _body.text.trim();
     if (title.isEmpty || body.isEmpty) {
-      DSToast.show(context, 'يرجى إدخال العنوان والنص', type: DSToastType.error);
+      DSToast.show(context, 'يرجى إدخال العنوان والنص',
+          type: DSToastType.error);
       return;
     }
 
-    final audience = ref.read(broadcastAudienceCountProvider(_target)).valueOrNull;
-    final audienceText =
-        audience != null ? ' إلى $audience مستلم' : '';
+    final audience =
+        ref.read(broadcastAudienceCountProvider(_target)).valueOrNull;
+    final audienceText = audience != null ? ' إلى $audience مستلم' : '';
     final ok = await DSDialog.confirm(
       context,
       title: 'إرسال الإشعار',
-      message: 'سيتم إرسال هذا الإشعار$audienceText (${_targetLabel(_target)}). متابعة؟',
+      message:
+          'سيتم إرسال هذا الإشعار$audienceText (${_targetLabel(_target)}). متابعة؟',
       confirmLabel: 'إرسال',
     );
     if (!ok || !mounted) return;
@@ -115,6 +117,7 @@ class _AdminBroadcastPageState extends ConsumerState<AdminBroadcastPage> {
   }
 
   static String _targetLabel(String t) => switch (t) {
+        'parent' => 'أولياء الأمور',
         'student' => 'الطلاب',
         'mohaffez' => 'المحفظون',
         _ => 'الجميع',
@@ -167,6 +170,7 @@ class _Composer extends StatelessWidget {
             items: const [
               DSSelectItem(value: 'all', label: 'الجميع'),
               DSSelectItem(value: 'student', label: 'الطلاب'),
+              DSSelectItem(value: 'parent', label: 'أولياء الأمور'),
               DSSelectItem(value: 'mohaffez', label: 'المحفظون'),
             ],
             onChanged: (v) => onTargetChanged(v ?? 'all'),
@@ -195,7 +199,8 @@ class _Composer extends StatelessWidget {
               label: sending ? 'جاري الإرسال…' : 'إرسال الإشعار',
               leading: sending
                   ? null
-                  : const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                  : const Icon(Icons.send_rounded,
+                      size: 16, color: Colors.white),
               onPressed: sending ? null : onSend,
             ),
           ),
@@ -303,6 +308,7 @@ class _HistoryItem extends StatelessWidget {
   }
 
   static String _targetLabel(String t) => switch (t) {
+        'parent' => 'أولياء الأمور',
         'student' => 'الطلاب',
         'mohaffez' => 'المحفظون',
         _ => 'الجميع',

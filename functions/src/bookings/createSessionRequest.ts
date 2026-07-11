@@ -51,6 +51,23 @@ function optionalTimestamp(value: unknown): FirebaseFirestore.Timestamp | null {
   return null;
 }
 
+function calculateAgeFromTimestamp(
+  birthDate: FirebaseFirestore.Timestamp | null
+): number | null {
+  if (!birthDate) return null;
+  const dob = birthDate.toDate();
+  const today = new Date();
+  let age = today.getUTCFullYear() - dob.getUTCFullYear();
+  const monthDiff = today.getUTCMonth() - dob.getUTCMonth();
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getUTCDate() < dob.getUTCDate())
+  ) {
+    age--;
+  }
+  return age >= 0 && age <= 120 ? age : null;
+}
+
 export const createSessionRequest = functions.https.onCall(
   async (data, context) => {
     const fallbackIdToken =
@@ -133,6 +150,8 @@ export const createSessionRequest = functions.https.onCall(
     const studentProfileBirthDate = optionalTimestamp(
       data.studentProfileBirthDate
     );
+    const canonicalStudentAge =
+      calculateAgeFromTimestamp(studentProfileBirthDate);
 
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (
@@ -449,7 +468,8 @@ export const createSessionRequest = functions.https.onCall(
         studentProfileGender: optionalString(data.studentProfileGender),
         studentProfileBirthDate,
         studentAge:
-          typeof data.studentAge === 'number' ? data.studentAge : null,
+          canonicalStudentAge ??
+          (typeof data.studentAge === 'number' ? data.studentAge : null),
         mohaffezName,
         sessionType,
         preferredProvider:

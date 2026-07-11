@@ -26,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/widgets/admin_app_bar.dart';
 
 // ── Plan badge colours ──────────────────────────────────────────────────────
@@ -157,9 +158,8 @@ class _SelectBundlePlanScreenState
     });
 
     try {
-      final activeProfile =
-          ref.read(activeStudentProfileProvider).valueOrNull ??
-              StudentProfileModel.fromUser(user);
+      final activeProfile = resolveBookingLearner(context, ref, user);
+      if (activeProfile == null) return;
       final callable =
           FirebaseFunctions.instance.httpsCallable('createSessionRequest');
 

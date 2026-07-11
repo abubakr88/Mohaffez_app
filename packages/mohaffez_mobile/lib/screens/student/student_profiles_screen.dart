@@ -1,9 +1,10 @@
 import 'dart:ui' as ui;
-
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
@@ -16,17 +17,22 @@ class StudentProfilesScreen extends ConsumerWidget {
   static const _border = Color(0xFFE5EDE9);
   static const _text2 = Color(0xFF4B5563);
   static const _text3 = Color(0xFF9CA3AF);
+  static const _maxChildPhotoBytes = 3 * 1024 * 1024;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
+    final isParentView = userAsync.maybeWhen(
+      data: (user) => user == null || normalizeRole(user.role) == roleParent,
+      orElse: () => true,
+    );
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         backgroundColor: _bg,
         appBar: AppBar(
-          title: const Text('إدارة الطلاب'),
+          title: Text(isParentView ? 'إدارة الأبناء/الطلاب' : 'بيانات الطالب'),
           backgroundColor: _tealDark,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -54,67 +60,133 @@ class StudentProfilesScreen extends ConsumerWidget {
               data: (profiles) {
                 final activeProfiles =
                     profiles.where((profile) => profile.isActive).toList();
-                final visibleProfiles = [
-                  StudentProfileModel.fromUser(user),
-                  ...activeProfiles
-                      .where((profile) => profile.relationship != 'self'),
-                ];
-                final activeProfile =
-                    StudentProfileModel.resolveActive(user, activeProfiles);
+                final isParent = normalizeRole(user.role) == roleParent;
+                final visibleProfiles = isParent
+                    ? activeProfiles
+                        .where((profile) => profile.relationship != 'self')
+                        .toList()
+                    : <StudentProfileModel>[StudentProfileModel.fromUser(user)];
+                final activeProfile = StudentProfileModel.resolveActiveOrNull(
+                  user,
+                  activeProfiles,
+                  allowSelfFallback: !isParent,
+                );
+                var selectedProfileId = activeProfile?.id;
 
-                return RefreshIndicator(
-                  onRefresh: () async {
-                    ref.invalidate(studentProfilesProvider(user.uid));
-                    await Future<void>.delayed(
-                      const Duration(milliseconds: 200),
+                return StatefulBuilder(
+                  builder: (context, setLocalState) {
+                    StudentProfileModel? selectedProfile;
+                    for (final profile in visibleProfiles) {
+                      if (profile.id == selectedProfileId) {
+                        selectedProfile = profile;
+                        break;
+                      }
+                    }
+                    final hasPendingChange = selectedProfile != null &&
+                        selectedProfile.id != activeProfile?.id;
+
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        ref.invalidate(studentProfilesProvider(user.uid));
+                        await Future<void>.delayed(
+                          const Duration(milliseconds: 200),
+                        );
+                      },
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+                        children: [
+                          _IntroCard(isParent: isParent),
+                          const SizedBox(height: 14),
+                          if (visibleProfiles.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 12),
+                              child: _EmptyChildrenCard(),
+                            ),
+                          ...visibleProfiles.map(
+                            (profile) {
+                              final isActive =
+                                  activeProfile?.id == profile.id ||
+                                      (activeProfile?.id == 'self' &&
+                                          profile.id == 'self');
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _ProfileCard(
+                                  profile: profile,
+                                  isActive: isActive,
+                                  isSelected: selectedProfileId == profile.id,
+                                  onSetActive: isParent
+                                      ? () {
+                                          HapticFeedback.selectionClick();
+                                          setLocalState(() {
+                                            selectedProfileId = profile.id;
+                                          });
+                                        }
+                                      : null,
+                                  onEdit: profile.id == 'self'
+                                      ? null
+                                      : () => _showProfileDialog(
+                                            context,
+                                            ref,
+                                            owner: user,
+                                            profile: profile,
+                                          ),
+                                  onDelete: profile.id == 'self'
+                                      ? null
+                                      : () =>
+                                          _confirmDelete(context, ref, profile),
+                                ),
+                              );
+                            },
+                          ),
+                          if (isParent) ...[
+                            const SizedBox(height: 4),
+                            FilledButton.icon(
+                              onPressed: hasPendingChange
+                                  ? () => _setActive(
+                                        context,
+                                        ref,
+                                        selectedProfile!,
+                                      )
+                                  : null,
+                              icon: const Icon(Icons.check_circle_rounded),
+                              label: Text(
+                                selectedProfile == null
+                                    ? 'اختر ابنًا لتفعيله'
+                                    : hasPendingChange
+                                        ? 'تأكيد التبديل إلى ${selectedProfile.name}'
+                                        : '${selectedProfile.name} مفعل حاليًا',
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _teal,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: _border,
+                                disabledForegroundColor: _text3,
+                                minimumSize: const Size.fromHeight(52),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            FilledButton.icon(
+                              onPressed: () =>
+                                  _showProfileDialog(context, ref, owner: user),
+                              icon: const Icon(Icons.person_add_alt_1_rounded),
+                              label: const Text('إضافة ابن/طالب'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _teal,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size.fromHeight(52),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     );
                   },
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
-                    children: [
-                      const _IntroCard(),
-                      const SizedBox(height: 14),
-                      ...visibleProfiles.map(
-                        (profile) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _ProfileCard(
-                            profile: profile,
-                            isActive: activeProfile.id == profile.id ||
-                                (activeProfile.id == 'self' &&
-                                    profile.id == 'self'),
-                            onSetActive: () =>
-                                _setActive(context, ref, profile),
-                            onEdit: profile.id == 'self'
-                                ? null
-                                : () => _showProfileDialog(
-                                      context,
-                                      ref,
-                                      owner: user,
-                                      profile: profile,
-                                    ),
-                            onDelete: profile.id == 'self'
-                                ? null
-                                : () => _confirmDelete(context, ref, profile),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      FilledButton.icon(
-                        onPressed: () =>
-                            _showProfileDialog(context, ref, owner: user),
-                        icon: const Icon(Icons.person_add_alt_1_rounded),
-                        label: const Text('إضافة طالب'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _teal,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 );
               },
             );
@@ -217,6 +289,9 @@ class StudentProfilesScreen extends ConsumerWidget {
     final nameController = TextEditingController(text: profile?.name ?? '');
     String? gender = profile?.gender;
     DateTime? birthDate = profile?.dateOfBirth;
+    XFile? selectedImage;
+    Uint8List? selectedImageBytes;
+    bool isSaving = false;
 
     await showDialog<void>(
       context: context,
@@ -231,6 +306,52 @@ class StudentProfilesScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _ChildPhotoPicker(
+                      name: nameController.text.trim(),
+                      photoUrl: profile?.photoUrl,
+                      selectedBytes: selectedImageBytes,
+                      onPick: () async {
+                        try {
+                          final image = await ImagePicker().pickImage(
+                            source: ImageSource.gallery,
+                            maxWidth: 1200,
+                            maxHeight: 1200,
+                            imageQuality: 85,
+                          );
+                          if (image == null) return;
+                          final bytes = await image.readAsBytes();
+                          if (bytes.length > _maxChildPhotoBytes) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'حجم الصورة كبير. اختر صورة أقل من 3 ميجابايت.',
+                                  ),
+                                  backgroundColor: AppThemeConstants.error,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          setState(() {
+                            selectedImage = image;
+                            selectedImageBytes = bytes;
+                          });
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'تعذر اختيار الصورة. يرجى المحاولة مرة أخرى',
+                                ),
+                                backgroundColor: AppThemeConstants.error,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
                     TextField(
                       controller: nameController,
                       decoration: const InputDecoration(
@@ -292,48 +413,76 @@ class StudentProfilesScreen extends ConsumerWidget {
                   child: const Text('إلغاء'),
                 ),
                 FilledButton(
-                  onPressed: () async {
-                    final name = nameController.text.trim();
-                    if (name.isEmpty) return;
-                    final repository =
-                        ref.read(studentProfileRepositoryProvider);
-                    final updated = (profile ??
-                            StudentProfileModel(
-                              id: '',
-                              ownerId: owner.uid,
-                              name: name,
-                              relationship: 'child',
-                            ))
-                        .copyWith(
-                      name: name,
-                      gender: gender,
-                      dateOfBirth: birthDate,
-                    );
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+                          final repository =
+                              ref.read(studentProfileRepositoryProvider);
+                          final updated = (profile ??
+                                  StudentProfileModel(
+                                    id: '',
+                                    ownerId: owner.uid,
+                                    name: name,
+                                    relationship: 'child',
+                                  ))
+                              .copyWith(
+                            name: name,
+                            gender: gender,
+                            dateOfBirth: birthDate,
+                          );
 
-                    try {
-                      if (profile == null) {
-                        await repository.createProfile(updated);
-                      } else {
-                        await repository.updateProfile(updated);
-                      }
-                      ref.invalidate(currentUserProvider);
-                      ref.invalidate(studentProfilesProvider(owner.uid));
-                      if (dialogContext.mounted) {
-                        Navigator.pop(dialogContext);
-                      }
-                    } catch (_) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('تعذر حفظ البيانات'),
-                            backgroundColor: AppThemeConstants.error,
-                          ),
-                        );
-                      }
-                    }
-                  },
+                          try {
+                            setState(() => isSaving = true);
+                            var savedProfile = updated;
+                            if (profile == null) {
+                              final createdId =
+                                  await repository.createProfile(updated);
+                              savedProfile = updated.copyWith(id: createdId);
+                            } else {
+                              await repository.updateProfile(updated);
+                            }
+                            if (selectedImage != null) {
+                              final photoUrl = await _uploadStudentProfilePhoto(
+                                ownerId: owner.uid,
+                                profileId: savedProfile.id,
+                                image: selectedImage!,
+                              );
+                              await repository.updateProfile(
+                                savedProfile.copyWith(photoUrl: photoUrl),
+                              );
+                            }
+                            ref.invalidate(currentUserProvider);
+                            ref.invalidate(studentProfilesProvider(owner.uid));
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          } catch (_) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('تعذر حفظ البيانات'),
+                                  backgroundColor: AppThemeConstants.error,
+                                ),
+                              );
+                            }
+                            if (dialogContext.mounted) {
+                              setState(() => isSaving = false);
+                            }
+                          }
+                        },
                   style: FilledButton.styleFrom(backgroundColor: _teal),
-                  child: const Text('حفظ'),
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('حفظ'),
                 ),
               ],
             ),
@@ -344,10 +493,130 @@ class StudentProfilesScreen extends ConsumerWidget {
 
     nameController.dispose();
   }
+
+  static Future<String> _uploadStudentProfilePhoto({
+    required String ownerId,
+    required String profileId,
+    required XFile image,
+  }) async {
+    final bytes = await image.readAsBytes();
+    if (bytes.length > _maxChildPhotoBytes) {
+      throw Exception('child profile photo too large');
+    }
+
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('student_profile_photos')
+        .child(ownerId)
+        .child(profileId);
+
+    await storageRef.putData(
+      bytes,
+      SettableMetadata(contentType: _imageContentTypeFor(image)),
+    );
+    return storageRef.getDownloadURL();
+  }
+
+  static String _imageContentTypeFor(XFile image) {
+    final mimeType = image.mimeType;
+    if (mimeType == 'image/png' ||
+        mimeType == 'image/jpeg' ||
+        mimeType == 'image/webp') {
+      return mimeType!;
+    }
+
+    final name = image.name.toLowerCase();
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+}
+
+class _ChildPhotoPicker extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+  final Uint8List? selectedBytes;
+  final VoidCallback onPick;
+
+  const _ChildPhotoPicker({
+    required this.name,
+    required this.photoUrl,
+    required this.selectedBytes,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedName = name.trim();
+    final initial = trimmedName.isNotEmpty ? trimmedName[0] : 'ط';
+    final trimmedPhotoUrl = photoUrl?.trim();
+    final hasPhoto = selectedBytes != null ||
+        (trimmedPhotoUrl != null && trimmedPhotoUrl.isNotEmpty);
+    ImageProvider? imageProvider;
+    if (selectedBytes != null) {
+      imageProvider = MemoryImage(selectedBytes!);
+    } else if (hasPhoto) {
+      imageProvider = NetworkImage(trimmedPhotoUrl!);
+    }
+
+    return Column(
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CircleAvatar(
+              radius: 42,
+              backgroundColor:
+                  StudentProfilesScreen._teal.withValues(alpha: 0.12),
+              backgroundImage: imageProvider,
+              child: hasPhoto
+                  ? null
+                  : Text(
+                      initial,
+                      style: const TextStyle(
+                        color: StudentProfilesScreen._teal,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+            ),
+            Positioned(
+              bottom: -2,
+              left: -2,
+              child: Material(
+                color: StudentProfilesScreen._teal,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onPick,
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: onPick,
+          icon: const Icon(Icons.photo_library_rounded, size: 18),
+          label: const Text('اختيار صورة الابن'),
+        ),
+      ],
+    );
+  }
 }
 
 class _IntroCard extends StatelessWidget {
-  const _IntroCard();
+  final bool isParent;
+
+  const _IntroCard({required this.isParent});
 
   @override
   Widget build(BuildContext context) {
@@ -358,15 +627,17 @@ class _IntroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFB9E2DA)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.family_restroom_rounded,
+          Icon(isParent ? Icons.family_restroom_rounded : Icons.person_rounded,
               color: StudentProfilesScreen._teal),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'اختر الطالب النشط قبل الحجز. سيظهر اسمه للمعلم في الطلب والجلسة، مع بقاء الحساب والدفع تحت حسابك الحالي.',
-              style: TextStyle(
+              isParent
+                  ? 'اختر الطالب النشط قبل الحجز. سيظهر اسمه للمعلم في الطلب والجلسة، مع بقاء الحساب والدفع تحت حسابك الحالي.'
+                  : 'هذا هو ملفك كطالب. حساب الطالب مخصص لطالب واحد فقط، ولإدارة أكثر من طالب يرجى استخدام حساب ولي أمر.',
+              style: const TextStyle(
                 color: StudentProfilesScreen._text2,
                 height: 1.45,
               ),
@@ -381,14 +652,16 @@ class _IntroCard extends StatelessWidget {
 class _ProfileCard extends StatelessWidget {
   final StudentProfileModel profile;
   final bool isActive;
-  final VoidCallback onSetActive;
+  final bool isSelected;
+  final VoidCallback? onSetActive;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const _ProfileCard({
     required this.profile,
     required this.isActive,
-    required this.onSetActive,
+    required this.isSelected,
+    this.onSetActive,
     this.onEdit,
     this.onDelete,
   });
@@ -397,6 +670,8 @@ class _ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final genderIcon =
         profile.gender == 'female' ? Icons.female_rounded : Icons.male_rounded;
+    final photoUrl = profile.photoUrl?.trim();
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
     final relationship =
         profile.relationship == 'self' ? 'الحساب الحالي' : 'طالب مُدار';
     final details = [
@@ -417,10 +692,10 @@ class _ProfileCard extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isActive
+              color: isSelected
                   ? StudentProfilesScreen._teal
                   : StudentProfilesScreen._border,
-              width: isActive ? 1.5 : 1,
+              width: isSelected ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
@@ -441,12 +716,24 @@ class _ProfileCard extends StatelessWidget {
                       : const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  genderIcon,
-                  color: isActive
-                      ? StudentProfilesScreen._teal
-                      : StudentProfilesScreen._text3,
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: hasPhoto
+                    ? Image.network(
+                        photoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          genderIcon,
+                          color: isActive
+                              ? StudentProfilesScreen._teal
+                              : StudentProfilesScreen._text3,
+                        ),
+                      )
+                    : Icon(
+                        genderIcon,
+                        color: isActive
+                            ? StudentProfilesScreen._teal
+                            : StudentProfilesScreen._text3,
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -467,6 +754,26 @@ class _ProfileCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (onSetActive != null && isSelected && !isActive)
+                          Container(
+                            margin: const EdgeInsetsDirectional.only(end: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0F2F1),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: const Text(
+                              'مختار',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: StudentProfilesScreen._teal,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
                         if (isActive)
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -516,6 +823,49 @@ class _ProfileCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyChildrenCard extends StatelessWidget {
+  const _EmptyChildrenCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: StudentProfilesScreen._border),
+      ),
+      child: const Column(
+        children: [
+          Icon(
+            Icons.family_restroom_rounded,
+            size: 42,
+            color: StudentProfilesScreen._teal,
+          ),
+          SizedBox(height: 10),
+          Text(
+            'أضف بيانات ابنك الأول',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: StudentProfilesScreen._text2,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'سيتم استخدام الطفل النشط في البحث والحجز والدفع والمتابعة.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: StudentProfilesScreen._text3,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }

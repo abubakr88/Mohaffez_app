@@ -1019,15 +1019,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     AsyncValue<List<PricingPlanModel>> plansAsync,
   ) {
     final student = ref.watch(currentUserProvider).valueOrNull;
-    if (student == null || student.role != 'student') {
+    if (student == null || !isLearnerAccountRole(student.role)) {
       return const SizedBox.shrink();
     }
+    final activeProfile = ref.watch(activeStudentProfileProvider).valueOrNull;
 
     final duration =
         (profile['trialSessionDurationMinutes'] as num?)?.toInt() ?? 30;
     final pair = TrialSessionPair(
       mohaffezId: widget.mohaffezId,
       studentId: student.uid,
+      studentProfileId: activeProfile?.id,
     );
     final existingRequest = ref.watch(trialRequestForPairProvider(pair));
 
@@ -1130,11 +1132,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     if (sent == true && mounted) {
       final studentId = ref.read(currentUserProvider).valueOrNull?.uid;
       if (studentId != null) {
+        final activeProfile =
+            ref.read(activeStudentProfileProvider).valueOrNull;
         ref.invalidate(
           trialRequestForPairProvider(
             TrialSessionPair(
               mohaffezId: widget.mohaffezId,
               studentId: studentId,
+              studentProfileId: activeProfile?.id,
             ),
           ),
         );
@@ -1575,11 +1580,6 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       pinned: true,
       automaticallyImplyLeading: false,
       backgroundColor: AppThemeConstants.deepTeal,
-      title: Text(
-        name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -1672,10 +1672,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           Text(
                             name,
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: AppThemeConstants.white,
-                              height: 1.15,
+                              height: 1.2,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,

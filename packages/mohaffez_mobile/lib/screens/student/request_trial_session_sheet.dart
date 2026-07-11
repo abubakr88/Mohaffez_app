@@ -7,6 +7,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../../providers/trial_session_provider.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 
 class RequestTrialSessionSheet extends ConsumerStatefulWidget {
   const RequestTrialSessionSheet({
@@ -143,11 +144,22 @@ class _RequestTrialSessionSheetState
     }
 
     try {
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user == null) {
+        _showMessage('يرجى تسجيل الدخول أولاً.');
+        return;
+      }
+      final activeProfile = resolveBookingLearner(context, ref, user);
+      if (activeProfile == null) return;
       await ref.read(trialSessionActionsProvider.notifier).createRequest(
-            mohaffezId: widget.mohaffezId,
-            sessionType: _sessionType,
-            availabilityWindows: windows,
-          );
+        mohaffezId: widget.mohaffezId,
+        sessionType: _sessionType,
+        availabilityWindows: windows,
+        learnerSnapshot: {
+          'studentName': activeProfile.name,
+          ...activeProfile.toCallableBookingSnapshot(user),
+        },
+      );
       if (mounted) Navigator.pop(context, true);
     } on FirebaseFunctionsException catch (error) {
       _showMessage(_friendlyError(error));

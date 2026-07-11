@@ -155,17 +155,42 @@ class SessionRequestModel {
       return null;
     }
 
+    Timestamp? toTimestamp(dynamic v) {
+      if (v is Timestamp) return v;
+      if (v is DateTime) return Timestamp.fromDate(v);
+      if (v is String) {
+        final parsed = DateTime.tryParse(v);
+        if (parsed != null) return Timestamp.fromDate(parsed);
+      }
+      return null;
+    }
+
+    int? calculateAge(Timestamp? birthDate) {
+      if (birthDate == null) return null;
+      final dob = birthDate.toDate();
+      final today = DateTime.now();
+      var age = today.year - dob.year;
+      if (today.month < dob.month ||
+          (today.month == dob.month && today.day < dob.day)) {
+        age--;
+      }
+      return age >= 0 && age <= 120 ? age : null;
+    }
+
+    final profileBirthDate = toTimestamp(map['studentProfileBirthDate']);
+    final storedAge = (map['studentAge'] as num?)?.toInt();
+
     return SessionRequestModel(
       id: id,
       studentId: map['studentId'] as String? ?? '',
       studentName: map['studentName'] as String? ?? '',
-      studentAge: (map['studentAge'] as num?)?.toInt(),
+      studentAge: calculateAge(profileBirthDate) ?? storedAge,
       guardianId: map['guardianId'] as String?,
       guardianName: map['guardianName'] as String?,
       studentProfileId: map['studentProfileId'] as String?,
       studentProfileName: map['studentProfileName'] as String?,
       studentProfileGender: map['studentProfileGender'] as String?,
-      studentProfileBirthDate: map['studentProfileBirthDate'] as Timestamp?,
+      studentProfileBirthDate: profileBirthDate,
       mohaffezId: map['mohaffezId'] as String? ?? '',
       mohaffezName: map['mohaffezName'] as String? ?? '',
       sessionType: map['sessionType'] as String? ?? 'online',

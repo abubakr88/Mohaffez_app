@@ -12,6 +12,13 @@ class ProfileAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final normalizedRole = normalizeRole(user.role);
+    final roleLabel = normalizedRole == roleParent
+        ? 'ولي أمر'
+        : normalizedRole == roleMohaffez
+            ? 'محفّظ'
+            : 'طالب';
+
     return SliverAppBar(
       expandedHeight: 200,
       pinned: true,
@@ -66,7 +73,7 @@ class ProfileAppBar extends StatelessWidget {
                   ],
                   // Role
                   Text(
-                    user.role == 'mohaffez' ? 'محفّظ' : 'طالب',
+                    roleLabel,
                     style: TextStyle(
                       fontSize: 14,
                       color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),
