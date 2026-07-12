@@ -56,7 +56,15 @@ const sessionFallbackFields = [
   'imamAddressLat',
   'imamAddressLng',
   'mohaffezPhone',
+  'studentPhone',
   'preferredProvider',
+  'guardianId',
+  'guardianName',
+  'studentProfileId',
+  'studentProfileName',
+  'studentProfileGender',
+  'studentProfileBirthDate',
+  'studentAge',
 ];
 
 function parseTimeRange(timeSlot: unknown):
@@ -447,6 +455,22 @@ export async function createSubscriptionFromPayment(
   const sessionsCount = parseNumber(metadata['sessionsCount'], 1);
   const validityDays  = typeof metadata['validityDays'] === 'number' ? metadata['validityDays'] : undefined;
   const sessionType   = parseString(metadata['sessionType'],   '');
+  const pricingSnapshot = {
+    studentCountryCode: parseString(metadata['studentCountryCode'], ''),
+    studentCountryName: parseString(metadata['studentCountryName'], ''),
+    displayCurrencyCode: parseString(metadata['displayCurrencyCode'], ''),
+    displayCurrencyLabel: parseString(metadata['displayCurrencyLabel'], ''),
+    displayAmount:
+      typeof metadata['displayAmount'] === 'number' ? metadata['displayAmount'] : null,
+    fxRateToEGP:
+      typeof metadata['fxRateToEGP'] === 'number' ? metadata['fxRateToEGP'] : null,
+    chargedAmountEGP:
+      typeof metadata['chargedAmountEGP'] === 'number' ? metadata['chargedAmountEGP'] : null,
+    sessionDurationMinutes:
+      typeof metadata['sessionDurationMinutes'] === 'number'
+        ? metadata['sessionDurationMinutes']
+        : null,
+  };
 
   return db.runTransaction(async (transaction) => {
     const PER_SESSION_TYPE_LIMIT = 1; // hard limit: one active bundle per studentId+mohaffezId+sessionType
@@ -485,6 +509,7 @@ export async function createSubscriptionFromPayment(
       mohaffezName:        payment.mohaffezName,
       planId:              parseString(metadata['planId'], ''),
       planTitle, planType,
+      ...pricingSnapshot,
       totalSessions:       sessionsCount,
       remainingSessions:   sessionsCount,
       totalPaid:           payment.amount,

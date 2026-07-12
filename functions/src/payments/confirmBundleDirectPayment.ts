@@ -105,6 +105,26 @@ export const confirmBundleDirectPayment = functions.https.onCall(
     const sessionsCount = dp.sessionsCount as number;
     const validityDays: number | null =
       typeof dp.validityDays === 'number' ? (dp.validityDays as number) : null;
+    const pricingSnapshot = {
+      studentCountryCode:
+        typeof dp.studentCountryCode === 'string' ? dp.studentCountryCode : null,
+      studentCountryName:
+        typeof dp.studentCountryName === 'string' ? dp.studentCountryName : null,
+      displayCurrencyCode:
+        typeof dp.displayCurrencyCode === 'string' ? dp.displayCurrencyCode : null,
+      displayCurrencyLabel:
+        typeof dp.displayCurrencyLabel === 'string' ? dp.displayCurrencyLabel : null,
+      displayAmount:
+        typeof dp.displayAmount === 'number' ? dp.displayAmount : null,
+      fxRateToEGP:
+        typeof dp.fxRateToEGP === 'number' ? dp.fxRateToEGP : null,
+      chargedAmountEGP:
+        typeof dp.chargedAmountEGP === 'number' ? dp.chargedAmountEGP : null,
+      sessionDurationMinutes:
+        typeof dp.sessionDurationMinutes === 'number'
+          ? dp.sessionDurationMinutes
+          : null,
+    };
 
     // Slot fields — already stored as Timestamps by studentMarkedDirectPayment
     // WHY: no string-to-Date parsing needed; avoids timezone-shift bug
@@ -123,6 +143,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
     const preferredTimeSlot = dp.preferredTimeSlot as string | undefined;
     const slotSessionType = dp.sessionType as string | undefined;
     const mohaffezPhone = dp.mohaffezPhone as string | undefined;
+    const studentPhone = dp.studentPhone as string | undefined;
     const imamAddressText = dp.imamAddressText as string | undefined;
     const imamAddressLat = dp.imamAddressLat as number | undefined;
     const imamAddressLng = dp.imamAddressLng as number | undefined;
@@ -250,9 +271,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         if (debtPiastres > thresholdPiastres) {
           throw new functions.https.HttpsError(
             'failed-precondition',
-            `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
-              `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
-              `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+            'الدفع المباشر غير متاح لهذا المحفظ حاليًا. يرجى اختيار الدفع الإلكتروني أو المحاولة لاحقًا.',
           );
         }
 
@@ -392,6 +411,13 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         transaction.set(subscriptionRef, {
           studentId,
           studentName: dp.studentName,
+          guardianId: dp.guardianId ?? studentId,
+          guardianName: dp.guardianName ?? null,
+          studentProfileId: dp.studentProfileId ?? null,
+          studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+          studentProfileGender: dp.studentProfileGender ?? null,
+          studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+          studentAge: dp.studentAge ?? null,
           mohaffezId,
           mohaffezName: dp.mohaffezName,
           planId,
@@ -406,6 +432,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           expiryDate,
           status: initialStatus,
           directPaymentRequestId: paymentId,
+          ...pricingSnapshot,
           // WHY: preserves link back to the original bundle booking request
           sessionRequestId: dp.sessionRequestId ?? null,
           createdAt: FieldValue.serverTimestamp(),
@@ -429,6 +456,13 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           transaction.set(sessionRef, {
             studentId,
             studentName: dp.studentName,
+            guardianId: dp.guardianId ?? studentId,
+            guardianName: dp.guardianName ?? null,
+            studentProfileId: dp.studentProfileId ?? null,
+            studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+            studentProfileGender: dp.studentProfileGender ?? null,
+            studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+            studentAge: dp.studentAge ?? null,
             mohaffezId,
             mohaffezName: dp.mohaffezName,
             sessionType: resolvedSessionType,
@@ -446,7 +480,9 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             subscriptionId: subscriptionRef.id,
             paymentTransactionId: transactionTag,
             requestId: dpTx.sessionRequestId ?? newRequestRef?.id ?? null,
+            ...pricingSnapshot,
             mohaffezPhone: mohaffezPhone ?? null,
+            studentPhone: studentPhone ?? null,
             imamAddressText: imamAddressText ?? null,
             imamAddressLat: imamAddressLat ?? null,
             imamAddressLng: imamAddressLng ?? null,
@@ -474,6 +510,14 @@ export const confirmBundleDirectPayment = functions.https.onCall(
                 paidAt: FieldValue.serverTimestamp(),
                 subscriptionId: subscriptionRef.id,
                 sessionId: sessionRef.id,
+                guardianId: dp.guardianId ?? studentId,
+                guardianName: dp.guardianName ?? null,
+                studentProfileId: dp.studentProfileId ?? null,
+                studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+                studentProfileGender: dp.studentProfileGender ?? null,
+                studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+                studentAge: dp.studentAge ?? null,
+                ...pricingSnapshot,
                 paymentId,
                 directPaymentConfirmedAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
@@ -485,6 +529,13 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             transaction.set(newRequestRef, {
               studentId,
               studentName: dp.studentName,
+              guardianId: dp.guardianId ?? studentId,
+              guardianName: dp.guardianName ?? null,
+              studentProfileId: dp.studentProfileId ?? null,
+              studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+              studentProfileGender: dp.studentProfileGender ?? null,
+              studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+              studentAge: dp.studentAge ?? null,
               mohaffezId,
               mohaffezName: dp.mohaffezName,
               sessionType: resolvedSessionType,
@@ -496,6 +547,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
               paymentType: 'bundle',
               subscriptionId: subscriptionRef.id,
               sessionId: sessionRef.id,
+              ...pricingSnapshot,
               paymentId,
               createdAt: FieldValue.serverTimestamp(),
               updatedAt: FieldValue.serverTimestamp(),

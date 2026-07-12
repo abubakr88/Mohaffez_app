@@ -11,11 +11,17 @@ class SessionRequestModel {
   final String studentId;
   final String studentName;
   final int? studentAge;
+  final String? guardianId;
+  final String? guardianName;
+  final String? studentProfileId;
+  final String? studentProfileName;
+  final String? studentProfileGender;
+  final Timestamp? studentProfileBirthDate;
   final String mohaffezId;
   final String mohaffezName;
   final String sessionType;
   final String?
-      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' (online only)
+      preferredProvider; // 'zoom' | 'googleMeet' | 'teams' | 'phoneCall'
   final String preferredTimeSlot;
   final Timestamp? slotDate;
   final Timestamp? slotStart;
@@ -24,6 +30,7 @@ class SessionRequestModel {
   final double? imamAddressLat;
   final double? imamAddressLng;
   final String? mohaffezPhone;
+  final String? studentPhone;
   final String status;
   final String? selectedPaymentMethod;
   final String? subscriptionId;
@@ -61,6 +68,15 @@ class SessionRequestModel {
   /// null when the plan has no expiry (or for single sessions).
   final int? validityDays;
 
+  final String? studentCountryCode;
+  final String? studentCountryName;
+  final String? displayCurrencyCode;
+  final String? displayCurrencyLabel;
+  final double? displayAmount;
+  final double? fxRateToEGP;
+  final double? chargedAmountEGP;
+  final int? sessionDurationMinutes;
+
   /// Direct payment request ID for pending confirmations.
   final String? directPaymentRequestId;
   // ──────────────────────────────────────────────────────────────────────────
@@ -70,6 +86,12 @@ class SessionRequestModel {
     required this.studentId,
     required this.studentName,
     this.studentAge,
+    this.guardianId,
+    this.guardianName,
+    this.studentProfileId,
+    this.studentProfileName,
+    this.studentProfileGender,
+    this.studentProfileBirthDate,
     required this.mohaffezId,
     required this.mohaffezName,
     required this.sessionType,
@@ -82,6 +104,7 @@ class SessionRequestModel {
     this.imamAddressLat,
     this.imamAddressLng,
     this.mohaffezPhone,
+    this.studentPhone,
     required this.status,
     this.selectedPaymentMethod,
     this.subscriptionId,
@@ -103,6 +126,14 @@ class SessionRequestModel {
     this.planTitle = '',
     this.sessionsCount = 1,
     this.validityDays,
+    this.studentCountryCode,
+    this.studentCountryName,
+    this.displayCurrencyCode,
+    this.displayCurrencyLabel,
+    this.displayAmount,
+    this.fxRateToEGP,
+    this.chargedAmountEGP,
+    this.sessionDurationMinutes,
     this.directPaymentRequestId,
   });
 
@@ -124,11 +155,42 @@ class SessionRequestModel {
       return null;
     }
 
+    Timestamp? toTimestamp(dynamic v) {
+      if (v is Timestamp) return v;
+      if (v is DateTime) return Timestamp.fromDate(v);
+      if (v is String) {
+        final parsed = DateTime.tryParse(v);
+        if (parsed != null) return Timestamp.fromDate(parsed);
+      }
+      return null;
+    }
+
+    int? calculateAge(Timestamp? birthDate) {
+      if (birthDate == null) return null;
+      final dob = birthDate.toDate();
+      final today = DateTime.now();
+      var age = today.year - dob.year;
+      if (today.month < dob.month ||
+          (today.month == dob.month && today.day < dob.day)) {
+        age--;
+      }
+      return age >= 0 && age <= 120 ? age : null;
+    }
+
+    final profileBirthDate = toTimestamp(map['studentProfileBirthDate']);
+    final storedAge = (map['studentAge'] as num?)?.toInt();
+
     return SessionRequestModel(
       id: id,
       studentId: map['studentId'] as String? ?? '',
       studentName: map['studentName'] as String? ?? '',
-      studentAge: (map['studentAge'] as num?)?.toInt(),
+      studentAge: calculateAge(profileBirthDate) ?? storedAge,
+      guardianId: map['guardianId'] as String?,
+      guardianName: map['guardianName'] as String?,
+      studentProfileId: map['studentProfileId'] as String?,
+      studentProfileName: map['studentProfileName'] as String?,
+      studentProfileGender: map['studentProfileGender'] as String?,
+      studentProfileBirthDate: profileBirthDate,
       mohaffezId: map['mohaffezId'] as String? ?? '',
       mohaffezName: map['mohaffezName'] as String? ?? '',
       sessionType: map['sessionType'] as String? ?? 'online',
@@ -141,6 +203,7 @@ class SessionRequestModel {
       imamAddressLat: toDouble(map['imamAddressLat']),
       imamAddressLng: toDouble(map['imamAddressLng']),
       mohaffezPhone: map['mohaffezPhone'] as String?,
+      studentPhone: map['studentPhone'] as String?,
       status: map['status'] as String? ?? 'pending',
       selectedPaymentMethod: map['selectedPaymentMethod'] as String?,
       subscriptionId: map['subscriptionId'] as String?,
@@ -163,6 +226,14 @@ class SessionRequestModel {
       planTitle: map['planTitle'] as String? ?? '',
       sessionsCount: (map['sessionsCount'] as num?)?.toInt() ?? 1,
       validityDays: (map['validityDays'] as num?)?.toInt(),
+      studentCountryCode: map['studentCountryCode'] as String?,
+      studentCountryName: map['studentCountryName'] as String?,
+      displayCurrencyCode: map['displayCurrencyCode'] as String?,
+      displayCurrencyLabel: map['displayCurrencyLabel'] as String?,
+      displayAmount: toDouble(map['displayAmount']),
+      fxRateToEGP: toDouble(map['fxRateToEGP']),
+      chargedAmountEGP: toDouble(map['chargedAmountEGP']),
+      sessionDurationMinutes: (map['sessionDurationMinutes'] as num?)?.toInt(),
       directPaymentRequestId: map['directPaymentRequestId'] as String?,
     );
   }
@@ -171,6 +242,15 @@ class SessionRequestModel {
         'studentId': studentId,
         'studentName': studentName,
         if (studentAge != null) 'studentAge': studentAge,
+        if (guardianId != null) 'guardianId': guardianId,
+        if (guardianName != null) 'guardianName': guardianName,
+        if (studentProfileId != null) 'studentProfileId': studentProfileId,
+        if (studentProfileName != null)
+          'studentProfileName': studentProfileName,
+        if (studentProfileGender != null)
+          'studentProfileGender': studentProfileGender,
+        if (studentProfileBirthDate != null)
+          'studentProfileBirthDate': studentProfileBirthDate,
         'mohaffezId': mohaffezId,
         'mohaffezName': mohaffezName,
         'sessionType': sessionType,
@@ -183,6 +263,7 @@ class SessionRequestModel {
         if (imamAddressLat != null) 'imamAddressLat': imamAddressLat,
         if (imamAddressLng != null) 'imamAddressLng': imamAddressLng,
         if (mohaffezPhone != null) 'mohaffezPhone': mohaffezPhone,
+        if (studentPhone != null) 'studentPhone': studentPhone,
         'status': status,
         if (selectedPaymentMethod != null)
           'selectedPaymentMethod': selectedPaymentMethod,
@@ -206,6 +287,19 @@ class SessionRequestModel {
         'planTitle': planTitle,
         'sessionsCount': sessionsCount,
         'validityDays': validityDays,
+        if (studentCountryCode != null)
+          'studentCountryCode': studentCountryCode,
+        if (studentCountryName != null)
+          'studentCountryName': studentCountryName,
+        if (displayCurrencyCode != null)
+          'displayCurrencyCode': displayCurrencyCode,
+        if (displayCurrencyLabel != null)
+          'displayCurrencyLabel': displayCurrencyLabel,
+        if (displayAmount != null) 'displayAmount': displayAmount,
+        if (fxRateToEGP != null) 'fxRateToEGP': fxRateToEGP,
+        if (chargedAmountEGP != null) 'chargedAmountEGP': chargedAmountEGP,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
         if (directPaymentRequestId != null)
           'directPaymentRequestId': directPaymentRequestId,
       };
@@ -227,6 +321,12 @@ class SessionRequestModel {
         studentId: studentId,
         studentName: studentName,
         studentAge: studentAge,
+        guardianId: guardianId,
+        guardianName: guardianName,
+        studentProfileId: studentProfileId,
+        studentProfileName: studentProfileName,
+        studentProfileGender: studentProfileGender,
+        studentProfileBirthDate: studentProfileBirthDate,
         mohaffezId: mohaffezId,
         mohaffezName: mohaffezName,
         sessionType: sessionType,
@@ -239,6 +339,7 @@ class SessionRequestModel {
         imamAddressLat: imamAddressLat,
         imamAddressLng: imamAddressLng,
         mohaffezPhone: mohaffezPhone,
+        studentPhone: studentPhone,
         status: status ?? this.status,
         selectedPaymentMethod:
             selectedPaymentMethod ?? this.selectedPaymentMethod,
@@ -260,6 +361,14 @@ class SessionRequestModel {
         planTitle: planTitle,
         sessionsCount: sessionsCount,
         validityDays: validityDays,
+        studentCountryCode: studentCountryCode,
+        studentCountryName: studentCountryName,
+        displayCurrencyCode: displayCurrencyCode,
+        displayCurrencyLabel: displayCurrencyLabel,
+        displayAmount: displayAmount,
+        fxRateToEGP: fxRateToEGP,
+        chargedAmountEGP: chargedAmountEGP,
+        sessionDurationMinutes: sessionDurationMinutes,
         directPaymentRequestId: directPaymentRequestId,
       );
 }

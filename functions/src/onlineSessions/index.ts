@@ -62,6 +62,49 @@ export const onSessionAcceptedCreateMeeting = functions.firestore
 
     const preferredProvider = asString(after.preferredProvider);
 
+    if (preferredProvider === 'phoneCall') {
+      try {
+        await change.after.ref.update({
+          meeting: {
+            provider: 'phoneCall',
+            roomId: 'phoneCall',
+            url: '',
+            createdAt: FieldValue.serverTimestamp(),
+            startedAt: null,
+            endedAt: null,
+            participants: {
+              studentJoinedAt: null,
+              teacherJoinedAt: null,
+            },
+            joinWindowOpensAt,
+            joinWindowClosesAt,
+          },
+          meetingReminderSent: false,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+
+        if (studentId) {
+          await createAndSendNotification({
+            userId: studentId,
+            senderId: mohaffezId,
+            title: 'تم تأكيد جلستك أونلاين ✅',
+            body: `${mohaffezName} قبل جلستك. ستكون الجلسة عبر مكالمة هاتفية في موعدها.`,
+            type: 'online_session_accepted',
+            isRead: false,
+            highPriority: true,
+            data: {
+              type: 'online_session_accepted',
+              sessionId,
+              provider: 'phoneCall',
+            },
+          });
+        }
+      } catch (error) {
+        functions.logger.error('Failed to create phone-call meeting', { sessionId, error });
+      }
+      return;
+    }
+
     let teacherLink = '';
     let resolvedProvider = '';
     if (mohaffezId) {

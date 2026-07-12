@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -14,6 +15,18 @@ import 'app.dart';
 import 'services/notification_service.dart';
 import 'services/sound_service.dart';
 import 'shared/widgets/dev_mode_overlay.dart';
+
+Future<void> _runStartupStep(
+  String name,
+  Future<void> Function() action,
+) async {
+  try {
+    await action();
+  } catch (e, stackTrace) {
+    debugPrint('Startup step "$name" skipped: $e');
+    if (kDebugMode) debugPrint('$stackTrace');
+  }
+}
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -24,6 +37,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    usePathUrlStrategy();
+  }
 
   try {
     if (Firebase.apps.isEmpty) {
@@ -31,7 +47,22 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
       debugPrint('✅ Firebase initialized');
     }
 
-    if (!kIsWeb) {
+    if (kIsWeb) {
+      const recaptchaKey = String.fromEnvironment(
+        'APP_CHECK_RECAPTCHA_KEY',
+        defaultValue: '',
+      );
+      if (recaptchaKey.isNotEmpty) {
+        await FirebaseAppCheck.instance.activate(
+          webProvider: ReCaptchaV3Provider(recaptchaKey),
+        );
+        debugPrint('✅ Firebase App Check activated for web');
+      } else {
+        debugPrint(
+          'ℹ️ Firebase App Check skipped for web: APP_CHECK_RECAPTCHA_KEY is empty',
+        );
+      }
+    } else {
       if (kReleaseMode) {
         await FirebaseAppCheck.instance.activate(
           androidProvider: AndroidProvider.playIntegrity,
@@ -53,8 +84,6 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
               'App Check token: ${hasToken ? 'valid' : 'null_or_empty'}');
         });
       }
-    } else {
-      debugPrint('ℹ️ Firebase App Check skipped for web');
     }
 
     try {
@@ -75,19 +104,23 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
       });
     }
 
-    await initializeDateFormatting('ar', null);
-    await initializeDateFormatting('ar_SA', null);
-    await initializeDateFormatting('ar_EG', null);
+    await _runStartupStep('date-formatting', () async {
+      await initializeDateFormatting('ar', null);
+      await initializeDateFormatting('ar_SA', null);
+      await initializeDateFormatting('ar_EG', null);
+    });
 
-    await CacheService.initialize();
-    await SoundService.initialize();
+    await _runStartupStep('cache-service', CacheService.initialize);
+    await _runStartupStep('sound-service', SoundService.initialize);
 
-    final hasStaleData = CacheService.getUserId() != null &&
-        FirebaseAuth.instance.currentUser == null;
-    if (hasStaleData) {
-      debugPrint('⚠️ Stale cache detected — clearing...');
-      await CacheService.clearAll();
-    }
+    await _runStartupStep('stale-cache-cleanup', () async {
+      final hasStaleData = CacheService.getUserId() != null &&
+          FirebaseAuth.instance.currentUser == null;
+      if (hasStaleData) {
+        debugPrint('⚠️ Stale cache detected — clearing...');
+        await CacheService.clearAll();
+      }
+    });
 
     if (!kIsWeb) {
       SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(

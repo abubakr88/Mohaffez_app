@@ -45,13 +45,23 @@ class BookingFlowState {
   }) {
     return BookingFlowState(
       slotContext: clearSlotContext ? null : (slotContext ?? this.slotContext),
-      selectedPlanId: clearSelectedPlan ? null : (selectedPlanId ?? this.selectedPlanId),
-      selectedPlanTitle: clearSelectedPlan ? null : (selectedPlanTitle ?? this.selectedPlanTitle),
-      selectedPlanPrice: clearSelectedPlan ? null : (selectedPlanPrice ?? this.selectedPlanPrice),
-      selectedPlanSessions: clearSelectedPlan ? null : (selectedPlanSessions ?? this.selectedPlanSessions),
-      selectedPlanValidityDays: clearSelectedPlan ? null : (selectedPlanValidityDays ?? this.selectedPlanValidityDays),
+      selectedPlanId:
+          clearSelectedPlan ? null : (selectedPlanId ?? this.selectedPlanId),
+      selectedPlanTitle: clearSelectedPlan
+          ? null
+          : (selectedPlanTitle ?? this.selectedPlanTitle),
+      selectedPlanPrice: clearSelectedPlan
+          ? null
+          : (selectedPlanPrice ?? this.selectedPlanPrice),
+      selectedPlanSessions: clearSelectedPlan
+          ? null
+          : (selectedPlanSessions ?? this.selectedPlanSessions),
+      selectedPlanValidityDays: clearSelectedPlan
+          ? null
+          : (selectedPlanValidityDays ?? this.selectedPlanValidityDays),
       bookingPath: clearBookingPath ? null : (bookingPath ?? this.bookingPath),
-      directPaymentRequestId: directPaymentRequestId ?? this.directPaymentRequestId,
+      directPaymentRequestId:
+          directPaymentRequestId ?? this.directPaymentRequestId,
     );
   }
 }
@@ -81,6 +91,10 @@ class BookingFlowNotifier extends StateNotifier<BookingFlowState> {
       selectedPlanSessions: sessions,
       selectedPlanValidityDays: validityDays,
     );
+  }
+
+  void clearSelectedPlan() {
+    state = state.copyWith(clearSelectedPlan: true);
   }
 
   void reset() {

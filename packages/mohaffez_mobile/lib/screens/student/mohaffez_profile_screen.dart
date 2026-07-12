@@ -1,13 +1,17 @@
 // lib/screens/mohaffez_profile_screen.dart
 
-import 'package:flutter/material.dart';
-import 'package:mohaffez_core/mohaffez_core.dart';
 import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../shared/utils/exported_profile_image_share.dart';
 import '../../shared/widgets/skeleton_card.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../providers/mohaffez_profile_providers.dart';
@@ -15,11 +19,21 @@ import '../../providers/trial_session_provider.dart';
 import 'request_trial_session_sheet.dart';
 import '../../tour/tour_guard_helper.dart';
 
+String _teacherNameFromProfile(
+  Map<String, dynamic> profile, {
+  String fallback = 'المحفظ',
+}) {
+  final name = (profile['name'] as String?)?.trim() ?? '';
+  if (name.isEmpty) return fallback;
+  return composeTeacherDisplayName(name, profile['honorific'] as String?);
+}
+
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
   final double? userLat;
   final double? userLng;
   final bool previewMode;
+  final bool publicMode;
 
   const MohaffezProfileScreen({
     super.key,
@@ -27,6 +41,7 @@ class MohaffezProfileScreen extends ConsumerStatefulWidget {
     this.userLat,
     this.userLng,
     this.previewMode = false,
+    this.publicMode = false,
   });
 
   @override
@@ -39,24 +54,43 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // Hardcoding any value (e.g. 'home') let students complete a booking with
   // an unsupported session type when the teacher had no plan for that type.
   String selectedSessionType = '';
+  PricingPlanModel? selectedPricingPlan;
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
   int? selectedDayOfWeek;
+  final GlobalKey _profileExportKey = GlobalKey();
+  final GlobalKey _pricingStepKey = GlobalKey();
+  final GlobalKey _scheduleStepKey = GlobalKey();
+  bool _isExportingProfile = false;
+
+  bool get _isPublicView => widget.publicMode;
+
+  void _revealStep(GlobalKey key) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = key.currentContext;
+      if (!mounted || targetContext == null) return;
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.08,
+      );
+    });
+  }
 
   /// Helper to filter pricing plans by selected session type
   List<PricingPlanModel> _relevantPlans(List<PricingPlanModel> plans) {
-    return plans.where((plan) {
-      if (selectedSessionType == 'home') {
-        return plan.mode == SessionMode.home;
-      }
-      if (selectedSessionType == 'mosque') {
-        return plan.mode == SessionMode.mosque;
-      }
-      if (selectedSessionType == 'online') {
-        return plan.mode == SessionMode.online;
-      }
-      return false;
-    }).toList();
+    final modePlans = plans
+        .where((plan) =>
+            selectedSessionType.isNotEmpty &&
+            PricingCountryUtils.matchesMode(plan, selectedSessionType))
+        .toList();
+    final studentCountry = PricingCountryUtils.inferUserCountry(
+        ref.read(currentUserProvider).valueOrNull);
+    return PricingCountryUtils.preferCountryPlans(
+      modePlans,
+      studentCountry.code,
+    );
   }
 
   String? _teacherVideoUrl(Map<String, dynamic> profile) {
@@ -145,7 +179,83 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   // ─── Navigation helper ────────────────────────────────────────────────────
 
+  void _openTeacherPhotoPreview(String imageUrl, String teacherName) {
+    final trimmedUrl = imageUrl.trim();
+    if (trimmedUrl.isEmpty) return;
+
+    showDialog<void>(
+      context: context,
+      barrierColor: AppThemeConstants.black.withValues(alpha: 0.86),
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: Dialog.fullscreen(
+            backgroundColor: AppThemeConstants.black,
+            child: SafeArea(
+              child: Stack(
+                children: [
+                  Center(
+                    child: InteractiveViewer(
+                      minScale: 0.8,
+                      maxScale: 4,
+                      child: CachedNetworkImage(
+                        imageUrl: trimmedUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: CircularProgressIndicator(
+                            color: AppThemeConstants.secondary,
+                            strokeWidth: 3,
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.broken_image_rounded,
+                          color: AppThemeConstants.white70,
+                          size: 64,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: IconButton.filledTonal(
+                      tooltip: 'إغلاق',
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 18,
+                    child: Text(
+                      teacherName,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppThemeConstants.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _navigateToBookingMethod() {
+    if (_isPublicView) {
+      context.go('/login');
+      return;
+    }
     if (widget.previewMode) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -155,6 +265,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       return;
     }
     if (guardWriteInTour(ref, context)) return;
+    if (selectedPricingPlan == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اختر الباقة المناسبة أولًا'),
+          backgroundColor: AppThemeConstants.warning,
+        ),
+      );
+      _revealStep(_pricingStepKey);
+      return;
+    }
     if (selectedTimeSlot == null || selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -167,7 +287,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     final profileValue =
         ref.read(mohaffezProfileProvider(widget.mohaffezId)).value ?? {};
     final slotContext = _buildSlotContext(profileValue);
-    ref.read(bookingFlowProvider.notifier).setSlotContext(slotContext);
+    final bookingFlow = ref.read(bookingFlowProvider.notifier);
+    final plan = selectedPricingPlan!;
+    bookingFlow.selectPlan(
+      planId: plan.id ?? '',
+      title: plan.title,
+      price: plan.priceEGP,
+      sessions: plan.sessionsCount,
+      validityDays: plan.validityDays,
+    );
+    bookingFlow.setSlotContext(slotContext);
     context.push('/booking/method');
   }
 
@@ -202,7 +331,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
     return SlotContext(
       mohaffezId: widget.mohaffezId,
-      mohaffezName: profileValue?['name'] as String? ?? '',
+      mohaffezName: profileValue == null
+          ? ''
+          : _teacherNameFromProfile(profileValue, fallback: ''),
       mohaffezPhone: profileValue?['phoneNumber'] as String?,
       isFoundingTeacher: profileValue?['status'] == 'active' &&
           UserBadges.fromJson(profileValue?['badges']).foundingTeacher.enabled,
@@ -224,31 +355,254 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  Future<List<PricingPlanModel>> _loadPlansForExport() async {
+    try {
+      return await ref
+          .read(activePricingPlansProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return <PricingPlanModel>[];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadCredentialsForExport() async {
+    try {
+      return await ref.read(credentialsProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadAvailabilityForExport() async {
+    try {
+      return await ref.read(availabilityProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadStatsForExport() async {
+    try {
+      return await ref.read(mohaffezStatsProvider(widget.mohaffezId).future);
+    } catch (_) {
+      return {'completedSessions': 0, 'uniqueStudents': 0};
+    }
+  }
+
+  Future<void> _precacheExportImages(
+    Map<String, dynamic> profile,
+    List<Map<String, dynamic>> credentials,
+  ) async {
+    final urls = <String>[];
+    final photoUrl = (profile['photoUrl'] as String?)?.trim();
+    if (photoUrl != null && photoUrl.isNotEmpty) urls.add(photoUrl);
+
+    final videoUrl = _teacherVideoUrl(profile);
+    final youtubeId = videoUrl == null ? null : _youtubeVideoId(videoUrl);
+    if (youtubeId != null) {
+      urls.add('https://img.youtube.com/vi/$youtubeId/hqdefault.jpg');
+    }
+
+    for (final credential in credentials.take(6)) {
+      final imageUrls = List<String>.from(
+        credential['imageUrls'] as List? ?? const [],
+      ).where((url) => url.trim().isNotEmpty);
+      urls.addAll(imageUrls.take(1));
+    }
+
+    await Future.wait(
+      urls.map(
+        (url) => precacheImage(
+          CachedNetworkImageProvider(url),
+          context,
+        )
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {},
+            )
+            .catchError((_) {}),
+      ),
+    );
+  }
+
+  String _exportFileName(Map<String, dynamic> profile) {
+    final rawName = _teacherNameFromProfile(profile, fallback: 'mohaffez')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '');
+    final safeName = rawName.isEmpty ? 'mohaffez' : rawName;
+    return 'mohafezy_profile_$safeName.png';
+  }
+
+  Future<void> _exportProfileAsImage() async {
+    if (_isExportingProfile) return;
+    setState(() => _isExportingProfile = true);
+
+    final mediaQuery = MediaQuery.of(context);
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    OverlayEntry? overlayEntry;
+    try {
+      final profile = await ref.read(
+        mohaffezProfileProvider(widget.mohaffezId).future,
+      );
+      final plans = await _loadPlansForExport();
+      final credentials = await _loadCredentialsForExport();
+      final availability = await _loadAvailabilityForExport();
+      final stats = await _loadStatsForExport();
+      if (!mounted) return;
+
+      await _precacheExportImages(profile, credentials);
+      if (!mounted) return;
+
+      final screenWidth = mediaQuery.size.width;
+      final exportWidth = screenWidth < 360
+          ? 360.0
+          : screenWidth > 430
+              ? 430.0
+              : screenWidth;
+
+      overlayEntry = OverlayEntry(
+        builder: (context) => IgnorePointer(
+          child: Material(
+            type: MaterialType.transparency,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: OverflowBox(
+                minWidth: exportWidth,
+                maxWidth: exportWidth,
+                minHeight: 0,
+                maxHeight: double.infinity,
+                alignment: Alignment.topCenter,
+                child: Opacity(
+                  opacity: 0.01,
+                  child: SizedBox(
+                    width: exportWidth,
+                    child: RepaintBoundary(
+                      key: _profileExportKey,
+                      child: Directionality(
+                        textDirection: ui.TextDirection.rtl,
+                        child: _TeacherProfileExportCard(
+                          profile: profile,
+                          plans: plans,
+                          credentials: credentials,
+                          availability: availability,
+                          stats: stats,
+                          videoUrl: _teacherVideoUrl(profile),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      overlay.insert(overlayEntry);
+      await WidgetsBinding.instance.endOfFrame;
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await WidgetsBinding.instance.endOfFrame;
+
+      final boundary = _profileExportKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw StateError('Profile export view was not ready');
+      }
+
+      final devicePixelRatio = mediaQuery.devicePixelRatio;
+      final pixelRatio = devicePixelRatio < 2
+          ? 2.0
+          : devicePixelRatio > 3
+              ? 3.0
+              : devicePixelRatio;
+      final image = await boundary.toImage(pixelRatio: pixelRatio);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final Uint8List? bytes = byteData?.buffer.asUint8List();
+      if (bytes == null || bytes.isEmpty) {
+        throw StateError('Profile export image was empty');
+      }
+
+      await shareExportedProfileImage(
+        bytes,
+        fileName: _exportFileName(profile),
+        text: _teacherProfileShareText(profile),
+      );
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('تم تجهيز صورة الملف الشخصي'),
+          backgroundColor: AppThemeConstants.success,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('تعذر تصدير الملف كصورة. يرجى المحاولة مرة أخرى'),
+          backgroundColor: AppThemeConstants.error,
+        ),
+      );
+    } finally {
+      overlayEntry?.remove();
+      if (mounted) setState(() => _isExportingProfile = false);
+    }
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
-    final plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    final AsyncValue<PublicMohaffezProfileBundle>? publicBundleAsync =
+        _isPublicView
+            ? ref.watch(publicMohaffezProfileProvider(widget.mohaffezId))
+            : null;
+    final AsyncValue<Map<String, dynamic>> profileAsync;
+    final AsyncValue<List<PricingPlanModel>> plansAsync;
+    if (_isPublicView) {
+      final bundleAsync = publicBundleAsync!;
+      profileAsync = bundleAsync.whenData((bundle) => bundle.profile);
+      plansAsync = bundleAsync.whenData((bundle) => bundle.plans);
+    } else {
+      profileAsync = ref.watch(mohaffezProfileProvider(widget.mohaffezId));
+      plansAsync = ref.watch(activePricingPlansProvider(widget.mohaffezId));
+    }
 
     // Reset selection if the currently-selected type loses its plan
     // (e.g. teacher deactivates it mid-session). We don't auto-pick a new
     // type — the student must tap one explicitly. Empty string = "none
     // selected"; the picker tiles render that as no-selection state.
-    ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
-      next.whenData((plans) {
-        if (selectedSessionType.isNotEmpty &&
-            !_hasPlanForType(plans, selectedSessionType) &&
-            mounted) {
-          setState(() {
-            selectedSessionType = '';
-            selectedTimeSlot = null;
-            selectedDate = null;
-            selectedDayOfWeek = null;
-          });
-        }
+    if (!_isPublicView) {
+      ref.listen(activePricingPlansProvider(widget.mohaffezId), (_, next) {
+        next.whenData((plans) {
+          if (selectedSessionType.isNotEmpty &&
+              !_hasPlanForType(plans, selectedSessionType) &&
+              mounted) {
+            setState(() {
+              selectedSessionType = '';
+              selectedPricingPlan = null;
+              selectedTimeSlot = null;
+              selectedDate = null;
+              selectedDayOfWeek = null;
+            });
+            ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
+          } else if (selectedPricingPlan != null &&
+              !plans.any((plan) =>
+                  plan.isActive && plan.id == selectedPricingPlan!.id) &&
+              mounted) {
+            setState(() {
+              selectedPricingPlan = null;
+              selectedTimeSlot = null;
+              selectedDate = null;
+              selectedDayOfWeek = null;
+            });
+            ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
+          }
+        });
       });
-    });
+    }
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
@@ -257,8 +611,22 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         body: profileAsync.when(
           data: (profile) {
             final videoUrl = _teacherVideoUrl(profile);
+            final publicBundle = publicBundleAsync?.valueOrNull;
             return RefreshIndicator(
               onRefresh: () async {
+                if (_isPublicView) {
+                  ref.invalidate(
+                    publicMohaffezProfileProvider(widget.mohaffezId),
+                  );
+                  await ref
+                      .read(
+                        publicMohaffezProfileProvider(widget.mohaffezId).future,
+                      )
+                      .catchError(
+                        (_) => throw Exception('public profile reload failed'),
+                      );
+                  return;
+                }
                 ref.invalidate(mohaffezProfileProvider(widget.mohaffezId));
                 ref.invalidate(activePricingPlansProvider(widget.mohaffezId));
                 ref.invalidate(credentialsProvider(widget.mohaffezId));
@@ -276,11 +644,15 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-                        if (widget.previewMode) ...[
-                          _buildOwnerPreviewPanel(),
+                        if (widget.previewMode && !_isPublicView) ...[
+                          _buildOwnerPreviewPanel(profile),
                           const SizedBox(height: 16),
                         ],
-                        _buildCompactTrustStrip(ref, profile),
+                        _buildCompactTrustStrip(
+                          ref,
+                          profile,
+                          publicBundle: publicBundle,
+                        ),
                         if (videoUrl != null) ...[
                           const SizedBox(height: 20),
                           _buildPremiumVideoSection(videoUrl),
@@ -291,18 +663,32 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           _buildModernBioSection(profile['bio'] as String),
                         ],
                         const SizedBox(height: 20),
-                        _buildCredentialsSection(ref),
-                        if (profile['trialSessionEnabled'] == true) ...[
+                        _buildCredentialsSection(
+                          ref,
+                          publicCredentials: publicBundle?.credentials,
+                        ),
+                        if (!_isPublicView &&
+                            profile['trialSessionEnabled'] == true) ...[
                           const SizedBox(height: 20),
                           _buildTrialSessionSection(profile, plansAsync),
                         ],
                         const SizedBox(height: 20),
                         _buildModernSessionSelector(plansAsync),
                         const SizedBox(height: 20),
-                        _buildModernPricingSection(plansAsync),
+                        KeyedSubtree(
+                          key: _pricingStepKey,
+                          child: _buildModernPricingSection(plansAsync),
+                        ),
                         const SizedBox(height: 20),
-                        _buildModernAvailabilitySection(
-                            ref, profile, plansAsync),
+                        KeyedSubtree(
+                          key: _scheduleStepKey,
+                          child: _buildModernAvailabilitySection(
+                            ref,
+                            profile,
+                            plansAsync,
+                            publicAvailability: publicBundle?.availability,
+                          ),
+                        ),
                         const SizedBox(height: 120),
                       ],
                     ),
@@ -351,86 +737,102 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             ),
           ),
         ),
-        bottomNavigationBar: widget.previewMode
-            ? _buildPreviewBottomBar()
-            : selectedTimeSlot != null && selectedDate != null
-                ? SafeArea(
-                    child: Container(
-                      margin: const EdgeInsets.all(16),
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 30,
-                            offset: const Offset(0, 10),
-                          )
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  selectedDate != null
-                                      ? DateFormat(
-                                          'EEEE، d MMM',
-                                          'ar',
-                                        ).format(selectedDate!)
-                                      : '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
+        bottomNavigationBar: _isPublicView
+            ? _buildPublicBottomBar()
+            : widget.previewMode
+                ? _buildPreviewBottomBar()
+                : selectedTimeSlot != null && selectedDate != null
+                    ? SafeArea(
+                        child: Container(
+                          margin: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 30,
+                                offset: const Offset(0, 10),
+                              )
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      selectedDate != null
+                                          ? DateFormat(
+                                              'EEEE، d MMM',
+                                              'ar',
+                                            ).format(selectedDate!)
+                                          : '',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      formatTimeToArabicAmPm(
+                                        selectedTimeSlot!['startTime'],
+                                      ),
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: _navigateToBookingMethod,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1D9E75),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 28,
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  formatTimeToArabicAmPm(
-                                    selectedTimeSlot!['startTime'],
-                                  ),
-                                  style: const TextStyle(
-                                    color: Colors.grey,
+                                child: const Text(
+                                  'تأكيد الحجز',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          ElevatedButton(
-                            onPressed: _navigateToBookingMethod,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1D9E75),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 28,
-                                vertical: 16,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                            child: const Text(
-                              'تأكيد الحجز',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : null,
+                        ),
+                      )
+                    : null,
       ),
     );
   }
 
-  Widget _buildOwnerPreviewPanel() {
+  Uri _teacherPublicProfileUri() {
+    return Uri.https(
+      'app.mohafezy.com',
+      '/p/t/${widget.mohaffezId}',
+    );
+  }
+
+  String _teacherProfileShareText(Map<String, dynamic> profile) {
+    final name = _teacherNameFromProfile(profile);
+    final specialization =
+        ((profile['specialization'] as String?) ?? 'تعليم القرآن').trim();
+    return 'تعرف على $name على تطبيق محفظي - $specialization\n${_teacherPublicProfileUri()}';
+  }
+
+  Widget _buildOwnerPreviewPanel(Map<String, dynamic> profile) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -501,9 +903,68 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isExportingProfile ? null : _exportProfileAsImage,
+                icon: _isExportingProfile
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.image_outlined),
+                label: Text(
+                  _isExportingProfile
+                      ? 'جاري تجهيز الصورة...'
+                      : 'تصدير الملف كصورة',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor:
+                      AppThemeConstants.primary.withValues(alpha: 0.55),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _copyPublicProfileLink,
+                icon: const Icon(Icons.link_rounded),
+                label: const Text('نسخ رابط الملف العام'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppThemeConstants.primary,
+                  side: BorderSide(
+                    color: AppThemeConstants.primary.withValues(alpha: 0.35),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _copyPublicProfileLink() async {
+    await Clipboard.setData(
+      ClipboardData(text: _teacherPublicProfileUri().toString()),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ رابط الملف العام')),
     );
   }
 
@@ -574,20 +1035,66 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  Widget _buildPublicBottomBar() {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: const Border(
+            top: BorderSide(color: AppThemeConstants.grey200),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.go('/login'),
+                icon: const Icon(Icons.login_rounded),
+                label: const Text('تسجيل الدخول'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => context.go('/register'),
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('إنشاء حساب للحجز'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppThemeConstants.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTrialSessionSection(
     Map<String, dynamic> profile,
     AsyncValue<List<PricingPlanModel>> plansAsync,
   ) {
     final student = ref.watch(currentUserProvider).valueOrNull;
-    if (student == null || student.role != 'student') {
+    if (student == null || !isLearnerAccountRole(student.role)) {
       return const SizedBox.shrink();
     }
+    final activeProfile = ref.watch(activeStudentProfileProvider).valueOrNull;
 
     final duration =
         (profile['trialSessionDurationMinutes'] as num?)?.toInt() ?? 30;
     final pair = TrialSessionPair(
       mohaffezId: widget.mohaffezId,
       studentId: student.uid,
+      studentProfileId: activeProfile?.id,
     );
     final existingRequest = ref.watch(trialRequestForPairProvider(pair));
 
@@ -690,11 +1197,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     if (sent == true && mounted) {
       final studentId = ref.read(currentUserProvider).valueOrNull?.uid;
       if (studentId != null) {
+        final activeProfile =
+            ref.read(activeStudentProfileProvider).valueOrNull;
         ref.invalidate(
           trialRequestForPairProvider(
             TrialSessionPair(
               mohaffezId: widget.mohaffezId,
               studentId: studentId,
+              studentProfileId: activeProfile?.id,
             ),
           ),
         );
@@ -725,69 +1235,111 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   Widget _buildReadOnlyPlanCard(PricingPlanModel plan) {
     final isBundle = plan.type == PlanType.bundle;
+    final isSelected = selectedPricingPlan?.id == plan.id;
     final badgeColor = isBundle
         ? AppThemeConstants.accentPurpleDark
         : AppThemeConstants.accentAmberDark;
     final badgeBg = isBundle
         ? AppThemeConstants.accentPurpleLight
         : AppThemeConstants.accentAmberLight;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppThemeConstants.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppThemeConstants.grey200),
-        boxShadow: [
-          BoxShadow(
+    return InkWell(
+      onTap: () {
+        setState(() {
+          selectedPricingPlan = plan;
+          selectedTimeSlot = null;
+          selectedDate = null;
+          selectedDayOfWeek = null;
+        });
+        ref.read(bookingFlowProvider.notifier).selectPlan(
+              planId: plan.id ?? '',
+              title: plan.title,
+              price: plan.priceEGP,
+              sessions: plan.sessionsCount,
+              validityDays: plan.validityDays,
+            );
+        _revealStep(_scheduleStepKey);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppThemeConstants.primary.withValues(alpha: 0.06)
+              : AppThemeConstants.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppThemeConstants.primary
+                : AppThemeConstants.grey200,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
               color: AppThemeConstants.black.withValues(alpha: 0.04),
               blurRadius: 4,
-              offset: const Offset(0, 2))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                  color: badgeBg, borderRadius: BorderRadius.circular(20)),
-              child: Text(isBundle ? 'باقة' : 'جلسة واحدة',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: badgeColor)),
+              offset: const Offset(0, 2),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(plan.title,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold))),
-            Text('${plan.priceEGP.toStringAsFixed(0)} جنيه',
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppThemeConstants.success)),
-          ]),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            _profileChip('${plan.sessionsCount} جلسة', Icons.event_available),
-            if (plan.validityDays != null && plan.validityDays! > 0)
-              _profileChip('${plan.validityDays} يوم', Icons.schedule),
-            if (isBundle)
-              _profileChip(
-                '${(plan.priceEGP / plan.sessionsCount).toStringAsFixed(0)} جنيه/جلسة',
-                Icons.payments_outlined,
-              ),
-          ]),
-          if (plan.description != null && plan.description!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(plan.description!,
-                style: const TextStyle(
-                    fontSize: 12, color: AppThemeConstants.grey600)),
           ],
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: isSelected
+                    ? AppThemeConstants.primary
+                    : AppThemeConstants.grey500,
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: badgeBg, borderRadius: BorderRadius.circular(20)),
+                child: Text(isBundle ? 'باقة' : 'جلسة واحدة',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: badgeColor)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text(plan.title,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.bold))),
+              Text(PricingCountryUtils.displayPriceText(plan),
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppThemeConstants.success)),
+            ]),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 6, children: [
+              _profileChip('${plan.sessionsCount} جلسة', Icons.event_available),
+              _profileChip(plan.countryName, Icons.public),
+              if (plan.sessionDurationMinutes != null)
+                _profileChip('${plan.sessionDurationMinutes} دقيقة',
+                    Icons.timer_outlined),
+              if (plan.validityDays != null && plan.validityDays! > 0)
+                _profileChip('${plan.validityDays} يوم', Icons.schedule),
+              if (isBundle)
+                _profileChip(
+                  '${(PricingCountryUtils.displayAmount(plan) / plan.sessionsCount).toStringAsFixed(0)} ${plan.currencyLabel}/جلسة',
+                  Icons.payments_outlined,
+                ),
+            ]),
+            if (plan.description != null && plan.description!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(plan.description!,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppThemeConstants.grey600)),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -891,37 +1443,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'خطط التسعير المتاحة',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              child: _BookingStepTitle(
+                number: 2,
+                title: 'اختر الباقة المناسبة',
+                subtitle: 'حدد جلسة واحدة أو إحدى الباقات المتاحة',
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-              decoration: BoxDecoration(
-                color: AppThemeConstants.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppThemeConstants.primary.withValues(alpha: 0.35)),
-              ),
-              child: const Row(children: [
-                Icon(Icons.info_outline_rounded,
-                    size: 16, color: AppThemeConstants.primary),
-                SizedBox(width: 8),
-                Expanded(
-                    child: Text(
-                  'يمكنك التواصل مع المحفظ مباشرة للتفاوض على سعر مناسب',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppThemeConstants.primary),
-                )),
-              ]),
-            ),
-            const SizedBox(height: 14),
             ...relevantPlans.map((plan) => Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _buildReadOnlyPlanCard(plan),
@@ -1007,19 +1535,32 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   Widget _buildCompactTrustStrip(
     WidgetRef ref,
-    Map<String, dynamic> profile,
-  ) {
+    Map<String, dynamic> profile, {
+    PublicMohaffezProfileBundle? publicBundle,
+  }) {
     final rating = profile['rating'] as num? ?? 0.0;
     final reviewCount = (profile['reviewCount'] as num?)?.toInt() ?? 0;
-    final stats = ref.watch(mohaffezStatsProvider(widget.mohaffezId));
-    final credentials = ref.watch(credentialsProvider(widget.mohaffezId));
-    final completedSessions =
-        stats.valueOrNull?['completedSessions'] as int? ?? 0;
-    final uniqueStudents = stats.valueOrNull?['uniqueStudents'] as int? ?? 0;
-    final approvedCredentials = credentials.valueOrNull?.length ?? 0;
-    final statsAreLoading = stats.isLoading && !stats.hasValue;
-    final credentialsAreLoading =
-        credentials.isLoading && !credentials.hasValue;
+    final stats = publicBundle == null
+        ? ref.watch(mohaffezStatsProvider(widget.mohaffezId))
+        : null;
+    final credentials = publicBundle == null
+        ? ref.watch(credentialsProvider(widget.mohaffezId))
+        : null;
+    final completedSessions = publicBundle != null
+        ? (publicBundle.stats['completedSessions'] as num?)?.toInt() ?? 0
+        : stats?.valueOrNull?['completedSessions'] as int? ?? 0;
+    final uniqueStudents = publicBundle != null
+        ? (publicBundle.stats['uniqueStudents'] as num?)?.toInt() ?? 0
+        : stats?.valueOrNull?['uniqueStudents'] as int? ?? 0;
+    final approvedCredentials = publicBundle?.credentials.length ??
+        credentials?.valueOrNull?.length ??
+        0;
+    final statsAreLoading = publicBundle == null &&
+        (stats?.isLoading ?? false) &&
+        !(stats?.hasValue ?? false);
+    final credentialsAreLoading = publicBundle == null &&
+        (credentials?.isLoading ?? false) &&
+        !(credentials?.hasValue ?? false);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1102,25 +1643,20 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // ─── AppBar ───────────────────────────────────────────────────────────────
 
   Widget _buildAppBar(BuildContext context, Map<String, dynamic> profile) {
-    final name = (profile['name'] as String?)?.trim().isNotEmpty == true
-        ? profile['name'] as String
-        : 'المحفّظ';
+    final name = _teacherNameFromProfile(profile, fallback: 'المحفّظ');
     final hasFoundingBadge = profile['status'] == 'active' &&
         UserBadges.fromJson(profile['badges']).foundingTeacher.enabled;
     final specialization = (profile['specialization'] as String?)?.trim();
     final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
     final reviewCount = profile['reviewCount'] as int? ?? 0;
+    final photoUrl = (profile['photoUrl'] as String?)?.trim();
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return SliverAppBar(
       expandedHeight: 248,
       pinned: true,
       automaticallyImplyLeading: false,
       backgroundColor: AppThemeConstants.deepTeal,
-      title: Text(
-        name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -1213,10 +1749,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           Text(
                             name,
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: AppThemeConstants.white,
-                              height: 1.15,
+                              height: 1.2,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -1265,45 +1801,89 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: 14),
-                    Container(
-                      width: 96,
-                      height: 96,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color:
-                              AppThemeConstants.white.withValues(alpha: 0.42),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                AppThemeConstants.black.withValues(alpha: 0.20),
-                            blurRadius: 16,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: CircleAvatar(
-                        backgroundColor: AppThemeConstants.white,
-                        child: profile['photoUrl'] != null &&
-                                (profile['photoUrl'] as String).isNotEmpty
-                            ? ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: profile['photoUrl'],
-                                  width: 88,
-                                  height: 88,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.person, size: 42),
+                    GestureDetector(
+                      onTap: hasPhoto
+                          ? () => _openTeacherPhotoPreview(photoUrl, name)
+                          : null,
+                      child: MouseRegion(
+                        cursor: hasPhoto
+                            ? SystemMouseCursors.click
+                            : SystemMouseCursors.basic,
+                        child: Semantics(
+                          button: hasPhoto,
+                          label: hasPhoto ? 'تكبير صورة المحفظ' : null,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 96,
+                                height: 96,
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppThemeConstants.white
+                                        .withValues(alpha: 0.42),
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppThemeConstants.black
+                                          .withValues(alpha: 0.20),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
                                 ),
-                              )
-                            : const Icon(
-                                Icons.person_rounded,
-                                size: 42,
-                                color: AppThemeConstants.primary,
+                                child: CircleAvatar(
+                                  backgroundColor: AppThemeConstants.white,
+                                  child: hasPhoto
+                                      ? ClipOval(
+                                          child: CachedNetworkImage(
+                                            imageUrl: photoUrl,
+                                            width: 88,
+                                            height: 88,
+                                            fit: BoxFit.cover,
+                                            errorWidget:
+                                                (context, url, error) =>
+                                                    const Icon(
+                                              Icons.person,
+                                              size: 42,
+                                            ),
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.person_rounded,
+                                          size: 42,
+                                          color: AppThemeConstants.primary,
+                                        ),
+                                ),
                               ),
+                              if (hasPhoto)
+                                Positioned(
+                                  left: -2,
+                                  bottom: -2,
+                                  child: Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: AppThemeConstants.secondary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppThemeConstants.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.zoom_out_map_rounded,
+                                      size: 14,
+                                      color: AppThemeConstants.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -1362,8 +1942,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   // ─── Credentials Gallery ──────────────────────────────────────────────────
 
-  Widget _buildCredentialsSection(WidgetRef ref) {
-    final credsAsync = ref.watch(credentialsProvider(widget.mohaffezId));
+  Widget _buildCredentialsSection(
+    WidgetRef ref, {
+    List<Map<String, dynamic>>? publicCredentials,
+  }) {
+    final credsAsync = publicCredentials != null
+        ? AsyncValue<List<Map<String, dynamic>>>.data(publicCredentials)
+        : ref.watch(credentialsProvider(widget.mohaffezId));
 
     return credsAsync.when(
       data: (creds) {
@@ -1631,6 +2216,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   DateTime? _credentialDate(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
     try {
       return value.toDate() as DateTime;
     } catch (_) {
@@ -1802,9 +2388,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   final hadSelectedSlot = selectedTimeSlot != null;
                   setState(() {
                     selectedSessionType = type;
+                    selectedPricingPlan = null;
                     selectedTimeSlot = null;
                     selectedDate = null;
+                    selectedDayOfWeek = null;
                   });
+                  ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
+                  _revealStep(_pricingStepKey);
                   if (hadSelectedSlot && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -1882,20 +2472,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'اختر نوع الجلسة',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'ستظهر الخطط والمواعيد المتاحة لهذا النوع فقط',
-            style: TextStyle(
-              color: AppThemeConstants.textSecondary,
-              fontSize: 13,
-            ),
+          const _BookingStepTitle(
+            number: 1,
+            title: 'اختر نوع الجلسة',
+            subtitle: 'أونلاين أو في المسجد أو زيارة منزلية',
           ),
           const SizedBox(height: 14),
           Row(
@@ -1927,15 +2507,18 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   Widget _buildModernAvailabilitySection(
     WidgetRef ref,
     Map<String, dynamic> profile,
-    AsyncValue<List<PricingPlanModel>> plansAsync,
-  ) {
-    if (selectedSessionType.isEmpty) {
+    AsyncValue<List<PricingPlanModel>> plansAsync, {
+    List<Map<String, dynamic>>? publicAvailability,
+  }) {
+    if (selectedSessionType.isEmpty || selectedPricingPlan == null) {
       return const SizedBox.shrink();
     }
 
-    final availability = ref.watch(
-      availabilityProvider(widget.mohaffezId),
-    );
+    final availability = publicAvailability != null
+        ? AsyncValue<List<Map<String, dynamic>>>.data(publicAvailability)
+        : ref.watch(
+            availabilityProvider(widget.mohaffezId),
+          );
 
     return availability.when(
       data: (slots) {
@@ -2038,19 +2621,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'احجز جلستك',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اختر اليوم والوقت المناسب لك',
-                  style: TextStyle(
-                    color: Colors.grey,
-                  ),
+                const _BookingStepTitle(
+                  number: 3,
+                  title: 'اختر الموعد',
+                  subtitle: 'حدد اليوم والوقت المناسب لك',
                 ),
                 const SizedBox(height: 20),
 
@@ -2296,6 +2870,851 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         child: CircularProgressIndicator(),
       ),
       error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _BookingStepTitle extends StatelessWidget {
+  const _BookingStepTitle({
+    required this.number,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final int number;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: AppThemeConstants.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$number',
+            style: const TextStyle(
+              color: AppThemeConstants.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppThemeConstants.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TeacherProfileExportCard extends StatelessWidget {
+  const _TeacherProfileExportCard({
+    required this.profile,
+    required this.plans,
+    required this.credentials,
+    required this.availability,
+    required this.stats,
+    required this.videoUrl,
+  });
+
+  final Map<String, dynamic> profile;
+  final List<PricingPlanModel> plans;
+  final List<Map<String, dynamic>> credentials;
+  final List<Map<String, dynamic>> availability;
+  final Map<String, dynamic> stats;
+  final String? videoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _teacherNameFromProfile(profile);
+    final specialization = _string(profile['specialization'], 'معلم قرآن');
+    final bio = _string(profile['bio'], '');
+    final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
+    final reviewCount = (profile['reviewCount'] as num?)?.toInt() ?? 0;
+    final completedSessions =
+        (stats['completedSessions'] as num?)?.toInt() ?? 0;
+    final uniqueStudents = (stats['uniqueStudents'] as num?)?.toInt() ?? 0;
+    final hasFoundingBadge = profile['status'] == 'active' &&
+        UserBadges.fromJson(profile['badges']).foundingTeacher.enabled;
+    final activePlans = plans.where((plan) => plan.isActive).toList();
+    final availableSlots = _availableSlotSummaries(availability);
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: double.infinity,
+        color: AppThemeConstants.background,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ExportHero(
+              name: name,
+              specialization: specialization,
+              photoUrl: _string(profile['photoUrl'], ''),
+              hasFoundingBadge: hasFoundingBadge,
+              rating: reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد',
+              reviewCount: reviewCount,
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _ExportStat(
+                    icon: Icons.star_rounded,
+                    value: reviewCount > 0 ? rating.toStringAsFixed(1) : 'جديد',
+                    label: 'التقييم',
+                  ),
+                  _ExportStat(
+                    icon: Icons.people_alt_rounded,
+                    value: '$uniqueStudents',
+                    label: 'طالب',
+                  ),
+                  _ExportStat(
+                    icon: Icons.task_alt_rounded,
+                    value: '$completedSessions',
+                    label: 'جلسة',
+                  ),
+                  _ExportStat(
+                    icon: Icons.workspace_premium_rounded,
+                    value: '${credentials.length}',
+                    label: 'شهادة',
+                  ),
+                ],
+              ),
+            ),
+            if (videoUrl != null && videoUrl!.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'الفيديو التعريفي',
+                icon: Icons.play_circle_outline_rounded,
+                child: _ExportVideoPreview(url: videoUrl!),
+              ),
+            ],
+            if (bio.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'نبذة عن المحفظ',
+                icon: Icons.info_outline_rounded,
+                child: Text(
+                  bio,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.55,
+                    color: AppThemeConstants.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+            if (credentials.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'الإجازات والشهادات',
+                icon: Icons.workspace_premium_rounded,
+                child: Column(
+                  children: credentials
+                      .map((credential) => _ExportCredentialRow(
+                            credential: credential,
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
+            if (activePlans.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'الجلسات والأسعار',
+                icon: Icons.sell_outlined,
+                child: Column(
+                  children: activePlans
+                      .map((plan) => _ExportPlanRow(plan: plan))
+                      .toList(),
+                ),
+              ),
+            ],
+            if (availableSlots.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _ExportSection(
+                title: 'مواعيد متاحة',
+                icon: Icons.calendar_month_outlined,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableSlots
+                      .take(8)
+                      .map((slot) => _ExportChip(
+                            icon: Icons.schedule_rounded,
+                            label: slot,
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'محفظي | mohafezy.com',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppThemeConstants.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _string(Object? value, String fallback) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+
+  static List<String> _availableSlotSummaries(
+    List<Map<String, dynamic>> availability,
+  ) {
+    const dayNames = [
+      'الإثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+      'الأحد',
+    ];
+    final items = <String>[];
+    for (final day in availability) {
+      final dayIndex = ((day['dayOfWeek'] as num?)?.toInt() ?? 1) - 1;
+      final dayName = dayNames[dayIndex.clamp(0, 6)];
+      final slots = List<Map<String, dynamic>>.from(day['timeSlots'] ?? []);
+      for (final slot in slots) {
+        if (slot['enabled'] != true) continue;
+        final start = _string(slot['startTime'], '');
+        final end = _string(slot['endTime'], '');
+        if (start.isEmpty || end.isEmpty) continue;
+        items.add('$dayName ${formatTimeToArabicAmPm('$start - $end')}');
+      }
+    }
+    return items;
+  }
+}
+
+class _ExportHero extends StatelessWidget {
+  const _ExportHero({
+    required this.name,
+    required this.specialization,
+    required this.photoUrl,
+    required this.hasFoundingBadge,
+    required this.rating,
+    required this.reviewCount,
+  });
+
+  final String name;
+  final String specialization;
+  final String photoUrl;
+  final bool hasFoundingBadge;
+  final String rating;
+  final int reviewCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 28, 18, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppThemeConstants.primary,
+            AppThemeConstants.primaryVariant,
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -40,
+            left: -40,
+            child: Container(
+              width: 170,
+              height: 170,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 92,
+                height: 92,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.45),
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  child: photoUrl.isNotEmpty
+                      ? ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: photoUrl,
+                            width: 84,
+                            height: 84,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(
+                              Icons.person_rounded,
+                              size: 42,
+                              color: AppThemeConstants.primary,
+                            ),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.person_rounded,
+                          size: 42,
+                          color: AppThemeConstants.primary,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'ملف محفظ معتمد',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      specialization,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (hasFoundingBadge) ...[
+                      const SizedBox(height: 8),
+                      const FoundingTeacherBadge(
+                        compact: true,
+                        showLabel: true,
+                        useFullLabel: true,
+                        size: 20,
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _ExportHeroBadge(
+                          icon: Icons.star_rounded,
+                          label: rating,
+                        ),
+                        _ExportHeroBadge(
+                          icon: Icons.rate_review_rounded,
+                          label:
+                              reviewCount > 0 ? '$reviewCount تقييم' : 'جديد',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExportHeroBadge extends StatelessWidget {
+  const _ExportHeroBadge({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExportStat extends StatelessWidget {
+  const _ExportStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppThemeConstants.primary, size: 20),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppThemeConstants.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportSection extends StatelessWidget {
+  const _ExportSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppThemeConstants.grey200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: AppThemeConstants.primary, size: 19),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportVideoPreview extends StatelessWidget {
+  const _ExportVideoPreview({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final youtubeId = _youtubeVideoId(url);
+    final thumbnailUrl = youtubeId == null
+        ? null
+        : 'https://img.youtube.com/vi/$youtubeId/hqdefault.jpg';
+
+    return Container(
+      height: 150,
+      decoration: BoxDecoration(
+        color: const Color(0xFF073F37),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (thumbnailUrl != null)
+            CachedNetworkImage(
+              imageUrl: thumbnailUrl,
+              fit: BoxFit.cover,
+              color: Colors.black.withValues(alpha: 0.30),
+              colorBlendMode: BlendMode.darken,
+              errorWidget: (_, __, ___) =>
+                  const ColoredBox(color: Color(0xFF073F37)),
+            ),
+          const Center(
+            child: Icon(
+              Icons.play_circle_fill_rounded,
+              color: Colors.white,
+              size: 56,
+            ),
+          ),
+          const Positioned(
+            right: 14,
+            left: 14,
+            bottom: 12,
+            child: Text(
+              'شاهد الفيديو التعريفي قبل الحجز',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String? _youtubeVideoId(String value) {
+    final trimmed = value.trim();
+    if (RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(trimmed)) return trimmed;
+    final withScheme =
+        trimmed.startsWith('http://') || trimmed.startsWith('https://')
+            ? trimmed
+            : 'https://$trimmed';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null) return null;
+    final host = uri.host.toLowerCase().replaceFirst('www.', '');
+    if (host == 'youtu.be' && uri.pathSegments.isNotEmpty) {
+      return uri.pathSegments.first;
+    }
+    if (host.endsWith('youtube.com')) {
+      final queryId = uri.queryParameters['v'];
+      if (queryId != null && queryId.isNotEmpty) return queryId;
+      final segments = uri.pathSegments;
+      if (segments.length >= 2 &&
+          const {'embed', 'shorts', 'live'}.contains(segments.first)) {
+        return segments[1];
+      }
+    }
+    return null;
+  }
+}
+
+class _ExportCredentialRow extends StatelessWidget {
+  const _ExportCredentialRow({required this.credential});
+
+  final Map<String, dynamic> credential;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _string(credential['title'], 'شهادة معتمدة');
+    final organization = _string(credential['organization'], '');
+    final imageUrls = List<String>.from(
+      credential['imageUrls'] as List? ?? const [],
+    ).where((url) => url.trim().isNotEmpty).toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7E2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: imageUrls.isEmpty
+                ? const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Color(0xFFE8A020),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: imageUrls.first,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: Color(0xFFE8A020),
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (organization.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    organization,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppThemeConstants.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.verified_rounded,
+            color: AppThemeConstants.success,
+            size: 18,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _string(Object? value, String fallback) {
+    if (value is! String) return fallback;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+}
+
+class _ExportPlanRow extends StatelessWidget {
+  const _ExportPlanRow({required this.plan});
+
+  final PricingPlanModel plan;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppThemeConstants.grey200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppThemeConstants.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                _modeIcon(plan.mode),
+                color: AppThemeConstants.primary,
+                size: 19,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    plan.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${_modeLabel(plan.mode)} • ${plan.sessionsCount} جلسة',
+                    style: const TextStyle(
+                      color: AppThemeConstants.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              PricingCountryUtils.displayPriceText(plan),
+              style: const TextStyle(
+                color: AppThemeConstants.primary,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _modeIcon(SessionMode? mode) {
+    return switch (mode) {
+      SessionMode.online => Icons.videocam_rounded,
+      SessionMode.mosque => Icons.mosque_rounded,
+      SessionMode.home => Icons.home_rounded,
+      _ => Icons.menu_book_rounded,
+    };
+  }
+
+  String _modeLabel(SessionMode? mode) {
+    return switch (mode) {
+      SessionMode.online => 'أونلاين',
+      SessionMode.mosque => 'في المسجد',
+      SessionMode.home => 'زيارة منزلية',
+      _ => 'جلسة',
+    };
+  }
+}
+
+class _ExportChip extends StatelessWidget {
+  const _ExportChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppThemeConstants.primary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppThemeConstants.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

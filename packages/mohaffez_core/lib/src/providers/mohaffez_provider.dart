@@ -15,7 +15,6 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
         .where('role', isEqualTo: 'mohaffez')
         .where('status', isEqualTo: 'active')
         .where('addressLat', isNotEqualTo: null)
-        .limit(50) // حد أقصى للنتائج
         .get()
         .timeout(const Duration(seconds: 15));
 
@@ -27,7 +26,9 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
     }).toList();
 
     // تصفية حسب نطاق المسافة إذا كان موقع المستخدم متاحاً
-    if (params.userLat != null && params.userLng != null) {
+    if (params.distanceFilterEnabled &&
+        params.userLat != null &&
+        params.userLng != null) {
       mohaffezList = mohaffezList.where((mohaffez) {
         final distance =
             mohaffez.getDistanceFrom(params.userLat, params.userLng);
@@ -35,11 +36,11 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       }).toList();
     }
 
-    // تصفية حسب البحث بالاسم
-    if (params.searchQuery != null && params.searchQuery!.isNotEmpty) {
-      final query = params.searchQuery!.toLowerCase();
+    // تصفية بحث موسعة: الاسم، النبذة، التخصصات، ونصوص خطط الأسعار النشطة.
+    final searchTerms = _searchTerms(params.searchQuery);
+    if (searchTerms.isNotEmpty) {
       mohaffezList = mohaffezList.where((mohaffez) {
-        return mohaffez.name.toLowerCase().contains(query);
+        return _matchesMohaffezSearch(mohaffez, searchTerms);
       }).toList();
     }
 
@@ -67,7 +68,8 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
     }
 
     // تصفية حسب قابلية الحجز: وقت قادم مفعّل + خطة سعر نشطة
-    if (params.availabilityFilter != TeacherAvailabilityFilter.all) {
+    if (params.availabilityFilter != TeacherAvailabilityFilter.all ||
+        params.sessionTypeFilter != TeacherSessionTypeFilter.all) {
       final now = serverNowFromRef(ref);
       final slotEntries = await Future.wait(
         mohaffezList.map((mohaffez) async {
@@ -75,6 +77,7 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
             firestore,
             mohaffez.id,
             now,
+            sessionTypeFilter: params.sessionTypeFilter,
           );
           return MapEntry(mohaffez.id, hasAvailableSlot);
         }),
@@ -82,12 +85,11 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       final slotById = Map.fromEntries(slotEntries);
 
       final planEntries = await Future.wait(
-        mohaffezList
-            .where((mohaffez) => slotById[mohaffez.id] == true)
-            .map((mohaffez) async {
+        mohaffezList.map((mohaffez) async {
           final hasActivePlan = await _hasActivePricingPlan(
             firestore,
             mohaffez.id,
+            sessionTypeFilter: params.sessionTypeFilter,
           );
           return MapEntry(mohaffez.id, hasActivePlan);
         }),
@@ -95,34 +97,26 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       final activePlanById = Map.fromEntries(planEntries);
 
       mohaffezList = mohaffezList.where((mohaffez) {
-        final isBookable = (slotById[mohaffez.id] ?? false) &&
-            (activePlanById[mohaffez.id] ?? false);
-        return params.availabilityFilter ==
-                TeacherAvailabilityFilter.availableOnly
-            ? isBookable
-            : !isBookable;
+        final hasMatchingPlan = activePlanById[mohaffez.id] ?? false;
+        final isBookable = (slotById[mohaffez.id] ?? false) && hasMatchingPlan;
+
+        switch (params.availabilityFilter) {
+          case TeacherAvailabilityFilter.availableOnly:
+            return isBookable;
+          case TeacherAvailabilityFilter.unavailableOnly:
+            if (params.sessionTypeFilter == TeacherSessionTypeFilter.all) {
+              return !isBookable;
+            }
+            return hasMatchingPlan && !isBookable;
+          case TeacherAvailabilityFilter.all:
+            return params.sessionTypeFilter == TeacherSessionTypeFilter.all
+                ? true
+                : hasMatchingPlan;
+        }
       }).toList();
     }
 
-    switch (params.sortBy) {
-      case SortType.distance:
-        if (params.userLat != null && params.userLng != null) {
-          mohaffezList.sort((a, b) {
-            final distA = a.getDistanceFrom(params.userLat, params.userLng) ??
-                double.infinity;
-            final distB = b.getDistanceFrom(params.userLat, params.userLng) ??
-                double.infinity;
-            return distA.compareTo(distB);
-          });
-        }
-        break;
-      case SortType.rating:
-        mohaffezList.sort((a, b) => b.rating.compareTo(a.rating));
-        break;
-      case SortType.followers:
-        mohaffezList.sort((a, b) => b.followerCount.compareTo(a.followerCount));
-        break;
-    }
+    mohaffezList.sort((a, b) => _compareMohaffezResults(a, b, params));
 
     return mohaffezList;
   } catch (e) {
@@ -134,8 +128,9 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
 Future<bool> _hasUpcomingAvailableSlot(
   FirebaseFirestore firestore,
   String mohaffezId,
-  DateTime now,
-) async {
+  DateTime now, {
+  TeacherSessionTypeFilter sessionTypeFilter = TeacherSessionTypeFilter.all,
+}) async {
   final today = DateTime(now.year, now.month, now.day);
   final currentDayOfWeek = today.weekday;
 
@@ -161,6 +156,9 @@ Future<bool> _hasUpcomingAvailableSlot(
 
     for (final slot in timeSlots) {
       if (slot['enabled'] != true) continue;
+      if (!_matchesSessionTypeFilter(slot['sessionType'], sessionTypeFilter)) {
+        continue;
+      }
       if (!isToday) return true;
 
       final startTime = slot['startTime'] as String?;
@@ -186,18 +184,27 @@ Future<bool> _hasUpcomingAvailableSlot(
 
 Future<bool> _hasActivePricingPlan(
   FirebaseFirestore firestore,
-  String mohaffezId,
-) async {
+  String mohaffezId, {
+  TeacherSessionTypeFilter sessionTypeFilter = TeacherSessionTypeFilter.all,
+}) async {
   final snapshot = await firestore
       .collection('users')
       .doc(mohaffezId)
       .collection('pricingPlans')
       .where('isActive', isEqualTo: true)
-      .limit(1)
       .get()
       .timeout(const Duration(seconds: 10));
 
-  return snapshot.docs.isNotEmpty;
+  if (sessionTypeFilter == TeacherSessionTypeFilter.all) {
+    return snapshot.docs.isNotEmpty;
+  }
+
+  return snapshot.docs.any(
+    (doc) => _matchesSessionTypeFilter(
+      doc.data()['mode'],
+      sessionTypeFilter,
+    ),
+  );
 }
 
 int? _normalizeDayOfWeek(Object? value) {
@@ -208,27 +215,146 @@ int? _normalizeDayOfWeek(Object? value) {
   return null;
 }
 
+bool _matchesSessionTypeFilter(
+  Object? rawSessionType,
+  TeacherSessionTypeFilter filter,
+) {
+  if (filter == TeacherSessionTypeFilter.all) return true;
+
+  final sessionType = rawSessionType?.toString().trim().toLowerCase();
+  if (sessionType == null || sessionType.isEmpty) return false;
+
+  return switch (filter) {
+    TeacherSessionTypeFilter.all => true,
+    TeacherSessionTypeFilter.online => sessionType == 'online',
+    TeacherSessionTypeFilter.home => sessionType == 'home',
+    TeacherSessionTypeFilter.mosque => sessionType == 'mosque',
+    TeacherSessionTypeFilter.offline => sessionType == 'home' ||
+        sessionType == 'mosque' ||
+        sessionType == 'in_person',
+  };
+}
+
+int _compareMohaffezResults(
+  MohaffezModel a,
+  MohaffezModel b,
+  NearbyParams params,
+) {
+  final foundingCompare = _compareFoundingTeacherBadge(a, b);
+  if (foundingCompare != 0) return foundingCompare;
+
+  final selectedSortCompare = switch (params.sortBy) {
+    SortType.distance => _compareDistance(a, b, params),
+    SortType.rating => b.rating.compareTo(a.rating),
+    SortType.followers => b.followerCount.compareTo(a.followerCount),
+  };
+  if (selectedSortCompare != 0) return selectedSortCompare;
+
+  final ratingCompare = b.rating.compareTo(a.rating);
+  if (ratingCompare != 0) return ratingCompare;
+
+  return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+}
+
+int _compareFoundingTeacherBadge(MohaffezModel a, MohaffezModel b) {
+  final aFounder = a.badges.foundingTeacher.enabled;
+  final bFounder = b.badges.foundingTeacher.enabled;
+  if (aFounder == bFounder) return 0;
+  return aFounder ? -1 : 1;
+}
+
+int _compareDistance(MohaffezModel a, MohaffezModel b, NearbyParams params) {
+  if (params.userLat == null || params.userLng == null) return 0;
+
+  final distA =
+      a.getDistanceFrom(params.userLat, params.userLng) ?? double.infinity;
+  final distB =
+      b.getDistanceFrom(params.userLat, params.userLng) ?? double.infinity;
+  return distA.compareTo(distB);
+}
+
+String _normalizeSearchText(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '')
+      .replaceAll('ـ', '')
+      .replaceAll('أ', 'ا')
+      .replaceAll('إ', 'ا')
+      .replaceAll('آ', 'ا')
+      .replaceAll('ى', 'ي')
+      .replaceAll('ؤ', 'و')
+      .replaceAll('ئ', 'ي')
+      .replaceAll('ة', 'ه')
+      .replaceAll(RegExp(r'[^\w\u0600-\u06FF]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+List<String> _searchTerms(String? rawQuery) {
+  final normalized = _normalizeSearchText(rawQuery ?? '');
+  if (normalized.isEmpty) return const [];
+  return normalized
+      .split(' ')
+      .where((term) => term.trim().isNotEmpty)
+      .toSet()
+      .toList(growable: false);
+}
+
+bool _matchesMohaffezSearch(
+  MohaffezModel mohaffez,
+  List<String> terms,
+) {
+  final searchableText = _normalizeSearchText(
+    [
+      mohaffez.displayName,
+      mohaffez.bio,
+      mohaffez.specialization,
+      mohaffez.addressText,
+      _genderSearchAliases(mohaffez.gender),
+      if (mohaffez.trialSessionEnabled)
+        'حلقة تجريبية حصة تجريبية جلسة تجريبية تجربة مجانية اختبار',
+      if (mohaffez.badges.foundingTeacher.enabled)
+        'محفظ مؤسس معلم مؤسس شارة مؤسس',
+      mohaffez.pricingSearchText,
+    ].whereType<Object>().join(' '),
+  );
+
+  return terms.every(searchableText.contains);
+}
+
+String _genderSearchAliases(String? gender) {
+  return switch (gender?.trim().toLowerCase()) {
+    'male' => 'معلم محفظ رجل ذكر male',
+    'female' => 'معلمة محفظة امرأة انثى female',
+    _ => '',
+  };
+}
+
 class NearbyParams {
   final double? userLat;
   final double? userLng;
   final double radiusKm;
+  final bool distanceFilterEnabled;
   final SortType sortBy;
   final String? searchQuery;
   final String? specialization;
   final TeacherAvailabilityFilter availabilityFilter;
   final TeacherGenderFilter genderFilter;
   final TeacherTrialSessionFilter trialSessionFilter;
+  final TeacherSessionTypeFilter sessionTypeFilter;
 
   NearbyParams({
     this.userLat,
     this.userLng,
     this.radiusKm = 50.0, // 50 كم افتراضياً
+    this.distanceFilterEnabled = true,
     this.sortBy = SortType.distance,
     this.searchQuery,
     this.specialization,
     this.availabilityFilter = TeacherAvailabilityFilter.availableOnly,
     this.genderFilter = TeacherGenderFilter.all,
     this.trialSessionFilter = TeacherTrialSessionFilter.all,
+    this.sessionTypeFilter = TeacherSessionTypeFilter.all,
   });
 
   @override
@@ -239,24 +365,28 @@ class NearbyParams {
           userLat == other.userLat &&
           userLng == other.userLng &&
           radiusKm == other.radiusKm &&
+          distanceFilterEnabled == other.distanceFilterEnabled &&
           sortBy == other.sortBy &&
           searchQuery == other.searchQuery &&
           specialization == other.specialization &&
           availabilityFilter == other.availabilityFilter &&
           genderFilter == other.genderFilter &&
-          trialSessionFilter == other.trialSessionFilter;
+          trialSessionFilter == other.trialSessionFilter &&
+          sessionTypeFilter == other.sessionTypeFilter;
 
   @override
   int get hashCode => Object.hash(
         userLat,
         userLng,
         radiusKm,
+        distanceFilterEnabled,
         sortBy,
         searchQuery,
         specialization,
         availabilityFilter,
         genderFilter,
         trialSessionFilter,
+        sessionTypeFilter,
       );
 }
 
@@ -267,6 +397,8 @@ enum TeacherAvailabilityFilter { availableOnly, all, unavailableOnly }
 enum TeacherGenderFilter { all, male, female }
 
 enum TeacherTrialSessionFilter { all, enabledOnly }
+
+enum TeacherSessionTypeFilter { all, online, offline, home, mosque }
 
 /// Provider for mohaffez session counts (for search results)
 final mohaffezSessionCountProvider = FutureProvider.family<int, String>(

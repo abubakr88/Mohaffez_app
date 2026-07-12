@@ -67,6 +67,10 @@ class RoleGuard implements RouteGuard {
     '/admin',
   ];
 
+  static bool _isPublicRoute(String path) {
+    return path.startsWith('/p/t/');
+  }
+
   @override
   String? check(Ref ref, GoRouterState state) {
     final authState = ref.read(authStateProvider);
@@ -74,6 +78,8 @@ class RoleGuard implements RouteGuard {
     final config = ref.read(systemConfigProvider).valueOrNull;
     final currentPath = state.uri.path;
     final inTour = ref.read(tourModeProvider).active;
+
+    if (_isPublicRoute(currentPath)) return null;
 
     // Only process if authenticated (AuthGuard handles unauth).
     // Tour mode supplies a synthetic user via overrides — treat as authenticated.
@@ -94,7 +100,7 @@ class RoleGuard implements RouteGuard {
       final role = user.role.trim().toLowerCase();
       final status = user.status.trim().toLowerCase();
 
-      if (role != 'mohaffez') {
+      if (role != roleMohaffez) {
         return _homeForUser(role, status) ?? studentHomePath;
       }
 
@@ -151,9 +157,9 @@ class RoleGuard implements RouteGuard {
     if (user == null) {
       if (!inTour) return null;
       final tourRole = ref.read(tourModeProvider).role;
-      role = tourRole == TourRole.mohaffez ? 'mohaffez' : 'student';
+      role = tourRole == TourRole.mohaffez ? roleMohaffez : roleStudent;
     } else {
-      role = user.role.trim();
+      role = normalizeRole(user.role);
     }
     if (role.isEmpty) return loginPath;
 
@@ -166,16 +172,16 @@ class RoleGuard implements RouteGuard {
 
     // Enforce role-based access.
     if (_startsWithAny(currentPath, mohaffezRoutePrefixes) &&
-        role != 'mohaffez') {
+        role != roleMohaffez) {
       return studentHomePath;
     }
 
     if (_startsWithAny(currentPath, studentRoutePrefixes) &&
-        role == 'mohaffez') {
+        role == roleMohaffez) {
       return mohaffezHomePath;
     }
 
-    if (_startsWithAny(currentPath, adminRoutePrefixes) && role != 'admin') {
+    if (_startsWithAny(currentPath, adminRoutePrefixes) && role != roleAdmin) {
       return studentHomePath;
     }
 
@@ -189,9 +195,9 @@ class RoleGuard implements RouteGuard {
   static String? _homeForUser(String role, String status) {
     final normalized = role.trim().toLowerCase();
     final normalizedStatus = status.trim().toLowerCase();
-    if (normalized == 'admin') return adminHomePath;
-    if (normalized == 'student') return studentHomePath;
-    if (normalized == 'mohaffez') {
+    if (normalized == roleAdmin) return adminHomePath;
+    if (isLearnerAccountRole(normalized)) return studentHomePath;
+    if (normalized == roleMohaffez) {
       if (normalizedStatus == 'pending_approval') return '/teacher-pending';
       if (normalizedStatus == 'rejected') return '/teacher-rejected';
       return mohaffezHomePath;

@@ -1,4 +1,4 @@
-﻿// lib/screens/student_assignments_screen.dart
+// lib/screens/student_assignments_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -8,6 +8,48 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
+
+String? _cleanNonEmptyString(dynamic value) {
+  if (value is! String) return null;
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+List<Map<String, dynamic>> _filterSessionsForProfile(
+  List<Map<String, dynamic>> sessions,
+  String? studentProfileId, {
+  bool requireProfileScope = false,
+}) {
+  final profileId = _cleanNonEmptyString(studentProfileId);
+  if (profileId == null || profileId == 'self') {
+    return requireProfileScope ? const <Map<String, dynamic>>[] : sessions;
+  }
+  return sessions
+      .where((session) =>
+          _cleanNonEmptyString(session['studentProfileId']) == profileId)
+      .toList();
+}
+
+String? _assignmentLearnerName(
+  Map<String, dynamic> session,
+  String? activeProfileId,
+  String? activeProfileName,
+) {
+  final profileName = _cleanNonEmptyString(session['studentProfileName']);
+  if (profileName != null) return profileName;
+
+  final sessionProfileId = _cleanNonEmptyString(session['studentProfileId']);
+  final activeId = _cleanNonEmptyString(activeProfileId);
+  if (activeId != null && activeId != 'self' && sessionProfileId == activeId) {
+    return _cleanNonEmptyString(activeProfileName);
+  }
+
+  if (sessionProfileId != null) {
+    return _cleanNonEmptyString(session['studentName']);
+  }
+
+  return null;
+}
 
 class StudentAssignmentsScreen extends ConsumerWidget {
   const StudentAssignmentsScreen({super.key});
@@ -24,7 +66,23 @@ class StudentAssignmentsScreen extends ConsumerWidget {
           );
         }
 
-        return _AssignmentsContent(studentId: user.uid);
+        final activeProfileAsync = ref.watch(activeStudentProfileProvider);
+        final activeProfile = activeProfileAsync.valueOrNull;
+        final isParent = normalizeRole(user.role) == roleParent;
+        if (isParent && activeProfileAsync.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return _AssignmentsContent(
+          studentId: user.uid,
+          studentProfileId:
+              activeProfile?.isPersisted == true ? activeProfile!.id : null,
+          activeProfileName:
+              activeProfile?.isPersisted == true ? activeProfile!.name : null,
+          requireProfileScope: isParent,
+        );
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -40,8 +98,16 @@ class StudentAssignmentsScreen extends ConsumerWidget {
 
 class _AssignmentsContent extends ConsumerStatefulWidget {
   final String studentId;
+  final String? studentProfileId;
+  final String? activeProfileName;
+  final bool requireProfileScope;
 
-  const _AssignmentsContent({required this.studentId});
+  const _AssignmentsContent({
+    required this.studentId,
+    this.studentProfileId,
+    this.activeProfileName,
+    this.requireProfileScope = false,
+  });
 
   @override
   ConsumerState<_AssignmentsContent> createState() =>
@@ -49,7 +115,6 @@ class _AssignmentsContent extends ConsumerStatefulWidget {
 }
 
 class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
-
   Future<void> _refreshAssignments() async {
     ref.invalidate(studentSessionsFirstPageProvider(widget.studentId));
     await ref
@@ -79,7 +144,10 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
+                        colors: [
+                          AppThemeConstants.primary,
+                          AppThemeConstants.primaryVariant
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -96,7 +164,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: AppThemeConstants.onPrimary.withValues(alpha: 0.2),
+                                    color: AppThemeConstants.onPrimary
+                                        .withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
@@ -130,7 +199,11 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                 padding: const EdgeInsets.all(16),
                 sliver: sessionsAsync.when(
                   data: (sessions) {
-                    final completedSessions = sessions
+                    final completedSessions = _filterSessionsForProfile(
+                      sessions,
+                      widget.studentProfileId,
+                      requireProfileScope: widget.requireProfileScope,
+                    )
                         .where((s) => (s['status'] as String?) == 'completed')
                         .toList();
 
@@ -151,6 +224,8 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
                           return _CompletedAssignmentCard(
                             session: completedSessions[index],
                             studentId: widget.studentId,
+                            studentProfileId: widget.studentProfileId,
+                            activeProfileName: widget.activeProfileName,
                           );
                         },
                         childCount: completedSessions.length,
@@ -178,16 +253,20 @@ class _AssignmentsContentState extends ConsumerState<_AssignmentsContent> {
 }
 
 // ============================================================================
-  // COMPLETED ASSIGNMENT CARD
+// COMPLETED ASSIGNMENT CARD
 // ============================================================================
 
 class _CompletedAssignmentCard extends ConsumerStatefulWidget {
   final Map<String, dynamic> session;
   final String studentId;
+  final String? studentProfileId;
+  final String? activeProfileName;
 
   const _CompletedAssignmentCard({
     required this.session,
     required this.studentId,
+    this.studentProfileId,
+    this.activeProfileName,
   });
 
   @override
@@ -217,7 +296,8 @@ class _CompletedAssignmentCardState
       return;
     }
 
-    final mohaffezName = session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
+    final mohaffezName =
+        session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
     final result = await context.push<int>(
       '/rate-session/$sessionId?mohaffezName=${Uri.encodeComponent(mohaffezName)}',
     );
@@ -239,6 +319,12 @@ class _CompletedAssignmentCardState
   Widget build(BuildContext context) {
     final mohaffezName =
         session['mohaffezName'] as String? ?? ArabicLabels.mohaffez;
+    final learnerName = _assignmentLearnerName(
+      session,
+      widget.studentProfileId,
+      widget.activeProfileName,
+    );
+    final titleName = learnerName ?? mohaffezName;
     final hifz = session['hifzAssignment'] as String? ?? '';
     final muraja = session['murajaAssignment'] as String? ?? '';
     // Ayah range fields
@@ -266,7 +352,8 @@ class _CompletedAssignmentCardState
       elevation: AppThemeConstants.elevationSm,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppThemeConstants.success.withValues(alpha: 0.3), width: 2),
+        side: BorderSide(
+            color: AppThemeConstants.success.withValues(alpha: 0.3), width: 2),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -294,12 +381,22 @@ class _CompletedAssignmentCardState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        mohaffezName,
+                        titleName,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      if (learnerName != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'المعلم: $mohaffezName',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppThemeConstants.textSecondary,
+                          ),
+                        ),
+                      ],
                       if (sessionDate != null) ...[
                         const SizedBox(height: 4),
                         Text(
@@ -315,7 +412,8 @@ class _CompletedAssignmentCardState
                 ),
                 if (teacherRating == 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: AppThemeConstants.warning.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -323,7 +421,8 @@ class _CompletedAssignmentCardState
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.star_outline, size: 15, color: AppThemeConstants.warning),
+                        Icon(Icons.star_outline,
+                            size: 15, color: AppThemeConstants.warning),
                         SizedBox(width: 4),
                         Text(
                           'بانتظار تقييمك',
@@ -388,12 +487,15 @@ class _CompletedAssignmentCardState
                   decoration: BoxDecoration(
                     color: AppThemeConstants.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.4)),
+                    border: Border.all(
+                        color:
+                            AppThemeConstants.primary.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.note, size: 16, color: AppThemeConstants.warning),
+                      const Icon(Icons.note,
+                          size: 16, color: AppThemeConstants.warning),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -428,7 +530,8 @@ class _CompletedAssignmentCardState
               const SizedBox(height: 12),
               const Row(
                 children: [
-                  Icon(Icons.assignment, size: 18, color: AppThemeConstants.textSecondary),
+                  Icon(Icons.assignment,
+                      size: 18, color: AppThemeConstants.textSecondary),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -477,12 +580,14 @@ class _CompletedAssignmentCardState
                 decoration: BoxDecoration(
                   color: AppThemeConstants.primary.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: AppThemeConstants.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.message, size: 16, color: AppThemeConstants.primary),
+                    const Icon(Icons.message,
+                        size: 16, color: AppThemeConstants.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -521,10 +626,12 @@ class _CompletedAssignmentCardState
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _navigateToRating,
-                  icon: const Icon(Icons.star_outline, color: AppThemeConstants.onPrimary),
+                  icon: const Icon(Icons.star_outline,
+                      color: AppThemeConstants.onPrimary),
                   label: const Text(
                     ArabicLabels.rateSession,
-                    style: TextStyle(fontSize: 16, color: AppThemeConstants.onPrimary),
+                    style: TextStyle(
+                        fontSize: 16, color: AppThemeConstants.onPrimary),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppThemeConstants.secondary,
@@ -537,15 +644,18 @@ class _CompletedAssignmentCardState
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppThemeConstants.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppThemeConstants.success.withValues(alpha: 0.4)),
+                  border: Border.all(
+                      color: AppThemeConstants.success.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.verified, color: AppThemeConstants.success, size: 22),
+                    const Icon(Icons.verified,
+                        color: AppThemeConstants.success, size: 22),
                     const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
@@ -560,7 +670,8 @@ class _CompletedAssignmentCardState
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star, size: 16, color: AppThemeConstants.secondary),
+                        const Icon(Icons.star,
+                            size: 16, color: AppThemeConstants.secondary),
                         const SizedBox(width: 4),
                         Text(
                           '$teacherRating/10',
@@ -618,8 +729,8 @@ class _CompletedAssignmentCardState
                 children: [
                   ...List.generate(
                     rating > 5 ? 5 : rating,
-                    (index) =>
-                        const Icon(Icons.star, size: 14, color: AppThemeConstants.secondary),
+                    (index) => const Icon(Icons.star,
+                        size: 14, color: AppThemeConstants.secondary),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -636,15 +747,15 @@ class _CompletedAssignmentCardState
           ] else
             const Expanded(
               child: Text(
-              ArabicLabels.assignmentNotCompleted,
-              style: TextStyle(
-                fontSize: 13,
-                color: AppThemeConstants.error,
-                fontWeight: FontWeight.w600,
+                ArabicLabels.assignmentNotCompleted,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppThemeConstants.error,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
             ),
         ],
       ),
@@ -674,7 +785,8 @@ class _CompletedAssignmentItem extends StatefulWidget {
   });
 
   @override
-  State<_CompletedAssignmentItem> createState() => _CompletedAssignmentItemState();
+  State<_CompletedAssignmentItem> createState() =>
+      _CompletedAssignmentItemState();
 }
 
 class _CompletedAssignmentItemState extends State<_CompletedAssignmentItem> {
@@ -729,7 +841,8 @@ class _CompletedAssignmentItemState extends State<_CompletedAssignmentItem> {
                 if (widget.fromAyah != null || widget.toAyah != null) ...[
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: widget.color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
@@ -802,9 +915,9 @@ class _MistakeReviewCard extends StatelessWidget {
 
   void _openMushaf(BuildContext context) {
     if (_mistakes.isEmpty) return;
-    
+
     final startPage = _mistakes.first.pageNumber;
-    
+
     context.push(
       '/mushaf/$startPage',
       extra: <String, dynamic>{'mistakes': _mistakes},
@@ -824,7 +937,8 @@ class _MistakeReviewCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppThemeConstants.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.4)),
+        border:
+            Border.all(color: AppThemeConstants.primary.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,7 +963,7 @@ class _MistakeReviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Mistake type chips
           Wrap(
             spacing: 8,
@@ -863,7 +977,8 @@ class _MistakeReviewCard extends StatelessWidget {
                 ),
                 label: Text(
                   '${entry.key.arabicLabel} (${entry.value})',
-                  style: const TextStyle(fontSize: 12, color: AppThemeConstants.white),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppThemeConstants.white),
                 ),
                 backgroundColor: getMistakeColor(entry.key),
                 visualDensity: VisualDensity.compact,
@@ -872,7 +987,7 @@ class _MistakeReviewCard extends StatelessWidget {
             }).toList(),
           ),
           const SizedBox(height: 16),
-          
+
           // Review button
           SizedBox(
             width: double.infinity,
@@ -892,5 +1007,3 @@ class _MistakeReviewCard extends StatelessWidget {
     );
   }
 }
-
-

@@ -1,9 +1,11 @@
-﻿// lib/screens/booking/booking_method_screen.dart
+// lib/screens/booking/booking_method_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../shared/utils/time_formatter.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 final teacherPlansProvider =
@@ -27,6 +29,7 @@ class BookingMethodScreen extends ConsumerStatefulWidget {
 class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
   BookingPath? _committedPath;
   bool _navigatingAway = false;
+  bool _selectedPlanRouteScheduled = false;
 
   late final BookingFlowNotifier _bookingNotifier;
 
@@ -71,6 +74,19 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         .setBookingPath(BookingPath.newDirectRequest);
     setState(() => _navigatingAway = true);
     context.push('/booking/direct-request');
+  }
+
+  void _continueWithSelectedPlan(PricingPlanModel plan) {
+    if (_selectedPlanRouteScheduled) return;
+    _selectedPlanRouteScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (plan.type == PlanType.bundle) {
+        _onBuyNewBundle();
+      } else {
+        _onNewDirectRequest();
+      }
+    });
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
@@ -139,7 +155,8 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
         body: activeBundleAsync.when(
           data: (activeBundle) => teacherPlansAsync.when(
             data: (plans) => _buildOptionsList(context, activeBundle, plans),
-            loading: () => const Center(child: Column(
+            loading: () => const Center(
+                child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircularProgressIndicator(),
@@ -147,10 +164,11 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
                 Text('جاري تحميل خطط التسعير...'),
               ],
             )),
-            error: (err, stack) =>
-                _buildErrorWidget('فشل في تحميل خطط التسعير', studentId, slotContext),
+            error: (err, stack) => _buildErrorWidget(
+                'فشل في تحميل خطط التسعير', studentId, slotContext),
           ),
-          loading: () => const Center(child: Column(
+          loading: () => const Center(
+              child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircularProgressIndicator(),
@@ -158,8 +176,8 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
               Text('جاري تحميل الباقة النشطة...'),
             ],
           )),
-          error: (err, stack) =>
-              _buildErrorWidget('فشل في تحميل الباقة النشطة', studentId, slotContext),
+          error: (err, stack) => _buildErrorWidget(
+              'فشل في تحميل الباقة النشطة', studentId, slotContext),
         ),
       ),
     );
@@ -172,20 +190,82 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     ActiveBundleInfo? activeBundle,
     List<PricingPlanModel> plans,
   ) {
-    final hasBundlePlans = plans.any((plan) => plan.type == PlanType.bundle);
+    final flow = ref.read(bookingFlowProvider);
+    final currentUser = ref.watch(currentUserProvider).valueOrNull;
+    final activeProfile = ref.watch(activeStudentProfileProvider).valueOrNull;
+    final role = currentUser == null ? '' : normalizeRole(currentUser.role);
+    final learnerName = activeProfile?.name ??
+        (role == roleParent ? null : currentUser?.name.trim());
+    final needsChildSelection = role == roleParent && activeProfile == null;
+    final studentCountry = PricingCountryUtils.inferUserCountry(
+        ref.read(currentUserProvider).valueOrNull);
+    final modePlans = plans
+        .where((plan) =>
+            plan.isActive &&
+            PricingCountryUtils.matchesMode(
+              plan,
+              flow.slotContext?.sessionType,
+            ))
+        .toList();
+    final visiblePlans =
+        PricingCountryUtils.preferCountryPlans(modePlans, studentCountry.code);
+
+    final hasBundlePlans =
+        visiblePlans.any((plan) => plan.type == PlanType.bundle);
     final canBuyNewBundle = hasBundlePlans && activeBundle == null;
 
-    final singleSessionPrices = plans
-        .where((p) => p.type == PlanType.single)
-        .map((p) => p.priceEGP)
-        .toList();
-    final lowestPrice = singleSessionPrices.isEmpty
+    final singleSessionPlans =
+        visiblePlans.where((p) => p.type == PlanType.single).toList();
+    final lowestPlan = singleSessionPlans.isEmpty
         ? null
-        : singleSessionPrices.reduce((a, b) => a < b ? a : b);
+        : singleSessionPlans.reduce(
+            (a, b) => a.priceEGP < b.priceEGP ? a : b,
+          );
+
+    PricingPlanModel? selectedPlan;
+    final selectedPlanId = flow.selectedPlanId;
+    if (selectedPlanId != null && selectedPlanId.isNotEmpty) {
+      for (final plan in visiblePlans) {
+        if (plan.id == selectedPlanId) {
+          selectedPlan = plan;
+          break;
+        }
+      }
+    }
+    final selectedSinglePlan =
+        selectedPlan?.type == PlanType.single ? selectedPlan : lowestPlan;
+
+    if (selectedPlan != null && activeBundle == null && !needsChildSelection) {
+      _continueWithSelectedPlan(selectedPlan);
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 14),
+              Text('جاري تجهيز ملخص الحجز...'),
+            ],
+          ),
+        ),
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       children: [
+        if (flow.slotContext != null) ...[
+          _BookingSummaryBanner(
+            slotContext: flow.slotContext!,
+            learnerName: learnerName,
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (needsChildSelection) ...[
+          const _MissingLearnerCard(),
+          const SizedBox(height: 16),
+        ],
         _BookingOptionCard(
           icon: Icons.card_membership_rounded,
           backgroundColor: AppThemeConstants.successBackground,
@@ -195,8 +275,10 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
               ? 'متبقي ${activeBundle.remainingSessions} جلسة من ${activeBundle.totalSessions}'
               : 'لا توجد باقة نشطة لهذا النوع',
           hint: activeBundle == null ? 'اشترِ باقة أولاً' : null,
-          isEnabled: activeBundle != null,
-          onTap: activeBundle != null ? _onUseExistingBundle : null,
+          isEnabled: activeBundle != null && !needsChildSelection,
+          onTap: activeBundle != null && !needsChildSelection
+              ? _onUseExistingBundle
+              : null,
         ),
         const SizedBox(height: 16),
 
@@ -209,8 +291,9 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
               ? 'لديك باقة نشطة بالفعل لهذا النوع من الجلسات'
               : 'اختر باقة وابدأ على الفور',
           hint: activeBundle != null ? 'يجب إنهاء الباقة الحالية أولاً' : null,
-          isEnabled: canBuyNewBundle,
-          onTap: canBuyNewBundle ? _onBuyNewBundle : null,
+          isEnabled: canBuyNewBundle && !needsChildSelection,
+          onTap:
+              canBuyNewBundle && !needsChildSelection ? _onBuyNewBundle : null,
         ),
         const SizedBox(height: 16),
 
@@ -221,11 +304,11 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
           iconColor: AppThemeConstants.primary,
           borderColor: AppThemeConstants.primary,
           title: 'إرسال طلب حجز جديد',
-          subtitle: lowestPrice != null
-              ? 'دفع مباشر لجلسة واحدة • ${lowestPrice.toInt()} جنيه'
-              : 'دفع مباشر لجلسة واحدة',
-          isEnabled: true,
-          onTap: _onNewDirectRequest,
+          subtitle: selectedSinglePlan != null
+              ? 'جلسة واحدة • ${PricingCountryUtils.displayPriceText(selectedSinglePlan)} • الدفع بعد القبول'
+              : 'جلسة واحدة • الدفع بعد قبول المحفظ',
+          isEnabled: !needsChildSelection,
+          onTap: needsChildSelection ? null : _onNewDirectRequest,
         ),
         const SizedBox(height: 32),
 
@@ -246,14 +329,16 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     );
   }
 
-  Widget _buildErrorWidget(String message, String? studentId, dynamic slotContext) {
+  Widget _buildErrorWidget(
+      String message, String? studentId, dynamic slotContext) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppThemeConstants.error),
+            const Icon(Icons.error_outline,
+                size: 48, color: AppThemeConstants.error),
             const SizedBox(height: 12),
             Text(
               message,
@@ -278,7 +363,8 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
                         mohaffezId: slotContext.mohaffezId,
                         sessionType: slotContext.sessionType,
                       )));
-                      ref.invalidate(teacherPlansProvider(slotContext.mohaffezId));
+                      ref.invalidate(
+                          teacherPlansProvider(slotContext.mohaffezId));
                     }
                   },
                   icon: const Icon(Icons.refresh),
@@ -294,6 +380,239 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
 }
 
 // ─── Option card widget ───────────────────────────────────────────────────────
+
+class _BookingSummaryBanner extends StatelessWidget {
+  const _BookingSummaryBanner({
+    required this.slotContext,
+    required this.learnerName,
+  });
+
+  final SlotContext slotContext;
+  final String? learnerName;
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.tryParse(slotContext.slotDate);
+    final dateLabel = date == null
+        ? slotContext.slotDate
+        : '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+    final address = slotContext.imamAddressText?.trim();
+
+    return Card(
+      elevation: AppThemeConstants.elevationSm,
+      color: AppThemeConstants.accentBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppThemeConstants.borderRadiusLg,
+        side: BorderSide(
+          color: AppThemeConstants.primary.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppThemeConstants.primary.withValues(alpha: 0.12),
+                    borderRadius: AppThemeConstants.borderRadiusMd,
+                  ),
+                  child: const Icon(
+                    Icons.fact_check_rounded,
+                    color: AppThemeConstants.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'مراجعة طلب الحجز',
+                    style: AppThemeConstants.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppThemeConstants.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _BookingSummaryPill(
+                  icon: Icons.child_care_rounded,
+                  label: learnerName?.trim().isNotEmpty == true
+                      ? learnerName!.trim()
+                      : 'اختر الطالب',
+                  isWarning: learnerName?.trim().isNotEmpty != true,
+                ),
+                _BookingSummaryPill(
+                  icon: Icons.person_rounded,
+                  label: slotContext.mohaffezName,
+                ),
+                _BookingSummaryPill(
+                  icon: Icons.video_camera_back_rounded,
+                  label: ArabicLabels.getSessionTypeLabel(
+                    slotContext.sessionType,
+                  ),
+                ),
+                _BookingSummaryPill(
+                  icon: Icons.access_time_rounded,
+                  label: formatTimeToArabicAmPm(slotContext.preferredTimeSlot),
+                ),
+                _BookingSummaryPill(
+                  icon: Icons.calendar_today_rounded,
+                  label: dateLabel,
+                ),
+                if (address != null && address.isNotEmpty)
+                  _BookingSummaryPill(
+                    icon: Icons.location_on_rounded,
+                    label: address,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppThemeConstants.surface,
+                borderRadius: AppThemeConstants.borderRadiusMd,
+                border: Border.all(color: AppThemeConstants.outline),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: AppThemeConstants.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'لن يتم طلب الدفع الآن. سيتم إرسال الطلب للمحفظ، وبعد القبول يمكنك إتمام الدفع ومتابعة حالة الحجز.',
+                      style: AppThemeConstants.bodySmall.copyWith(
+                        color: AppThemeConstants.textSecondary,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingLearnerCard extends StatelessWidget {
+  const _MissingLearnerCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.warningBackground,
+        borderRadius: AppThemeConstants.borderRadiusLg,
+        border: Border.all(color: AppThemeConstants.warning),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.child_care_rounded,
+                color: AppThemeConstants.warning,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'اختر الابن قبل الحجز',
+                  style: AppThemeConstants.titleSmall.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppThemeConstants.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'هذا حساب ولي أمر. اختر الابن النشط حتى يظهر الطلب والجلسة والواجبات باسمه.',
+            style: AppThemeConstants.bodySmall.copyWith(
+              color: AppThemeConstants.textSecondary,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => context.push('/student-profiles'),
+              icon: const Icon(Icons.people_alt_rounded),
+              label: const Text('اختيار أو إضافة ابن'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppThemeConstants.primary,
+                foregroundColor: AppThemeConstants.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BookingSummaryPill extends StatelessWidget {
+  const _BookingSummaryPill({
+    required this.icon,
+    required this.label,
+    this.isWarning = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isWarning;
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        isWarning ? AppThemeConstants.warning : AppThemeConstants.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: AppThemeConstants.borderRadiusMd,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 210),
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: AppThemeConstants.bodySmall.copyWith(
+                color: AppThemeConstants.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _BookingOptionCard extends StatelessWidget {
   final IconData icon;
@@ -328,7 +647,7 @@ class _BookingOptionCard extends StatelessWidget {
         color: backgroundColor ?? AppThemeConstants.surface,
         shape: RoundedRectangleBorder(
           borderRadius: AppThemeConstants.borderRadiusMd,
-          side: borderColor != null 
+          side: borderColor != null
               ? BorderSide(color: borderColor!, width: 1.5)
               : BorderSide.none,
         ),
@@ -342,13 +661,14 @@ class _BookingOptionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: (iconColor ?? AppThemeConstants.primary).withValues(alpha: 0.1),
+                    color: (iconColor ?? AppThemeConstants.primary)
+                        .withValues(alpha: 0.1),
                     borderRadius: AppThemeConstants.borderRadiusSm,
                   ),
                   child: Icon(
                     icon,
                     size: 28,
-                    color: isEnabled 
+                    color: isEnabled
                         ? (iconColor ?? AppThemeConstants.primary)
                         : AppThemeConstants.textDisabled,
                   ),
@@ -361,7 +681,7 @@ class _BookingOptionCard extends StatelessWidget {
                       Text(
                         title,
                         style: AppThemeConstants.titleMedium.copyWith(
-                          color: isEnabled 
+                          color: isEnabled
                               ? AppThemeConstants.textPrimary
                               : AppThemeConstants.textDisabled,
                         ),
@@ -390,8 +710,8 @@ class _BookingOptionCard extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  Icons.chevron_right_rounded, 
-                  color: isEnabled 
+                  Icons.chevron_right_rounded,
+                  color: isEnabled
                       ? AppThemeConstants.textSecondary
                       : AppThemeConstants.textDisabled,
                 ),

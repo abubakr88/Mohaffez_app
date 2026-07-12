@@ -544,7 +544,7 @@ class _SessionDetailsScreenState extends ConsumerState<SessionDetailsScreen> {
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider).value;
     final isMohaffez = currentUser?.role == 'mohaffez';
-    final isStudent = currentUser?.role == 'student';
+    final isStudent = isLearnerAccountRole(currentUser?.role);
     final isAdmin = currentUser?.role == 'admin';
     final session = widget.session;
 

@@ -10,7 +10,8 @@
 //   • quiz mastery       (correct answers / accuracy / best streak)
 //   • juz milestones     (completed ajzaa + memorization milestones)
 //   • points / XP        (a single currency aggregating all activity)
-import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore, Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show FirebaseFirestore, Query, Timestamp;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ─── Quran content sizing ───────────────────────────────────────────────────────
@@ -21,16 +22,123 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // reflect *real* content — e.g. البقرة alone is ~48 pages ≈ 2.4 أجزاء, not "1 of
 // 114 surahs".
 const List<int> surahPageWeight = <int>[
-  17, 795, 447, 488, 356, 381, 430, 166, 348, 224, 232, 224, 108, 108, 91, 240,
-  190, 190, 124, 157, 166, 166, 132, 157, 124, 166, 141, 182, 132, 108, 66, 50,
-  166, 108, 99, 91, 116, 91, 149, 157, 99, 108, 108, 50, 58, 75, 66, 75, 41, 41,
-  50, 41, 41, 50, 50, 50, 75, 58, 58, 41, 25, 25, 25, 33, 33, 33, 41, 33, 33, 33,
-  25, 33, 25, 33, 17, 33, 25, 25, 25, 17, 17, 8, 33, 8, 17, 8, 17, 8, 25, 8, 8,
-  14, 6, 6, 8, 8, 8, 14, 6, 11, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+  17,
+  795,
+  447,
+  488,
+  356,
+  381,
+  430,
+  166,
+  348,
+  224,
+  232,
+  224,
+  108,
+  108,
+  91,
+  240,
+  190,
+  190,
+  124,
+  157,
+  166,
+  166,
+  132,
+  157,
+  124,
+  166,
+  141,
+  182,
+  132,
+  108,
+  66,
+  50,
+  166,
+  108,
+  99,
+  91,
+  116,
+  91,
+  149,
+  157,
+  99,
+  108,
+  108,
+  50,
+  58,
+  75,
+  66,
+  75,
+  41,
+  41,
+  50,
+  41,
+  41,
+  50,
+  50,
+  50,
+  75,
+  58,
+  58,
+  41,
+  25,
+  25,
+  25,
+  33,
+  33,
+  33,
+  41,
+  33,
+  33,
+  33,
+  25,
+  33,
+  25,
+  33,
+  17,
+  33,
+  25,
+  25,
+  25,
+  17,
+  17,
+  8,
+  33,
+  8,
+  17,
+  8,
+  17,
+  8,
+  25,
+  8,
+  8,
+  14,
+  6,
+  6,
+  8,
+  8,
+  8,
+  14,
+  6,
+  11,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
+  6,
 ];
 
-final int _totalSurahWeight =
-    surahPageWeight.fold<int>(0, (a, b) => a + b);
+final int _totalSurahWeight = surahPageWeight.fold<int>(0, (a, b) => a + b);
 
 /// Fraction of the whole Quran memorized (0..1), weighted by real surah length.
 double memorizedQuranFraction(Set<int> memorized) {
@@ -112,12 +220,120 @@ XpTier resolveXpTier(int xp) {
 /// in the UI. NOTE: do not use this to measure memorized content (a surah like
 /// البقرة spans several ajzaa); use [memorizedJuzEquivalent] for that instead.
 const List<int> surahStartJuz = <int>[
-  1, 1, 3, 4, 6, 7, 8, 9, 10, 11, 11, 12, 13, 13, 14, 14, 15, 15, 16, 16,
-  17, 17, 18, 18, 18, 19, 19, 20, 20, 21, 21, 21, 21, 22, 22, 22, 23, 23, 23, 24,
-  24, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 28, 28, 28,
-  28, 28, 28, 28, 28, 28, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 29, 30, 30, 30,
-  30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
-  30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
+  1,
+  1,
+  3,
+  4,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  11,
+  12,
+  13,
+  13,
+  14,
+  14,
+  15,
+  15,
+  16,
+  16,
+  17,
+  17,
+  18,
+  18,
+  18,
+  19,
+  19,
+  20,
+  20,
+  21,
+  21,
+  21,
+  21,
+  22,
+  22,
+  22,
+  23,
+  23,
+  23,
+  24,
+  24,
+  25,
+  25,
+  25,
+  25,
+  26,
+  26,
+  26,
+  26,
+  26,
+  26,
+  27,
+  27,
+  27,
+  27,
+  27,
+  27,
+  28,
+  28,
+  28,
+  28,
+  28,
+  28,
+  28,
+  28,
+  28,
+  29,
+  29,
+  29,
+  29,
+  29,
+  29,
+  29,
+  29,
+  29,
+  29,
+  29,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
+  30,
 ];
 
 /// Ajzaa-worth of memorized content (0..30). Content-weighted — see
@@ -170,7 +386,8 @@ class QuizStats {
     this.sessionsWithQuiz = 0,
   });
 
-  int get accuracyPct => totalAsked == 0 ? 0 : ((totalCorrect / totalAsked) * 100).round();
+  int get accuracyPct =>
+      totalAsked == 0 ? 0 : ((totalCorrect / totalAsked) * 100).round();
 }
 
 class StudentProgress {
@@ -198,13 +415,35 @@ DateTime? _toDateTime(dynamic v) {
 /// One read of the student's completed sessions, yielding session count, dates
 /// (for streaks) and aggregated quiz stats (for mastery). Replaces several
 /// single-purpose queries with one. Auto-disposes per student.
-final studentProgressProvider =
-    FutureProvider.autoDispose.family<StudentProgress, String>((ref, studentId) async {
-  final snap = await FirebaseFirestore.instance
+final studentProgressProvider = FutureProvider.autoDispose
+    .family<StudentProgress, String>((ref, studentId) async {
+  return _loadStudentProgress(studentId: studentId);
+});
+
+final learnerProgressProvider = FutureProvider.autoDispose
+    .family<StudentProgress, ({String studentId, String? studentProfileId})>(
+        (ref, params) async {
+  return _loadStudentProgress(
+    studentId: params.studentId,
+    studentProfileId: params.studentProfileId,
+  );
+});
+
+Future<StudentProgress> _loadStudentProgress({
+  required String studentId,
+  String? studentProfileId,
+}) async {
+  Query<Map<String, dynamic>> query = FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('studentId', isEqualTo: studentId)
-      .where('status', isEqualTo: 'completed')
-      .get();
+      .where('status', isEqualTo: 'completed');
+
+  final profileId = studentProfileId?.trim();
+  if (profileId != null && profileId.isNotEmpty && profileId != 'self') {
+    query = query.where('studentProfileId', isEqualTo: profileId);
+  }
+
+  final snap = await query.get();
 
   final dates = <DateTime>[];
   var totalCorrect = 0;
@@ -240,7 +479,7 @@ final studentProgressProvider =
       sessionsWithQuiz: sessionsWithQuiz,
     ),
   );
-});
+}
 
 // ─── Achievement model + catalog ───────────────────────────────────────────────
 enum AchievementCategory { session, streak, memorization, juz, quiz }
@@ -307,30 +546,177 @@ List<Achievement> _build({
 }) {
   return [
     // Sessions
-    Achievement(id: 'sess_1', title: 'أول خطوة', emoji: '🌟', hint: 'أكمل أول حلقة', current: sessions, target: 1, category: AchievementCategory.session),
-    Achievement(id: 'sess_5', title: 'المداوم', emoji: '🔥', hint: '5 حلقات مكتملة', current: sessions, target: 5, category: AchievementCategory.session),
-    Achievement(id: 'sess_15', title: 'الحريص', emoji: '💎', hint: '15 حلقة مكتملة', current: sessions, target: 15, category: AchievementCategory.session),
-    Achievement(id: 'sess_30', title: 'المثابر', emoji: '⚡', hint: '30 حلقة مكتملة', current: sessions, target: 30, category: AchievementCategory.session),
-    Achievement(id: 'sess_60', title: 'المتفوق', emoji: '🏅', hint: '60 حلقة مكتملة', current: sessions, target: 60, category: AchievementCategory.session),
+    Achievement(
+        id: 'sess_1',
+        title: 'أول خطوة',
+        emoji: '🌟',
+        hint: 'أكمل أول حلقة',
+        current: sessions,
+        target: 1,
+        category: AchievementCategory.session),
+    Achievement(
+        id: 'sess_5',
+        title: 'المداوم',
+        emoji: '🔥',
+        hint: '5 حلقات مكتملة',
+        current: sessions,
+        target: 5,
+        category: AchievementCategory.session),
+    Achievement(
+        id: 'sess_15',
+        title: 'الحريص',
+        emoji: '💎',
+        hint: '15 حلقة مكتملة',
+        current: sessions,
+        target: 15,
+        category: AchievementCategory.session),
+    Achievement(
+        id: 'sess_30',
+        title: 'المثابر',
+        emoji: '⚡',
+        hint: '30 حلقة مكتملة',
+        current: sessions,
+        target: 30,
+        category: AchievementCategory.session),
+    Achievement(
+        id: 'sess_60',
+        title: 'المتفوق',
+        emoji: '🏅',
+        hint: '60 حلقة مكتملة',
+        current: sessions,
+        target: 60,
+        category: AchievementCategory.session),
     // Streak
-    Achievement(id: 'streak_2', title: 'بداية موفقة', emoji: '✨', hint: 'أسبوعان متتاليان', current: weeklyStreak, target: 2, category: AchievementCategory.streak),
-    Achievement(id: 'streak_4', title: 'ملتزم', emoji: '🔥', hint: '4 أسابيع متتالية', current: weeklyStreak, target: 4, category: AchievementCategory.streak),
-    Achievement(id: 'streak_8', title: 'لا يتوقف', emoji: '🚀', hint: '8 أسابيع متتالية', current: weeklyStreak, target: 8, category: AchievementCategory.streak),
-    Achievement(id: 'streak_12', title: 'فولاذي', emoji: '🛡️', hint: '12 أسبوعاً متتالياً', current: weeklyStreak, target: 12, category: AchievementCategory.streak),
+    Achievement(
+        id: 'streak_2',
+        title: 'بداية موفقة',
+        emoji: '✨',
+        hint: 'أسبوعان متتاليان',
+        current: weeklyStreak,
+        target: 2,
+        category: AchievementCategory.streak),
+    Achievement(
+        id: 'streak_4',
+        title: 'ملتزم',
+        emoji: '🔥',
+        hint: '4 أسابيع متتالية',
+        current: weeklyStreak,
+        target: 4,
+        category: AchievementCategory.streak),
+    Achievement(
+        id: 'streak_8',
+        title: 'لا يتوقف',
+        emoji: '🚀',
+        hint: '8 أسابيع متتالية',
+        current: weeklyStreak,
+        target: 8,
+        category: AchievementCategory.streak),
+    Achievement(
+        id: 'streak_12',
+        title: 'فولاذي',
+        emoji: '🛡️',
+        hint: '12 أسبوعاً متتالياً',
+        current: weeklyStreak,
+        target: 12,
+        category: AchievementCategory.streak),
     // Quiz mastery
-    Achievement(id: 'quiz_correct_10', title: 'رامي السهام', emoji: '🎯', hint: '10 إجابات صحيحة', current: quiz.totalCorrect, target: 10, category: AchievementCategory.quiz),
-    Achievement(id: 'quiz_correct_50', title: 'قنّاص', emoji: '🏹', hint: '50 إجابة صحيحة', current: quiz.totalCorrect, target: 50, category: AchievementCategory.quiz),
-    Achievement(id: 'quiz_streak_5', title: 'سلسلة ذهبية', emoji: '⚡', hint: 'سلسلة 5 إجابات صحيحة', current: quiz.bestStreak, target: 5, category: AchievementCategory.quiz),
-    Achievement(id: 'quiz_acc_90', title: 'الدقة العالية', emoji: '💯', hint: 'دقة 90% أو أعلى', current: quiz.accuracyPct, target: 90, category: AchievementCategory.quiz),
+    Achievement(
+        id: 'quiz_correct_10',
+        title: 'رامي السهام',
+        emoji: '🎯',
+        hint: '10 إجابات صحيحة',
+        current: quiz.totalCorrect,
+        target: 10,
+        category: AchievementCategory.quiz),
+    Achievement(
+        id: 'quiz_correct_50',
+        title: 'قنّاص',
+        emoji: '🏹',
+        hint: '50 إجابة صحيحة',
+        current: quiz.totalCorrect,
+        target: 50,
+        category: AchievementCategory.quiz),
+    Achievement(
+        id: 'quiz_streak_5',
+        title: 'سلسلة ذهبية',
+        emoji: '⚡',
+        hint: 'سلسلة 5 إجابات صحيحة',
+        current: quiz.bestStreak,
+        target: 5,
+        category: AchievementCategory.quiz),
+    Achievement(
+        id: 'quiz_acc_90',
+        title: 'الدقة العالية',
+        emoji: '💯',
+        hint: 'دقة 90% أو أعلى',
+        current: quiz.accuracyPct,
+        target: 90,
+        category: AchievementCategory.quiz),
     // Memorization — measured by *portion of the Quran*, not surah count.
-    Achievement(id: 'mem_first', title: 'أول سورة', emoji: '🌸', hint: 'احفظ أول سورة', current: memorizedCount, target: 1, category: AchievementCategory.memorization),
-    Achievement(id: 'mem_quarter', title: 'ربع القرآن', emoji: '📜', hint: 'احفظ ما يعادل ٧ أجزاء', current: juzEquivalent, target: 7, category: AchievementCategory.memorization),
-    Achievement(id: 'mem_half', title: 'نصف القرآن', emoji: '🌙', hint: 'احفظ ما يعادل ١٥ جزءاً', current: juzEquivalent, target: 15, category: AchievementCategory.memorization),
-    Achievement(id: 'mem_full', title: 'الحافظ الكريم', emoji: '👑', hint: 'احفظ القرآن كاملاً', current: juzEquivalent, target: 30, category: AchievementCategory.memorization),
+    Achievement(
+        id: 'mem_first',
+        title: 'أول سورة',
+        emoji: '🌸',
+        hint: 'احفظ أول سورة',
+        current: memorizedCount,
+        target: 1,
+        category: AchievementCategory.memorization),
+    Achievement(
+        id: 'mem_quarter',
+        title: 'ربع القرآن',
+        emoji: '📜',
+        hint: 'احفظ ما يعادل ٧ أجزاء',
+        current: juzEquivalent,
+        target: 7,
+        category: AchievementCategory.memorization),
+    Achievement(
+        id: 'mem_half',
+        title: 'نصف القرآن',
+        emoji: '🌙',
+        hint: 'احفظ ما يعادل ١٥ جزءاً',
+        current: juzEquivalent,
+        target: 15,
+        category: AchievementCategory.memorization),
+    Achievement(
+        id: 'mem_full',
+        title: 'الحافظ الكريم',
+        emoji: '👑',
+        hint: 'احفظ القرآن كاملاً',
+        current: juzEquivalent,
+        target: 30,
+        category: AchievementCategory.memorization),
     // Juz milestones — content-weighted ajzaa (e.g. البقرة ≈ جزءان ونصف).
-    Achievement(id: 'juz_1', title: 'أول جزء', emoji: '📗', hint: 'احفظ ما يعادل جزءاً كاملاً', current: juzEquivalent, target: 1, category: AchievementCategory.juz),
-    Achievement(id: 'juz_3', title: 'ثلاثة أجزاء', emoji: '📚', hint: 'احفظ ما يعادل ٣ أجزاء', current: juzEquivalent, target: 3, category: AchievementCategory.juz),
-    Achievement(id: 'juz_5', title: 'خمسة أجزاء', emoji: '🏅', hint: 'احفظ ما يعادل ٥ أجزاء', current: juzEquivalent, target: 5, category: AchievementCategory.juz),
-    Achievement(id: 'juz_10', title: 'عشرة أجزاء', emoji: '🏆', hint: 'احفظ ما يعادل ١٠ أجزاء', current: juzEquivalent, target: 10, category: AchievementCategory.juz),
+    Achievement(
+        id: 'juz_1',
+        title: 'أول جزء',
+        emoji: '📗',
+        hint: 'احفظ ما يعادل جزءاً كاملاً',
+        current: juzEquivalent,
+        target: 1,
+        category: AchievementCategory.juz),
+    Achievement(
+        id: 'juz_3',
+        title: 'ثلاثة أجزاء',
+        emoji: '📚',
+        hint: 'احفظ ما يعادل ٣ أجزاء',
+        current: juzEquivalent,
+        target: 3,
+        category: AchievementCategory.juz),
+    Achievement(
+        id: 'juz_5',
+        title: 'خمسة أجزاء',
+        emoji: '🏅',
+        hint: 'احفظ ما يعادل ٥ أجزاء',
+        current: juzEquivalent,
+        target: 5,
+        category: AchievementCategory.juz),
+    Achievement(
+        id: 'juz_10',
+        title: 'عشرة أجزاء',
+        emoji: '🏆',
+        hint: 'احفظ ما يعادل ١٠ أجزاء',
+        current: juzEquivalent,
+        target: 10,
+        category: AchievementCategory.juz),
   ];
 }

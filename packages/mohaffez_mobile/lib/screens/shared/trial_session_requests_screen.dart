@@ -132,6 +132,7 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = request['status'] as String? ?? '';
     final pending = status == 'pending_teacher';
+    final terminalMessage = _trialTerminalMessage(status);
     final windows = List<Map<String, dynamic>>.from(
       request['availabilityWindows'] as List? ?? const [],
     );
@@ -169,8 +170,15 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
                 ),
               ],
             ),
-          ] else if (status == 'awaiting_student_confirmation')
+          ] else if (status == 'awaiting_student_confirmation' ||
+              status == 'confirmed' ||
+              terminalMessage != null) ...[
             _ProposalSummary(request: request),
+            if (terminalMessage != null) ...[
+              const SizedBox(height: 10),
+              _TerminalStatusMessage(message: terminalMessage),
+            ],
+          ],
         ],
       ),
     );
@@ -348,6 +356,7 @@ class _StudentTrialRequestCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = request['status'] as String? ?? '';
+    final terminalMessage = _trialTerminalMessage(status);
     return _TrialCard(
       title: request['mohaffezName'] as String? ?? 'المحفظ',
       status: status,
@@ -377,9 +386,13 @@ class _StudentTrialRequestCard extends ConsumerWidget {
                 ),
               ],
             ),
-          ] else if (status == 'confirmed')
-            _ProposalSummary(request: request)
-          else if (request['rejectionReason'] != null)
+          ] else if (status == 'confirmed' || terminalMessage != null) ...[
+            _ProposalSummary(request: request),
+            if (terminalMessage != null) ...[
+              const SizedBox(height: 10),
+              _TerminalStatusMessage(message: terminalMessage),
+            ],
+          ] else if (request['rejectionReason'] != null)
             Text('السبب: ${request['rejectionReason']}'),
         ],
       ),
@@ -540,6 +553,25 @@ class _ProposalSummary extends StatelessWidget {
   }
 }
 
+class _TerminalStatusMessage extends StatelessWidget {
+  const _TerminalStatusMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.grey100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(message),
+    );
+  }
+}
+
 class _InfoChip extends StatelessWidget {
   const _InfoChip({required this.icon, required this.label});
 
@@ -662,12 +694,59 @@ String _formatRange(DateTime start, DateTime end) {
         color: AppThemeConstants.success,
         icon: Icons.check_circle,
       );
+    case 'completed':
+      return (
+        label: 'مكتملة',
+        color: AppThemeConstants.success,
+        icon: Icons.task_alt,
+      );
+    case 'cancelled_by_teacher':
+      return (
+        label: 'ألغاه المحفظ',
+        color: AppThemeConstants.warning,
+        icon: Icons.cancel_schedule_send,
+      );
+    case 'cancelled_by_student':
+      return (
+        label: 'ألغاه الطالب',
+        color: AppThemeConstants.warning,
+        icon: Icons.cancel_schedule_send,
+      );
+    case 'teacher_no_show':
+      return (
+        label: 'غياب المحفظ',
+        color: AppThemeConstants.error,
+        icon: Icons.person_off,
+      );
+    case 'student_no_show':
+      return (
+        label: 'غياب الطالب',
+        color: AppThemeConstants.error,
+        icon: Icons.person_off,
+      );
     default:
       return (
         label: 'مرفوض',
         color: AppThemeConstants.error,
         icon: Icons.cancel,
       );
+  }
+}
+
+String? _trialTerminalMessage(String status) {
+  switch (status) {
+    case 'completed':
+      return 'تم إكمال الحلقة التجريبية.';
+    case 'cancelled_by_teacher':
+      return 'تم إلغاء الحلقة التجريبية من المحفظ.';
+    case 'cancelled_by_student':
+      return 'تم إلغاء الحلقة التجريبية من الطالب.';
+    case 'teacher_no_show':
+      return 'تم تسجيل غياب المحفظ عن الحلقة التجريبية.';
+    case 'student_no_show':
+      return 'تم تسجيل غياب الطالب عن الحلقة التجريبية.';
+    default:
+      return null;
   }
 }
 

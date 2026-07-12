@@ -23,6 +23,63 @@ const STATUS = {
   CANCELLED: 'cancelled',
 } as const;
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function optionalTimestamp(
+  value: unknown
+): FirebaseFirestore.Timestamp | null {
+  if (value instanceof admin.firestore.Timestamp) return value;
+  if (value instanceof Date) return admin.firestore.Timestamp.fromDate(value);
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return admin.firestore.Timestamp.fromDate(parsed);
+    }
+  }
+  return null;
+}
+
+function buildLearnerSnapshot(
+  primary: Record<string, unknown>,
+  fallback: Record<string, unknown> | null | undefined,
+  studentId: string
+): Record<string, unknown> {
+  return {
+    guardianId:
+      optionalString(primary['guardianId']) ??
+      optionalString(fallback?.['guardianId']) ??
+      studentId,
+    guardianName:
+      optionalString(primary['guardianName']) ??
+      optionalString(fallback?.['guardianName']),
+    studentProfileId:
+      optionalString(primary['studentProfileId']) ??
+      optionalString(fallback?.['studentProfileId']),
+    studentProfileName:
+      optionalString(primary['studentProfileName']) ??
+      optionalString(fallback?.['studentProfileName']) ??
+      optionalString(primary['studentName']) ??
+      optionalString(fallback?.['studentName']),
+    studentProfileGender:
+      optionalString(primary['studentProfileGender']) ??
+      optionalString(fallback?.['studentProfileGender']),
+    studentProfileBirthDate:
+      optionalTimestamp(primary['studentProfileBirthDate']) ??
+      optionalTimestamp(fallback?.['studentProfileBirthDate']),
+    studentAge:
+      optionalNumber(primary['studentAge']) ??
+      optionalNumber(fallback?.['studentAge']),
+  };
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. studentMarkedDirectPayment
@@ -52,11 +109,20 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       imamAddressLat,
       imamAddressLng,
       mohaffezPhone,
+      studentPhone,
       planType,
       planId,
       planTitle,
       sessionsCount,
       validityDays,
+      studentCountryCode,
+      studentCountryName,
+      displayCurrencyCode,
+      displayCurrencyLabel,
+      displayAmount,
+      fxRateToEGP,
+      chargedAmountEGP,
+      sessionDurationMinutes,
     } = data;
 
     if (typeof requestId !== 'string' || requestId.trim().length === 0) {
@@ -70,6 +136,26 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       typeof sessionsCount === 'number' ? sessionsCount : null;
     const finalValidityDays: number | null =
       typeof validityDays === 'number' ? validityDays : null;
+    const pricingSnapshot = {
+      studentCountryCode:
+        typeof studentCountryCode === 'string' ? studentCountryCode : null,
+      studentCountryName:
+        typeof studentCountryName === 'string' ? studentCountryName : null,
+      displayCurrencyCode:
+        typeof displayCurrencyCode === 'string' ? displayCurrencyCode : null,
+      displayCurrencyLabel:
+        typeof displayCurrencyLabel === 'string' ? displayCurrencyLabel : null,
+      displayAmount:
+        typeof displayAmount === 'number' ? displayAmount : null,
+      fxRateToEGP:
+        typeof fxRateToEGP === 'number' ? fxRateToEGP : null,
+      chargedAmountEGP:
+        typeof chargedAmountEGP === 'number' ? chargedAmountEGP : null,
+      sessionDurationMinutes:
+        typeof sessionDurationMinutes === 'number'
+          ? sessionDurationMinutes
+          : null,
+    };
     const isBundleOrSubscription =
       finalPlanType === 'bundle' || finalPlanType === 'subscription';
 
@@ -86,6 +172,15 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       }
 
       const reqData = reqSnap.data()!;
+      const learnerSnapshot = buildLearnerSnapshot(
+        data as Record<string, unknown>,
+        reqData,
+        studentId
+      );
+      const effectiveStudentName =
+        optionalString(learnerSnapshot['studentProfileName']) ??
+        optionalString(studentName) ??
+        'الطالب';
 
       if (reqData.status === STATUS.ACCEPTED) {
         throw new functions.https.HttpsError(
@@ -132,9 +227,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       if (debtPiastres > thresholdPiastres) {
         throw new functions.https.HttpsError(
           'failed-precondition',
-          `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
-            `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
-            `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+          'الدفع المباشر غير متاح لهذا المحفظ حاليًا. يرجى اختيار الدفع الإلكتروني أو المحاولة لاحقًا.',
         );
       }
 
@@ -184,7 +277,8 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           id: newReqRef.id,
           status: STATUS.AWAITING_DIRECT,
           studentId,
-          studentName,
+          studentName: effectiveStudentName,
+          ...learnerSnapshot,
           mohaffezId,
           mohaffezName,
           sessionType,
@@ -201,11 +295,16 @@ export const studentMarkedDirectPayment = functions.https.onCall(
           planTitle:      finalPlanTitle,
           sessionsCount:  finalSessionsCount,
           validityDays:   finalValidityDays,
+          ...pricingSnapshot,
           isPaid: false,
           selectedPaymentMethod: 'directpayment',
           directPaymentRequestId: null,
           slotLockId: newLockRef.id,
           paymentAmount: amount,
+          studentPhone:
+            typeof studentPhone === 'string' && studentPhone.trim().length > 0
+              ? studentPhone.trim()
+              : null,
           requiresPaymentOnAcceptance: false,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
@@ -231,7 +330,8 @@ export const studentMarkedDirectPayment = functions.https.onCall(
 
         originalSessionRequestId: requestId,
         studentId,
-        studentName,
+        studentName: effectiveStudentName,
+        ...learnerSnapshot,
         mohaffezId,
         mohaffezName,
         amount,
@@ -250,6 +350,10 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         imamAddressLat:  imamAddressLat  ?? null,
         imamAddressLng:  imamAddressLng  ?? null,
         mohaffezPhone:   mohaffezPhone   ?? null,
+        studentPhone:
+          typeof studentPhone === 'string' && studentPhone.trim().length > 0
+            ? studentPhone.trim()
+            : null,
         paymentMethod,
         studentNote: studentNote ?? null,
         status: 'pendingconfirmation',
@@ -263,6 +367,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         planTitle:     finalPlanTitle,
         sessionsCount: finalSessionsCount,
         validityDays:  finalValidityDays,
+        ...pricingSnapshot,
       });
 
       // WRITE D: update existing sessionRequest
@@ -333,6 +438,13 @@ export const studentMarkedDirectPayment = functions.https.onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 export const mohaffezConfirmDirectPayment = functions.https.onCall(
   async (data, context) => {
+    functions.logger.info('mohaffezConfirmDirectPayment invoked', {
+      directPaymentRequestId:
+        optionalString((data as { directPaymentRequestId?: unknown })?.directPaymentRequestId) ?? null,
+      authUid: context.auth?.uid ?? null,
+      appId: (context as unknown as { app?: { appId?: string } }).app?.appId ?? null,
+    });
+
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', 'Login required');
     }
@@ -351,6 +463,10 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
     // ✅ FIX Bug2: try/catch instead of .catch() so raw errors are wrapped
     //    with their actual message, and HttpsErrors are re-thrown as-is.
     try {
+      functions.logger.info('mohaffezConfirmDirectPayment started', {
+        directPaymentRequestId,
+        mohaffezId,
+      });
       return await db.runTransaction(async (tx) => {
         // ── READS ──
         const dpRef  = db.collection('directPaymentRequests').doc(directPaymentRequestId);
@@ -415,25 +531,84 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
             : 0.05;
 
         // ✅ FIX Bug1: instanceof guard before .toDate() — prevents TypeError → INTERNAL
-        if (!(dp.sessionDate instanceof admin.firestore.Timestamp)) {
+        const studentId =
+          optionalString(dp.studentId) ?? optionalString(reqData.studentId);
+        if (!studentId) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'directPaymentRequests doc is missing studentId.'
+          );
+        }
+
+        const sessionAmount =
+          optionalNumber(dp.amount) ?? optionalNumber(reqData.paymentAmount);
+        if (sessionAmount === null || sessionAmount <= 0) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'directPaymentRequests doc has invalid or missing amount.'
+          );
+        }
+
+        const sessionDate =
+          optionalTimestamp(dp.sessionDate) ??
+          optionalTimestamp(reqData.slotDate) ??
+          optionalTimestamp(reqData.sessionDate);
+        if (!sessionDate) {
           throw new functions.https.HttpsError(
             'failed-precondition',
             'directPaymentRequests doc has invalid or missing sessionDate.'
           );
         }
-        const sessionDate = dp.sessionDate as admin.firestore.Timestamp;
+
+        const slotStart =
+          optionalTimestamp(dp.slotStart) ?? optionalTimestamp(reqData.slotStart);
+        const slotEnd =
+          optionalTimestamp(dp.slotEnd) ?? optionalTimestamp(reqData.slotEnd);
+        if (!slotStart || !slotEnd) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'directPayment/sessionRequest docs are missing slotStart or slotEnd.'
+          );
+        }
+
+        const sessionType = optionalString(dp.sessionType) ?? reqSessionType;
+        const preferredTimeSlot =
+          optionalString(dp.preferredTimeSlot) ??
+          optionalString(reqData.preferredTimeSlot);
+        if (!preferredTimeSlot) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'directPayment/sessionRequest docs are missing preferredTimeSlot.'
+          );
+        }
+
+        const mohaffezName =
+          optionalString(dp.mohaffezName) ??
+          optionalString(reqData.mohaffezName) ??
+          '';
+        const preferredProvider =
+          sessionType === 'online'
+            ? optionalString(dp.preferredProvider) ??
+              optionalString(reqData.preferredProvider)
+            : null;
+        const learnerSnapshot = buildLearnerSnapshot(
+          dp as Record<string, unknown>,
+          reqData,
+          studentId
+        );
+        const effectiveStudentName =
+          optionalString(learnerSnapshot['studentProfileName']) ??
+          optionalString(dp.studentName) ??
+          'الطالب';
 
         // Compute commission before writes so we can pre-read wallet state.
         const commissionAmount =
           typeof lockedInAmount === 'number' && isFinite(lockedInAmount) && lockedInAmount >= 0
             ? lockedInAmount
-            : (dp.amount as number) * commissionRate;
+            : sessionAmount * commissionRate;
 
         // Create session ref (generates ID only — no read).
         const sessionRef = db.collection('hafizSessions').doc();
-        const slotStart  = dp.slotStart as admin.firestore.Timestamp;
-        const slotEnd    = dp.slotEnd   as admin.firestore.Timestamp;
-
         // Pre-read wallet state for the commission ledger entry before any
         // writes. Firestore transactions require all reads before all writes.
         let ledgerPrep: LedgerPrep | null = null;
@@ -460,7 +635,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
             createdBy: 'system',
             metadata: {
               directPaymentRequestId,
-              sessionAmountEgp: dp.amount,
+              sessionAmountEgp: sessionAmount,
               commissionRate,
               commissionEgp: commissionAmount,
             },
@@ -471,24 +646,41 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
         tx.set(sessionRef, {
           requestId:           (dp.sessionRequestId as string | null) ?? null,
           mohaffezId,
-          studentId:           dp.studentId,
-          mohaffezName:        dp.mohaffezName,
-          studentName:         dp.studentName,
-          sessionType:         dp.sessionType,
-          preferredProvider:   (reqData.preferredProvider as string | undefined) ?? null,
-          preferredTimeSlot:   dp.preferredTimeSlot,
+          studentId,
+          mohaffezName,
+          studentName:         effectiveStudentName,
+          ...learnerSnapshot,
+          sessionType,
+          preferredProvider,
+          preferredTimeSlot,
           sessionDate,
           slotStart,
           slotEnd,
           status:              'accepted',
           isPaid:              true,
-          sessionPrice:        dp.amount,
+          sessionPrice:        sessionAmount,
           paymentType:         'directpayment',
           directPaymentRequestId,
-          mohaffezPhone:       dp.mohaffezPhone       ?? null,
-          imamAddressText:     dp.imamAddressText      ?? null,
-          imamAddressLat:      dp.imamAddressLat       ?? null,
-          imamAddressLng:      dp.imamAddressLng       ?? null,
+          mohaffezPhone:
+            optionalString(dp.mohaffezPhone) ??
+            optionalString(reqData.mohaffezPhone) ??
+            null,
+          studentPhone:
+            optionalString(dp.studentPhone) ??
+            optionalString(reqData.studentPhone) ??
+            null,
+          imamAddressText:
+            optionalString(dp.imamAddressText) ??
+            optionalString(reqData.imamAddressText) ??
+            null,
+          imamAddressLat:
+            optionalNumber(dp.imamAddressLat) ??
+            optionalNumber(reqData.imamAddressLat) ??
+            null,
+          imamAddressLng:
+            optionalNumber(dp.imamAddressLng) ??
+            optionalNumber(reqData.imamAddressLng) ??
+            null,
           createdAt:           FieldValue.serverTimestamp(),
           acceptedAt:          FieldValue.serverTimestamp(),
           reminder24hSent:     false,
@@ -537,7 +729,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
             createdBy: 'system',
             metadata: {
               directPaymentRequestId,
-              sessionAmountEgp: dp.amount,
+              sessionAmountEgp: sessionAmount,
               commissionRate,
               commissionEgp: commissionAmount,
             },
@@ -546,11 +738,11 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
 
         const notifRef = db.collection('notifications').doc();
         tx.set(notifRef, {
-          userId:      dp.studentId,
-          recipientId: dp.studentId,
+          userId:      studentId,
+          recipientId: studentId,
           senderId:    mohaffezId,
           title:       'تم تأكيد الدفع المباشر!',
-          body:        `${dp.mohaffezName as string} أكد استلام المبلغ! تم تأكيد جلستك تلقائياً`,
+          body:        `${mohaffezName} أكد استلام المبلغ! تم تأكيد جلستك تلقائياً`,
           type:        'directpaymentconfirmed',
           isRead:      false,
           data: {
@@ -574,7 +766,15 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
         return JSON.parse((error as Error).message);
       }
       // Re-throw HttpsErrors as-is — never let Firebase wrap them as 'internal'
-      if (error instanceof functions.https.HttpsError) throw error;
+      if (error instanceof functions.https.HttpsError) {
+        functions.logger.error('mohaffezConfirmDirectPayment https error', {
+          directPaymentRequestId,
+          code: error.code,
+          message: error.message,
+          details: error.details ?? null,
+        });
+        throw error;
+      }
       // Wrap raw errors so the real message surfaces on the client
       const message = error instanceof Error ? error.message : 'Unknown error';
       functions.logger.error('mohaffezConfirmDirectPayment failed', {

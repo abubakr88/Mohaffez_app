@@ -22,15 +22,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _autoValidate = false;
   String _selectedRole = 'student';
   String _selectedGender = 'male';
+  String? _selectedHonorific;
 
   IconData _genderIcon(String gender) {
     return gender == 'female' ? Icons.woman_rounded : Icons.man_rounded;
   }
 
   IconData get _roleBadgeIcon {
-    return _selectedRole == 'mohaffez'
-        ? Icons.menu_book_rounded
-        : Icons.school_rounded;
+    if (_selectedRole == roleMohaffez) return Icons.menu_book_rounded;
+    if (_selectedRole == roleParent) return Icons.family_restroom_rounded;
+    return Icons.school_rounded;
+  }
+
+  String _genderTitle(String gender) {
+    if (_selectedRole == roleMohaffez) {
+      return gender == 'female' ? 'معلمة' : 'معلم';
+    }
+    if (_selectedRole == roleParent) {
+      return gender == 'female' ? 'ولية أمر' : 'ولي أمر';
+    }
+    return gender == 'female' ? 'طالبة' : 'طالب';
   }
 
   @override
@@ -54,6 +65,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       await notifier.completeGoogleSignIn(
         role: _selectedRole,
         gender: _selectedGender,
+        honorific: _selectedHonorific,
       );
       return;
     }
@@ -69,6 +81,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
     if (!_formKey.currentState!.validate()) return;
 
+    final teacherRegistrationEnabled = ref
+            .read(systemConfigProvider)
+            .valueOrNull
+            ?.teacherRegistrationEnabled ??
+        true;
+    if (_selectedRole == roleMohaffez && !teacherRegistrationEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('تسجيل المحفظين الجدد متوقف حالياً. يرجى المحاولة لاحقاً.'),
+          backgroundColor: AppThemeConstants.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final notifier = ref.read(authNotifierProvider.notifier);
     await notifier.signUp(
       email: _emailController.text.trim(),
@@ -76,6 +105,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       name: _nameController.text.trim(),
       role: _selectedRole,
       gender: _selectedGender,
+      honorific: _selectedHonorific,
     );
 
     if (!mounted) return;
@@ -98,6 +128,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(authNotifierProvider);
     final isLoading = state.isLoading;
+    final teacherRegistrationEnabled = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.teacherRegistrationEnabled ??
+        true;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -151,10 +186,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 title: 'محفّظ',
                                 subtitle: 'معلم القرآن',
                                 color: AppThemeConstants.primary,
-                                isSelected: _selectedRole == 'mohaffez',
+                                isSelected: _selectedRole == roleMohaffez,
+                                enabled: teacherRegistrationEnabled,
                                 onTap: () {
                                   setState(() {
-                                    _selectedRole = 'mohaffez';
+                                    _selectedRole = roleMohaffez;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(
+                              width: AppThemeConstants.spaceMd -
+                                  AppThemeConstants.spaceXs,
+                            ),
+                            Expanded(
+                              child: _RoleCard(
+                                icon: Icons.family_restroom_rounded,
+                                title: 'ولي أمر',
+                                subtitle: 'أدير أبناءي',
+                                color: AppThemeConstants.primary,
+                                isSelected: _selectedRole == roleParent,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRole = roleParent;
                                   });
                                 },
                               ),
@@ -169,10 +223,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 title: 'طالب',
                                 subtitle: 'دارس القرآن',
                                 color: AppThemeConstants.secondary,
-                                isSelected: _selectedRole == 'student',
+                                isSelected: _selectedRole == roleStudent,
                                 onTap: () {
                                   setState(() {
-                                    _selectedRole = 'student';
+                                    _selectedRole = roleStudent;
                                   });
                                 },
                               ),
@@ -180,6 +234,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ],
                         ),
                         const SizedBox(height: AppThemeConstants.spaceLg),
+                        if (_selectedRole == roleMohaffez) ...[
+                          DropdownButtonFormField<String?>(
+                            initialValue: _selectedHonorific,
+                            decoration: const InputDecoration(
+                              labelText: 'اللقب قبل الاسم',
+                              prefixIcon:
+                                  Icon(Icons.workspace_premium_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
+                              ),
+                              filled: true,
+                              fillColor: AppThemeConstants.background,
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('بدون لقب'),
+                              ),
+                              ...teacherHonorifics.map(
+                                (title) => DropdownMenuItem<String?>(
+                                  value: title,
+                                  child: Text(title),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _selectedHonorific = value);
+                            },
+                          ),
+                          Spacing.vMd,
+                        ],
                         TextFormField(
                           controller: _nameController,
                           decoration: const InputDecoration(
@@ -262,9 +347,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               child: _GenderCard(
                                 icon: _genderIcon('male'),
                                 badgeIcon: _roleBadgeIcon,
-                                title: _selectedRole == 'student'
-                                    ? 'طالب'
-                                    : 'معلم',
+                                title: _genderTitle('male'),
                                 color: AppThemeConstants.primary,
                                 isSelected: _selectedGender == 'male',
                                 onTap: () {
@@ -282,9 +365,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               child: _GenderCard(
                                 icon: _genderIcon('female'),
                                 badgeIcon: _roleBadgeIcon,
-                                title: _selectedRole == 'student'
-                                    ? 'طالبة'
-                                    : 'معلمة',
+                                title: _genderTitle('female'),
                                 color: AppThemeConstants.secondary,
                                 isSelected: _selectedGender == 'female',
                                 onTap: () {
@@ -440,6 +521,7 @@ class _RoleCard extends StatelessWidget {
   final String subtitle;
   final Color color;
   final bool isSelected;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _RoleCard({
@@ -448,51 +530,55 @@ class _RoleCard extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.isSelected,
+    this.enabled = true,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: 0.1)
-              : AppThemeConstants.background,
-          borderRadius: AppThemeConstants.borderRadiusMd,
-          border: Border.all(
-            color: isSelected ? color : AppThemeConstants.divider,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 48,
-              color: isSelected ? color : AppThemeConstants.textDisabled,
+      onTap: enabled ? onTap : null,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(AppThemeConstants.spaceMd),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? color.withValues(alpha: 0.1)
+                : AppThemeConstants.background,
+            borderRadius: AppThemeConstants.borderRadiusMd,
+            border: Border.all(
+              color: isSelected ? color : AppThemeConstants.divider,
+              width: isSelected ? 2 : 1,
             ),
-            Spacing.vSm,
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 48,
                 color: isSelected ? color : AppThemeConstants.textSecondary,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppThemeConstants.textSecondary,
+              Spacing.vSm,
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? color : AppThemeConstants.textSecondary,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppThemeConstants.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -23,6 +23,30 @@ function parseFlutterDate(iso: string): Date {
   return new Date(iso);
 }
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function optionalTimestamp(
+  value: unknown
+): FirebaseFirestore.Timestamp | null {
+  if (value instanceof admin.firestore.Timestamp) return value;
+  if (value instanceof Date) return admin.firestore.Timestamp.fromDate(value);
+  if (typeof value === 'string') {
+    const parsed = parseFlutterDate(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return admin.firestore.Timestamp.fromDate(parsed);
+    }
+  }
+  return null;
+}
+
 // FIXED: BUG-5 - strip both hyphens AND en-dashes
 function normalizeTimeSlot(raw: string): string {
   return raw.replace(/\s/g, '').replace(/[\u2013\u2014]/g, '-');
@@ -52,9 +76,17 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     imamAddressLat,
     imamAddressLng,
     mohaffezPhone,
+    studentPhone,
     promoCode,
     requestId,
     paymentId,
+    guardianId,
+    guardianName,
+    studentProfileId,
+    studentProfileName,
+    studentProfileGender,
+    studentProfileBirthDate,
+    studentAge,
   } = data;
 
   // ✅ LOG INPUT PARAMETERS
@@ -288,6 +320,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     // ============================================
     let requestRef: FirebaseFirestore.DocumentReference;
     let isUpdatingExisting = false;
+    let existingRequestData: FirebaseFirestore.DocumentData | undefined;
 
     if (requestId) {
       requestRef = db.collection('sessionRequests').doc(requestId);
@@ -310,6 +343,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       }
       
       const requestData = existingRequest.data();
+      existingRequestData = requestData;
       
       // ✅ CHECK: If already accepted
       if (requestData && requestData.status === STATUS.ACCEPTED) {
@@ -354,6 +388,31 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     const sessionRef = db.collection("hafizSessions").doc();
+    const learnerSnapshot = {
+      guardianId:
+        optionalString(guardianId) ??
+        optionalString(existingRequestData?.['guardianId']) ??
+        studentId,
+      guardianName:
+        optionalString(guardianName) ??
+        optionalString(existingRequestData?.['guardianName']),
+      studentProfileId:
+        optionalString(studentProfileId) ??
+        optionalString(existingRequestData?.['studentProfileId']),
+      studentProfileName:
+        optionalString(studentProfileName) ??
+        optionalString(existingRequestData?.['studentProfileName']) ??
+        optionalString(studentName),
+      studentProfileGender:
+        optionalString(studentProfileGender) ??
+        optionalString(existingRequestData?.['studentProfileGender']),
+      studentProfileBirthDate:
+        optionalTimestamp(studentProfileBirthDate) ??
+        optionalTimestamp(existingRequestData?.['studentProfileBirthDate']),
+      studentAge:
+        optionalNumber(studentAge) ??
+        optionalNumber(existingRequestData?.['studentAge']),
+    };
 
     // ============================================
     // ✅ STEP 5: WRITE PHASE
@@ -366,6 +425,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       promoDiscount: 100,
       notificationsAlreadySent: true,
       sessionId: sessionRef.id,
+      ...learnerSnapshot,
       acceptedAt: FieldValue.serverTimestamp(),
       paidAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -385,6 +445,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         studentId,
         mohaffezId,
         studentName,
+        ...learnerSnapshot,
         mohaffezName,
         sessionType,
         preferredProvider:
@@ -399,6 +460,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         imamAddressLat: imamAddressLat || null,
         imamAddressLng: imamAddressLng || null,
         mohaffezPhone: mohaffezPhone || null,
+        studentPhone:
+          typeof studentPhone === 'string' && studentPhone.trim().length > 0
+            ? studentPhone.trim()
+            : null,
         requiresPaymentOnAcceptance: false,
         selectedPaymentMethod: "freesession",
         createdAt: FieldValue.serverTimestamp(),
@@ -416,6 +481,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       studentId,
       mohaffezName,
       studentName,
+      ...learnerSnapshot,
       sessionType,
       preferredProvider:
         sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
@@ -423,6 +489,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           : null,
       location: imamAddressText || "",
       mohaffezPhone: mohaffezPhone || null,
+      studentPhone:
+        typeof studentPhone === 'string' && studentPhone.trim().length > 0
+          ? studentPhone.trim()
+          : null,
       imamAddressLat: imamAddressLat || null,
       imamAddressLng: imamAddressLng || null,
       imamAddressText: imamAddressText || null,

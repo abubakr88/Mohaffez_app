@@ -11,7 +11,7 @@ import {
 } from '../utils/adminPermissions';
 import { writeAdminAuditLog } from '../utils/auditLog';
 
-type TargetRole = 'all' | 'student' | 'mohaffez';
+type TargetRole = 'all' | 'student' | 'parent' | 'mohaffez';
 
 function userAuditState(data: FirebaseFirestore.DocumentData | undefined) {
   if (data == null) return null;
@@ -464,7 +464,7 @@ export const deleteMyAccount = functions.https.onCall(async (_data, context) => 
 });
 
 /**
- * input: { title: string, body: string, targetRole: 'all'|'student'|'mohaffez' }
+ * input: { title: string, body: string, targetRole: 'all'|'student'|'parent'|'mohaffez' }
  * output: { recipientCount: number }
  */
 export const sendBroadcastNotification = functions.https.onCall(async (data, context) => {
@@ -786,7 +786,7 @@ export const rejectTeacher = functions.https.onCall(async (data, context) => {
 });
 
 /**
- * input: { targetRole: 'all' | 'student' | 'mohaffez' }
+ * input: { targetRole: 'all' | 'student' | 'parent' | 'mohaffez' }
  * output: { count: number }
  */
 export const getBroadcastAudienceCount = functions.https.onCall(async (data, context) => {

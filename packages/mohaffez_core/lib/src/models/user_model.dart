@@ -5,6 +5,58 @@ import 'teacher_badge.dart';
 part 'user_model.freezed.dart';
 part 'user_model.g.dart';
 
+const String roleStudent = 'student';
+const String roleParent = 'parent';
+const String roleMohaffez = 'mohaffez';
+const String roleAdmin = 'admin';
+const String roleOrganizationAdmin = 'organization_admin';
+const String roleOrganizationTeacher = 'organization_teacher';
+const String roleOrganizationStudent = 'organization_student';
+
+const Set<String> learnerAccountRoles = {
+  roleStudent,
+  roleParent,
+};
+
+const Set<String> selfSelectableSignupRoles = {
+  roleStudent,
+  roleParent,
+  roleMohaffez,
+};
+
+String normalizeRole(String? role) => (role ?? '').trim().toLowerCase();
+
+bool isLearnerAccountRole(String? role) {
+  return learnerAccountRoles.contains(normalizeRole(role));
+}
+
+bool isSelfSelectableSignupRole(String? role) {
+  return selfSelectableSignupRoles.contains(normalizeRole(role));
+}
+
+const List<String> teacherHonorifics = [
+  'الشيخ',
+  'الشيخة',
+  'المعلم',
+  'المعلمة',
+  'الدكتور',
+  'الدكتورة',
+  'الأستاذ',
+  'الأستاذة',
+];
+
+String composeTeacherDisplayName(String name, String? honorific) {
+  final cleanName = name.trim();
+  final cleanHonorific = honorific?.trim() ?? '';
+  if (cleanHonorific.isEmpty || !teacherHonorifics.contains(cleanHonorific)) {
+    return cleanName;
+  }
+  if (cleanName == cleanHonorific || cleanName.startsWith('$cleanHonorific ')) {
+    return cleanName;
+  }
+  return '$cleanHonorific $cleanName';
+}
+
 @freezed
 class UserModel with _$UserModel {
   const factory UserModel({
@@ -12,6 +64,7 @@ class UserModel with _$UserModel {
     required String name,
     required String email,
     required String role,
+    String? honorific,
     @Default('active') String status,
     String? photoUrl,
     String? bio,
@@ -27,6 +80,10 @@ class UserModel with _$UserModel {
     String? addressText,
     double? addressLat,
     double? addressLng,
+    String? country,
+    String? countryCode,
+    @Default('individual') String accountType,
+    String? activeStudentProfileId,
     @TimestampConverter() DateTime? createdAt,
     // ── Setup Account Fields ─────────────────────────────────
     @Default(false) bool setupCompleted,
@@ -75,6 +132,12 @@ class UserModel with _$UserModel {
       'meetingLinks': meetingLinks,
     });
   }
+}
+
+extension UserTeacherDisplayName on UserModel {
+  String get displayName => normalizeRole(role) == roleMohaffez
+      ? composeTeacherDisplayName(name, honorific)
+      : name;
 }
 
 class TimestampConverter implements JsonConverter<DateTime?, Object?> {

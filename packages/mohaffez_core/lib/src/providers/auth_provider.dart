@@ -17,6 +17,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../services/cache_service.dart';
 import '../models/commission_tier_model.dart';
+import '../models/user_model.dart';
 import 'booking_flow_provider.dart';
 
 /// Thrown when a new Google user has authenticated but has no Firestore doc yet.
@@ -35,10 +36,14 @@ class NeedsRoleSelectionException implements Exception {
 }
 
 final authStateProvider = StreamProvider<User?>((ref) {
-  return FirebaseAuth.instance.authStateChanges().asyncMap((firebaseUser) async {
+  return FirebaseAuth.instance
+      .authStateChanges()
+      .asyncMap((firebaseUser) async {
     if (firebaseUser != null) {
       try {
-        await firebaseUser.getIdToken(false).timeout(const Duration(seconds: 10));
+        await firebaseUser
+            .getIdToken(false)
+            .timeout(const Duration(seconds: 10));
       } catch (e) {
         debugPrint('authStateProvider: token refresh failed, using cached: $e');
         // Non-fatal: fall back silently, stream still resolves with the user
@@ -54,7 +59,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
   final AuthService _authService;
   final Ref _ref;
 
-  AuthNotifier(this._authService, this._ref) : super(const AsyncValue.data(null));
+  AuthNotifier(this._authService, this._ref)
+      : super(const AsyncValue.data(null));
 
   Map<String, dynamic> _initialCommissionFields(String role) {
     if (role != 'mohaffez') return const <String, dynamic>{};
@@ -70,6 +76,21 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
         'lateSessionsLast14d': 0,
       },
     };
+  }
+
+  Future<void> _ensureTeacherRegistrationAllowed(String role) async {
+    if (role != 'mohaffez') return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('systemConfig')
+        .doc('global')
+        .get();
+    final enabled = doc.data()?['teacherRegistrationEnabled'] as bool? ?? true;
+    if (!enabled) {
+      throw Exception(
+        'تسجيل المحفظين الجدد متوقف حالياً. يرجى المحاولة لاحقاً.',
+      );
+    }
   }
 
   Future<void> signIn({
@@ -108,7 +129,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       final status = data['status'] as String? ?? 'active';
       if (status == 'suspended') {
         await _authService.logout();
-        throw Exception('\u062A\u0645 \u062A\u0639\u0644\u064A\u0642 \u062D\u0633\u0627\u0628\u0643. \u064A\u0631\u062C\u0649 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645.');
+        throw Exception(
+            '\u062A\u0645 \u062A\u0639\u0644\u064A\u0642 \u062D\u0633\u0627\u0628\u0643. \u064A\u0631\u062C\u0649 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645.');
       }
 
       // Check 2: userSuspensions collection (source of truth).
@@ -116,10 +138,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           .collection('userSuspensions')
           .doc(userId)
           .get();
-      if (suspensionDoc.exists &&
-          (suspensionDoc.data()?['isActive'] == true)) {
+      if (suspensionDoc.exists && (suspensionDoc.data()?['isActive'] == true)) {
         await _authService.logout();
-        throw Exception('\u062A\u0645 \u062A\u0639\u0644\u064A\u0642 \u062D\u0633\u0627\u0628\u0643. \u064A\u0631\u062C\u0649 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645.');
+        throw Exception(
+            '\u062A\u0645 \u062A\u0639\u0644\u064A\u0642 \u062D\u0633\u0627\u0628\u0643. \u064A\u0631\u062C\u0649 \u0627\u0644\u062A\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062F\u0639\u0645.');
       }
 
       await CacheService.saveUserId(userId);
@@ -140,10 +162,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     required String name,
     required String role,
     String? gender,
+    String? honorific,
   }) async {
     state = const AsyncValue.loading();
 
     state = await AsyncValue.guard(() async {
+      await _ensureTeacherRegistrationAllowed(role);
+
       final cred = await _authService.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -162,6 +187,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'name': name,
           'email': email,
           'role': role,
+          if (role == roleMohaffez && teacherHonorifics.contains(honorific))
+            'honorific': honorific,
           'status': 'active',
           'photoUrl': null,
           'bio': null,
@@ -178,6 +205,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'setupCompleted': false,
           'dateOfBirth': null,
           'city': null,
+          'accountType': role == roleParent ? 'guardian' : 'individual',
+          'activeStudentProfileId': role == roleParent ? null : 'self',
           'examScore': null,
           'examTakenAt': null,
           'examRetryCount': 0,
@@ -265,12 +294,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
   Future<void> completeGoogleSignIn({
     required String role,
     required String gender,
+    String? honorific,
   }) async {
     state = const AsyncValue.loading();
 
     state = await AsyncValue.guard(() async {
       final user = _authService.currentUser;
       if (user == null) throw Exception('الجلسة انتهت، يرجى المحاولة مجدداً');
+
+      await _ensureTeacherRegistrationAllowed(role);
 
       final userId = user.uid;
       final name = user.displayName ?? '';
@@ -283,6 +315,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'name': name,
           'email': email,
           'role': role,
+          if (role == roleMohaffez && teacherHonorifics.contains(honorific))
+            'honorific': honorific,
           'status': 'active',
           'photoUrl': photoUrl,
           'bio': null,
@@ -299,6 +333,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'setupCompleted': false,
           'dateOfBirth': null,
           'city': null,
+          'accountType': role == roleParent ? 'guardian' : 'individual',
+          'activeStudentProfileId': role == roleParent ? null : 'self',
           'examScore': null,
           'examTakenAt': null,
           'examRetryCount': 0,
@@ -392,6 +428,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
       'setupCompleted': false,
       'dateOfBirth': null,
       'city': null,
+      'accountType': 'individual',
       'examScore': null,
       'examTakenAt': null,
       'examRetryCount': 0,
@@ -405,6 +442,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
         updates[entry.key] = entry.value;
       }
     }
+    final role = existingData['role']?.toString().trim().toLowerCase();
+    if (!existingData.containsKey('activeStudentProfileId') &&
+        role == roleStudent) {
+      updates['activeStudentProfileId'] = 'self';
+    }
 
     // Only update if there are missing fields
     if (updates.isNotEmpty) {
@@ -413,10 +455,12 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
             .collection('users')
             .doc(userId)
             .update(updates);
-        debugPrint('AuthNotifier: Updated missing fields for user $userId: ${updates.keys.join(', ')}');
+        debugPrint(
+            'AuthNotifier: Updated missing fields for user $userId: ${updates.keys.join(', ')}');
       } catch (e) {
         // Non-fatal: Log but don't block login
-        debugPrint('AuthNotifier: Failed to update user fields (non-fatal): $e');
+        debugPrint(
+            'AuthNotifier: Failed to update user fields (non-fatal): $e');
       }
     }
   }

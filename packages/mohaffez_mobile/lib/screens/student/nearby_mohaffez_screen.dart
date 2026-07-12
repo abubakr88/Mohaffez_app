@@ -14,6 +14,10 @@ import '../../shared/widgets/cached_avatar.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
 
+enum _SearchSetupStep { sessionMode, offlinePlace, teacherGender }
+
+enum _BookingSearchMode { online, offline }
+
 class NearbyMohaffezScreen extends ConsumerStatefulWidget {
   const NearbyMohaffezScreen({super.key});
 
@@ -28,19 +32,23 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   static const String _osmTileUrl =
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-  SortType selectedFilter = SortType.distance;
+  SortType selectedFilter = SortType.rating;
   TeacherAvailabilityFilter availabilityFilter =
       TeacherAvailabilityFilter.availableOnly;
   TeacherGenderFilter genderFilter = TeacherGenderFilter.all;
   TeacherTrialSessionFilter trialSessionFilter = TeacherTrialSessionFilter.all;
+  TeacherSessionTypeFilter sessionTypeFilter = TeacherSessionTypeFilter.all;
   double? userLat;
   double? userLng;
   bool isLoadingLocation = true;
   String? locationError;
   double radiusKm = 50.0;
+  bool distanceFilterEnabled = true;
   String searchQuery = '';
   String? selectedSpecialization;
   MohaffezModel? _selectedTeacher;
+  List<MohaffezModel> _lastTeachers = const [];
+  bool _hasLoadedTeachers = false;
   final MapController _mapController = MapController();
   bool _hasFitInitialBounds = false;
   bool _showMapView = false;
@@ -49,6 +57,11 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   final FocusNode _searchFocusNode = FocusNode();
   Timer? _searchDebounce;
   late final AnimationController _pulseController;
+  bool _searchSetupComplete = false;
+  _SearchSetupStep _setupStep = _SearchSetupStep.sessionMode;
+  _BookingSearchMode? _pendingMode;
+  TeacherSessionTypeFilter? _pendingSessionType;
+  TeacherGenderFilter _pendingGender = TeacherGenderFilter.all;
 
   @override
   void initState() {
@@ -60,7 +73,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     _pulseController.addListener(() {
       if (mounted) setState(() {});
     });
-    _getCurrentLocation();
   }
 
   @override
@@ -125,30 +137,69 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   double? _distanceFor(MohaffezModel teacher) =>
       teacher.getDistanceFrom(userLat, userLng);
 
+  String _searchScopeSummary(int teacherCount) {
+    if (_isOnlineSearch) {
+      return '$teacherCount محفظ أونلاين في كل المناطق';
+    }
+
+    final sessionLabel = _sessionTypeLabel(sessionTypeFilter);
+    if (!distanceFilterEnabled) {
+      return '$teacherCount $sessionLabel في كل المناطق';
+    }
+
+    return '$teacherCount $sessionLabel ضمن ${radiusKm.round()} كم';
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_searchSetupComplete) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: _buildSearchSetupExperience(context),
+        ),
+      );
+    }
+
     final params = NearbyParams(
       userLat: userLat,
       userLng: userLng,
       radiusKm: radiusKm,
+      distanceFilterEnabled: distanceFilterEnabled,
       sortBy: selectedFilter,
       searchQuery: searchQuery.isNotEmpty ? searchQuery : null,
       specialization: selectedSpecialization,
       availabilityFilter: availabilityFilter,
       genderFilter: genderFilter,
       trialSessionFilter: trialSessionFilter,
+      sessionTypeFilter: sessionTypeFilter,
     );
     final mohaffezAsync = ref.watch(nearbyMohaffezProvider(params));
+    final freshTeachers = mohaffezAsync.valueOrNull;
+    if (freshTeachers != null) {
+      _lastTeachers = freshTeachers;
+      _hasLoadedTeachers = true;
+    }
+    final hasCachedResults = _hasLoadedTeachers;
+    final isUpdatingResults = mohaffezAsync.isLoading && hasCachedResults;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         body: mohaffezAsync.when(
           data: (teachers) => _buildMainExperience(context, teachers),
-          loading: _buildLoading,
-          error: (_, __) => ErrorDisplay.dataLoad(
-            onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
-          ),
+          loading: () => hasCachedResults
+              ? _buildMainExperience(
+                  context,
+                  _lastTeachers,
+                  isUpdatingResults: isUpdatingResults,
+                )
+              : _buildLoading(),
+          error: (_, __) => hasCachedResults
+              ? _buildMainExperience(context, _lastTeachers)
+              : ErrorDisplay.dataLoad(
+                  onRetry: () => ref.invalidate(nearbyMohaffezProvider(params)),
+                ),
         ),
       ),
     );
@@ -156,8 +207,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
 
   Widget _buildMainExperience(
     BuildContext context,
-    List<MohaffezModel> teachers,
-  ) {
+    List<MohaffezModel> teachers, {
+    bool isUpdatingResults = false,
+  }) {
     return SafeArea(
       child: Column(
         children: [
@@ -165,40 +217,415 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
           Expanded(
             child: Stack(
               children: [
-                IndexedStack(
-                  index: _showMapView ? 0 : 1,
-                  children: [
-                    _buildMapPane(teachers),
-                    _buildResultsPane(context, teachers),
-                  ],
-                ),
-                Positioned(
-                  bottom: 20,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: _showMapView
-                        ? _ViewToggleButton(
-                            label: 'عرض القائمة',
-                            icon: Icons.format_list_bulleted_rounded,
-                            onTap: () => setState(() => _showMapView = false),
-                          )
-                        : _ViewToggleButton(
-                            label: 'عرض على الخريطة',
-                            icon: Icons.map_rounded,
-                            onTap: () {
-                              setState(() => _showMapView = true);
-                              _fitInitialBounds(teachers, force: true);
-                            },
-                          ),
+                if (_mapAllowed)
+                  IndexedStack(
+                    index: _showMapView ? 0 : 1,
+                    children: [
+                      _buildMapPane(teachers),
+                      _buildResultsPane(
+                        context,
+                        teachers,
+                        isUpdatingResults: isUpdatingResults,
+                      ),
+                    ],
+                  )
+                else
+                  _buildResultsPane(
+                    context,
+                    teachers,
+                    isUpdatingResults: isUpdatingResults,
                   ),
-                ),
+                if (_mapAllowed)
+                  Positioned(
+                    bottom: 20,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: _showMapView
+                          ? _ViewToggleButton(
+                              label: 'عرض القائمة',
+                              icon: Icons.format_list_bulleted_rounded,
+                              onTap: () => setState(() => _showMapView = false),
+                            )
+                          : _ViewToggleButton(
+                              label: 'عرض على الخريطة',
+                              icon: Icons.map_rounded,
+                              onTap: () {
+                                setState(() => _showMapView = true);
+                                _fitInitialBounds(teachers, force: true);
+                              },
+                            ),
+                    ),
+                  ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildSearchSetupExperience(BuildContext context) {
+    final title = switch (_setupStep) {
+      _SearchSetupStep.sessionMode => 'كيف تريد الجلسة؟',
+      _SearchSetupStep.offlinePlace => 'أين تريد الجلسة الحضورية؟',
+      _SearchSetupStep.teacherGender => 'من تفضل أن يدرّس الطالب؟',
+    };
+    final subtitle = switch (_setupStep) {
+      _SearchSetupStep.sessionMode =>
+        'سنضبط البحث والفلاتر حسب طريقة الجلسة لتظهر لك نتائج مناسبة.',
+      _SearchSetupStep.offlinePlace =>
+        'سنستخدم المسافة والخريطة للعثور على أقرب المحفظين المناسبين.',
+      _SearchSetupStep.teacherGender =>
+        'يمكنك اختيار المعلم أو المعلمة، أو عرض الجميع ثم تضييق النتائج لاحقًا.',
+    };
+
+    return SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF08252E), Color(0xFF0B7A75)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: context.canPop() ? context.pop : null,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: AppThemeConstants.white,
+                    tooltip: 'رجوع',
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'إعداد البحث',
+                    style: TextStyle(
+                      color: AppThemeConstants.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppThemeConstants.white,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppThemeConstants.black.withValues(alpha: 0.18),
+                      blurRadius: 26,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppThemeConstants.primary
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.tune_rounded,
+                            color: AppThemeConstants.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: AppThemeConstants.textPrimary,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                subtitle,
+                                style: const TextStyle(
+                                  color: AppThemeConstants.textSecondary,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: switch (_setupStep) {
+                          _SearchSetupStep.sessionMode =>
+                            _buildSessionModeStep(),
+                          _SearchSetupStep.offlinePlace =>
+                            _buildOfflinePlaceStep(),
+                          _SearchSetupStep.teacherGender =>
+                            _buildTeacherGenderStep(),
+                        },
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        if (_setupStep != _SearchSetupStep.sessionMode)
+                          TextButton.icon(
+                            onPressed: _goBackSetupStep,
+                            icon: const Icon(Icons.arrow_back_rounded),
+                            label: const Text('السابق'),
+                          )
+                        else
+                          const SizedBox(width: 90),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed:
+                                _canContinueSetup ? _goNextSetupStep : null,
+                            icon: Icon(
+                              _setupStep == _SearchSetupStep.teacherGender
+                                  ? Icons.search_rounded
+                                  : Icons.arrow_forward_rounded,
+                            ),
+                            label: Text(
+                              _setupStep == _SearchSetupStep.teacherGender
+                                  ? 'عرض النتائج'
+                                  : 'التالي',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppThemeConstants.primary,
+                              foregroundColor: AppThemeConstants.white,
+                              disabledBackgroundColor:
+                                  AppThemeConstants.outline,
+                              disabledForegroundColor:
+                                  AppThemeConstants.textSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSessionModeStep() {
+    return Column(
+      children: [
+        _SetupChoiceCard(
+          title: 'جلسة أونلاين',
+          subtitle:
+              'بدون مسافة أو خريطة. سنعرض المعلمين المناسبين من كل المناطق.',
+          icon: Icons.videocam_rounded,
+          selected: _pendingMode == _BookingSearchMode.online,
+          onTap: () => setState(() {
+            _pendingMode = _BookingSearchMode.online;
+            _pendingSessionType = TeacherSessionTypeFilter.online;
+          }),
+        ),
+        const SizedBox(height: 12),
+        _SetupChoiceCard(
+          title: 'جلسة حضورية',
+          subtitle:
+              'في البيت أو المسجد. سنستخدم المسافة والخريطة في ترتيب النتائج.',
+          icon: Icons.location_on_rounded,
+          selected: _pendingMode == _BookingSearchMode.offline,
+          onTap: () => setState(() {
+            _pendingMode = _BookingSearchMode.offline;
+            _pendingSessionType = null;
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOfflinePlaceStep() {
+    return Column(
+      children: [
+        _SetupChoiceCard(
+          title: 'في البيت',
+          subtitle: 'اعرض المحفظين الذين لديهم مواعيد وخطط لجلسات البيت.',
+          icon: Icons.home_work_rounded,
+          selected: _pendingSessionType == TeacherSessionTypeFilter.home,
+          onTap: () => setState(() {
+            _pendingSessionType = TeacherSessionTypeFilter.home;
+          }),
+        ),
+        const SizedBox(height: 12),
+        _SetupChoiceCard(
+          title: 'في المسجد',
+          subtitle: 'اعرض المحفظين الذين لديهم مواعيد وخطط لجلسات المسجد.',
+          icon: Icons.mosque_rounded,
+          selected: _pendingSessionType == TeacherSessionTypeFilter.mosque,
+          onTap: () => setState(() {
+            _pendingSessionType = TeacherSessionTypeFilter.mosque;
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeacherGenderStep() {
+    return Column(
+      children: [
+        _SetupChoiceCard(
+          title: 'الكل',
+          subtitle:
+              'اعرض المعلمين والمعلمات ثم استخدم التخصص والتوفر لتضييق النتائج.',
+          icon: Icons.groups_rounded,
+          selected: _pendingGender == TeacherGenderFilter.all,
+          onTap: () => setState(() {
+            _pendingGender = TeacherGenderFilter.all;
+          }),
+        ),
+        const SizedBox(height: 12),
+        _SetupChoiceCard(
+          title: 'معلم',
+          subtitle: 'اعرض المعلمين فقط.',
+          icon: Icons.male_rounded,
+          selected: _pendingGender == TeacherGenderFilter.male,
+          onTap: () => setState(() {
+            _pendingGender = TeacherGenderFilter.male;
+          }),
+        ),
+        const SizedBox(height: 12),
+        _SetupChoiceCard(
+          title: 'معلمة',
+          subtitle: 'اعرض المعلمات فقط.',
+          icon: Icons.female_rounded,
+          selected: _pendingGender == TeacherGenderFilter.female,
+          onTap: () => setState(() {
+            _pendingGender = TeacherGenderFilter.female;
+          }),
+        ),
+      ],
+    );
+  }
+
+  bool get _canContinueSetup {
+    return switch (_setupStep) {
+      _SearchSetupStep.sessionMode => _pendingMode != null,
+      _SearchSetupStep.offlinePlace => _pendingSessionType != null,
+      _SearchSetupStep.teacherGender => true,
+    };
+  }
+
+  bool get _isOnlineSearch =>
+      sessionTypeFilter == TeacherSessionTypeFilter.online;
+
+  bool get _mapAllowed => !_isOnlineSearch;
+
+  bool get _showModeFiltersInSheet => false;
+
+  String get _headerTitle {
+    return switch (sessionTypeFilter) {
+      TeacherSessionTypeFilter.online => 'محفظون أونلاين',
+      TeacherSessionTypeFilter.home => 'محفظون للبيت',
+      TeacherSessionTypeFilter.mosque => 'محفظون للمسجد',
+      TeacherSessionTypeFilter.offline => 'محفظون حضوري',
+      TeacherSessionTypeFilter.all => 'المحفظون القريبون',
+    };
+  }
+
+  void _goNextSetupStep() {
+    if (!_canContinueSetup) return;
+
+    switch (_setupStep) {
+      case _SearchSetupStep.sessionMode:
+        setState(() {
+          _setupStep = _pendingMode == _BookingSearchMode.online
+              ? _SearchSetupStep.teacherGender
+              : _SearchSetupStep.offlinePlace;
+        });
+        return;
+      case _SearchSetupStep.offlinePlace:
+        setState(() => _setupStep = _SearchSetupStep.teacherGender);
+        return;
+      case _SearchSetupStep.teacherGender:
+        _startGuidedSearch();
+        return;
+    }
+  }
+
+  void _goBackSetupStep() {
+    setState(() {
+      _setupStep = switch (_setupStep) {
+        _SearchSetupStep.teacherGender =>
+          _pendingMode == _BookingSearchMode.offline
+              ? _SearchSetupStep.offlinePlace
+              : _SearchSetupStep.sessionMode,
+        _SearchSetupStep.offlinePlace => _SearchSetupStep.sessionMode,
+        _SearchSetupStep.sessionMode => _SearchSetupStep.sessionMode,
+      };
+    });
+  }
+
+  void _startGuidedSearch() {
+    final selectedType = _pendingSessionType ?? TeacherSessionTypeFilter.online;
+    final online = selectedType == TeacherSessionTypeFilter.online;
+
+    setState(() {
+      _searchSetupComplete = true;
+      sessionTypeFilter = selectedType;
+      genderFilter = _pendingGender;
+      availabilityFilter = TeacherAvailabilityFilter.availableOnly;
+      trialSessionFilter = TeacherTrialSessionFilter.all;
+      selectedSpecialization = null;
+      radiusKm = 50;
+      distanceFilterEnabled = !online;
+      selectedFilter = online ? SortType.rating : SortType.distance;
+      _showMapView = false;
+      _selectedTeacher = null;
+      _hasFitInitialBounds = false;
+    });
+
+    if (!online) {
+      _getCurrentLocation();
+    }
+  }
+
+  void _restartSearchSetup() {
+    setState(() {
+      _searchSetupComplete = false;
+      _setupStep = _SearchSetupStep.sessionMode;
+      _pendingMode = sessionTypeFilter == TeacherSessionTypeFilter.online
+          ? _BookingSearchMode.online
+          : _BookingSearchMode.offline;
+      _pendingSessionType = sessionTypeFilter == TeacherSessionTypeFilter.all
+          ? null
+          : sessionTypeFilter;
+      _pendingGender = genderFilter;
+      _showMapView = false;
+      _selectedTeacher = null;
+    });
   }
 
   Widget _buildMapPane(List<MohaffezModel> teachers) {
@@ -227,7 +654,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                       ? CancellableNetworkTileProvider()
                       : NetworkTileProvider(),
                 ),
-                if (userLat != null && userLng != null)
+                if (distanceFilterEnabled && userLat != null && userLng != null)
                   CircleLayer(
                     circles: [
                       CircleMarker(
@@ -302,7 +729,11 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     );
   }
 
-  Widget _buildResultsPane(BuildContext context, List<MohaffezModel> teachers) {
+  Widget _buildResultsPane(
+    BuildContext context,
+    List<MohaffezModel> teachers, {
+    bool isUpdatingResults = false,
+  }) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       decoration: BoxDecoration(
@@ -320,8 +751,25 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       child: Column(
         children: [
           _buildSearchBar(),
+          _buildGuidedModeBanner(),
           _buildFilterRail(),
-          if (isLoadingLocation || locationError != null)
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: isUpdatingResults
+                ? const Padding(
+                    key: ValueKey('updating-results'),
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.all(Radius.circular(999)),
+                      child: LinearProgressIndicator(minHeight: 3),
+                    ),
+                  )
+                : const SizedBox(
+                    key: ValueKey('stable-results'),
+                    height: 0,
+                  ),
+          ),
+          if (_mapAllowed && (isLoadingLocation || locationError != null))
             _buildLocationBanner(),
           if (_selectedTeacher != null)
             Padding(
@@ -468,10 +916,12 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
 
   void _selectTeacher(MohaffezModel teacher) {
     setState(() => _selectedTeacher = teacher);
-    _mapController.move(
-      LatLng(teacher.addressLat!, teacher.addressLng!),
-      14.5,
-    );
+    if (_mapAllowed && _hasLocation(teacher)) {
+      _mapController.move(
+        LatLng(teacher.addressLat!, teacher.addressLng!),
+        14.5,
+      );
+    }
   }
 
   void _animateToUser() {
@@ -545,9 +995,9 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'المحفظون القريبون',
-                    style: TextStyle(
+                  Text(
+                    _headerTitle,
+                    style: const TextStyle(
                       color: AppThemeConstants.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -555,7 +1005,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '$teacherCount محفظ ضمن ${radiusKm.round()} كم',
+                    _searchScopeSummary(teacherCount),
                     style: TextStyle(
                       color: AppThemeConstants.white.withValues(alpha: 0.72),
                       fontSize: 12,
@@ -591,7 +1041,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
           focusNode: _searchFocusNode,
           textDirection: TextDirection.rtl,
           decoration: InputDecoration(
-            hintText: 'ابحث باسم المحفظ...',
+            hintText: 'ابحث بالاسم، المهارة أو الباقة...',
             prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
@@ -605,7 +1055,7 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
           ),
           onChanged: (value) {
             _searchDebounce?.cancel();
-            _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+            _searchDebounce = Timer(const Duration(milliseconds: 500), () {
               if (mounted) {
                 setState(() {
                   searchQuery = value.trim();
@@ -615,6 +1065,58 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
               }
             });
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuidedModeBanner() {
+    final sessionLabel = _sessionTypeLabel(sessionTypeFilter);
+    final genderLabel = _genderLabel(genderFilter);
+    final icon = _isOnlineSearch
+        ? Icons.videocam_rounded
+        : sessionTypeFilter == TeacherSessionTypeFilter.mosque
+            ? Icons.mosque_rounded
+            : Icons.home_work_rounded;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _isOnlineSearch
+              ? AppThemeConstants.infoLight
+              : const Color(0xFFFFF8E1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppThemeConstants.primaryVariant.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppThemeConstants.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '$sessionLabel · $genderLabel',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppThemeConstants.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _restartSearchSetup,
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              label: const Text('تغيير'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppThemeConstants.primary,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -633,13 +1135,15 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _MapChip(
-                        label: 'الأقرب',
-                        icon: Icons.near_me_rounded,
-                        isSelected: selectedFilter == SortType.distance,
-                        onTap: () => _updateFilter(SortType.distance),
-                      ),
-                      const SizedBox(width: 8),
+                      if (_mapAllowed) ...[
+                        _MapChip(
+                          label: 'الأقرب',
+                          icon: Icons.near_me_rounded,
+                          isSelected: selectedFilter == SortType.distance,
+                          onTap: () => _updateFilter(SortType.distance),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       _MapChip(
                         label: 'الأعلى تقييماً',
                         icon: Icons.star_rounded,
@@ -673,15 +1177,6 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                   icon: Icons.event_available_rounded,
                   label: _availabilityLabel(availabilityFilter),
                 ),
-                if (genderFilter != TeacherGenderFilter.all) ...[
-                  const SizedBox(width: 8),
-                  _ActiveFilterPill(
-                    icon: genderFilter == TeacherGenderFilter.male
-                        ? Icons.male_rounded
-                        : Icons.female_rounded,
-                    label: _genderLabel(genderFilter),
-                  ),
-                ],
                 if (trialSessionFilter ==
                     TeacherTrialSessionFilter.enabledOnly) ...[
                   const SizedBox(width: 8),
@@ -697,11 +1192,15 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                     label: selectedSpecialization!,
                   ),
                 ],
-                const SizedBox(width: 8),
-                _ActiveFilterPill(
-                  icon: Icons.radar_rounded,
-                  label: '${radiusKm.round()} كم',
-                ),
+                if (_mapAllowed) ...[
+                  const SizedBox(width: 8),
+                  _ActiveFilterPill(
+                    icon: Icons.radar_rounded,
+                    label: distanceFilterEnabled
+                        ? '${radiusKm.round()} كم'
+                        : 'كل المسافات',
+                  ),
+                ],
               ],
             ),
           ),
@@ -714,8 +1213,10 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     var tempAvailabilityFilter = availabilityFilter;
     var tempGenderFilter = genderFilter;
     var tempTrialSessionFilter = trialSessionFilter;
+    var tempSessionTypeFilter = sessionTypeFilter;
     var tempSpecialization = selectedSpecialization;
     var tempRadius = radiusKm;
+    var tempDistanceFilterEnabled = distanceFilterEnabled;
 
     showModalBottomSheet<void>(
       context: context,
@@ -849,45 +1350,90 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 18),
-                            const _SheetSectionTitle(
-                              icon: Icons.person_search_rounded,
-                              title: 'نوع المحفظ',
-                            ),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _FilterOptionChip(
-                                  label: 'الكل',
-                                  icon: Icons.groups_rounded,
-                                  isSelected: tempGenderFilter ==
-                                      TeacherGenderFilter.all,
-                                  onTap: () => setSheetState(() {
-                                    tempGenderFilter = TeacherGenderFilter.all;
-                                  }),
-                                ),
-                                _FilterOptionChip(
-                                  label: 'معلم',
-                                  icon: Icons.male_rounded,
-                                  isSelected: tempGenderFilter ==
-                                      TeacherGenderFilter.male,
-                                  onTap: () => setSheetState(() {
-                                    tempGenderFilter = TeacherGenderFilter.male;
-                                  }),
-                                ),
-                                _FilterOptionChip(
-                                  label: 'معلمة',
-                                  icon: Icons.female_rounded,
-                                  isSelected: tempGenderFilter ==
-                                      TeacherGenderFilter.female,
-                                  onTap: () => setSheetState(() {
-                                    tempGenderFilter =
-                                        TeacherGenderFilter.female;
-                                  }),
-                                ),
-                              ],
-                            ),
+                            if (_showModeFiltersInSheet) ...[
+                              const SizedBox(height: 18),
+                              const _SheetSectionTitle(
+                                icon: Icons.video_camera_front_rounded,
+                                title: 'نوع الجلسة',
+                              ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _FilterOptionChip(
+                                    label: 'الكل',
+                                    icon: Icons.apps_rounded,
+                                    isSelected: tempSessionTypeFilter ==
+                                        TeacherSessionTypeFilter.all,
+                                    onTap: () => setSheetState(() {
+                                      tempSessionTypeFilter =
+                                          TeacherSessionTypeFilter.all;
+                                    }),
+                                  ),
+                                  _FilterOptionChip(
+                                    label: 'أونلاين',
+                                    icon: Icons.videocam_rounded,
+                                    isSelected: tempSessionTypeFilter ==
+                                        TeacherSessionTypeFilter.online,
+                                    onTap: () => setSheetState(() {
+                                      tempSessionTypeFilter =
+                                          TeacherSessionTypeFilter.online;
+                                    }),
+                                  ),
+                                  _FilterOptionChip(
+                                    label: 'حضوري',
+                                    icon: Icons.mosque_rounded,
+                                    isSelected: tempSessionTypeFilter ==
+                                        TeacherSessionTypeFilter.offline,
+                                    onTap: () => setSheetState(() {
+                                      tempSessionTypeFilter =
+                                          TeacherSessionTypeFilter.offline;
+                                    }),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 18),
+                              const _SheetSectionTitle(
+                                icon: Icons.person_search_rounded,
+                                title: 'نوع المحفظ',
+                              ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _FilterOptionChip(
+                                    label: 'الكل',
+                                    icon: Icons.groups_rounded,
+                                    isSelected: tempGenderFilter ==
+                                        TeacherGenderFilter.all,
+                                    onTap: () => setSheetState(() {
+                                      tempGenderFilter =
+                                          TeacherGenderFilter.all;
+                                    }),
+                                  ),
+                                  _FilterOptionChip(
+                                    label: 'معلم',
+                                    icon: Icons.male_rounded,
+                                    isSelected: tempGenderFilter ==
+                                        TeacherGenderFilter.male,
+                                    onTap: () => setSheetState(() {
+                                      tempGenderFilter =
+                                          TeacherGenderFilter.male;
+                                    }),
+                                  ),
+                                  _FilterOptionChip(
+                                    label: 'معلمة',
+                                    icon: Icons.female_rounded,
+                                    isSelected: tempGenderFilter ==
+                                        TeacherGenderFilter.female,
+                                    onTap: () => setSheetState(() {
+                                      tempGenderFilter =
+                                          TeacherGenderFilter.female;
+                                    }),
+                                  ),
+                                ],
+                              ),
+                            ],
                             if (SpecializationConstants
                                 .specializations.isNotEmpty) ...[
                               const SizedBox(height: 18),
@@ -924,49 +1470,96 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                 ],
                               ),
                             ],
-                            const SizedBox(height: 18),
-                            const _SheetSectionTitle(
-                              icon: Icons.radar_rounded,
-                              title: 'نطاق البحث',
-                            ),
-                            Container(
-                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-                              decoration: BoxDecoration(
-                                color: AppThemeConstants.infoLight,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: AppThemeConstants.primaryVariant
-                                      .withValues(alpha: 0.22),
-                                ),
+                            if (_mapAllowed) ...[
+                              const SizedBox(height: 18),
+                              const _SheetSectionTitle(
+                                icon: Icons.radar_rounded,
+                                title: 'نطاق البحث',
                               ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    '${tempRadius.round()} كم',
-                                    style: const TextStyle(
-                                      color: AppThemeConstants.primary,
-                                      fontWeight: FontWeight.w900,
-                                    ),
+                              Container(
+                                padding:
+                                    const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                                decoration: BoxDecoration(
+                                  color: AppThemeConstants.infoLight,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppThemeConstants.primaryVariant
+                                        .withValues(alpha: 0.22),
                                   ),
-                                  Expanded(
-                                    child: Slider(
-                                      value: tempRadius,
-                                      min: 5,
-                                      max: 100,
-                                      divisions: 19,
-                                      label: '${tempRadius.round()} كم',
-                                      activeColor: AppThemeConstants.secondary,
-                                      inactiveColor: AppThemeConstants.outline,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    CheckboxListTile(
+                                      value: tempDistanceFilterEnabled,
                                       onChanged: (value) {
                                         setSheetState(() {
-                                          tempRadius = value;
+                                          tempDistanceFilterEnabled =
+                                              value ?? true;
                                         });
                                       },
+                                      contentPadding: EdgeInsets.zero,
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
+                                      activeColor: AppThemeConstants.primary,
+                                      dense: true,
+                                      title: const Text(
+                                        'تفعيل فلتر المسافة',
+                                        style: TextStyle(
+                                          color: AppThemeConstants.textPrimary,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      subtitle: const Text(
+                                        'عند إيقافه ستظهر النتائج من كل المناطق.',
+                                        style: TextStyle(
+                                          color:
+                                              AppThemeConstants.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    Opacity(
+                                      opacity:
+                                          tempDistanceFilterEnabled ? 1 : 0.45,
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            '${tempRadius.round()} كم',
+                                            style: const TextStyle(
+                                              color: AppThemeConstants.primary,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Slider(
+                                              value: tempRadius,
+                                              min: 5,
+                                              max: 100,
+                                              divisions: 19,
+                                              label: '${tempRadius.round()} كم',
+                                              activeColor:
+                                                  AppThemeConstants.secondary,
+                                              inactiveColor:
+                                                  AppThemeConstants.outline,
+                                              onChanged:
+                                                  tempDistanceFilterEnabled
+                                                      ? (value) {
+                                                          setSheetState(() {
+                                                            tempRadius = value;
+                                                          });
+                                                        }
+                                                      : null,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -988,11 +1581,13 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                             onPressed: () => setSheetState(() {
                               tempAvailabilityFilter =
                                   TeacherAvailabilityFilter.availableOnly;
-                              tempGenderFilter = TeacherGenderFilter.all;
+                              tempGenderFilter = genderFilter;
                               tempTrialSessionFilter =
                                   TeacherTrialSessionFilter.all;
+                              tempSessionTypeFilter = sessionTypeFilter;
                               tempSpecialization = null;
                               tempRadius = 50;
+                              tempDistanceFilterEnabled = _mapAllowed;
                             }),
                             icon: const Icon(Icons.restart_alt_rounded),
                             label: const Text('إعادة ضبط'),
@@ -1005,8 +1600,12 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
                                   availability: tempAvailabilityFilter,
                                   gender: tempGenderFilter,
                                   trialSession: tempTrialSessionFilter,
+                                  sessionType: sessionTypeFilter,
                                   specialization: tempSpecialization,
                                   radius: tempRadius,
+                                  distanceEnabled: _mapAllowed
+                                      ? tempDistanceFilterEnabled
+                                      : false,
                                 );
                                 Navigator.of(sheetContext).pop();
                               },
@@ -1116,10 +1715,11 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
   int get _activeFilterCount {
     var count = 0;
     if (availabilityFilter != TeacherAvailabilityFilter.availableOnly) count++;
-    if (genderFilter != TeacherGenderFilter.all) count++;
     if (trialSessionFilter != TeacherTrialSessionFilter.all) count++;
     if (selectedSpecialization != null) count++;
-    if (radiusKm.round() != 50) count++;
+    if (_mapAllowed && (!distanceFilterEnabled || radiusKm.round() != 50)) {
+      count++;
+    }
     return count;
   }
 
@@ -1145,12 +1745,29 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
     }
   }
 
+  String _sessionTypeLabel(TeacherSessionTypeFilter filter) {
+    switch (filter) {
+      case TeacherSessionTypeFilter.all:
+        return 'كل الجلسات';
+      case TeacherSessionTypeFilter.online:
+        return 'أونلاين';
+      case TeacherSessionTypeFilter.home:
+        return 'جلسة في البيت';
+      case TeacherSessionTypeFilter.mosque:
+        return 'جلسة في المسجد';
+      case TeacherSessionTypeFilter.offline:
+        return 'حضوري';
+    }
+  }
+
   void _applyDetailedFilters({
     required TeacherAvailabilityFilter availability,
     required TeacherGenderFilter gender,
     required TeacherTrialSessionFilter trialSession,
+    required TeacherSessionTypeFilter sessionType,
     required String? specialization,
     required double radius,
+    required bool distanceEnabled,
   }) {
     final normalizedRadius = radius.clamp(5.0, 100.0).toDouble();
 
@@ -1158,20 +1775,145 @@ class _NearbyMohaffezScreenState extends ConsumerState<NearbyMohaffezScreen>
       availabilityFilter = availability;
       genderFilter = gender;
       trialSessionFilter = trialSession;
+      sessionTypeFilter = sessionType;
       selectedSpecialization = specialization;
       radiusKm = normalizedRadius;
+      distanceFilterEnabled = distanceEnabled;
+      if (sessionType == TeacherSessionTypeFilter.online &&
+          selectedFilter == SortType.distance) {
+        selectedFilter = SortType.rating;
+      }
       _selectedTeacher = null;
       _hasFitInitialBounds = false;
     });
   }
 
   void _clearSearch() {
+    _searchDebounce?.cancel();
     _searchController.clear();
     setState(() {
       searchQuery = '';
       _selectedTeacher = null;
       _hasFitInitialBounds = false;
     });
+  }
+}
+
+class _SetupChoiceCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SetupChoiceCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground =
+        selected ? AppThemeConstants.white : AppThemeConstants.textPrimary;
+    final secondaryText = selected
+        ? AppThemeConstants.white.withValues(alpha: 0.82)
+        : AppThemeConstants.textSecondary;
+
+    return Material(
+      color: AppThemeConstants.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppThemeConstants.primary
+                : AppThemeConstants.white.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected
+                  ? AppThemeConstants.secondary
+                  : AppThemeConstants.outline,
+              width: selected ? 1.6 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (selected
+                        ? AppThemeConstants.primary
+                        : AppThemeConstants.black)
+                    .withValues(alpha: selected ? 0.22 : 0.08),
+                blurRadius: selected ? 20 : 12,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppThemeConstants.white.withValues(alpha: 0.16)
+                      : AppThemeConstants.primaryVariant
+                          .withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(
+                  icon,
+                  color: selected
+                      ? AppThemeConstants.secondary
+                      : AppThemeConstants.primary,
+                  size: 25,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: secondaryText,
+                        fontSize: 12,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: selected
+                    ? AppThemeConstants.secondary
+                    : AppThemeConstants.textSecondary.withValues(alpha: 0.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1362,7 +2104,7 @@ class _MapTeacherPreviewCard extends StatelessWidget {
               CachedAvatar(
                 imageUrl: teacher.photoUrl,
                 radius: 28,
-                semanticLabel: teacher.name,
+                semanticLabel: teacher.displayName,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1370,7 +2112,7 @@ class _MapTeacherPreviewCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      teacher.name,
+                      teacher.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1526,7 +2268,7 @@ class _TeacherPreviewCard extends StatelessWidget {
               CachedAvatar(
                 imageUrl: teacher.photoUrl,
                 radius: 34,
-                semanticLabel: teacher.name,
+                semanticLabel: teacher.displayName,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1537,7 +2279,7 @@ class _TeacherPreviewCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            teacher.name,
+                            teacher.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1700,7 +2442,7 @@ class _TeacherResultTile extends StatelessWidget {
               CachedAvatar(
                 imageUrl: teacher.photoUrl,
                 radius: 28,
-                semanticLabel: teacher.name,
+                semanticLabel: teacher.displayName,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1708,7 +2450,7 @@ class _TeacherResultTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      teacher.name,
+                      teacher.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

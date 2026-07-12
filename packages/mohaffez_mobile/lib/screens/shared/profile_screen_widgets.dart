@@ -12,6 +12,13 @@ class ProfileAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final normalizedRole = normalizeRole(user.role);
+    final roleLabel = normalizedRole == roleParent
+        ? 'ولي أمر'
+        : normalizedRole == roleMohaffez
+            ? 'محفّظ'
+            : 'طالب';
+
     return SliverAppBar(
       expandedHeight: 200,
       pinned: true,
@@ -44,12 +51,12 @@ class ProfileAppBar extends StatelessWidget {
                   CachedAvatar(
                     imageUrl: user.photoUrl,
                     radius: 50,
-                    semanticLabel: user.name,
+                    semanticLabel: user.displayName,
                   ),
                   const SizedBox(height: 8),
                   // Name
                   Text(
-                    user.name,
+                    user.displayName,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -66,7 +73,7 @@ class ProfileAppBar extends StatelessWidget {
                   ],
                   // Role
                   Text(
-                    user.role == 'mohaffez' ? 'محفّظ' : 'طالب',
+                    roleLabel,
                     style: TextStyle(
                       fontSize: 14,
                       color: AppThemeConstants.onPrimary.withValues(alpha: 0.7),

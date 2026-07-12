@@ -35,15 +35,16 @@ class _ConfigForm extends ConsumerWidget {
   const _ConfigForm({required this.config});
   final SystemConfigModel config;
 
-  Future<void> _save(BuildContext context, WidgetRef ref,
-      Map<String, dynamic> updates) async {
+  Future<void> _save(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> updates) async {
     await ref
         .read(systemConfigNotifierProvider.notifier)
         .updateGlobalConfig(updates);
     if (!context.mounted) return;
     final state = ref.read(systemConfigNotifierProvider);
     state.when(
-      data: (_) => DSToast.show(context, 'تم حفظ الإعداد', type: DSToastType.success),
+      data: (_) =>
+          DSToast.show(context, 'تم حفظ الإعداد', type: DSToastType.success),
       loading: () {},
       error: (e, _) =>
           DSToast.show(context, 'فشل الحفظ: $e', type: DSToastType.error),
@@ -126,8 +127,7 @@ class _ConfigForm extends ConsumerWidget {
                 context,
                 title: 'نسبة العمولة (%)',
                 initial: (config.commissionRate * 100).toStringAsFixed(0),
-                onSave: (n) =>
-                    _save(context, ref, {'commissionRate': n / 100}),
+                onSave: (n) => _save(context, ref, {'commissionRate': n / 100}),
               ),
             ),
             _EditableRow(
@@ -139,8 +139,8 @@ class _ConfigForm extends ConsumerWidget {
                 title: 'عمولة الدفع المباشر (%)',
                 initial:
                     (config.directPaymentCommission * 100).toStringAsFixed(0),
-                onSave: (n) => _save(
-                    context, ref, {'directPaymentCommission': n / 100}),
+                onSave: (n) =>
+                    _save(context, ref, {'directPaymentCommission': n / 100}),
               ),
             ),
             _EditableRow(
@@ -163,9 +163,36 @@ class _ConfigForm extends ConsumerWidget {
                 title: 'حد دين الدفع المباشر (ج.م)',
                 initial:
                     config.directPaymentDebtThresholdEgp.toStringAsFixed(0),
-                onSave: (n) => _save(
-                    context, ref, {'directPaymentDebtThresholdEgp': n}),
+                onSave: (n) =>
+                    _save(context, ref, {'directPaymentDebtThresholdEgp': n}),
               ),
+            ),
+          ],
+        ),
+
+        _ConfigCard(
+          title: 'إعدادات التسعير',
+          children: [
+            _EditableRow(
+              label: 'الحد الأدنى لسعر الساعة',
+              value:
+                  '${config.minimumTeacherHourlyRateEgp.toStringAsFixed(0)} ج.م',
+              onEdit: () => _editNumber(
+                context,
+                title: 'الحد الأدنى لسعر الساعة (ج.م)',
+                initial: config.minimumTeacherHourlyRateEgp.toStringAsFixed(0),
+                minValue: 0,
+                onSave: (n) => _save(
+                  context,
+                  ref,
+                  {'minimumTeacherHourlyRateEgp': n},
+                ),
+              ),
+            ),
+            const SizedBox(height: DSSpacing.sm),
+            Text(
+              'يُحسب الحد من سعر الخطة وعدد الجلسات ومدة كل جلسة. القيمة صفر تعني عدم فرض حد أدنى.',
+              style: DSText.caption(context, color: DSColors.text3),
             ),
           ],
         ),
@@ -200,8 +227,8 @@ class _ConfigForm extends ConsumerWidget {
                 title: 'مهلة الدفع (ساعة)',
                 initial: '${config.paymentDeadlineHours}',
                 isInt: true,
-                onSave: (n) => _save(
-                    context, ref, {'paymentDeadlineHours': n.toInt()}),
+                onSave: (n) =>
+                    _save(context, ref, {'paymentDeadlineHours': n.toInt()}),
               ),
             ),
             _EditableRow(
@@ -212,8 +239,8 @@ class _ConfigForm extends ConsumerWidget {
                 title: 'حد الحجز المسبق (يوم)',
                 initial: '${config.maxAdvanceBookingDays}',
                 isInt: true,
-                onSave: (n) => _save(
-                    context, ref, {'maxAdvanceBookingDays': n.toInt()}),
+                onSave: (n) =>
+                    _save(context, ref, {'maxAdvanceBookingDays': n.toInt()}),
               ),
             ),
             _EditableRow(
@@ -236,8 +263,8 @@ class _ConfigForm extends ConsumerWidget {
                 title: 'مهلة التأخير المسموحة (دقيقة)',
                 initial: '${config.lateSessionGraceMinutes}',
                 isInt: true,
-                onSave: (n) => _save(
-                    context, ref, {'lateSessionGraceMinutes': n.toInt()}),
+                onSave: (n) =>
+                    _save(context, ref, {'lateSessionGraceMinutes': n.toInt()}),
               ),
             ),
           ],
@@ -252,6 +279,19 @@ class _ConfigForm extends ConsumerWidget {
                 value: config.credentialReviewRequired,
                 onChanged: (v) =>
                     _save(context, ref, {'credentialReviewRequired': v})),
+            const SizedBox(height: DSSpacing.sm),
+            _SwitchRow(
+                label: 'استقبال محفظين جدد',
+                value: config.teacherRegistrationEnabled,
+                onChanged: (v) =>
+                    _save(context, ref, {'teacherRegistrationEnabled': v})),
+            const SizedBox(height: DSSpacing.xs),
+            Text(
+              config.teacherRegistrationEnabled
+                  ? 'يمكن للزوار إنشاء حساب محفظ جديد وإكمال طلب المراجعة.'
+                  : 'تم إيقاف إنشاء حسابات المحفظين الجدد مؤقتاً. حسابات الطلاب تعمل بشكل طبيعي.',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
             const SizedBox(height: DSSpacing.sm),
             _SwitchRow(
                 label: 'قبول المحفظين تلقائياً',
@@ -314,8 +354,8 @@ class _ConfigForm extends ConsumerWidget {
                 title: 'فترة الانتظار (يوم)',
                 initial: '${config.examRetryCooldownDays}',
                 isInt: true,
-                onSave: (n) => _save(
-                    context, ref, {'examRetryCooldownDays': n.toInt()}),
+                onSave: (n) =>
+                    _save(context, ref, {'examRetryCooldownDays': n.toInt()}),
               ),
             ),
           ],
@@ -401,6 +441,7 @@ class _ConfigForm extends ConsumerWidget {
     required String initial,
     required ValueChanged<double> onSave,
     bool isInt = false,
+    double? minValue,
   }) async {
     final controller = TextEditingController(text: initial);
     String? error;
@@ -432,6 +473,16 @@ class _ConfigForm extends ConsumerWidget {
     if (parsed == null) {
       if (context.mounted) {
         DSToast.show(context, 'قيمة غير صالحة', type: DSToastType.error);
+      }
+      return;
+    }
+    if (minValue != null && parsed < minValue) {
+      if (context.mounted) {
+        DSToast.show(
+          context,
+          'يجب ألا تقل القيمة عن ${minValue.toStringAsFixed(0)}',
+          type: DSToastType.error,
+        );
       }
       return;
     }
@@ -473,7 +524,8 @@ class _SwitchRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(child: Text(label, style: DSText.body(context))),
-        Switch(value: value, onChanged: onChanged, activeColor: DSColors.primary),
+        Switch(
+            value: value, onChanged: onChanged, activeColor: DSColors.primary),
       ],
     );
   }
@@ -493,7 +545,8 @@ class _EditableRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: DSText.body(context, color: DSColors.text2)),
+            child:
+                Text(label, style: DSText.body(context, color: DSColors.text2)),
           ),
           Text(value, style: DSText.bodyMedium(context)),
           const SizedBox(width: DSSpacing.xs),

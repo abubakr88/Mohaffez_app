@@ -1,4 +1,4 @@
-﻿// FILE: lib/config/guards/auth_guard.dart
+// FILE: lib/config/guards/auth_guard.dart
 // CHANGES:
 // - Fixed stuck on splash when auth is resolved but user is unauthenticated
 // - Added loop protection (never redirect if already at login)
@@ -29,6 +29,10 @@ class AuthGuard implements RouteGuard {
     '/payment/return',
   };
 
+  static bool _isPublicRoute(String path) {
+    return publicRoutes.contains(path) || path.startsWith('/p/t/');
+  }
+
   @override
   String? check(Ref ref, GoRouterState state) {
     // Tour mode bypasses auth — synthetic user provided via overrides.
@@ -36,7 +40,10 @@ class AuthGuard implements RouteGuard {
 
     final authState = ref.read(authStateProvider);
     final currentPath = state.uri.path;
-    final isPublicRoute = publicRoutes.contains(currentPath);
+    final isPublicRoute = _isPublicRoute(currentPath);
+
+    // Public profile pages must be viewable without a valid auth session.
+    if (isPublicRoute && currentPath.startsWith('/p/t/')) return null;
 
     // Still loading auth — do nothing
     if (authState.isLoading) return null;

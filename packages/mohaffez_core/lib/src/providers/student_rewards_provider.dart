@@ -4,29 +4,120 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ─── Surah names (1-based index) ──────────────────────────────────────────────
 const List<String> surahNames = [
-  'الفاتحة', 'البقرة', 'آل عمران', 'النساء', 'المائدة',
-  'الأنعام', 'الأعراف', 'الأنفال', 'التوبة', 'يونس',
-  'هود', 'يوسف', 'الرعد', 'إبراهيم', 'الحجر',
-  'النحل', 'الإسراء', 'الكهف', 'مريم', 'طه',
-  'الأنبياء', 'الحج', 'المؤمنون', 'النور', 'الفرقان',
-  'الشعراء', 'النمل', 'القصص', 'العنكبوت', 'الروم',
-  'لقمان', 'السجدة', 'الأحزاب', 'سبأ', 'فاطر',
-  'يس', 'الصافات', 'ص', 'الزمر', 'غافر',
-  'فصلت', 'الشورى', 'الزخرف', 'الدخان', 'الجاثية',
-  'الأحقاف', 'محمد', 'الفتح', 'الحجرات', 'ق',
-  'الذاريات', 'الطور', 'النجم', 'القمر', 'الرحمن',
-  'الواقعة', 'الحديد', 'المجادلة', 'الحشر', 'الممتحنة',
-  'الصف', 'الجمعة', 'المنافقون', 'التغابن', 'الطلاق',
-  'التحريم', 'الملك', 'القلم', 'الحاقة', 'المعارج',
-  'نوح', 'الجن', 'المزمل', 'المدثر', 'القيامة',
-  'الإنسان', 'المرسلات', 'النبأ', 'النازعات', 'عبس',
-  'التكوير', 'الانفطار', 'المطففين', 'الانشقاق', 'البروج',
-  'الطارق', 'الأعلى', 'الغاشية', 'الفجر', 'البلد',
-  'الشمس', 'الليل', 'الضحى', 'الشرح', 'التين',
-  'العلق', 'القدر', 'البينة', 'الزلزلة', 'العاديات',
-  'القارعة', 'التكاثر', 'العصر', 'الهمزة', 'الفيل',
-  'قريش', 'الماعون', 'الكوثر', 'الكافرون', 'النصر',
-  'المسد', 'الإخلاص', 'الفلق', 'الناس',
+  'الفاتحة',
+  'البقرة',
+  'آل عمران',
+  'النساء',
+  'المائدة',
+  'الأنعام',
+  'الأعراف',
+  'الأنفال',
+  'التوبة',
+  'يونس',
+  'هود',
+  'يوسف',
+  'الرعد',
+  'إبراهيم',
+  'الحجر',
+  'النحل',
+  'الإسراء',
+  'الكهف',
+  'مريم',
+  'طه',
+  'الأنبياء',
+  'الحج',
+  'المؤمنون',
+  'النور',
+  'الفرقان',
+  'الشعراء',
+  'النمل',
+  'القصص',
+  'العنكبوت',
+  'الروم',
+  'لقمان',
+  'السجدة',
+  'الأحزاب',
+  'سبأ',
+  'فاطر',
+  'يس',
+  'الصافات',
+  'ص',
+  'الزمر',
+  'غافر',
+  'فصلت',
+  'الشورى',
+  'الزخرف',
+  'الدخان',
+  'الجاثية',
+  'الأحقاف',
+  'محمد',
+  'الفتح',
+  'الحجرات',
+  'ق',
+  'الذاريات',
+  'الطور',
+  'النجم',
+  'القمر',
+  'الرحمن',
+  'الواقعة',
+  'الحديد',
+  'المجادلة',
+  'الحشر',
+  'الممتحنة',
+  'الصف',
+  'الجمعة',
+  'المنافقون',
+  'التغابن',
+  'الطلاق',
+  'التحريم',
+  'الملك',
+  'القلم',
+  'الحاقة',
+  'المعارج',
+  'نوح',
+  'الجن',
+  'المزمل',
+  'المدثر',
+  'القيامة',
+  'الإنسان',
+  'المرسلات',
+  'النبأ',
+  'النازعات',
+  'عبس',
+  'التكوير',
+  'الانفطار',
+  'المطففين',
+  'الانشقاق',
+  'البروج',
+  'الطارق',
+  'الأعلى',
+  'الغاشية',
+  'الفجر',
+  'البلد',
+  'الشمس',
+  'الليل',
+  'الضحى',
+  'الشرح',
+  'التين',
+  'العلق',
+  'القدر',
+  'البينة',
+  'الزلزلة',
+  'العاديات',
+  'القارعة',
+  'التكاثر',
+  'العصر',
+  'الهمزة',
+  'الفيل',
+  'قريش',
+  'الماعون',
+  'الكوثر',
+  'الكافرون',
+  'النصر',
+  'المسد',
+  'الإخلاص',
+  'الفلق',
+  'الناس',
 ];
 
 // ─── Level system ─────────────────────────────────────────────────────────────
@@ -61,27 +152,42 @@ class StudentLevel {
 List<StudentLevel> _levelsForAge(int age) {
   if (age < 12) {
     return const [
-      StudentLevel(name: 'مبتدئ',  emoji: '🌱', currentMin: 0,  nextMin: 3,  rank: 0),
-      StudentLevel(name: 'متعلم',  emoji: '📖', currentMin: 3,  nextMin: 9,  rank: 1),
-      StudentLevel(name: 'مجتهد', emoji: '⭐', currentMin: 9,  nextMin: 19, rank: 2),
-      StudentLevel(name: 'متقن',   emoji: '🌙', currentMin: 19, nextMin: 40, rank: 3),
-      StudentLevel(name: 'النابغة', emoji: '👑', currentMin: 40, nextMin: -1, rank: 4),
+      StudentLevel(
+          name: 'مبتدئ', emoji: '🌱', currentMin: 0, nextMin: 3, rank: 0),
+      StudentLevel(
+          name: 'متعلم', emoji: '📖', currentMin: 3, nextMin: 9, rank: 1),
+      StudentLevel(
+          name: 'مجتهد', emoji: '⭐', currentMin: 9, nextMin: 19, rank: 2),
+      StudentLevel(
+          name: 'متقن', emoji: '🌙', currentMin: 19, nextMin: 40, rank: 3),
+      StudentLevel(
+          name: 'النابغة', emoji: '👑', currentMin: 40, nextMin: -1, rank: 4),
     ];
   } else if (age < 18) {
     return const [
-      StudentLevel(name: 'مبتدئ',   emoji: '🌱', currentMin: 0,  nextMin: 4,  rank: 0),
-      StudentLevel(name: 'متعلم',   emoji: '📖', currentMin: 4,  nextMin: 11, rank: 1),
-      StudentLevel(name: 'مجتهد',  emoji: '⭐', currentMin: 11, nextMin: 25, rank: 2),
-      StudentLevel(name: 'متقن',    emoji: '🌙', currentMin: 25, nextMin: 50, rank: 3),
-      StudentLevel(name: 'المتميز', emoji: '🏆', currentMin: 50, nextMin: -1, rank: 4),
+      StudentLevel(
+          name: 'مبتدئ', emoji: '🌱', currentMin: 0, nextMin: 4, rank: 0),
+      StudentLevel(
+          name: 'متعلم', emoji: '📖', currentMin: 4, nextMin: 11, rank: 1),
+      StudentLevel(
+          name: 'مجتهد', emoji: '⭐', currentMin: 11, nextMin: 25, rank: 2),
+      StudentLevel(
+          name: 'متقن', emoji: '🌙', currentMin: 25, nextMin: 50, rank: 3),
+      StudentLevel(
+          name: 'المتميز', emoji: '🏆', currentMin: 50, nextMin: -1, rank: 4),
     ];
   } else {
     return const [
-      StudentLevel(name: 'مبتدئ',  emoji: '🌱', currentMin: 0,  nextMin: 5,  rank: 0),
-      StudentLevel(name: 'متعلم',  emoji: '📖', currentMin: 5,  nextMin: 15, rank: 1),
-      StudentLevel(name: 'مجتهد', emoji: '⭐', currentMin: 15, nextMin: 30, rank: 2),
-      StudentLevel(name: 'متقن',   emoji: '🌙', currentMin: 30, nextMin: 60, rank: 3),
-      StudentLevel(name: 'الحافظ', emoji: '🏆', currentMin: 60, nextMin: -1, rank: 4),
+      StudentLevel(
+          name: 'مبتدئ', emoji: '🌱', currentMin: 0, nextMin: 5, rank: 0),
+      StudentLevel(
+          name: 'متعلم', emoji: '📖', currentMin: 5, nextMin: 15, rank: 1),
+      StudentLevel(
+          name: 'مجتهد', emoji: '⭐', currentMin: 15, nextMin: 30, rank: 2),
+      StudentLevel(
+          name: 'متقن', emoji: '🌙', currentMin: 30, nextMin: 60, rank: 3),
+      StudentLevel(
+          name: 'الحافظ', emoji: '🏆', currentMin: 60, nextMin: -1, rank: 4),
     ];
   }
 }
@@ -90,8 +196,7 @@ int calculateAge(DateTime? dob) {
   if (dob == null) return 20;
   final now = DateTime.now();
   int age = now.year - dob.year;
-  if (now.month < dob.month ||
-      (now.month == dob.month && now.day < dob.day)) {
+  if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
     age--;
   }
   return age.clamp(0, 120);
@@ -111,29 +216,84 @@ StudentLevel resolveLevel(int sessions, int age) {
 /// Real-time stream of memorized surah numbers (1-114) for a student.
 final memorizedSurahsProvider = StreamProvider.family<List<int>, String>(
   (ref, studentId) {
+    return _watchMemorizedSurahs(studentId: studentId);
+  },
+);
+
+final learnerMemorizedSurahsProvider = StreamProvider.family<List<int>,
+    ({String studentId, String? studentProfileId})>(
+  (ref, params) {
+    return _watchMemorizedSurahs(
+      studentId: params.studentId,
+      studentProfileId: params.studentProfileId,
+    );
+  },
+);
+
+Stream<List<int>> _watchMemorizedSurahs({
+  required String studentId,
+  String? studentProfileId,
+}) {
+  return _memorizedSurahsRef(
+    studentId: studentId,
+    studentProfileId: studentProfileId,
+  ).snapshots().map((snap) => snap.docs
+      .map((d) => (d.data()['surahNumber'] as num?)?.toInt() ?? 0)
+      .where((n) => n >= 1 && n <= 114)
+      .toList());
+}
+
+CollectionReference<Map<String, dynamic>> _memorizedSurahsRef({
+  required String studentId,
+  String? studentProfileId,
+}) {
+  final profileId = studentProfileId?.trim();
+  if (profileId != null && profileId.isNotEmpty && profileId != 'self') {
     return FirebaseFirestore.instance
         .collection('users')
         .doc(studentId)
-        .collection('memorizedSurahs')
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => (d.data()['surahNumber'] as num?)?.toInt() ?? 0)
-            .where((n) => n >= 1 && n <= 114)
-            .toList());
-  },
-);
+        .collection('studentProfiles')
+        .doc(profileId)
+        .collection('memorizedSurahs');
+  }
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(studentId)
+      .collection('memorizedSurahs');
+}
 
 /// Count of completed hafiz sessions for a student.
 final studentCompletedSessionsProvider =
     FutureProvider.autoDispose.family<int, String>((ref, studentId) async {
-  final agg = await FirebaseFirestore.instance
+  return _countCompletedSessions(studentId: studentId);
+});
+
+final learnerCompletedSessionsProvider = FutureProvider.autoDispose
+    .family<int, ({String studentId, String? studentProfileId})>(
+        (ref, params) async {
+  return _countCompletedSessions(
+    studentId: params.studentId,
+    studentProfileId: params.studentProfileId,
+  );
+});
+
+Future<int> _countCompletedSessions({
+  required String studentId,
+  String? studentProfileId,
+}) async {
+  Query<Map<String, dynamic>> query = FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('studentId', isEqualTo: studentId)
-      .where('status', isEqualTo: 'completed')
-      .count()
-      .get();
+      .where('status', isEqualTo: 'completed');
+
+  final profileId = studentProfileId?.trim();
+  if (profileId != null && profileId.isNotEmpty && profileId != 'self') {
+    query = query.where('studentProfileId', isEqualTo: profileId);
+  }
+
+  final agg = await query.count().get();
   return agg.count ?? 0;
-});
+}
 
 // ─── Write helper ─────────────────────────────────────────────────────────────
 
@@ -143,12 +303,12 @@ Future<void> toggleMemorizedSurah({
   required bool isCurrentlyMemorized,
   required String mohaffezId,
   required String mohaffezName,
+  String? studentProfileId,
 }) async {
-  final docRef = FirebaseFirestore.instance
-      .collection('users')
-      .doc(studentId)
-      .collection('memorizedSurahs')
-      .doc('$surahNumber');
+  final docRef = _memorizedSurahsRef(
+    studentId: studentId,
+    studentProfileId: studentProfileId,
+  ).doc('$surahNumber');
 
   if (isCurrentlyMemorized) {
     await docRef.delete();

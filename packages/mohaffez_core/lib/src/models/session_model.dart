@@ -17,41 +17,43 @@ class SessionModel with _$SessionModel {
     required String studentId,
     required String mohaffezName,
     required String studentName,
+    String? guardianId,
+    String? guardianName,
+    String? studentProfileId,
+    String? studentProfileName,
+    String? studentProfileGender,
+    @TimestampConverter() DateTime? studentProfileBirthDate,
     required String sessionType,
     String? location,
-
     String? mohaffezPhone,
     double? imamAddressLat,
     double? imamAddressLng,
     String? preferredTimeSlot,
-
     @Default(1) int juzCount,
     String? hifzAssignment,
     String? murajaAssignment,
-
     bool? previousHifzCompleted,
     @Default(0) int previousHifzRating,
     bool? previousMurajaCompleted,
     @Default(0) int previousMurajaRating,
-
     String? performanceNotes,
     @Default(10) int sessionRating,
     @Default(0) int teacherRating,
     String? sessionNotes,
-
     @TimestampConverter() DateTime? sessionDate,
     @TimestampConverter() DateTime? slotStart,
     @TimestampConverter() DateTime? slotEnd,
     @TimestampConverter() DateTime? createdAt,
     @TimestampConverter() DateTime? completedAt,
-
     String? status,
-    String? cancelledBy,              // 'student' | 'teacher'
+    String? cancelledBy, // 'student' | 'teacher'
     @TimestampConverter() DateTime? cancelledAt,
-    @Default(false) bool studentNoShow, // teacher reported: student didn't attend
-    @Default(false) bool teacherNoShow, // student reported: teacher didn't attend
-    double? refundAmount,             // EGP refunded to student on cancellation
-    double? refundPercent,            // 0, 50, or 100
+    @Default(false)
+    bool studentNoShow, // teacher reported: student didn't attend
+    @Default(false)
+    bool teacherNoShow, // student reported: teacher didn't attend
+    double? refundAmount, // EGP refunded to student on cancellation
+    double? refundPercent, // 0, 50, or 100
 
     // PAYMENT FIELDS
     @Default(false) bool isPaid,
@@ -61,7 +63,8 @@ class SessionModel with _$SessionModel {
     double? sessionPrice,
 
     // ONLINE SESSION FIELDS
-    String? preferredProvider, // 'zoom' | 'googleMeet' | 'teams' (chosen by student)
+    String?
+        preferredProvider, // 'zoom' | 'googleMeet' | 'teams' (chosen by student)
     String? meetingLink,
     String? meetingId,
     String? meetingPassword,
@@ -72,7 +75,6 @@ class SessionModel with _$SessionModel {
     @Default(<QuranMistake>[]) List<QuranMistake> mistakes,
     @Default(<int>[]) List<int> pagesRead,
     int? currentPage,
-
     @Default(0) int tajweedMistakesCount,
     @Default(0) int pronunciationMistakesCount,
     @Default(0) int readingMistakesCount,
@@ -146,9 +148,8 @@ extension SessionModelExtensions on SessionModel {
       'addition': mistakesOfType(MistakeType.addition).length,
       'other': mistakesOfType(MistakeType.other).length,
       'pagesWithMistakes': mistakesByPage.length,
-      'averageMistakesPerPage': mistakesByPage.isEmpty
-          ? 0.0
-          : totalMistakes / mistakesByPage.length,
+      'averageMistakesPerPage':
+          mistakesByPage.isEmpty ? 0.0 : totalMistakes / mistakesByPage.length,
     };
   }
 
@@ -185,4 +186,3 @@ extension SessionModelExtensions on SessionModel {
       (sessionNotes != null && sessionNotes!.isNotEmpty) ||
       (performanceNotes != null && performanceNotes!.isNotEmpty);
 }
-

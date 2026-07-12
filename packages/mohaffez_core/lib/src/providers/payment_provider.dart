@@ -6,6 +6,7 @@ import '../models/payment_model.dart';
 import '../models/pricing_plan_model.dart';
 import '../models/subscription_model.dart';
 import '../repositories/payment_repository.dart';
+import '../utils/pricing_country_utils.dart';
 
 final studentSubscriptionsProvider =
     StreamProvider.family<List<SubscriptionModel>, String>((ref, studentId) {
@@ -91,6 +92,7 @@ class PaymentActionsNotifier extends StateNotifier<AsyncValue<void>> {
         'sessionsCount': plan.sessionsCount,
         'validityDays': plan.validityDays,
         'priceEGP': plan.priceEGP,
+        ...PricingCountryUtils.paymentSnapshot(plan),
       };
 
       // ✅ FREE SESSION FLOW (100% promo code)

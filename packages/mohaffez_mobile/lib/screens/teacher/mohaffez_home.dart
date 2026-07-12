@@ -220,7 +220,7 @@ class MohaffezHomeContent extends ConsumerWidget {
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
                     background: _HomeHeader(
-                      name: user?.name ?? 'المحفظ',
+                      name: user?.displayName ?? 'المحفظ',
                       photoUrl: user?.photoUrl,
                       dateText: DateFormat('EEEE، d MMMM', 'ar').format(now),
                       greeting: _greeting(now),
@@ -397,12 +397,17 @@ class _HomeHeader extends StatelessWidget {
                                     color: AppThemeConstants.white
                                         .withValues(alpha: 0.7)),
                                 const SizedBox(width: 5),
-                                Text(
-                                  dateText,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppThemeConstants.white
-                                        .withValues(alpha: 0.75),
+                                Expanded(
+                                  child: Text(
+                                    dateText,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppThemeConstants.white
+                                          .withValues(alpha: 0.75),
+                                    ),
                                   ),
                                 ),
                               ],

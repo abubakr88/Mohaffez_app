@@ -3,6 +3,7 @@
 class MohaffezStudentSummary {
   final String studentId;
   final String studentName;
+  final String? studentProfileId;
   final String? photoUrl;
   final DateTime? lastSessionDate;
   final String lastSessionStatus;
@@ -23,6 +24,7 @@ class MohaffezStudentSummary {
   const MohaffezStudentSummary({
     required this.studentId,
     required this.studentName,
+    this.studentProfileId,
     this.photoUrl,
     this.lastSessionDate,
     this.lastSessionStatus = 'accepted',
@@ -45,6 +47,7 @@ class MohaffezStudentSummary {
     return MohaffezStudentSummary(
       studentId: studentId,
       studentName: studentName,
+      studentProfileId: studentProfileId,
       photoUrl: photoUrl ?? this.photoUrl,
       lastSessionDate: lastSessionDate,
       lastSessionStatus: lastSessionStatus,
@@ -68,6 +71,7 @@ class MohaffezStudentSummary {
     return MohaffezStudentSummary(
       studentId: json['studentId'] as String,
       studentName: json['studentName'] as String,
+      studentProfileId: json['studentProfileId'] as String?,
       photoUrl: json['photoUrl'] as String?,
       lastSessionDate: json['lastSessionDate'] != null
           ? DateTime.parse(json['lastSessionDate'] as String)
@@ -93,6 +97,7 @@ class MohaffezStudentSummary {
     return {
       'studentId': studentId,
       'studentName': studentName,
+      'studentProfileId': studentProfileId,
       'photoUrl': photoUrl,
       'lastSessionDate': lastSessionDate?.toIso8601String(),
       'lastSessionStatus': lastSessionStatus,

@@ -44,6 +44,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
   String? _mainLocationText;
   double? _mainLocationLat;
   double? _mainLocationLng;
+  String? _countryName;
+  String? _countryCode;
 
   // ─── Exam state (mohaffez only) ────────────────────────────────
   List<ExamQuestion>? _questions;
@@ -69,6 +71,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
           _mainLocationText = user.addressText;
           _mainLocationLat = user.addressLat;
           _mainLocationLng = user.addressLng;
+          _countryName = user.country;
+          _countryCode = user.countryCode;
         });
       }
     });
@@ -168,6 +172,26 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
     }
 
     final isMohaffez = ref.read(currentUserProvider).value?.role == 'mohaffez';
+
+    if (isMohaffez == true) {
+      final teacherRegistrationEnabled = ref
+              .read(systemConfigProvider)
+              .valueOrNull
+              ?.teacherRegistrationEnabled ??
+          true;
+      if (!teacherRegistrationEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'تسجيل المحفظين الجدد متوقف حالياً. يرجى المحاولة لاحقاً.',
+            ),
+            backgroundColor: AppThemeConstants.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
 
     if (isMohaffez == true && !_isAtLeast18(_dateOfBirth!)) {
       showDialog(
@@ -289,6 +313,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         addressText: _mainLocationText!.trim(),
         addressLat: _mainLocationLat!,
         addressLng: _mainLocationLng!,
+        country: _countryName,
+        countryCode: _countryCode,
       );
 
       // Invalidate user provider to pick up setupCompleted: true
@@ -327,6 +353,12 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       _mainLocationText = (result['locationName'] as String?) ??
           (result['city'] as String?) ??
           'موقع محدد';
+      _countryName = (result['country'] as String?)?.trim();
+      _countryCode = PricingCountryUtils.inferCountry(
+        countryName: _countryName,
+        city: result['city'] as String?,
+        addressText: _mainLocationText,
+      ).code;
 
       final pickedCity = (result['city'] as String?)?.trim();
       if (pickedCity != null && pickedCity.isNotEmpty) {
@@ -440,6 +472,8 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
         addressText: _mainLocationText!.trim(),
         addressLat: _mainLocationLat!,
         addressLng: _mainLocationLng!,
+        country: _countryName,
+        countryCode: _countryCode,
         examScore: score,
         totalQuestions: questions.length,
         correctAnswers: correct,

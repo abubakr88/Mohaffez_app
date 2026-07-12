@@ -49,6 +49,22 @@ class MeetingLauncherService {
     await _writeJoinTimestamp(sessionId, role);
   }
 
+  static Future<bool> launchPhoneCall({
+    required String phone,
+    required String sessionId,
+    required String role,
+  }) async {
+    final normalized = phone.trim();
+    if (normalized.isEmpty) return false;
+
+    final uri = Uri(scheme: 'tel', path: normalized);
+    if (!await canLaunchUrl(uri)) return false;
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await _writeJoinTimestamp(sessionId, role);
+    return true;
+  }
+
   static Future<bool> _showChecklist(BuildContext context) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -126,7 +142,8 @@ class MeetingLauncherService {
 
     // Guard 1 — too early. Teacher can only start within `leadTimeMinutes`
     // before sessionDate.
-    final sessionDateRaw = sessionData['sessionDate'];
+    final sessionDateRaw =
+        sessionData['slotStart'] ?? sessionData['sessionDate'];
     final DateTime? sessionDate = sessionDateRaw is Timestamp
         ? sessionDateRaw.toDate()
         : (sessionDateRaw is DateTime ? sessionDateRaw : null);
@@ -158,8 +175,7 @@ class MeetingLauncherService {
     final hasOther = concurrent.docs.any((d) {
       if (d.id == sessionId) return false;
       final data = d.data();
-      return data['meetingStartedAt'] != null &&
-          data['meetingEndedAt'] == null;
+      return data['meetingStartedAt'] != null && data['meetingEndedAt'] == null;
     });
     if (hasOther) {
       return (
@@ -169,7 +185,24 @@ class MeetingLauncherService {
       );
     }
 
-    final teacherSnap = await firestore.collection('users').doc(teacherId).get();
+    if (preferredProvider == 'phoneCall') {
+      try {
+        await firestore.collection('hafizSessions').doc(sessionId).update({
+          'meeting.provider': 'phoneCall',
+          'meeting.roomId': 'phoneCall',
+          'meeting.url': '',
+          'meetingStartedAt': FieldValue.serverTimestamp(),
+          'meetingTeacherJoinedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        return (url: null, error: 'unknown', minutesUntilEarliestStart: null);
+      }
+      return (url: '', error: null, minutesUntilEarliestStart: null);
+    }
+
+    final teacherSnap =
+        await firestore.collection('users').doc(teacherId).get();
     final teacherData = teacherSnap.data() ?? const <String, dynamic>{};
     final linksRaw = teacherData['meetingLinks'];
     final Map<String, String> links = linksRaw is Map
@@ -307,7 +340,8 @@ class _ChecklistSheetState extends State<_ChecklistSheet> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppThemeConstants.success.withValues(alpha: 0.1),
+                          color:
+                              AppThemeConstants.success.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(item.$1,
@@ -371,4 +405,3 @@ class _ChecklistSheetState extends State<_ChecklistSheet> {
     );
   }
 }
-

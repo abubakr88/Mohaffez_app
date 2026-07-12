@@ -56,7 +56,24 @@ class StudentRewardsScreen extends ConsumerWidget {
         if (resolvedUser == null) {
           return const Scaffold(body: Center(child: Text('لا توجد بيانات')));
         }
-        return _RewardsBody(student: resolvedUser);
+
+        StudentProfileModel? activeProfile;
+        if (student == null) {
+          final activeProfileAsync = ref.watch(activeStudentProfileProvider);
+          activeProfile = activeProfileAsync.valueOrNull;
+          if (normalizeRole(resolvedUser.role) == roleParent &&
+              activeProfileAsync.isLoading) {
+            return const Scaffold(
+              backgroundColor: _C.bg,
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+        }
+
+        return _RewardsBody(
+          student: resolvedUser,
+          learnerProfile: activeProfile,
+        );
       },
     );
   }
@@ -64,7 +81,11 @@ class StudentRewardsScreen extends ConsumerWidget {
 
 class _RewardsBody extends ConsumerStatefulWidget {
   final UserModel student;
-  const _RewardsBody({required this.student});
+  final StudentProfileModel? learnerProfile;
+  const _RewardsBody({
+    required this.student,
+    this.learnerProfile,
+  });
 
   @override
   ConsumerState<_RewardsBody> createState() => _RewardsBodyState();
@@ -72,10 +93,19 @@ class _RewardsBody extends ConsumerStatefulWidget {
 
 class _RewardsBodyState extends ConsumerState<_RewardsBody> {
   late final ConfettiController _confetti;
-  static const _levelPrefKey = 'lastSeenLevelRank';
-  static const _seenAchPrefKey = 'seenAchievementIds';
   bool _celebrationChecked = false;
   AchievementCategory? _filter; // null = all
+
+  String get _learnerStorageKey {
+    final profile = widget.learnerProfile;
+    if (profile != null && profile.isPersisted) {
+      return '${widget.student.uid}:${profile.id}';
+    }
+    return widget.student.uid;
+  }
+
+  String get _levelPrefKey => 'lastSeenLevelRank:$_learnerStorageKey';
+  String get _seenAchPrefKey => 'seenAchievementIds:$_learnerStorageKey';
 
   @override
   void initState() {
@@ -101,7 +131,8 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
     final prefs = await SharedPreferences.getInstance();
 
     // ── New achievements ──
-    final earnedIds = achievements.where((a) => a.earned).map((a) => a.id).toSet();
+    final earnedIds =
+        achievements.where((a) => a.earned).map((a) => a.id).toSet();
     final seen = prefs.getStringList(_seenAchPrefKey)?.toSet();
     if (seen != null) {
       final fresh = earnedIds.difference(seen);
@@ -252,8 +283,8 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
                       ),
                       child: const Text(
                         'رائع! 🌟',
-                        style:
-                            TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16),
                       ),
                     ),
                   ),
@@ -273,10 +304,19 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
   @override
   Widget build(BuildContext context) {
     final uid = widget.student.uid;
-    final surahsAsync = ref.watch(memorizedSurahsProvider(uid));
-    final progressAsync = ref.watch(studentProgressProvider(uid));
+    final learnerProfileId = widget.learnerProfile?.isPersisted == true
+        ? widget.learnerProfile!.id
+        : null;
+    final surahsAsync = ref.watch(learnerMemorizedSurahsProvider(
+      (studentId: uid, studentProfileId: learnerProfileId),
+    ));
+    final progressAsync = ref.watch(learnerProgressProvider(
+      (studentId: uid, studentProfileId: learnerProfileId),
+    ));
 
-    final age = calculateAge(widget.student.dateOfBirth);
+    final age = calculateAge(
+      widget.learnerProfile?.dateOfBirth ?? widget.student.dateOfBirth,
+    );
     final progress = progressAsync.valueOrNull ?? const StudentProgress();
     final memorized = surahsAsync.valueOrNull ?? const <int>[];
     final memorizedSet = memorized.toSet();
@@ -303,7 +343,9 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
     final isEmpty = sessions == 0 && memorized.isEmpty;
 
     // Once both async sources are resolved, run the entry celebrations.
-    if (progressAsync.hasValue && surahsAsync.hasValue && !_celebrationChecked) {
+    if (progressAsync.hasValue &&
+        surahsAsync.hasValue &&
+        !_celebrationChecked) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _runCelebrations(level: level, achievements: achievements),
       );
@@ -323,113 +365,119 @@ class _RewardsBodyState extends ConsumerState<_RewardsBody> {
               child: SizedBox(
                 width: _kMaxContentWidth,
                 child: CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  expandedHeight: 286,
-                  pinned: true,
-                  elevation: 0,
-                  backgroundColor: _C.teal700,
-                  surfaceTintColor: Colors.transparent,
-                  actions: [
-                    IconButton(
-                      tooltip: SoundService.enabled ? 'كتم الصوت' : 'تشغيل الصوت',
-                      icon: Icon(
-                        SoundService.enabled
-                            ? Icons.volume_up_rounded
-                            : Icons.volume_off_rounded,
-                        color: Colors.white,
+                  slivers: [
+                    SliverAppBar(
+                      expandedHeight: 286,
+                      pinned: true,
+                      elevation: 0,
+                      backgroundColor: _C.teal700,
+                      surfaceTintColor: Colors.transparent,
+                      actions: [
+                        IconButton(
+                          tooltip: SoundService.enabled
+                              ? 'كتم الصوت'
+                              : 'تشغيل الصوت',
+                          icon: Icon(
+                            SoundService.enabled
+                                ? Icons.volume_up_rounded
+                                : Icons.volume_off_rounded,
+                            color: Colors.white,
+                          ),
+                          onPressed: () async {
+                            await SoundService.setEnabled(
+                                !SoundService.enabled);
+                            if (SoundService.enabled) {
+                              SoundService.play(Sfx.tap);
+                            }
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                      ],
+                      flexibleSpace: FlexibleSpaceBar(
+                        collapseMode: CollapseMode.pin,
+                        background: _LevelHeader(
+                          student: widget.student,
+                          learnerName: widget.learnerProfile?.name,
+                          level: level,
+                          xpTier: xpTier,
+                          xp: xp,
+                          sessions: sessions,
+                          age: age,
+                        ),
                       ),
-                      onPressed: () async {
-                        await SoundService.setEnabled(!SoundService.enabled);
-                        if (SoundService.enabled) SoundService.play(Sfx.tap);
-                        if (mounted) setState(() {});
-                      },
                     ),
+
+                    SliverToBoxAdapter(
+                      child: _StatsRow(
+                        sessions: sessions,
+                        memorized: memorized.length,
+                        juz: juzDone,
+                        streak: streak,
+                      ),
+                    ),
+
+                    if (isEmpty)
+                      const SliverToBoxAdapter(child: _EmptyStateHero()),
+
+                    if (!isEmpty && streak >= 2)
+                      SliverToBoxAdapter(child: _StreakCard(streak: streak)),
+
+                    if (!isEmpty)
+                      SliverToBoxAdapter(
+                        child: _NextGoalCard(achievements: achievements),
+                      ),
+
+                    if (quiz.totalAsked > 0)
+                      SliverToBoxAdapter(child: _QuizMasteryCard(quiz: quiz)),
+
+                    // Achievements with category filter
+                    SliverToBoxAdapter(
+                      child: _AchievementsHeader(
+                        earned: achievements.where((a) => a.earned).length,
+                        total: achievements.length,
+                        filter: _filter,
+                        onFilter: (c) {
+                          SoundService.play(Sfx.tap);
+                          setState(() => _filter = c);
+                        },
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      sliver: SliverGrid(
+                        // Fixed tile size → columns grow with width instead of the
+                        // cells ballooning on tablet / web.
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 124,
+                          mainAxisExtent: 122,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) => _AchievementCard(
+                            achievement: filtered[i],
+                            index: i,
+                          ),
+                          childCount: filtered.length,
+                        ),
+                      ),
+                    ),
+
+                    SliverToBoxAdapter(
+                      child: _SurahsSection(
+                        memorizedSet: memorizedSet,
+                        isEarlyStudent: isEmpty,
+                      ),
+                    ),
+
+                    SliverToBoxAdapter(child: _MotivationalCard(level: level)),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
                   ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    collapseMode: CollapseMode.pin,
-                    background: _LevelHeader(
-                      student: widget.student,
-                      level: level,
-                      xpTier: xpTier,
-                      xp: xp,
-                      sessions: sessions,
-                      age: age,
-                    ),
-                  ),
-                ),
-
-                SliverToBoxAdapter(
-                  child: _StatsRow(
-                    sessions: sessions,
-                    memorized: memorized.length,
-                    juz: juzDone,
-                    streak: streak,
-                  ),
-                ),
-
-                if (isEmpty) const SliverToBoxAdapter(child: _EmptyStateHero()),
-
-                if (!isEmpty && streak >= 2)
-                  SliverToBoxAdapter(child: _StreakCard(streak: streak)),
-
-                if (!isEmpty)
-                  SliverToBoxAdapter(
-                    child: _NextGoalCard(achievements: achievements),
-                  ),
-
-                if (quiz.totalAsked > 0)
-                  SliverToBoxAdapter(child: _QuizMasteryCard(quiz: quiz)),
-
-                // Achievements with category filter
-                SliverToBoxAdapter(
-                  child: _AchievementsHeader(
-                    earned: achievements.where((a) => a.earned).length,
-                    total: achievements.length,
-                    filter: _filter,
-                    onFilter: (c) {
-                      SoundService.play(Sfx.tap);
-                      setState(() => _filter = c);
-                    },
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  sliver: SliverGrid(
-                    // Fixed tile size → columns grow with width instead of the
-                    // cells ballooning on tablet / web.
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 124,
-                      mainAxisExtent: 122,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => _AchievementCard(
-                        achievement: filtered[i],
-                        index: i,
-                      ),
-                      childCount: filtered.length,
-                    ),
-                  ),
-                ),
-
-                SliverToBoxAdapter(
-                  child: _SurahsSection(
-                    memorizedSet: memorizedSet,
-                    isEarlyStudent: isEmpty,
-                  ),
-                ),
-
-                SliverToBoxAdapter(child: _MotivationalCard(level: level)),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              ],
                 ),
               ),
             ),
-
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
@@ -577,6 +625,7 @@ class _EmptyStateHero extends StatelessWidget {
 // ─── Level header (XP tier + progress) ─────────────────────────────────────────
 class _LevelHeader extends StatelessWidget {
   final UserModel student;
+  final String? learnerName;
   final StudentLevel level;
   final XpTier xpTier;
   final int xp;
@@ -585,6 +634,7 @@ class _LevelHeader extends StatelessWidget {
 
   const _LevelHeader({
     required this.student,
+    this.learnerName,
     required this.level,
     required this.xpTier,
     required this.xp,
@@ -596,6 +646,9 @@ class _LevelHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final tierProgress = xpTier.progress(xp);
     final toNext = xpTier.toNext(xp);
+    final displayName = learnerName != null && learnerName!.trim().isNotEmpty
+        ? learnerName!.trim()
+        : student.name;
 
     return Container(
       decoration: const BoxDecoration(
@@ -638,7 +691,7 @@ class _LevelHeader extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          student.name,
+                          displayName,
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 13,
@@ -671,8 +724,8 @@ class _LevelHeader extends StatelessWidget {
                             ),
                             const Text(
                               ' نقطة',
-                              style:
-                                  TextStyle(color: Colors.white70, fontSize: 12),
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 12),
                             ),
                           ],
                         ),
@@ -720,7 +773,9 @@ class _LevelHeader extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          xpTier.next == -1 ? 'أعلى رتبة 🎉' : '$xp / ${xpTier.next}',
+                          xpTier.next == -1
+                              ? 'أعلى رتبة 🎉'
+                              : '$xp / ${xpTier.next}',
                           style: const TextStyle(
                               color: Colors.white70, fontSize: 12),
                         ),
@@ -834,7 +889,10 @@ class _StatsRow extends StatelessWidget {
           _StatCard(label: 'أجزاء', value: juz, emoji: '📖'),
           const SizedBox(width: 8),
           _StatCard(
-              label: 'أسابيع متتالية', value: streak, emoji: '🔥', highlight: true),
+              label: 'أسابيع متتالية',
+              value: streak,
+              emoji: '🔥',
+              highlight: true),
         ],
       ),
     );
@@ -1072,9 +1130,11 @@ class _QuizMasteryCard extends StatelessWidget {
                 _MiniStat(
                     emoji: '✅', value: quiz.totalCorrect, label: 'إجابة صحيحة'),
                 _divider(),
-                _MiniStat(emoji: '💯', value: quiz.accuracyPct, label: 'الدقة %'),
+                _MiniStat(
+                    emoji: '💯', value: quiz.accuracyPct, label: 'الدقة %'),
                 _divider(),
-                _MiniStat(emoji: '⚡', value: quiz.bestStreak, label: 'أطول سلسلة'),
+                _MiniStat(
+                    emoji: '⚡', value: quiz.bestStreak, label: 'أطول سلسلة'),
               ],
             ),
           ),
@@ -1311,8 +1371,7 @@ class _AchievementCard extends StatelessWidget {
                     value: b.progress,
                     minHeight: 8,
                     backgroundColor: _C.border,
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(_C.teal700),
+                    valueColor: const AlwaysStoppedAnimation<Color>(_C.teal700),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1359,7 +1418,8 @@ class _AchievementCard extends StatelessWidget {
       curve: Curves.easeOutBack,
       builder: (_, t, child) => Opacity(
         opacity: t.clamp(0.0, 1.0),
-        child: Transform.scale(scale: 0.8 + 0.2 * t.clamp(0.0, 1.0), child: child),
+        child:
+            Transform.scale(scale: 0.8 + 0.2 * t.clamp(0.0, 1.0), child: child),
       ),
       child: GestureDetector(
         onTap: () => _showSheet(context),
@@ -1403,10 +1463,26 @@ class _AchievementCard extends StatelessWidget {
                           ? const ColorFilter.mode(
                               Colors.transparent, BlendMode.dst)
                           : const ColorFilter.matrix([
-                              0.2126, 0.7152, 0.0722, 0, 0,
-                              0.2126, 0.7152, 0.0722, 0, 0,
-                              0.2126, 0.7152, 0.0722, 0, 0,
-                              0, 0, 0, 1, 0,
+                              0.2126,
+                              0.7152,
+                              0.0722,
+                              0,
+                              0,
+                              0.2126,
+                              0.7152,
+                              0.0722,
+                              0,
+                              0,
+                              0.2126,
+                              0.7152,
+                              0.0722,
+                              0,
+                              0,
+                              0,
+                              0,
+                              0,
+                              1,
+                              0,
                             ]),
                       child: Text(
                         b.emoji,
@@ -1956,7 +2032,9 @@ class _SurahBadge extends StatelessWidget {
             height: 22,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: memorized ? Colors.white.withValues(alpha: 0.28) : Colors.white,
+              color: memorized
+                  ? Colors.white.withValues(alpha: 0.28)
+                  : Colors.white,
               shape: BoxShape.circle,
               border: memorized ? null : Border.all(color: _C.border),
             ),

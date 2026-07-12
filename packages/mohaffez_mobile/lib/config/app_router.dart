@@ -34,11 +34,13 @@ import '../screens/student/student_assignments_screen.dart';
 import '../screens/student/student_requests_screen.dart';
 import '../screens/student/student_sessions_screen.dart';
 import '../screens/student/student_schedule_screen.dart';
+import '../screens/student/student_profiles_screen.dart';
 import '../screens/student/student_payment_screen.dart';
 import '../screens/student/nearby_mohaffez_screen.dart';
 import '../screens/student/mohaffez_profile_screen.dart';
 import '../screens/student/rate_session_screen.dart';
 import '../screens/student/booking_method_screen.dart';
+import '../screens/student/booking_status_screen.dart';
 import '../screens/student/select_bundle_plan_screen.dart';
 import '../screens/student/confirm_bundle_session_screen.dart';
 import '../screens/student/direct_booking_request_screen.dart';
@@ -161,6 +163,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/payment/return',
         name: 'payment-return',
         builder: (context, state) => PaymentReturnScreen(uri: state.uri),
+      ),
+      GoRoute(
+        path: '/p/t/:id',
+        name: 'public-teacher-profile',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return MohaffezProfileScreen(
+            mohaffezId: id,
+            publicMode: true,
+          );
+        },
       ),
       GoRoute(
         path: '/google-role-selection',
@@ -305,6 +318,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const StudentWalletScreen(),
           ),
           GoRoute(
+            path: '/student-profiles',
+            name: 'student-profiles',
+            builder: (context, state) => const StudentProfilesScreen(),
+          ),
+          GoRoute(
             path: '/wallet-topup',
             name: 'wallet-topup',
             builder: (context, state) => const WalletTopupScreen(),
@@ -362,6 +380,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const BookingMethodScreen(),
           ),
           GoRoute(
+            path: '/booking/status/:requestId',
+            name: 'booking-status',
+            builder: (context, state) {
+              final requestId = state.pathParameters['requestId'] ?? '';
+              return BookingStatusScreen(requestId: requestId);
+            },
+          ),
+          GoRoute(
             path: '/booking/select-bundle-plan',
             name: 'booking-select-bundle-plan',
             builder: (context, state) => const SelectBundlePlanScreen(),
@@ -376,6 +402,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             name: 'booking-direct-payment',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
+              double? asDouble(Object? value) =>
+                  value is num ? value.toDouble() : null;
+              int? asInt(Object? value) => value is num ? value.toInt() : null;
               return DirectPaymentScreen(
                 requestId: extra?['requestId'],
                 mohaffezId: extra?['mohaffezId'],
@@ -383,21 +412,29 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 studentName: extra?['studentName'],
                 studentEmail: extra?['studentEmail'] ?? '',
                 studentPhone: extra?['studentPhone'] ?? '',
-                amount: extra?['amount'],
+                amount: asDouble(extra?['amount']),
                 sessionType: extra?['sessionType'],
                 preferredTimeSlot: extra?['preferredTimeSlot'],
                 slotDate: extra?['slotDate'],
                 slotStart: extra?['slotStart'],
                 slotEnd: extra?['slotEnd'],
                 imamAddressText: extra?['imamAddressText'],
-                imamAddressLat: extra?['imamAddressLat'],
-                imamAddressLng: extra?['imamAddressLng'],
+                imamAddressLat: asDouble(extra?['imamAddressLat']),
+                imamAddressLng: asDouble(extra?['imamAddressLng']),
                 mohaffezPhone: extra?['mohaffezPhone'],
                 planType: extra?['planType'],
                 planId: extra?['planId'],
                 planTitle: extra?['planTitle'],
-                sessionsCount: extra?['sessionsCount'],
-                validityDays: extra?['validityDays'],
+                sessionsCount: asInt(extra?['sessionsCount']),
+                validityDays: asInt(extra?['validityDays']),
+                studentCountryCode: extra?['studentCountryCode'],
+                studentCountryName: extra?['studentCountryName'],
+                displayCurrencyCode: extra?['displayCurrencyCode'],
+                displayCurrencyLabel: extra?['displayCurrencyLabel'],
+                displayAmount: asDouble(extra?['displayAmount']),
+                fxRateToEGP: asDouble(extra?['fxRateToEGP']),
+                chargedAmountEGP: asDouble(extra?['chargedAmountEGP']),
+                sessionDurationMinutes: asInt(extra?['sessionDurationMinutes']),
                 autoBookFirstSession: extra?['autoBookFirstSession'] ?? false,
               );
             },

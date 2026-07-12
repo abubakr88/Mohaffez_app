@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/payment_service.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/empty_state.dart';
 
@@ -94,12 +95,18 @@ class _StudentPaymentConfirmationScreenState
         ),
         body: plansAsync.when(
           data: (plans) {
-            final filteredPlans = plans.where((p) {
+            final modePlans = plans.where((p) {
               if (_sessionType == 'home') return p.mode == SessionMode.home;
               if (_sessionType == 'mosque') return p.mode == SessionMode.mosque;
               if (_sessionType == 'online') return p.mode == SessionMode.online;
               return false;
             }).toList();
+            final studentCountry = PricingCountryUtils.inferUserCountry(
+                ref.read(currentUserProvider).valueOrNull);
+            final filteredPlans = PricingCountryUtils.preferCountryPlans(
+              modePlans,
+              studentCountry.code,
+            );
 
             if (filteredPlans.isEmpty) {
               return const EmptyState(
@@ -142,7 +149,7 @@ class _StudentPaymentConfirmationScreenState
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: Text(
-                      '${ArabicLabels.payNow} ${selectedPlan!.priceEGP.toStringAsFixed(0)} جنيه',
+                      '${ArabicLabels.payNow} ${PricingCountryUtils.displayPriceText(selectedPlan!)}',
                       style: const TextStyle(
                           color: AppThemeConstants.white,
                           fontWeight: FontWeight.bold),
@@ -219,7 +226,7 @@ class _StudentPaymentConfirmationScreenState
             Expanded(
                 child: Text(plan.title,
                     style: const TextStyle(fontWeight: FontWeight.bold))),
-            Text('${plan.priceEGP.toStringAsFixed(0)} جنيه'),
+            Text(PricingCountryUtils.displayPriceText(plan)),
           ],
         ),
       ),
@@ -235,6 +242,8 @@ class _StudentPaymentConfirmationScreenState
           const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')));
       return;
     }
+    final activeProfile = resolveBookingLearner(context, ref, user);
+    if (activeProfile == null) return;
 
     var loadingDialogOpen = true;
     BuildContext? loadingDialogContext;
@@ -260,7 +269,7 @@ class _StudentPaymentConfirmationScreenState
     try {
       final basePayment = PaymentModel(
         studentId: user.uid,
-        studentName: user.name,
+        studentName: activeProfile.name,
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
@@ -283,7 +292,11 @@ class _StudentPaymentConfirmationScreenState
               _sessionDate != null ? Timestamp.fromDate(_sessionDate!) : null,
           'preferredTimeSlot': _timeSlot,
           'location': _location,
+          'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
+          ...activeProfile.toBookingSnapshot(user),
         },
+        ...activeProfile.toBookingSnapshot(user),
+        ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
       };
 
       final result = await ref
@@ -306,7 +319,7 @@ class _StudentPaymentConfirmationScreenState
       var paymentUrl = result.paymentUrl;
       if (paymentUrl.isEmpty && selectedPlan!.priceEGP > 0.01) {
         final studentPhone = user.phoneNumber?.trim();
-        final studentName = user.name.trim();
+        final studentName = activeProfile.name.trim();
         final paymobResult =
             await ref.read(paymentServiceProvider).initiatePayment(
                   paymentId: result.paymentId,

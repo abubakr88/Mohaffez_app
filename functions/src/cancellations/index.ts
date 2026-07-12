@@ -56,6 +56,48 @@ async function sendNotif(userId: string, title: string, body: string, type: stri
   });
 }
 
+function trialRequestIdFromSession(session: SessionDoc): string {
+  const trialRequestId = session.trialRequestId;
+  if (typeof trialRequestId === 'string' && trialRequestId.trim().length > 0) {
+    return trialRequestId.trim();
+  }
+  const requestId = session.requestId;
+  return typeof requestId === 'string' && requestId.trim().length > 0
+    ? requestId.trim()
+    : '';
+}
+
+async function syncTrialRequestStatus(
+  sessionId: string,
+  session: SessionDoc,
+  update: Record<string, unknown>,
+) {
+  const trialRequestId = trialRequestIdFromSession(session);
+  if (!trialRequestId) {
+    functions.logger.warn('Trial session is missing trialRequestId/requestId', {
+      sessionId,
+    });
+    return;
+  }
+
+  try {
+    await db.collection('trialSessionRequests').doc(trialRequestId).set(
+      {
+        ...update,
+        sessionId,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (error) {
+    functions.logger.error('Failed to sync trial request status', {
+      sessionId,
+      trialRequestId,
+      error,
+    });
+  }
+}
+
 // Bundle detection extracted to bundleDetection.ts for unit testing. The
 // trigger here provides a Firestore-backed sessionRequest lookup callback.
 import { detectBundleContext as detectBundleContextPure } from './bundleDetection';
@@ -122,6 +164,20 @@ export const onSessionCancelled = functions.firestore
     const sessionStart =
       toDate(after.slotStart) ?? toDate(after.sessionDate);
     const cancelledAt = toDate(after.cancelledAt) ?? new Date();
+
+    if (isTrial) {
+      await syncTrialRequestStatus(sessionId, after, {
+        status: teacherNoShow
+          ? 'teacher_no_show'
+          : cancelledBy === 'teacher'
+            ? 'cancelled_by_teacher'
+            : 'cancelled_by_student',
+        cancelledBy,
+        teacherNoShow,
+        cancelledAt: after.cancelledAt ?? FieldValue.serverTimestamp(),
+        closedAt: FieldValue.serverTimestamp(),
+      });
+    }
 
     // ── Determine refund % and penalty % ─────────────────────────────────
     const { refundPercent, penaltyPercent } = isTrial
@@ -469,8 +525,9 @@ export const onSessionCancelled = functions.firestore
         await createAdminAlert({
           type: 'teacher_no_show',
           sessionId, mohaffezId, studentId,
-          penaltyPercent: 1.5,
+          penaltyPercent: isTrial ? 0 : 1.5,
           refundAmountEgp,
+          isTrial,
           paymentType: paymentType ?? 'unknown',
         });
       } else if (penaltyPercent > 0) {
@@ -603,9 +660,10 @@ export const onStudentNoShowReported = functions.https.onCall(async (data, conte
     return { success: true, message: 'already reported' };
   }
 
-  // Validate: session must have already started (sessionDate in the past)
-  const sessionDate = toDate(s.sessionDate);
-  if (!sessionDate || sessionDate.getTime() > Date.now()) {
+  // Validate against the real start time. sessionDate can be date-only
+  // midnight, which would allow reporting a late-day session too early.
+  const sessionStart = toDate(s.slotStart) ?? toDate(s.sessionDate);
+  if (!sessionStart || sessionStart.getTime() > Date.now()) {
     throw new functions.https.HttpsError('failed-precondition', 'session has not started yet');
   }
 

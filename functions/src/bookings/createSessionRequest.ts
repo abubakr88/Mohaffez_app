@@ -34,6 +34,40 @@ function parseFlutterDate(iso: string): Date {
   return new Date(iso);
 }
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function optionalTimestamp(value: unknown): FirebaseFirestore.Timestamp | null {
+  if (value instanceof admin.firestore.Timestamp) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = parseFlutterDate(value.trim());
+    if (!isNaN(parsed.getTime())) {
+      return admin.firestore.Timestamp.fromDate(parsed);
+    }
+  }
+  return null;
+}
+
+function calculateAgeFromTimestamp(
+  birthDate: FirebaseFirestore.Timestamp | null
+): number | null {
+  if (!birthDate) return null;
+  const dob = birthDate.toDate();
+  const today = new Date();
+  let age = today.getUTCFullYear() - dob.getUTCFullYear();
+  const monthDiff = today.getUTCMonth() - dob.getUTCMonth();
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getUTCDate() < dob.getUTCDate())
+  ) {
+    age--;
+  }
+  return age >= 0 && age <= 120 ? age : null;
+}
+
 export const createSessionRequest = functions.https.onCall(
   async (data, context) => {
     const fallbackIdToken =
@@ -89,6 +123,7 @@ export const createSessionRequest = functions.https.onCall(
       imamAddressLat,
       imamAddressLng,
       mohaffezPhone,
+      studentPhone,
       subscriptionId,          // FIX-TS6133: now consumed below (log + Firestore write)
       requiresPaymentOnAcceptance,
       selectedPaymentMethod,
@@ -102,6 +137,21 @@ export const createSessionRequest = functions.https.onCall(
       rawPlanType === 'bundle' || rawPlanType === 'subscription';
     const validityDays: number | null =
       typeof data.validityDays === 'number' ? data.validityDays : null;
+    const sessionDurationMinutes: number | null =
+      typeof data.sessionDurationMinutes === 'number'
+        ? data.sessionDurationMinutes
+        : null;
+    const displayAmount: number | null =
+      typeof data.displayAmount === 'number' ? data.displayAmount : null;
+    const fxRateToEGP: number | null =
+      typeof data.fxRateToEGP === 'number' ? data.fxRateToEGP : null;
+    const chargedAmountEGP: number | null =
+      typeof data.chargedAmountEGP === 'number' ? data.chargedAmountEGP : null;
+    const studentProfileBirthDate = optionalTimestamp(
+      data.studentProfileBirthDate
+    );
+    const canonicalStudentAge =
+      calculateAgeFromTimestamp(studentProfileBirthDate);
 
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (
@@ -411,6 +461,15 @@ export const createSessionRequest = functions.https.onCall(
         studentId,
         mohaffezId,
         studentName,
+        guardianId: optionalString(data.guardianId) ?? studentId,
+        guardianName: optionalString(data.guardianName),
+        studentProfileId: optionalString(data.studentProfileId),
+        studentProfileName: optionalString(data.studentProfileName),
+        studentProfileGender: optionalString(data.studentProfileGender),
+        studentProfileBirthDate,
+        studentAge:
+          canonicalStudentAge ??
+          (typeof data.studentAge === 'number' ? data.studentAge : null),
         mohaffezName,
         sessionType,
         preferredProvider:
@@ -425,6 +484,10 @@ export const createSessionRequest = functions.https.onCall(
         imamAddressLat: imamAddressLat ?? null,
         imamAddressLng: imamAddressLng ?? null,
         mohaffezPhone: mohaffezPhone ?? null,
+        studentPhone:
+          typeof studentPhone === 'string' && studentPhone.trim().length > 0
+            ? studentPhone.trim()
+            : null,
         subscriptionId: subscriptionId ?? null,   // FIX-TS6133: was (data.subscriptionId as string) ?? null
         planId: (data.planId as string) ?? null,
         planTitle: (data.planTitle as string) ?? null,
@@ -434,6 +497,26 @@ export const createSessionRequest = functions.https.onCall(
         sessionsCount:
           typeof data.sessionsCount === 'number' ? data.sessionsCount : null,
         validityDays: validityDays,
+        sessionDurationMinutes,
+        studentCountryCode:
+          typeof data.studentCountryCode === 'string'
+            ? data.studentCountryCode
+            : null,
+        studentCountryName:
+          typeof data.studentCountryName === 'string'
+            ? data.studentCountryName
+            : null,
+        displayCurrencyCode:
+          typeof data.displayCurrencyCode === 'string'
+            ? data.displayCurrencyCode
+            : null,
+        displayCurrencyLabel:
+          typeof data.displayCurrencyLabel === 'string'
+            ? data.displayCurrencyLabel
+            : null,
+        displayAmount,
+        fxRateToEGP,
+        chargedAmountEGP,
         requiresPaymentOnAcceptance:
           selectedPaymentMethod === 'directpayment' && !isBundlePlan
             ? true

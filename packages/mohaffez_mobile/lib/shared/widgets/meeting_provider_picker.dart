@@ -2,9 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
-import 'meeting_links_sheet.dart' show meetingProviders;
+import 'meeting_links_sheet.dart' show MeetingProviderSpec, meetingProviders;
 
-/// Lets the student pick which meeting platform (Zoom / Meet / Teams) to use
+const _phoneCallProvider = MeetingProviderSpec(
+  id: 'phoneCall',
+  label: 'مكالمة هاتفية',
+  hostMatch: '',
+  hint: '',
+  icon: Icons.phone_rounded,
+  color: AppThemeConstants.success,
+);
+
+/// Lets the student pick which communication channel (Zoom / Meet / Teams /
+/// phone call) to use
 /// for an online session, restricted to providers the teacher has actually
 /// configured in `users/{teacherId}.meetingLinks`.
 ///
@@ -30,9 +40,13 @@ class MeetingProviderPicker extends ConsumerWidget {
       error: (_, __) => const _ErrorCard(),
       data: (teacher) {
         if (teacher == null) return const _ErrorCard();
+        final currentUser = ref.watch(currentUserProvider).valueOrNull;
         final available = meetingProviders
             .where((p) => (teacher.meetingLinks[p.id] ?? '').trim().isNotEmpty)
             .toList();
+        final hasTeacherPhone = (teacher.phoneNumber ?? '').trim().isNotEmpty;
+        final hasStudentPhone =
+            (currentUser?.phoneNumber ?? '').trim().isNotEmpty;
 
         // Legacy fallback: if teacher only has the old single meetingLink,
         // treat its host as one provider so booking still works during migration.
@@ -43,6 +57,10 @@ class MeetingProviderPicker extends ConsumerWidget {
               .where((p) => legacy.toLowerCase().contains(p.hostMatch))
               .toList();
           if (match.isNotEmpty) available.addAll(match);
+        }
+
+        if (hasTeacherPhone && hasStudentPhone) {
+          available.add(_phoneCallProvider);
         }
 
         if (available.isEmpty) return const _NoProvidersCard();

@@ -78,7 +78,7 @@ class _RouterNotifier extends ChangeNotifier {
     }
 
     final role = auth.role;
-    if (role == 'student' &&
+    if (isLearnerAccountRole(role) &&
         (location.startsWith('/t') || location.startsWith('/admin'))) {
       return '/s';
     }

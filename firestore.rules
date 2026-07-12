@@ -19,6 +19,26 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
     }
 
+    function minimumTeacherHourlyRateEgp() {
+      let configPath = /databases/$(database)/documents/systemConfig/global;
+      return exists(configPath)
+        ? get(configPath).data.get('minimumTeacherHourlyRateEgp', 0)
+        : 0;
+    }
+
+    function hasValidTeacherPlanRate(plan) {
+      let minimumRate = minimumTeacherHourlyRateEgp();
+      return plan.priceEGP is number &&
+             plan.priceEGP > 0 &&
+             plan.sessionsCount is int &&
+             plan.sessionsCount > 0 &&
+             plan.sessionDurationMinutes is int &&
+             plan.sessionDurationMinutes > 0 &&
+             (minimumRate <= 0 ||
+              plan.priceEGP * 60 >=
+                minimumRate * plan.sessionsCount * plan.sessionDurationMinutes);
+    }
+
     // Admin authority is granted exclusively via custom claims minted server-side
     // (Cloud Functions / Admin SDK). The previous Firestore-doc fallback is removed
     // so a self-set `role: 'admin'` field on /users/{uid} cannot grant admin powers.
@@ -84,6 +104,35 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/userSuspensions/$(request.auth.uid));
     }
 
+    function isOrganizationMember(orgId) {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    function isOrganizationOwner(orgId) {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/organizations/$(orgId)) &&
+             get(/databases/$(database)/documents/organizations/$(orgId)).data.ownerId == request.auth.uid;
+    }
+
+    // ============================================
+    // FUTURE ORGANIZATIONS / SCHOOLS
+    // ============================================
+
+    match /organizations/{orgId} {
+      allow read: if isAdmin() || isOrganizationOwner(orgId) || isOrganizationMember(orgId);
+      allow create: if isAuthenticated() &&
+                    request.resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.type in ['school', 'academy'];
+      allow update: if isAdmin() || isOrganizationOwner(orgId);
+      allow delete: if isAdmin();
+
+      match /members/{memberId} {
+        allow read: if isAdmin() || isOrganizationOwner(orgId) || isOrganizationMember(orgId);
+        allow create, update, delete: if isAdmin() || isOrganizationOwner(orgId);
+      }
+    }
+
     // ============================================
     // USER PROFILES & SETTINGS
     // ============================================
@@ -98,8 +147,14 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
                     request.auth.uid == userId &&
                     request.resource.data.uid == userId &&
-                    request.resource.data.role in ['student', 'mohaffez'] &&
+                    request.resource.data.role in ['student', 'parent', 'mohaffez'] &&
                     request.resource.data.status in ['active', 'pending_approval'] &&
+                    (!request.resource.data.keys().hasAny(['honorific']) ||
+                      (request.resource.data.role == 'mohaffez' &&
+                        request.resource.data.honorific in [
+                          'الشيخ', 'الشيخة', 'المعلم', 'المعلمة',
+                          'الدكتور', 'الدكتورة', 'الأستاذ', 'الأستاذة'
+                        ])) &&
                     !request.resource.data.keys().hasAny(['badges']);
 
       // User self-update: profile fields + setup account fields
@@ -110,13 +165,15 @@ service cloud.firestore {
             'followerCount', 'followingCount', 'fcmToken',
             'fcmTokenUpdatedAt', 'photoUrl', 'bio',
             'phoneNumber', 'addressText', 'addressLat',
-            'addressLng', 'specialization', 'name',
+            'addressLng', 'specialization', 'name', 'honorific',
             'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
             'trialSessionEnabled', 'trialSessionDurationMinutes',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
             'setupCompleted', 'dateOfBirth', 'city',
+            'country', 'countryCode',
+            'accountType', 'activeStudentProfileId',
             'examScore', 'examTakenAt',
             'examQuestionCount', 'examCorrectCount',
             'examPassed', 'examRetryCount', 'examNextRetryAt',
@@ -140,6 +197,22 @@ service cloud.firestore {
               ||
               request.resource.data.trialSessionDurationMinutes
                 in [15, 20, 30, 45, 60]
+            )
+          )
+        ) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['honorific'])
+          ||
+          (
+            resource.data.role == 'mohaffez' &&
+            (
+              !request.resource.data.keys().hasAny(['honorific']) ||
+              request.resource.data.honorific == null ||
+              request.resource.data.honorific in [
+                'الشيخ', 'الشيخة', 'المعلم', 'المعلمة',
+                'الدكتور', 'الدكتورة', 'الأستاذ', 'الأستاذة'
+              ]
             )
           )
         );
@@ -209,6 +282,29 @@ service cloud.firestore {
       }
 
       // ── Availability schedules ──
+      match /studentProfiles/{profileId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                      request.resource.data.ownerId == userId &&
+                      request.resource.data.name is string &&
+                      request.resource.data.name.size() > 0 &&
+                      request.resource.data.relationship in ['self', 'child', 'student'];
+        allow update: if isOwner(userId) &&
+                      request.resource.data.ownerId == userId &&
+                      request.resource.data.name is string &&
+                      request.resource.data.name.size() > 0 &&
+                      request.resource.data.relationship in ['self', 'child', 'student'];
+        allow delete: if isOwner(userId);
+
+        match /memorizedSurahs/{surahNumber} {
+          allow read: if isAuthenticated();
+          allow create, update: if isAuthenticated() &&
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mohaffez';
+          allow delete: if isAuthenticated() &&
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mohaffez';
+        }
+      }
+
       match /availability/{availabilityId} {
         allow read: if isAuthenticated();
 
@@ -243,11 +339,18 @@ service cloud.firestore {
         allow create: if isOwner(userId) &&
                       request.resource.data.mohaffezId == userId &&
                       request.resource.data.isActive == true &&
-                      request.resource.data.priceEGP > 0 &&
-                      request.resource.data.sessionsCount > 0;
+                      hasValidTeacherPlanRate(request.resource.data);
 
         allow update: if isOwner(userId) &&
-                      request.resource.data.mohaffezId == userId;
+                      request.resource.data.mohaffezId == userId &&
+                      (
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny([
+                            'priceEGP', 'sessionsCount',
+                            'sessionDurationMinutes'
+                          ])
+                        || hasValidTeacherPlanRate(request.resource.data)
+                      );
 
         allow delete: if isOwner(userId);
       }

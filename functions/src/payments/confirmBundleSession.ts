@@ -107,6 +107,7 @@ export const confirmBundleSession = functions.https.onCall(
       const imamAddressLat    = (requestData.imamAddressLat   as number  | null)  ?? null;
       const imamAddressLng    = (requestData.imamAddressLng   as number  | null)  ?? null;
       const mohaffezPhone     = (requestData.mohaffezPhone    as string  | null)  ?? null;
+      const studentPhone      = (requestData.studentPhone     as string  | null)  ?? null;
 
       const rawAmount = requestData.paymentAmount;
       let amount: number =
@@ -252,6 +253,13 @@ export const confirmBundleSession = functions.https.onCall(
         studentId,
         mohaffezName,
         studentName,
+        guardianId: requestData.guardianId ?? studentId,
+        guardianName: requestData.guardianName ?? null,
+        studentProfileId: requestData.studentProfileId ?? null,
+        studentProfileName: requestData.studentProfileName ?? studentName,
+        studentProfileGender: requestData.studentProfileGender ?? null,
+        studentProfileBirthDate: requestData.studentProfileBirthDate ?? null,
+        studentAge: requestData.studentAge ?? null,
         sessionType,
         preferredProvider:
           sessionType === 'online' && reqPreferredProvider
@@ -267,6 +275,7 @@ export const confirmBundleSession = functions.https.onCall(
         imamAddressLat:   imamAddressLat   ?? null,
         imamAddressLng:   imamAddressLng   ?? null,
         mohaffezPhone:    mohaffezPhone    ?? null,
+        studentPhone:     studentPhone     ?? null,
         isPaid:           true,
         paymentMethod:    'subscription',
         // Per-session price (bundlePrice / totalSessions). Without this,
@@ -275,6 +284,14 @@ export const confirmBundleSession = functions.https.onCall(
         // of the teacher's tier/revenue calculation entirely.
         sessionPrice:     amount,
         subscriptionId,
+        studentCountryCode: subscription.studentCountryCode ?? null,
+        studentCountryName: subscription.studentCountryName ?? null,
+        displayCurrencyCode: subscription.displayCurrencyCode ?? null,
+        displayCurrencyLabel: subscription.displayCurrencyLabel ?? null,
+        displayAmount: subscription.displayAmount ?? null,
+        fxRateToEGP: subscription.fxRateToEGP ?? null,
+        chargedAmountEGP: subscription.chargedAmountEGP ?? null,
+        sessionDurationMinutes: subscription.sessionDurationMinutes ?? null,
         reminder24hSent:  false,
         reminder1hSent:   false,
         juzCount:         1,

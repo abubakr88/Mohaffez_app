@@ -7,21 +7,30 @@ class TrialSessionPair {
   const TrialSessionPair({
     required this.mohaffezId,
     required this.studentId,
+    this.studentProfileId,
   });
 
   final String mohaffezId;
   final String studentId;
+  final String? studentProfileId;
 
-  String get requestId => '${mohaffezId}_$studentId';
+  String get requestId {
+    final profileId = studentProfileId?.trim();
+    if (profileId == null || profileId.isEmpty || profileId == 'self') {
+      return '${mohaffezId}_$studentId';
+    }
+    return '${mohaffezId}_${studentId}_$profileId';
+  }
 
   @override
   bool operator ==(Object other) =>
       other is TrialSessionPair &&
       other.mohaffezId == mohaffezId &&
-      other.studentId == studentId;
+      other.studentId == studentId &&
+      other.studentProfileId == studentProfileId;
 
   @override
-  int get hashCode => Object.hash(mohaffezId, studentId);
+  int get hashCode => Object.hash(mohaffezId, studentId, studentProfileId);
 }
 
 final trialRequestForPairProvider =
@@ -118,12 +127,14 @@ class TrialSessionActions extends StateNotifier<AsyncValue<void>> {
     required String mohaffezId,
     required String sessionType,
     required List<Map<String, String>> availabilityWindows,
+    Map<String, dynamic> learnerSnapshot = const {},
   }) {
     return _call('createTrialSessionRequest', {
       'mohaffezId': mohaffezId,
       'sessionType': sessionType,
       'availabilityWindows': availabilityWindows,
       'timezoneOffsetMinutes': DateTime.now().timeZoneOffset.inMinutes,
+      ...learnerSnapshot,
     });
   }
 

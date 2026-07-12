@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 part 'pricing_plan_model.freezed.dart';
 part 'pricing_plan_model.g.dart';
 
-
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum PlanType {
@@ -26,7 +25,6 @@ enum SessionMode {
   mosque,
 }
 
-
 // ─── Model ────────────────────────────────────────────────────────────────────
 
 @freezed
@@ -41,9 +39,15 @@ class PricingPlanModel with _$PricingPlanModel {
     // A missing mode no longer throws during parsing and crashes the entire
     // getPlansForTeacher() list, which previously silently disabled Option 2.
     SessionMode? mode,
-
     required double priceEGP,
+    @Default('EG') String countryCode,
+    @Default('مصر') String countryName,
+    @Default('EGP') String currencyCode,
+    @Default('ج.م') String currencyLabel,
+    double? displayPrice,
+    @Default(1.0) double fxRateToEGP,
     required int sessionsCount,
+    int? sessionDurationMinutes,
     int? validityDays,
     int? sessionsPerWeek,
     @Default(true) bool isActive,
@@ -65,17 +69,25 @@ class PricingPlanModel with _$PricingPlanModel {
 
     // Coerce Firestore numeric types safely
     final rawPrice = data['priceEGP'];
+    final rawDisplayPrice = data['displayPrice'];
+    final rawFxRate = data['fxRateToEGP'];
     final rawSessions = data['sessionsCount'];
+    final rawDuration = data['sessionDurationMinutes'];
 
     final safeData = {
       ...data,
-      'id': doc.id,                                              // FIX 2
-      'priceEGP': rawPrice is int                               // FIX 3
+      'id': doc.id, // FIX 2
+      'priceEGP': rawPrice is int // FIX 3
           ? rawPrice.toDouble()
           : rawPrice ?? 0.0,
-      'sessionsCount': rawSessions is double                    // FIX 3
+      'displayPrice':
+          rawDisplayPrice is int ? rawDisplayPrice.toDouble() : rawDisplayPrice,
+      'fxRateToEGP': rawFxRate is int ? rawFxRate.toDouble() : rawFxRate ?? 1.0,
+      'sessionsCount': rawSessions is double // FIX 3
           ? rawSessions.toInt()
           : rawSessions ?? 0,
+      'sessionDurationMinutes':
+          rawDuration is double ? rawDuration.toInt() : rawDuration,
     };
 
     try {
@@ -93,13 +105,18 @@ class PricingPlanModel with _$PricingPlanModel {
         type: PlanType.single,
         mode: null,
         priceEGP: 0.0,
+        countryCode: data['countryCode'] as String? ?? 'EG',
+        countryName: data['countryName'] as String? ?? 'مصر',
+        currencyCode: data['currencyCode'] as String? ?? 'EGP',
+        currencyLabel: data['currencyLabel'] as String? ?? 'ج.م',
+        displayPrice: null,
+        fxRateToEGP: 1.0,
         sessionsCount: 0,
-        isActive: false,  // disabled so it won't be selectable
+        isActive: false, // disabled so it won't be selectable
       );
     }
   }
 }
-
 
 // ─── Converters ───────────────────────────────────────────────────────────────
 
@@ -126,8 +143,7 @@ class PlanTypeConverter implements JsonConverter<PlanType, String> {
   const PlanTypeConverter();
 
   @override
-  PlanType fromJson(String json) =>
-      PlanType.values.firstWhere(
+  PlanType fromJson(String json) => PlanType.values.firstWhere(
         (e) => e.name == json,
         orElse: () => PlanType.single,
       );

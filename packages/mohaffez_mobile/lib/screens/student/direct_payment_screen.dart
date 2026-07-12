@@ -1,12 +1,29 @@
 // lib/screens/direct_payment_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/pay_from_wallet_card.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
+
+const _directPaymentUnavailableMessage =
+    'الدفع المباشر غير متاح لهذا المحفظ حاليًا. يرجى اختيار الدفع الإلكتروني أو المحاولة لاحقًا.';
+
+String _studentSafeDirectPaymentError(FirebaseFunctionsException error) {
+  final message = error.message?.trim();
+  if (error.code == 'failed-precondition' ||
+      message == null ||
+      message.isEmpty ||
+      message.contains('مستحقات') ||
+      message.contains('الحد المسموح')) {
+    return _directPaymentUnavailableMessage;
+  }
+  return message;
+}
 
 class DirectPaymentScreen extends ConsumerStatefulWidget {
   final String? requestId;
@@ -30,6 +47,14 @@ class DirectPaymentScreen extends ConsumerStatefulWidget {
   final String? planTitle;
   final int? sessionsCount;
   final int? validityDays;
+  final String? studentCountryCode;
+  final String? studentCountryName;
+  final String? displayCurrencyCode;
+  final String? displayCurrencyLabel;
+  final double? displayAmount;
+  final double? fxRateToEGP;
+  final double? chargedAmountEGP;
+  final int? sessionDurationMinutes;
   final bool autoBookFirstSession;
 
   const DirectPaymentScreen({
@@ -55,6 +80,14 @@ class DirectPaymentScreen extends ConsumerStatefulWidget {
     this.planTitle,
     this.sessionsCount,
     this.validityDays,
+    this.studentCountryCode,
+    this.studentCountryName,
+    this.displayCurrencyCode,
+    this.displayCurrencyLabel,
+    this.displayAmount,
+    this.fxRateToEGP,
+    this.chargedAmountEGP,
+    this.sessionDurationMinutes,
     this.autoBookFirstSession = false,
   });
 
@@ -86,6 +119,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   double? resolvedImamAddressLat;
   double? resolvedImamAddressLng;
   String? resolvedMohaffezPhone;
+  String? resolvedGuardianId;
+  String? resolvedGuardianName;
+  String? resolvedStudentProfileId;
+  String? resolvedStudentProfileName;
+  String? resolvedStudentProfileGender;
+  DateTime? resolvedStudentProfileBirthDate;
+  int? resolvedStudentAge;
 
   // App-kill recovery — populated from sessionRequests doc when provider is empty
   String? _hydratedPlanId;
@@ -93,6 +133,14 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   String? _hydratedPlanType;
   int? _hydratedSessions;
   int? _hydratedValidity;
+  String? _hydratedStudentCountryCode;
+  String? _hydratedStudentCountryName;
+  String? _hydratedDisplayCurrencyCode;
+  String? _hydratedDisplayCurrencyLabel;
+  double? _hydratedDisplayAmount;
+  double? _hydratedFxRateToEGP;
+  double? _hydratedChargedAmountEGP;
+  int? _hydratedSessionDurationMinutes;
 
   @override
   void initState() {
@@ -104,6 +152,12 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     final flow = ref.read(bookingFlowProvider);
     final slotContext = flow.slotContext;
     final currentUser = ref.read(currentUserProvider).value;
+    final activeProfile = currentUser == null
+        ? null
+        : resolveBookingLearner(context, ref, currentUser);
+    if (currentUser != null && activeProfile == null) {
+      return;
+    }
 
     // 🔍 DIAG Step 3: DirectPaymentScreen building, print all incoming params
     debugPrint('🔵 [BUNDLE_FLOW] Step3_DirectPaymentScreen_BUILD: '
@@ -143,7 +197,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     // Resolve values: widget params win over provider context
     resolvedMohaffezId = widget.mohaffezId ?? slotContext?.mohaffezId;
     resolvedMohaffezName = widget.mohaffezName ?? slotContext?.mohaffezName;
-    resolvedStudentName = widget.studentName ?? currentUser?.name ?? '';
+    resolvedStudentName =
+        widget.studentName ?? activeProfile?.name ?? currentUser?.name ?? '';
     resolvedStudentEmail = widget.studentEmail.isNotEmpty
         ? widget.studentEmail
         : currentUser?.email ?? '';
@@ -160,6 +215,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     resolvedImamAddressLng =
         widget.imamAddressLng ?? slotContext?.imamAddressLng;
     resolvedMohaffezPhone = widget.mohaffezPhone ?? slotContext?.mohaffezPhone;
+    resolvedGuardianId = currentUser?.uid;
+    resolvedGuardianName = currentUser?.name;
+    resolvedStudentProfileId = activeProfile?.id;
+    resolvedStudentProfileName = activeProfile?.name;
+    resolvedStudentProfileGender = activeProfile?.gender;
+    resolvedStudentProfileBirthDate = activeProfile?.dateOfBirth;
+    resolvedStudentAge = activeProfile?.age;
 
     // Slot dates: prefer widget DateTime params first, then parse from provider
     if (widget.slotDate != null) {
@@ -226,16 +288,39 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           resolvedMohaffezName,
           d['mohaffezName'] as String?,
         ]);
+        resolvedStudentName = _firstNonEmpty([
+          d['studentProfileName'] as String?,
+          d['studentName'] as String?,
+          resolvedStudentName,
+        ]);
+        resolvedGuardianId ??= d['guardianId'] as String?;
+        resolvedGuardianName ??= d['guardianName'] as String?;
+        resolvedStudentProfileId ??= d['studentProfileId'] as String?;
+        resolvedStudentProfileName ??= d['studentProfileName'] as String?;
+        resolvedStudentProfileGender ??= d['studentProfileGender'] as String?;
+        resolvedStudentProfileBirthDate ??= parse(d['studentProfileBirthDate']);
+        resolvedStudentAge ??= (d['studentAge'] as num?)?.toInt();
         resolvedSlotDate ??= parse(d['slotDate']);
         resolvedSlotStart ??= parse(d['slotStart']);
         resolvedSlotEnd ??= parse(d['slotEnd']);
         resolvedTimeSlot ??= d['preferredTimeSlot'] as String?;
         resolvedSessionType ??= d['sessionType'] as String?;
+        resolvedAmount ??= (d['paymentAmount'] as num?)?.toDouble();
         _hydratedPlanId ??= d['planId'] as String?;
         _hydratedPlanTitle ??= d['planTitle'] as String?;
         _hydratedPlanType ??= d['planType'] as String?;
         _hydratedSessions ??= (d['sessionsCount'] as num?)?.toInt();
         _hydratedValidity ??= (d['validityDays'] as num?)?.toInt();
+        _hydratedStudentCountryCode ??= d['studentCountryCode'] as String?;
+        _hydratedStudentCountryName ??= d['studentCountryName'] as String?;
+        _hydratedDisplayCurrencyCode ??= d['displayCurrencyCode'] as String?;
+        _hydratedDisplayCurrencyLabel ??= d['displayCurrencyLabel'] as String?;
+        _hydratedDisplayAmount ??= (d['displayAmount'] as num?)?.toDouble();
+        _hydratedFxRateToEGP ??= (d['fxRateToEGP'] as num?)?.toDouble();
+        _hydratedChargedAmountEGP ??=
+            (d['chargedAmountEGP'] as num?)?.toDouble();
+        _hydratedSessionDurationMinutes ??=
+            (d['sessionDurationMinutes'] as num?)?.toInt();
       });
 
       if (resolvedAmount == null && resolvedMohaffezId != null) {
@@ -260,12 +345,19 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     try {
       final repository = ref.read(pricingRepositoryProvider);
       final plans = await repository.getPlansForTeacher(mohaffezId);
-      final sessionMode = SessionMode.values.firstWhere(
-        (m) => m.name == sessionType,
-        orElse: () => SessionMode.online,
+      final studentCountry = PricingCountryUtils.inferUserCountry(
+          ref.read(currentUserProvider).valueOrNull);
+      final matchingPlans = plans
+          .where((plan) =>
+              plan.type == PlanType.single &&
+              PricingCountryUtils.matchesMode(plan, sessionType))
+          .toList();
+      final visiblePlans = PricingCountryUtils.preferCountryPlans(
+        matchingPlans,
+        studentCountry.code,
       );
-      final singlePlan = plans.firstWhere(
-        (plan) => plan.type == PlanType.single && plan.mode == sessionMode,
+      final singlePlan = visiblePlans.firstWhere(
+        (plan) => plan.type == PlanType.single,
         orElse: () => throw Exception('No single session plan found'),
       );
       if (!mounted) return;
@@ -381,6 +473,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         mohaffezId: resolvedMohaffezId!,
         mohaffezName: resolvedMohaffezName ?? '',
         studentName: resolvedStudentName ?? '',
+        guardianId: resolvedGuardianId,
+        guardianName: resolvedGuardianName,
+        studentProfileId: resolvedStudentProfileId,
+        studentProfileName: resolvedStudentProfileName,
+        studentProfileGender: resolvedStudentProfileGender,
+        studentProfileBirthDate: resolvedStudentProfileBirthDate,
+        studentAge: resolvedStudentAge,
         studentEmail: resolvedStudentEmail ?? '',
         studentPhone: resolvedStudentPhone ?? '',
         amount: resolvedAmount!,
@@ -402,6 +501,19 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         planTitle: widget.planTitle ?? _hydratedPlanTitle,
         sessionsCount: widget.sessionsCount ?? _hydratedSessions,
         validityDays: widget.validityDays ?? _hydratedValidity,
+        studentCountryCode:
+            widget.studentCountryCode ?? _hydratedStudentCountryCode,
+        studentCountryName:
+            widget.studentCountryName ?? _hydratedStudentCountryName,
+        displayCurrencyCode:
+            widget.displayCurrencyCode ?? _hydratedDisplayCurrencyCode,
+        displayCurrencyLabel:
+            widget.displayCurrencyLabel ?? _hydratedDisplayCurrencyLabel,
+        displayAmount: widget.displayAmount ?? _hydratedDisplayAmount,
+        fxRateToEGP: widget.fxRateToEGP ?? _hydratedFxRateToEGP,
+        chargedAmountEGP: widget.chargedAmountEGP ?? _hydratedChargedAmountEGP,
+        sessionDurationMinutes:
+            widget.sessionDurationMinutes ?? _hydratedSessionDurationMinutes,
       );
 
       // 🔍 DIAG Step 3: CF response
@@ -422,7 +534,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             backgroundColor: AppThemeConstants.success,
           ),
         );
-        context.go('/home');
+        context.go('/booking/status/$requestId');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -430,6 +542,20 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
                   Text(result['message']?.toString() ?? 'فشل إرسال الإشعار')),
         );
       }
+    } on FirebaseFunctionsException catch (e) {
+      // Surface server-side business-rule failures, e.g. when a teacher has
+      // platform dues above the configured direct-payment threshold.
+      debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: '
+          'code=${e.code}, message=${e.message}');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          duration: const Duration(seconds: 7),
+          content: Text(_studentSafeDirectPaymentError(e)),
+        ),
+      );
     } on Exception catch (e) {
       // 🔍 DIAG Step 3: CF error
       debugPrint('❌ [BUNDLE_FLOW] Step3_CF_ERROR: error=$e');

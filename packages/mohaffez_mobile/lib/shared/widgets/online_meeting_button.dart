@@ -73,13 +73,19 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
     final state = ref.watch(meetingButtonStateProvider(
         (sessionId: widget.sessionId, role: widget.role)));
     if (state == MeetingButtonState.hidden) return const SizedBox.shrink();
+    final info = ref.watch(meetingInfoProvider(widget.sessionId)).valueOrNull;
+    final isPhoneCall = info?.isPhoneCall ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!_infoCardSeen) _InfoCard(onDismiss: _dismissInfoCard),
+        if (!_infoCardSeen)
+          _InfoCard(
+            isPhoneCall: isPhoneCall,
+            onDismiss: _dismissInfoCard,
+          ),
         const SizedBox(height: 8),
-        _buildButton(context, state),
+        _buildButton(context, state, info),
       ],
     );
   }
@@ -91,8 +97,78 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
 
   // ── State → button ─────────────────────────────────────────────────────────
 
-  Widget _buildButton(BuildContext context, MeetingButtonState state) {
+  Widget _buildButton(
+    BuildContext context,
+    MeetingButtonState state,
+    MeetingInfo? info,
+  ) {
     final isTeacher = widget.role == 'mohaffez';
+    final isPhoneCall = info?.isPhoneCall ?? false;
+    if (isPhoneCall) {
+      switch (state) {
+        case MeetingButtonState.waitingForTeacher:
+          return const _DisabledButton(
+            icon: Icons.hourglass_bottom_rounded,
+            label: 'حان وقت الجلسة - في انتظار مكالمة المعلم',
+            subtext: 'سيظهر زر الاتصال بعد أن يبدأ المعلم الجلسة',
+            color: AppThemeConstants.info,
+          );
+        case MeetingButtonState.ready:
+          return _JoinButton(
+            label: 'ابدأ المكالمة الهاتفية',
+            icon: Icons.phone_rounded,
+            gradient: const LinearGradient(
+              colors: [
+                AppThemeConstants.primary,
+                AppThemeConstants.primaryVariant,
+              ],
+            ),
+            loading: _launching,
+            onTap: () => _handleJoin(state: state, info: info),
+          );
+        case MeetingButtonState.inProgress:
+          if (isTeacher) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _SessionInProgressBanner(),
+                const SizedBox(height: 10),
+                _JoinButton(
+                  label: 'تم بدء الجلسة - اتصل بالطالب',
+                  icon: Icons.phone_in_talk_rounded,
+                  gradient: const LinearGradient(
+                    colors: [
+                      AppThemeConstants.secondary,
+                      AppThemeConstants.primary,
+                    ],
+                  ),
+                  loading: _launching,
+                  onTap: () => _handleJoin(state: state, info: info),
+                ),
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _SessionStartedBanner(),
+              const SizedBox(height: 10),
+              _PulseJoinButton(
+                pulse: _pulse,
+                label: 'اتصل بمعلمك الآن',
+                loading: _launching,
+                onTap: () => _handleJoin(state: state, info: info),
+              ),
+            ],
+          );
+        case MeetingButtonState.pendingMeetingLink:
+        case MeetingButtonState.tooEarly:
+        case MeetingButtonState.teacherLate:
+        case MeetingButtonState.ended:
+        case MeetingButtonState.hidden:
+          break;
+      }
+    }
     switch (state) {
       case MeetingButtonState.pendingMeetingLink:
         return const _DisabledButton(
@@ -133,10 +209,13 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
           label: readyLabel,
           icon: Icons.videocam_rounded,
           gradient: const LinearGradient(
-            colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
+            colors: [
+              AppThemeConstants.primary,
+              AppThemeConstants.primaryVariant
+            ],
           ),
           loading: _launching,
-          onTap: _handleJoin,
+          onTap: () => _handleJoin(),
         );
 
       case MeetingButtonState.inProgress:
@@ -156,7 +235,7 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
                   ],
                 ),
                 loading: _launching,
-                onTap: _handleJoin,
+                onTap: () => _handleJoin(),
               ),
             ],
           );
@@ -170,7 +249,7 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
               pulse: _pulse,
               label: 'انضم إلى معلمك الآن',
               loading: _launching,
-              onTap: _handleJoin,
+              onTap: () => _handleJoin(),
             ),
           ],
         );
@@ -187,21 +266,60 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
     }
   }
 
-  Future<void> _handleJoin() async {
+  Future<void> _handleJoin({
+    MeetingButtonState? state,
+    MeetingInfo? info,
+  }) async {
     if (_launching) return;
     setState(() => _launching = true);
 
-    final info = ref.read(meetingInfoProvider(widget.sessionId)).valueOrNull;
-    if (info == null || info.url.isEmpty) {
+    final currentInfo =
+        info ?? ref.read(meetingInfoProvider(widget.sessionId)).valueOrNull;
+    if (currentInfo == null) {
       setState(() => _launching = false);
       return;
     }
 
     try {
+      if (currentInfo.isPhoneCall) {
+        if (widget.role == 'mohaffez' && state == MeetingButtonState.ready) {
+          final leadTimeMinutes = ref
+                  .read(systemConfigProvider)
+                  .valueOrNull
+                  ?.meetingStartLeadTimeMinutes ??
+              60;
+          final result = await MeetingLauncherService.markMeetingStarted(
+            sessionId: widget.sessionId,
+            teacherId: ref.read(authStateProvider).valueOrNull?.uid ?? '',
+            leadTimeMinutes: leadTimeMinutes,
+          );
+          if (result.error != null) return;
+        }
+
+        final phone = widget.role == 'mohaffez'
+            ? currentInfo.studentPhone
+            : currentInfo.mohaffezPhone;
+        final launched = await MeetingLauncherService.launchPhoneCall(
+          phone: phone,
+          sessionId: widget.sessionId,
+          role: widget.role,
+        );
+        if (!launched && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('رقم الهاتف غير متاح لهذه الجلسة'),
+              backgroundColor: AppThemeConstants.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (currentInfo.url.isEmpty) return;
       await MeetingLauncherService.launch(
         context: context,
         ref: ref,
-        info: info,
+        info: currentInfo,
         sessionId: widget.sessionId,
         role: widget.role,
       );
@@ -215,7 +333,12 @@ class _OnlineMeetingButtonState extends ConsumerState<OnlineMeetingButton>
 
 class _InfoCard extends StatelessWidget {
   final VoidCallback onDismiss;
-  const _InfoCard({required this.onDismiss});
+  final bool isPhoneCall;
+
+  const _InfoCard({
+    required this.onDismiss,
+    this.isPhoneCall = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -236,8 +359,11 @@ class _InfoCard extends StatelessWidget {
               color: AppThemeConstants.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.videocam_rounded,
-                color: AppThemeConstants.primary, size: 20),
+            child: Icon(
+              isPhoneCall ? Icons.phone_rounded : Icons.videocam_rounded,
+              color: AppThemeConstants.primary,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -311,8 +437,7 @@ class _DisabledButton extends StatelessWidget {
               if (subtext != null)
                 Text(subtext!,
                     style: TextStyle(
-                        fontSize: 11,
-                        color: color.withValues(alpha: 0.7))),
+                        fontSize: 11, color: color.withValues(alpha: 0.7))),
             ],
           ),
         ],
@@ -449,8 +574,7 @@ class _TeacherLateCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Container(
-            padding:
-                const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
             decoration: BoxDecoration(
               color: AppThemeConstants.warning.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),

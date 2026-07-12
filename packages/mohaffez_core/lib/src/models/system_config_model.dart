@@ -6,6 +6,7 @@ class SystemConfigModel {
   final double commissionRate;
   final double directPaymentCommission;
   final double minimumWithdrawAmount;
+  final double minimumTeacherHourlyRateEgp;
   final int paymentDeadlineHours;
   final int promoCodeMaxDiscount;
   final bool freeSessionEnabled;
@@ -32,6 +33,7 @@ class SystemConfigModel {
   final bool sessionReminderEnabled;
   final bool commissionJobEnabled;
   final bool credentialReviewRequired;
+  final bool teacherRegistrationEnabled;
   final bool autoApproveMohaffez;
   final bool allowUnverifiedBooking;
   final bool paymobEnabled;
@@ -64,6 +66,7 @@ class SystemConfigModel {
     required this.commissionRate,
     required this.directPaymentCommission,
     required this.minimumWithdrawAmount,
+    required this.minimumTeacherHourlyRateEgp,
     required this.paymentDeadlineHours,
     required this.promoCodeMaxDiscount,
     required this.freeSessionEnabled,
@@ -90,6 +93,7 @@ class SystemConfigModel {
     required this.sessionReminderEnabled,
     required this.commissionJobEnabled,
     required this.credentialReviewRequired,
+    required this.teacherRegistrationEnabled,
     required this.autoApproveMohaffez,
     required this.allowUnverifiedBooking,
     required this.paymobEnabled,
@@ -119,6 +123,9 @@ class SystemConfigModel {
       minimumWithdrawAmount:
           (data['minimumWithdrawAmount'] as num?)?.toDouble() ??
               defaults.minimumWithdrawAmount,
+      minimumTeacherHourlyRateEgp:
+          (data['minimumTeacherHourlyRateEgp'] as num?)?.toDouble() ??
+              defaults.minimumTeacherHourlyRateEgp,
       paymentDeadlineHours: (data['paymentDeadlineHours'] as num?)?.toInt() ??
           defaults.paymentDeadlineHours,
       promoCodeMaxDiscount: (data['promoCodeMaxDiscount'] as num?)?.toInt() ??
@@ -176,18 +183,19 @@ class SystemConfigModel {
           defaults.commissionJobEnabled,
       credentialReviewRequired: data['credentialReviewRequired'] as bool? ??
           defaults.credentialReviewRequired,
+      teacherRegistrationEnabled: data['teacherRegistrationEnabled'] as bool? ??
+          defaults.teacherRegistrationEnabled,
       autoApproveMohaffez:
           data['autoApproveMohaffez'] as bool? ?? defaults.autoApproveMohaffez,
       allowUnverifiedBooking: data['allowUnverifiedBooking'] as bool? ??
           defaults.allowUnverifiedBooking,
-      paymobEnabled:
-          data['paymobEnabled'] as bool? ?? defaults.paymobEnabled,
+      paymobEnabled: data['paymobEnabled'] as bool? ?? defaults.paymobEnabled,
       maxCredentialFiles: (data['maxCredentialFiles'] as num?)?.toInt() ??
           defaults.maxCredentialFiles,
       examPassingScore: (data['examPassingScore'] as num?)?.toDouble() ??
           defaults.examPassingScore,
-      examMaxRetries: (data['examMaxRetries'] as num?)?.toInt() ??
-          defaults.examMaxRetries,
+      examMaxRetries:
+          (data['examMaxRetries'] as num?)?.toInt() ?? defaults.examMaxRetries,
       examRetryCooldownDays: (data['examRetryCooldownDays'] as num?)?.toInt() ??
           defaults.examRetryCooldownDays,
       updatedAt:
@@ -219,6 +227,7 @@ class SystemConfigModel {
       commissionRate: 0.05,
       directPaymentCommission: 0.05,
       minimumWithdrawAmount: 100.0,
+      minimumTeacherHourlyRateEgp: 0.0,
       paymentDeadlineHours: 48,
       promoCodeMaxDiscount: 100,
       freeSessionEnabled: true,
@@ -245,6 +254,7 @@ class SystemConfigModel {
       sessionReminderEnabled: true,
       commissionJobEnabled: true,
       credentialReviewRequired: true,
+      teacherRegistrationEnabled: true,
       autoApproveMohaffez: false,
       allowUnverifiedBooking: false,
       paymobEnabled: false,
@@ -267,6 +277,7 @@ class SystemConfigModel {
       'commissionRate': commissionRate,
       'directPaymentCommission': directPaymentCommission,
       'minimumWithdrawAmount': minimumWithdrawAmount,
+      'minimumTeacherHourlyRateEgp': minimumTeacherHourlyRateEgp,
       'paymentDeadlineHours': paymentDeadlineHours,
       'promoCodeMaxDiscount': promoCodeMaxDiscount,
       'freeSessionEnabled': freeSessionEnabled,
@@ -276,7 +287,6 @@ class SystemConfigModel {
       'sessionReminderHours1': sessionReminderHours1,
       'sessionReminderHours2': sessionReminderHours2,
       'maxAdvanceBookingDays': maxAdvanceBookingDays,
-
       'meetingStartLeadTimeMinutes': meetingStartLeadTimeMinutes,
       'maintenanceMode': maintenanceMode,
       'maintenanceMessage': maintenanceMessage,
@@ -294,6 +304,7 @@ class SystemConfigModel {
       'sessionReminderEnabled': sessionReminderEnabled,
       'commissionJobEnabled': commissionJobEnabled,
       'credentialReviewRequired': credentialReviewRequired,
+      'teacherRegistrationEnabled': teacherRegistrationEnabled,
       'autoApproveMohaffez': autoApproveMohaffez,
       'allowUnverifiedBooking': allowUnverifiedBooking,
       'paymobEnabled': paymobEnabled,
