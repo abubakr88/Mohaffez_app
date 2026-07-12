@@ -23,6 +23,7 @@ class _GoogleRoleSelectionScreenState
     extends ConsumerState<GoogleRoleSelectionScreen> {
   String? _selectedRole;
   String _selectedGender = 'male';
+  String? _selectedHonorific;
   bool _isLoading = false;
 
   IconData _genderIcon(String gender) {
@@ -30,9 +31,9 @@ class _GoogleRoleSelectionScreenState
   }
 
   IconData get _roleBadgeIcon {
-    return _selectedRole == 'mohaffez'
-        ? Icons.menu_book_rounded
-        : Icons.school_rounded;
+    if (_selectedRole == roleMohaffez) return Icons.menu_book_rounded;
+    if (_selectedRole == roleParent) return Icons.family_restroom_rounded;
+    return Icons.school_rounded;
   }
 
   Future<void> _submit() async {
@@ -51,7 +52,7 @@ class _GoogleRoleSelectionScreenState
             .valueOrNull
             ?.teacherRegistrationEnabled ??
         true;
-    if (_selectedRole == 'mohaffez' && !teacherRegistrationEnabled) {
+    if (_selectedRole == roleMohaffez && !teacherRegistrationEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -70,6 +71,7 @@ class _GoogleRoleSelectionScreenState
     await notifier.completeGoogleSignIn(
       role: _selectedRole!,
       gender: _selectedGender,
+      honorific: _selectedHonorific,
     );
 
     if (!mounted) return;
@@ -171,7 +173,16 @@ class _GoogleRoleSelectionScreenState
                           title: 'طالب',
                           subtitle: 'أبحث عن محفظ لحفظ القرآن',
                           icon: Icons.school_rounded,
-                          value: 'student',
+                          value: roleStudent,
+                          selectedValue: _selectedRole,
+                          onSelected: (v) => setState(() => _selectedRole = v),
+                        ),
+                        const SizedBox(height: 12),
+                        _RoleCard(
+                          title: 'ولي أمر',
+                          subtitle: 'أدير حجوزات ودروس أبنائي',
+                          icon: Icons.family_restroom_rounded,
+                          value: roleParent,
                           selectedValue: _selectedRole,
                           onSelected: (v) => setState(() => _selectedRole = v),
                         ),
@@ -180,7 +191,7 @@ class _GoogleRoleSelectionScreenState
                           title: 'محفظ',
                           subtitle: 'أرغب في تدريس وتسميع القرآن',
                           icon: Icons.menu_book_rounded,
-                          value: 'mohaffez',
+                          value: roleMohaffez,
                           selectedValue: _selectedRole,
                           enabled: teacherRegistrationEnabled,
                           onSelected: (v) => setState(() => _selectedRole = v),
@@ -221,6 +232,35 @@ class _GoogleRoleSelectionScreenState
                             ),
                           ],
                         ),
+                        if (_selectedRole == roleMohaffez) ...[
+                          const SizedBox(height: 20),
+                          DropdownButtonFormField<String?>(
+                            initialValue: _selectedHonorific,
+                            decoration: const InputDecoration(
+                              labelText: 'اللقب قبل الاسم',
+                              prefixIcon:
+                                  Icon(Icons.workspace_premium_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
+                              ),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('بدون لقب'),
+                              ),
+                              ...teacherHonorifics.map(
+                                (title) => DropdownMenuItem<String?>(
+                                  value: title,
+                                  child: Text(title),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _selectedHonorific = value);
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 32),
                         SizedBox(
                           height: 54,

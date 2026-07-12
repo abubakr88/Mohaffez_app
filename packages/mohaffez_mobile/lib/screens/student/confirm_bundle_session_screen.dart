@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/meeting_provider_picker.dart';
 
@@ -222,6 +223,9 @@ class _ConfirmBundleSessionScreenState
       return;
     }
 
+    final activeProfile = resolveBookingLearner(context, ref, currentUser);
+    if (activeProfile == null) return;
+
     setState(() => _isLoading = true);
 
     String? slotLockId;
@@ -276,7 +280,7 @@ class _ConfirmBundleSessionScreenState
       final result = await bookingService.createSessionRequest(
         mohaffezId: slotContext.mohaffezId,
         studentId: currentUser.uid,
-        studentName: currentUser.name,
+        studentName: activeProfile.name,
         mohaffezName: slotContext.mohaffezName,
         sessionType: slotContext.sessionType,
         preferredTimeSlot: slotContext.preferredTimeSlot,
@@ -302,6 +306,13 @@ class _ConfirmBundleSessionScreenState
         paymentAmount: 0,
         preferredProvider:
             slotContext.sessionType == 'online' ? _selectedProvider : null,
+        guardianId: currentUser.uid,
+        guardianName: currentUser.name,
+        studentProfileId: activeProfile.id,
+        studentProfileName: activeProfile.name,
+        studentProfileGender: activeProfile.gender,
+        studentProfileBirthDate: activeProfile.dateOfBirth,
+        studentAge: activeProfile.age,
       );
 
       if (!mounted) return;

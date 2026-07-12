@@ -34,6 +34,40 @@ function parseFlutterDate(iso: string): Date {
   return new Date(iso);
 }
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function optionalTimestamp(value: unknown): FirebaseFirestore.Timestamp | null {
+  if (value instanceof admin.firestore.Timestamp) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = parseFlutterDate(value.trim());
+    if (!isNaN(parsed.getTime())) {
+      return admin.firestore.Timestamp.fromDate(parsed);
+    }
+  }
+  return null;
+}
+
+function calculateAgeFromTimestamp(
+  birthDate: FirebaseFirestore.Timestamp | null
+): number | null {
+  if (!birthDate) return null;
+  const dob = birthDate.toDate();
+  const today = new Date();
+  let age = today.getUTCFullYear() - dob.getUTCFullYear();
+  const monthDiff = today.getUTCMonth() - dob.getUTCMonth();
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getUTCDate() < dob.getUTCDate())
+  ) {
+    age--;
+  }
+  return age >= 0 && age <= 120 ? age : null;
+}
+
 export const createSessionRequest = functions.https.onCall(
   async (data, context) => {
     const fallbackIdToken =
@@ -113,6 +147,11 @@ export const createSessionRequest = functions.https.onCall(
       typeof data.fxRateToEGP === 'number' ? data.fxRateToEGP : null;
     const chargedAmountEGP: number | null =
       typeof data.chargedAmountEGP === 'number' ? data.chargedAmountEGP : null;
+    const studentProfileBirthDate = optionalTimestamp(
+      data.studentProfileBirthDate
+    );
+    const canonicalStudentAge =
+      calculateAgeFromTimestamp(studentProfileBirthDate);
 
     // ── 3. Validate ────────────────────────────────────────────────────────
     if (
@@ -422,6 +461,15 @@ export const createSessionRequest = functions.https.onCall(
         studentId,
         mohaffezId,
         studentName,
+        guardianId: optionalString(data.guardianId) ?? studentId,
+        guardianName: optionalString(data.guardianName),
+        studentProfileId: optionalString(data.studentProfileId),
+        studentProfileName: optionalString(data.studentProfileName),
+        studentProfileGender: optionalString(data.studentProfileGender),
+        studentProfileBirthDate,
+        studentAge:
+          canonicalStudentAge ??
+          (typeof data.studentAge === 'number' ? data.studentAge : null),
         mohaffezName,
         sessionType,
         preferredProvider:

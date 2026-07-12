@@ -7,10 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../shared/widgets/empty_state.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../services/payment_service.dart';
 
-enum _DpMethod { online, direct }
+enum _DpMethod { online, wallet, direct }
 
 class StudentPaymentScreen extends ConsumerStatefulWidget {
   const StudentPaymentScreen({
@@ -61,6 +62,138 @@ class StudentPaymentScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<StudentPaymentScreen> createState() =>
       _StudentPaymentScreenState();
+}
+
+class _PaymentChoiceTile extends StatelessWidget {
+  const _PaymentChoiceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = selected
+        ? AppThemeConstants.primary
+        : enabled
+            ? AppThemeConstants.textSecondary
+            : AppThemeConstants.grey500;
+
+    return Material(
+      color: AppThemeConstants.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppThemeConstants.primary.withValues(alpha: 0.07)
+                : AppThemeConstants.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? AppThemeConstants.primary
+                  : AppThemeConstants.grey300,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: accent,
+              ),
+              const SizedBox(width: 10),
+              Icon(icon, color: accent, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: enabled
+                            ? AppThemeConstants.textPrimary
+                            : AppThemeConstants.grey500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: enabled
+                            ? AppThemeConstants.textSecondary
+                            : AppThemeConstants.warning,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentAvailabilityMessage extends StatelessWidget {
+  const _PaymentAvailabilityMessage({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppThemeConstants.warningLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppThemeConstants.warning.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            color: AppThemeConstants.warning,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppThemeConstants.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
@@ -131,6 +264,13 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         selectedPaymentMethod == 'buy_new_package';
   }
 
+  bool get isLegacyDirectPaymentRequest =>
+      widget.lockedRequest?['selectedPaymentMethod']
+          ?.toString()
+          .trim()
+          .toLowerCase() ==
+      'directpayment';
+
   bool _planMatchesLockedRequest(PricingPlanModel plan) {
     if (!isLockedRequest) return true;
 
@@ -166,12 +306,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   @override
   void initState() {
     super.initState();
-    // Force direct-payment method for bundle booking flow.
-    // WHY: bundle purchases go through studentMarkedDirectPayment CF
-    //      (student notifies teacher → teacher confirms), NOT Paymob.
-    //      Leaving the default as DPMethod.online causes "Pay Now"
-    //      (Paymob gateway) to appear instead of the request flow.
-    if (widget.showBundlePlansOnly) {
+    // Existing requests that already committed to an external transfer must
+    // remain completable. New requests use wallet or Paymob after acceptance.
+    if (isLegacyDirectPaymentRequest) {
       _selectedDPMethod = _DpMethod.direct;
     }
     debugPrint(
@@ -181,6 +318,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   }
 
   Future<void> _loadWalletAvailability() async {
+    if (!isLegacyDirectPaymentRequest) {
+      if (mounted) setState(() => _loadingWallets = false);
+      return;
+    }
     if (widget.requestId == null || widget.requestId!.isEmpty) {
       if (mounted) setState(() => _loadingWallets = false);
       return;
@@ -400,6 +541,133 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   }
 
   Widget _buildPaymentMethodToggle(PricingResult pricing) {
+    if (!isLegacyDirectPaymentRequest) {
+      return _buildModernPaymentMethodToggle(pricing);
+    }
+    return _buildLegacyPaymentMethodToggle(pricing);
+  }
+
+  Widget _buildModernPaymentMethodToggle(PricingResult pricing) {
+    if (pricing.finalPrice <= 0.01) return const SizedBox.shrink();
+
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    if (user == null) return const SizedBox.shrink();
+
+    final paymobOn =
+        ref.watch(systemConfigProvider).valueOrNull?.paymobEnabled ?? false;
+    final walletAsync = ref.watch(walletProvider((
+      userId: user.uid,
+      ownerType: WalletOwnerType.student,
+    )));
+
+    return walletAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.only(top: 16),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (paymobOn) ...[
+              const Text(
+                'اختر طريقة الدفع',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              _PaymentChoiceTile(
+                icon: Icons.credit_card_rounded,
+                title: 'الدفع الإلكتروني',
+                subtitle: 'إتمام الدفع بأمان من خلال بوابة الدفع',
+                selected: true,
+                enabled: true,
+                onTap: () =>
+                    setState(() => _selectedDPMethod = _DpMethod.online),
+              ),
+              const SizedBox(height: 10),
+            ],
+            _PaymentAvailabilityMessage(
+              message: paymobOn
+                  ? 'تعذر تحميل رصيد محفظي، لكن يمكنك المتابعة بالدفع الإلكتروني.'
+                  : 'تعذر تحميل وسائل الدفع حاليًا. يرجى المحاولة مرة أخرى.',
+            ),
+          ],
+        ),
+      ),
+      data: (wallet) {
+        final balance = wallet.balanceEgp;
+        final walletSufficient = balance >= pricing.finalPrice;
+        final walletEligible = widget.requestId?.trim().isNotEmpty == true;
+
+        if (!paymobOn &&
+            walletEligible &&
+            walletSufficient &&
+            _selectedDPMethod == _DpMethod.online) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _selectedDPMethod == _DpMethod.online) {
+              setState(() => _selectedDPMethod = _DpMethod.wallet);
+            }
+          });
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'اختر طريقة الدفع',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              if (walletEligible)
+                _PaymentChoiceTile(
+                  icon: Icons.account_balance_wallet_rounded,
+                  title: 'رصيد محفظي',
+                  subtitle: walletSufficient
+                      ? 'الرصيد المتاح ${balance.toStringAsFixed(2)} ج.م'
+                      : 'الرصيد ${balance.toStringAsFixed(2)} ج.م — ينقصك ${(pricing.finalPrice - balance).toStringAsFixed(2)} ج.م',
+                  selected: _selectedDPMethod == _DpMethod.wallet,
+                  enabled: walletSufficient,
+                  onTap: () =>
+                      setState(() => _selectedDPMethod = _DpMethod.wallet),
+                  trailing: walletSufficient
+                      ? null
+                      : TextButton.icon(
+                          onPressed: () => context.push('/wallet-topup'),
+                          icon: const Icon(Icons.add_card_rounded, size: 18),
+                          label: const Text('شحن'),
+                        ),
+                ),
+              if (paymobOn) ...[
+                if (walletEligible) const SizedBox(height: 10),
+                _PaymentChoiceTile(
+                  icon: Icons.credit_card_rounded,
+                  title: 'الدفع الإلكتروني',
+                  subtitle: 'إتمام الدفع بأمان من خلال بوابة الدفع',
+                  selected: _selectedDPMethod == _DpMethod.online,
+                  enabled: true,
+                  onTap: () =>
+                      setState(() => _selectedDPMethod = _DpMethod.online),
+                ),
+              ],
+              if (!paymobOn && (!walletEligible || !walletSufficient)) ...[
+                const SizedBox(height: 10),
+                _PaymentAvailabilityMessage(
+                  message: walletEligible
+                      ? 'اشحن رصيد محفظي لإتمام الدفع.'
+                      : 'الدفع الإلكتروني غير متاح حاليًا. يرجى المحاولة لاحقًا.',
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLegacyPaymentMethodToggle(PricingResult pricing) {
     // Don't show for free sessions
     if (pricing.finalPrice <= 0.01) return const SizedBox.shrink();
 
@@ -669,7 +937,20 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     final requiresSlot = !isFreeSession &&
         !isBundlePlan && // bundles do not require a slot
         widget.requestId == null;
-    final canPay = !isProcessingPayment && (!requiresSlot || hasSelectedSlot);
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final wallet = user == null
+        ? null
+        : ref
+            .watch(walletProvider((
+              userId: user.uid,
+              ownerType: WalletOwnerType.student,
+            )))
+            .valueOrNull;
+    final walletCanCover = _selectedDPMethod != _DpMethod.wallet ||
+        (wallet != null && wallet.balanceEgp >= pricing.finalPrice);
+    final canPay = !isProcessingPayment &&
+        (!requiresSlot || hasSelectedSlot) &&
+        walletCanCover;
 
     return SizedBox(
       width: double.infinity,
@@ -682,14 +963,21 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 height: 20,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: AppThemeConstants.white))
-            : Icon(isFreeSession ? Icons.check_circle : Icons.payment,
+            : Icon(
+                _selectedDPMethod == _DpMethod.wallet
+                    ? Icons.account_balance_wallet_rounded
+                    : isFreeSession
+                        ? Icons.check_circle
+                        : Icons.payment,
                 color: AppThemeConstants.white),
         label: Text(
           isProcessingPayment
               ? 'جاري المعالجة...'
               : isFreeSession
                   ? 'تأكيد الجلسة المجانية 🎁'
-                  : '${pricing.finalPrice.toStringAsFixed(0)} ${ArabicLabels.egp} - ${ArabicLabels.payNow}',
+                  : _selectedDPMethod == _DpMethod.wallet
+                      ? 'ادفع ${pricing.finalPrice.toStringAsFixed(0)} ج.م من رصيد محفظي'
+                      : 'ادفع ${pricing.finalPrice.toStringAsFixed(0)} ج.م إلكترونيًا',
           style: const TextStyle(
               color: AppThemeConstants.white,
               fontWeight: FontWeight.bold,
@@ -725,7 +1013,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     final pricing = resolvePricing();
     final isFreeSession = pricing.finalPrice < 0.01;
 
-    // BUG-A FIX: Handle bundle/subscription direct payment
+    // Legacy external transfers remain available only for requests that were
+    // created with that method before the new wallet/Paymob flow.
     final planType = selectedPlan?.type;
     final isBundlePlan = planType == PlanType.bundle;
     final paymobOn = await _isPaymobEnabled();
@@ -733,6 +1022,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
     if (isFreeSession && appliedPromoCode != null) {
       await handleFreeSession(context, ref, user);
+    } else if (_selectedDPMethod == _DpMethod.wallet) {
+      await _payFromAppWallet(pricing);
     } else if (_selectedDPMethod == _DpMethod.direct) {
       // BUG-A FIX: Allow bundles to proceed without requestId
       if (isBundlePlan || widget.requestId != null) {
@@ -745,13 +1036,56 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'الدفع الإلكتروني غير مفعل حالياً. اختر الدفع المباشر أو حاول مرة أخرى.',
+              'الدفع الإلكتروني غير مفعل حالياً. يمكنك الدفع من رصيد محفظي أو المحاولة لاحقًا.',
             ),
           ),
         );
         return;
       }
       await handleRegularPayment(context, ref, user, pricing);
+    }
+  }
+
+  Future<void> _payFromAppWallet(PricingResult pricing) async {
+    final requestId = widget.requestId?.trim();
+    if (requestId == null || requestId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text('لا يمكن الدفع من المحفظة قبل قبول طلب الحجز.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => isProcessingPayment = true);
+    try {
+      await ref.read(walletRepositoryProvider).payFromWallet(
+            sessionRequestId: requestId,
+            amountEgp: pricing.finalPrice,
+          );
+      if (!mounted) return;
+      ref.read(bookingFlowProvider.notifier).reset();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.success,
+          content: Text('تم الدفع من رصيد محفظي وتأكيد الحجز.'),
+        ),
+      );
+      context.go('/booking/status/$requestId');
+    } catch (error) {
+      debugPrint('Wallet payment failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppThemeConstants.error,
+          content: Text(
+              'تعذر إتمام الدفع من المحفظة. تحقق من الرصيد وحاول مرة أخرى.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => isProcessingPayment = false);
     }
   }
 
@@ -776,6 +1110,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     dynamic user,
     PricingResult pricing,
   ) {
+    final userModel = user as UserModel;
+    final activeProfile = resolveBookingLearner(context, ref, userModel);
+    if (activeProfile == null) return;
+
     // ── BUNDLE/SUBSCRIPTION: no slot or requestId needed upfront ──────────
     // WHY: Bundles are paid first; sessions are booked separately afterward.
     // Only single-session plans require a slot and a requestId at this stage.
@@ -805,9 +1143,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           'requestId': null,
           'mohaffezId': widget.mohaffezId,
           'mohaffezName': effectiveMohaffezName,
-          'studentName': user.name,
-          'studentEmail': user.email ?? '',
-          'studentPhone': user.phoneNumber ?? '',
+          'studentName': activeProfile.name,
+          'studentEmail': userModel.email,
+          'studentPhone': userModel.phoneNumber ?? '',
           'amount': pricing.finalPrice,
           'sessionType': slotData?['sessionType'] ?? lockedSessionType,
           'preferredTimeSlot': slotData?['preferredTimeSlot'] ?? '',
@@ -826,6 +1164,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           'planType': planType?.name ?? PlanType.bundle.name,
           'sessionsCount': selectedPlan!.sessionsCount,
           'validityDays': selectedPlan!.validityDays,
+          ...activeProfile.toBookingSnapshot(userModel),
           ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
           'autoBookFirstSession': widget.autoBookFirstSession,
         },
@@ -872,9 +1211,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         'requestId': requestId,
         'mohaffezId': widget.mohaffezId,
         'mohaffezName': effectiveMohaffezName,
-        'studentName': user.name,
-        'studentEmail': user.email ?? '',
-        'studentPhone': user.phoneNumber ?? '',
+        'studentName': activeProfile.name,
+        'studentEmail': userModel.email,
+        'studentPhone': userModel.phoneNumber ?? '',
         'amount': pricing.finalPrice,
         'sessionType': lockedSessionType,
         'preferredTimeSlot': lockedTimeSlot,
@@ -887,6 +1226,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         'imamAddressLng': widget.mohaffezLng,
         'mohaffezPhone':
             widget.mohaffezPhone ?? widget.lockedRequest?['mohaffezPhone'],
+        ...activeProfile.toBookingSnapshot(userModel),
       },
     );
   }
@@ -960,7 +1300,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           if (timeSlot != null && timeSlot.isNotEmpty)
             lockedDetailRow(
                 ArabicLabels.time, formatTimeToArabicAmPm(timeSlot)),
-          if (location != null && location.isNotEmpty)
+          if (lockedSessionType != 'online' &&
+              location != null &&
+              location.isNotEmpty)
             lockedDetailRow(ArabicLabels.location, location),
           const SizedBox(height: 12),
           if (planSelectionFallback || !isLockedRequest)
@@ -1341,6 +1683,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
   // ── Existing: handleFreeSession (unchanged) ───────────────────────────────
   Future<void> handleFreeSession(
       BuildContext context, WidgetRef ref, dynamic user) async {
+    final userModel = user as UserModel;
+    final activeProfile = resolveBookingLearner(context, ref, userModel);
+    if (activeProfile == null) return;
+
     // Guard against using context after async gaps
     if (!mounted) return;
     setState(() => isProcessingPayment = true);
@@ -1421,7 +1767,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
       final basePayment = PaymentModel(
         studentId: user.uid,
-        studentName: user.name,
+        studentName: activeProfile.name,
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
@@ -1444,7 +1790,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             'sessionType': sessionType,
             'location': location,
             'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
+            ...activeProfile.toBookingSnapshot(userModel),
           },
+          ...activeProfile.toBookingSnapshot(userModel),
           ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
         },
       );
@@ -1463,7 +1811,14 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
                 mohaffezId: widget.mohaffezId,
                 mohaffezName: effectiveMohaffezName,
                 studentId: user.uid,
-                studentName: user.name,
+                studentName: activeProfile.name,
+                guardianId: user.uid,
+                guardianName: user.name,
+                studentProfileId: activeProfile.id,
+                studentProfileName: activeProfile.name,
+                studentProfileGender: activeProfile.gender,
+                studentProfileBirthDate: activeProfile.dateOfBirth,
+                studentAge: activeProfile.age,
                 sessionType: sessionType,
                 preferredTimeSlot: timeSlot,
                 slotDate: slotDate,
@@ -1490,7 +1845,11 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
         );
         await Future.delayed(const Duration(milliseconds: 800));
         if (!context.mounted) return;
-        context.go('/home');
+        if (widget.requestId != null && widget.requestId!.isNotEmpty) {
+          context.go('/booking/status/${widget.requestId}');
+        } else {
+          context.go('/home');
+        }
       } else {
         throw Exception(result.errorMessage ?? 'فشل تأكيد الجلسة');
       }
@@ -1514,6 +1873,10 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     dynamic user,
     PricingResult pricing,
   ) async {
+    final userModel = user as UserModel;
+    final activeProfile = resolveBookingLearner(context, ref, userModel);
+    if (activeProfile == null) return;
+
     setState(() => isProcessingPayment = true);
     var loadingDialogOpen = true;
     BuildContext? loadingDialogContext;
@@ -1537,7 +1900,7 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
     try {
       final basePayment = PaymentModel(
         studentId: user.uid,
-        studentName: user.name,
+        studentName: activeProfile.name,
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
@@ -1562,7 +1925,9 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
             'preferredTimeSlot': lockedTimeSlot,
             'location': widget.location,
             'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
+            ...activeProfile.toBookingSnapshot(userModel),
           },
+        ...activeProfile.toBookingSnapshot(userModel),
         ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
         if (appliedPromoCode != null) 'promoCode': appliedPromoCode!.code,
       };
@@ -1586,8 +1951,8 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
 
       var paymentUrl = result.paymentUrl;
       if (paymentUrl.isEmpty) {
-        final studentPhone = (user.phoneNumber as String?)?.trim();
-        final studentName = (user.name as String).trim();
+        final studentPhone = user.phoneNumber?.trim();
+        final studentName = activeProfile.name.trim();
         final paymobResult =
             await ref.read(paymentServiceProvider).initiatePayment(
                   paymentId: result.paymentId,
@@ -1647,7 +2012,11 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
               content: Text('تم الدفع بنجاح!'),
               backgroundColor: AppThemeConstants.success),
         );
-        Navigator.pop(context, true);
+        if (widget.requestId != null && widget.requestId!.isNotEmpty) {
+          context.go('/booking/status/${widget.requestId}');
+        } else {
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       debugPrint('Paymob payment error: $e');

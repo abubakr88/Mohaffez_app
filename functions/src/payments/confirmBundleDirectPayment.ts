@@ -271,9 +271,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         if (debtPiastres > thresholdPiastres) {
           throw new functions.https.HttpsError(
             'failed-precondition',
-            `لا يمكن إتمام الدفع المباشر — المحفظ لديه مستحقات على المنصة ` +
-              `(${(debtPiastres / 100).toFixed(2)} ج.م) تتجاوز الحد المسموح ` +
-              `(${thresholdEgp.toFixed(0)} ج.م). يرجى اختيار الدفع من المحفظة.`,
+            'الدفع المباشر غير متاح لهذا المحفظ حاليًا. يرجى اختيار الدفع الإلكتروني أو المحاولة لاحقًا.',
           );
         }
 
@@ -413,6 +411,13 @@ export const confirmBundleDirectPayment = functions.https.onCall(
         transaction.set(subscriptionRef, {
           studentId,
           studentName: dp.studentName,
+          guardianId: dp.guardianId ?? studentId,
+          guardianName: dp.guardianName ?? null,
+          studentProfileId: dp.studentProfileId ?? null,
+          studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+          studentProfileGender: dp.studentProfileGender ?? null,
+          studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+          studentAge: dp.studentAge ?? null,
           mohaffezId,
           mohaffezName: dp.mohaffezName,
           planId,
@@ -451,6 +456,13 @@ export const confirmBundleDirectPayment = functions.https.onCall(
           transaction.set(sessionRef, {
             studentId,
             studentName: dp.studentName,
+            guardianId: dp.guardianId ?? studentId,
+            guardianName: dp.guardianName ?? null,
+            studentProfileId: dp.studentProfileId ?? null,
+            studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+            studentProfileGender: dp.studentProfileGender ?? null,
+            studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+            studentAge: dp.studentAge ?? null,
             mohaffezId,
             mohaffezName: dp.mohaffezName,
             sessionType: resolvedSessionType,
@@ -498,6 +510,13 @@ export const confirmBundleDirectPayment = functions.https.onCall(
                 paidAt: FieldValue.serverTimestamp(),
                 subscriptionId: subscriptionRef.id,
                 sessionId: sessionRef.id,
+                guardianId: dp.guardianId ?? studentId,
+                guardianName: dp.guardianName ?? null,
+                studentProfileId: dp.studentProfileId ?? null,
+                studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+                studentProfileGender: dp.studentProfileGender ?? null,
+                studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+                studentAge: dp.studentAge ?? null,
                 ...pricingSnapshot,
                 paymentId,
                 directPaymentConfirmedAt: FieldValue.serverTimestamp(),
@@ -510,6 +529,13 @@ export const confirmBundleDirectPayment = functions.https.onCall(
             transaction.set(newRequestRef, {
               studentId,
               studentName: dp.studentName,
+              guardianId: dp.guardianId ?? studentId,
+              guardianName: dp.guardianName ?? null,
+              studentProfileId: dp.studentProfileId ?? null,
+              studentProfileName: dp.studentProfileName ?? dp.studentName ?? null,
+              studentProfileGender: dp.studentProfileGender ?? null,
+              studentProfileBirthDate: dp.studentProfileBirthDate ?? null,
+              studentAge: dp.studentAge ?? null,
               mohaffezId,
               mohaffezName: dp.mohaffezName,
               sessionType: resolvedSessionType,

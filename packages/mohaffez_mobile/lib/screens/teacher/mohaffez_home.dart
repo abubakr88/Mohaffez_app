@@ -220,7 +220,7 @@ class MohaffezHomeContent extends ConsumerWidget {
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.pin,
                     background: _HomeHeader(
-                      name: user?.name ?? 'المحفظ',
+                      name: user?.displayName ?? 'المحفظ',
                       photoUrl: user?.photoUrl,
                       dateText: DateFormat('EEEE، d MMMM', 'ar').format(now),
                       greeting: _greeting(now),

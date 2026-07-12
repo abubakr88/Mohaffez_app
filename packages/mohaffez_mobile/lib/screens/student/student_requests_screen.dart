@@ -456,6 +456,12 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
                 return _RequestCard(
                   request: displayRequest,
                   onCancel: () => _handleCancel(context, ref, displayRequest),
+                  onViewStatus: () {
+                    final requestId = _requestIdOf(displayRequest);
+                    if (requestId != null && requestId.isNotEmpty) {
+                      context.push('/booking/status/$requestId');
+                    }
+                  },
                   onPayNow: _requiresPayment(displayRequest)
                       ? () => _navigateToPayment(displayRequest)
                       : null,
@@ -623,11 +629,13 @@ class _StudentRequestsScreenState extends ConsumerState<StudentRequestsScreen> {
 class _RequestCard extends StatelessWidget {
   final Map<String, dynamic> request;
   final VoidCallback onCancel;
+  final VoidCallback onViewStatus;
   final VoidCallback? onPayNow;
 
   const _RequestCard({
     required this.request,
     required this.onCancel,
+    required this.onViewStatus,
     this.onPayNow,
   });
 
@@ -800,6 +808,16 @@ class _RequestCard extends StatelessWidget {
             // Shown when student has already sent payment and is waiting
             // for the teacher to confirm receipt.
             // FIX: Handles both Firestore spellings (with and without underscores)
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onViewStatus,
+                icon: const Icon(Icons.track_changes_rounded, size: 18),
+                label: const Text('متابعة حالة الطلب'),
+              ),
+            ),
+
             if (isAwaitingDirectConfirmation) ...[
               const SizedBox(height: 12),
               Container(

@@ -54,6 +54,8 @@ class _SessionCompletionScreenState
   // New assignments
   final newHifzController = TextEditingController();
   final newMurajaController = TextEditingController();
+  final newHifzFocusNode = FocusNode();
+  final newMurajaFocusNode = FocusNode();
   // Ayah range for new hifz
   final newHifzFromAyahController = TextEditingController();
   final newHifzToAyahController = TextEditingController();
@@ -75,11 +77,130 @@ class _SessionCompletionScreenState
   int currentQuranPage = 1;
   final List<QuranMistake> sessionMistakes = [];
 
+  static const List<int> _surahAyahCounts = <int>[
+    7,
+    286,
+    200,
+    176,
+    120,
+    165,
+    206,
+    75,
+    129,
+    109,
+    123,
+    111,
+    43,
+    52,
+    99,
+    128,
+    111,
+    110,
+    98,
+    135,
+    112,
+    78,
+    118,
+    64,
+    77,
+    227,
+    93,
+    88,
+    69,
+    60,
+    34,
+    30,
+    73,
+    54,
+    45,
+    83,
+    182,
+    88,
+    75,
+    85,
+    54,
+    53,
+    89,
+    59,
+    37,
+    35,
+    38,
+    29,
+    18,
+    45,
+    60,
+    49,
+    62,
+    55,
+    78,
+    96,
+    29,
+    22,
+    24,
+    13,
+    14,
+    11,
+    11,
+    18,
+    12,
+    12,
+    30,
+    52,
+    52,
+    44,
+    28,
+    28,
+    20,
+    56,
+    40,
+    31,
+    50,
+    40,
+    46,
+    42,
+    29,
+    19,
+    36,
+    25,
+    22,
+    17,
+    19,
+    26,
+    30,
+    20,
+    15,
+    21,
+    11,
+    8,
+    8,
+    19,
+    5,
+    8,
+    8,
+    11,
+    11,
+    8,
+    3,
+    9,
+    5,
+    4,
+    7,
+    3,
+    6,
+    3,
+    5,
+    4,
+    5,
+    6,
+  ];
+
   @override
   void dispose() {
     performanceNotesController.dispose();
     newHifzController.dispose();
     newMurajaController.dispose();
+    newHifzFocusNode.dispose();
+    newMurajaFocusNode.dispose();
     newHifzFromAyahController.dispose();
     newHifzToAyahController.dispose();
     newMurajaFromAyahController.dispose();
@@ -212,6 +333,328 @@ class _SessionCompletionScreenState
           ),
         ),
       ),
+    );
+  }
+
+  List<MapEntry<int, String>> get _orderedSurahs {
+    final entries = QuranService.surahNames.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return entries;
+  }
+
+  String _cleanSurahQuery(String value) {
+    return value.replaceFirst(RegExp(r'^سورة\s+'), '').trim();
+  }
+
+  String _normalizeSurahSearch(String value) {
+    return _cleanSurahQuery(value)
+        .replaceAll('أ', 'ا')
+        .replaceAll('إ', 'ا')
+        .replaceAll('آ', 'ا')
+        .replaceAll('ٱ', 'ا')
+        .replaceAll('ى', 'ي')
+        .replaceAll('ة', 'ه')
+        .replaceAll(RegExp(r'\s+'), '')
+        .trim();
+  }
+
+  Iterable<String> _surahSearchOptions(String query) {
+    final trimmed = _cleanSurahQuery(query);
+    final normalizedQuery = _normalizeSurahSearch(trimmed);
+
+    if (trimmed.isEmpty) {
+      return _orderedSurahs.map((entry) => entry.value);
+    }
+
+    return _orderedSurahs.where((entry) {
+      final normalizedName = _normalizeSurahSearch(entry.value);
+      return normalizedName.contains(normalizedQuery) ||
+          entry.key.toString().contains(trimmed);
+    }).map((entry) => entry.value);
+  }
+
+  int? _surahNumberForName(String surahName) {
+    final selectedName = _cleanSurahQuery(surahName);
+    for (final entry in QuranService.surahNames.entries) {
+      if (entry.value == selectedName) return entry.key;
+    }
+    return null;
+  }
+
+  String? _selectedSurahName(TextEditingController controller) {
+    final text = controller.text.trim();
+    if (text.isEmpty) return null;
+    if (QuranService.surahNames.containsValue(text)) return text;
+
+    final withoutPrefix = _cleanSurahQuery(text);
+    if (QuranService.surahNames.containsValue(withoutPrefix)) {
+      return withoutPrefix;
+    }
+    return null;
+  }
+
+  int? _selectedSurahNumber(TextEditingController controller) {
+    final selectedName = _selectedSurahName(controller);
+    if (selectedName == null) return null;
+    return _surahNumberForName(selectedName);
+  }
+
+  int? _selectedAyahValue(
+    TextEditingController controller,
+    int maxAyah, {
+    int minAyah = 1,
+  }) {
+    final value = int.tryParse(controller.text.trim());
+    if (value == null || value < minAyah || value > maxAyah) return null;
+    return value;
+  }
+
+  Widget _buildSurahDropdown({
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required TextEditingController fromAyahController,
+    required TextEditingController toAyahController,
+    required String labelText,
+    required String hintText,
+    required IconData icon,
+    required Color color,
+  }) {
+    final selectedSurah = _selectedSurahName(controller);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return RawAutocomplete<String>(
+          key: ValueKey<String>(
+            'surah-search-${identityHashCode(controller)}-${selectedSurah ?? ''}',
+          ),
+          textEditingController: controller,
+          focusNode: focusNode,
+          displayStringForOption: (option) => option,
+          optionsBuilder: (textEditingValue) {
+            return _surahSearchOptions(textEditingValue.text);
+          },
+          onSelected: (value) {
+            setState(() {
+              controller.text = value;
+              fromAyahController.clear();
+              toAyahController.clear();
+            });
+          },
+          fieldViewBuilder: (
+            context,
+            textEditingController,
+            fieldFocusNode,
+            onFieldSubmitted,
+          ) {
+            return TextFormField(
+              controller: textEditingController,
+              focusNode: fieldFocusNode,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                labelText: labelText,
+                hintText: hintText,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: Icon(icon, color: color),
+                suffixIcon: IconButton(
+                  tooltip: 'عرض السور',
+                  icon: const Icon(Icons.arrow_drop_down),
+                  onPressed: () {
+                    fieldFocusNode.requestFocus();
+                    textEditingController.selection = TextSelection.collapsed(
+                      offset: textEditingController.text.length,
+                    );
+                  },
+                ),
+              ),
+              onChanged: (_) {
+                if (_selectedSurahName(controller) == null) {
+                  fromAyahController.clear();
+                  toAyahController.clear();
+                }
+                setState(() {});
+              },
+              onFieldSubmitted: (_) => onFieldSubmitted(),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            final optionList = options.toList();
+            return Align(
+              alignment: Alignment.topRight,
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: 320,
+                    maxWidth: constraints.maxWidth,
+                    minWidth: constraints.maxWidth,
+                  ),
+                  child: optionList.isEmpty
+                      ? const SizedBox(
+                          height: 56,
+                          child: Center(
+                            child: Text('لا توجد سورة بهذا البحث'),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: optionList.length,
+                          separatorBuilder: (_, __) => const Divider(
+                            height: 1,
+                            color: AppThemeConstants.grey100,
+                          ),
+                          itemBuilder: (context, index) {
+                            final option = optionList[index];
+                            final surahNumber = _surahNumberForName(option);
+                            return ListTile(
+                              dense: true,
+                              title: Text(
+                                option,
+                                textAlign: TextAlign.right,
+                              ),
+                              trailing: Text(
+                                surahNumber?.toString() ?? '',
+                                style: const TextStyle(
+                                  color: AppThemeConstants.grey500,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onTap: () => onSelected(option),
+                            );
+                          },
+                        ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAyahRangeDropdowns({
+    required TextEditingController surahController,
+    required TextEditingController fromAyahController,
+    required TextEditingController toAyahController,
+    required Color color,
+  }) {
+    final surahNumber = _selectedSurahNumber(surahController);
+    final ayahCount =
+        surahNumber == null ? 0 : _surahAyahCounts[surahNumber - 1];
+    final enabled = surahNumber != null;
+    final fromValue =
+        enabled ? _selectedAyahValue(fromAyahController, ayahCount) : null;
+    final minToAyah = fromValue ?? 1;
+    final toValue = enabled
+        ? _selectedAyahValue(
+            toAyahController,
+            ayahCount,
+            minAyah: minToAyah,
+          )
+        : null;
+
+    List<DropdownMenuItem<int>> ayahItems({int minAyah = 1}) {
+      if (!enabled) return const <DropdownMenuItem<int>>[];
+      return List.generate(
+        ayahCount - minAyah + 1,
+        (index) {
+          final ayah = minAyah + index;
+          return DropdownMenuItem<int>(
+            value: ayah,
+            child: Text('$ayah'),
+          );
+        },
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<int>(
+            key: ValueKey<String>(
+              'from-ayah-${identityHashCode(fromAyahController)}-$surahNumber-${fromValue ?? ''}',
+            ),
+            initialValue: fromValue,
+            isExpanded: true,
+            menuMaxHeight: 320,
+            decoration: InputDecoration(
+              labelText: 'من آية رقم',
+              hintText: enabled ? null : 'اختر السورة أولًا',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              prefixIcon: Icon(
+                Icons.format_list_numbered,
+                color: enabled ? color : AppThemeConstants.grey400,
+              ),
+            ),
+            items: ayahItems(),
+            onChanged: !enabled
+                ? null
+                : (value) {
+                    setState(() {
+                      if (value == null) {
+                        fromAyahController.clear();
+                        return;
+                      }
+
+                      fromAyahController.text = value.toString();
+                      final currentTo =
+                          int.tryParse(toAyahController.text.trim());
+                      if (currentTo == null ||
+                          currentTo < value ||
+                          currentTo > ayahCount) {
+                        toAyahController.text = value.toString();
+                      }
+                    });
+                  },
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Icon(Icons.arrow_forward, color: AppThemeConstants.grey400),
+        const SizedBox(width: 12),
+        Expanded(
+          child: DropdownButtonFormField<int>(
+            key: ValueKey<String>(
+              'to-ayah-${identityHashCode(toAyahController)}-$surahNumber-${toValue ?? ''}',
+            ),
+            initialValue: toValue,
+            isExpanded: true,
+            menuMaxHeight: 320,
+            decoration: InputDecoration(
+              labelText: 'إلى آية رقم',
+              hintText: enabled ? null : 'اختر السورة أولًا',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              prefixIcon: Icon(
+                Icons.format_list_numbered,
+                color: enabled ? color : AppThemeConstants.grey400,
+              ),
+            ),
+            items: ayahItems(minAyah: minToAyah),
+            onChanged: !enabled
+                ? null
+                : (value) {
+                    setState(() {
+                      if (value == null) {
+                        toAyahController.clear();
+                        return;
+                      }
+
+                      if (fromValue == null) {
+                        fromAyahController.text = '1';
+                      }
+                      toAyahController.text = value.toString();
+                    });
+                  },
+          ),
+        ),
+      ],
     );
   }
 
@@ -668,20 +1111,15 @@ class _SessionCompletionScreenState
                   child: Column(
                     children: [
                       // New hifz
-                      TextFormField(
+                      _buildSurahDropdown(
                         controller: newHifzController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: 'الحفظ المطلوب',
-                          hintText: 'مثال: سورة الكهف',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.menu_book,
-                            color: AppThemeConstants.success,
-                          ),
-                        ),
+                        focusNode: newHifzFocusNode,
+                        fromAyahController: newHifzFromAyahController,
+                        toAyahController: newHifzToAyahController,
+                        labelText: 'الحفظ المطلوب',
+                        hintText: 'اختر السورة',
+                        icon: Icons.menu_book,
+                        color: AppThemeConstants.success,
                       ),
                       const SizedBox(height: 4),
                       // "All surah" toggle for hifz
@@ -702,65 +1140,24 @@ class _SessionCompletionScreenState
                       // Hifz ayah range (hidden when "all surah" is checked)
                       if (!newHifzAllSurah) ...[
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: newHifzFromAyahController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'من آية رقم',
-                                  hintText: 'مثال: 1',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.format_list_numbered,
-                                    color: AppThemeConstants.success,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Icon(Icons.arrow_forward,
-                                color: AppThemeConstants.grey400),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: newHifzToAyahController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'إلى آية رقم',
-                                  hintText: 'مثال: 10',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.format_list_numbered,
-                                    color: AppThemeConstants.success,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        _buildAyahRangeDropdowns(
+                          surahController: newHifzController,
+                          fromAyahController: newHifzFromAyahController,
+                          toAyahController: newHifzToAyahController,
+                          color: AppThemeConstants.success,
                         ),
                       ],
                       const SizedBox(height: 16),
                       // New muraja
-                      TextFormField(
+                      _buildSurahDropdown(
                         controller: newMurajaController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: 'المراجعة المطلوبة',
-                          hintText: 'مثال: سورة البقرة',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.history_edu,
-                            color: AppThemeConstants.accentBlue,
-                          ),
-                        ),
+                        focusNode: newMurajaFocusNode,
+                        fromAyahController: newMurajaFromAyahController,
+                        toAyahController: newMurajaToAyahController,
+                        labelText: 'المراجعة المطلوبة',
+                        hintText: 'اختر السورة',
+                        icon: Icons.history_edu,
+                        color: AppThemeConstants.accentBlue,
                       ),
                       const SizedBox(height: 4),
                       // "All surah" toggle for muraja
@@ -782,47 +1179,11 @@ class _SessionCompletionScreenState
                       // Muraja ayah range (hidden when "all surah" is checked)
                       if (!newMurajaAllSurah) ...[
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: newMurajaFromAyahController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'من آية رقم',
-                                  hintText: 'مثال: 1',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.format_list_numbered,
-                                    color: AppThemeConstants.accentBlue,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Icon(Icons.arrow_forward,
-                                color: AppThemeConstants.grey400),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: newMurajaToAyahController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: 'إلى آية رقم',
-                                  hintText: 'مثال: 50',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  prefixIcon: const Icon(
-                                    Icons.format_list_numbered,
-                                    color: AppThemeConstants.accentBlue,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        _buildAyahRangeDropdowns(
+                          surahController: newMurajaController,
+                          fromAyahController: newMurajaFromAyahController,
+                          toAyahController: newMurajaToAyahController,
+                          color: AppThemeConstants.accentBlue,
                         ),
                       ],
                     ],

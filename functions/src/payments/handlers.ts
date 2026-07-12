@@ -58,6 +58,13 @@ const sessionFallbackFields = [
   'mohaffezPhone',
   'studentPhone',
   'preferredProvider',
+  'guardianId',
+  'guardianName',
+  'studentProfileId',
+  'studentProfileName',
+  'studentProfileGender',
+  'studentProfileBirthDate',
+  'studentAge',
 ];
 
 function parseTimeRange(timeSlot: unknown):

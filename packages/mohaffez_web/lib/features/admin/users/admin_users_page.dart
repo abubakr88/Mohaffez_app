@@ -73,6 +73,12 @@ class AdminUsersPage extends ConsumerWidget {
                         .setRole('student'),
                   ),
                   _FilterChip(
+                    label: 'أولياء أمور',
+                    selected: filter.roleFilter == 'parent',
+                    onTap: () =>
+                        ref.read(userFilterProvider.notifier).setRole('parent'),
+                  ),
+                  _FilterChip(
                     label: 'مديرون',
                     selected: filter.roleFilter == 'admin',
                     onTap: () =>
@@ -292,7 +298,9 @@ class AdminUsersPage extends ConsumerWidget {
                                     ? 'محفظ'
                                     : role == 'admin'
                                         ? 'مدير'
-                                        : 'طالب',
+                                        : role == 'parent'
+                                            ? 'ولي أمر'
+                                            : 'طالب',
                                 variant: role == 'mohaffez'
                                     ? DSBadgeVariant.primary
                                     : role == 'admin'

@@ -36,11 +36,11 @@ final nearbyMohaffezProvider = FutureProvider.autoDispose
       }).toList();
     }
 
-    // تصفية حسب البحث بالاسم
-    if (params.searchQuery != null && params.searchQuery!.isNotEmpty) {
-      final query = _normalizeSearchText(params.searchQuery!);
+    // تصفية بحث موسعة: الاسم، النبذة، التخصصات، ونصوص خطط الأسعار النشطة.
+    final searchTerms = _searchTerms(params.searchQuery);
+    if (searchTerms.isNotEmpty) {
       mohaffezList = mohaffezList.where((mohaffez) {
-        return _normalizeSearchText(mohaffez.name).contains(query);
+        return _matchesMohaffezSearch(mohaffez, searchTerms);
       }).toList();
     }
 
@@ -227,6 +227,8 @@ bool _matchesSessionTypeFilter(
   return switch (filter) {
     TeacherSessionTypeFilter.all => true,
     TeacherSessionTypeFilter.online => sessionType == 'online',
+    TeacherSessionTypeFilter.home => sessionType == 'home',
+    TeacherSessionTypeFilter.mosque => sessionType == 'mosque',
     TeacherSessionTypeFilter.offline => sessionType == 'home' ||
         sessionType == 'mosque' ||
         sessionType == 'in_person',
@@ -275,6 +277,7 @@ String _normalizeSearchText(String value) {
   return value
       .toLowerCase()
       .replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '')
+      .replaceAll('ـ', '')
       .replaceAll('أ', 'ا')
       .replaceAll('إ', 'ا')
       .replaceAll('آ', 'ا')
@@ -282,8 +285,49 @@ String _normalizeSearchText(String value) {
       .replaceAll('ؤ', 'و')
       .replaceAll('ئ', 'ي')
       .replaceAll('ة', 'ه')
+      .replaceAll(RegExp(r'[^\w\u0600-\u06FF]+'), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
+}
+
+List<String> _searchTerms(String? rawQuery) {
+  final normalized = _normalizeSearchText(rawQuery ?? '');
+  if (normalized.isEmpty) return const [];
+  return normalized
+      .split(' ')
+      .where((term) => term.trim().isNotEmpty)
+      .toSet()
+      .toList(growable: false);
+}
+
+bool _matchesMohaffezSearch(
+  MohaffezModel mohaffez,
+  List<String> terms,
+) {
+  final searchableText = _normalizeSearchText(
+    [
+      mohaffez.displayName,
+      mohaffez.bio,
+      mohaffez.specialization,
+      mohaffez.addressText,
+      _genderSearchAliases(mohaffez.gender),
+      if (mohaffez.trialSessionEnabled)
+        'حلقة تجريبية حصة تجريبية جلسة تجريبية تجربة مجانية اختبار',
+      if (mohaffez.badges.foundingTeacher.enabled)
+        'محفظ مؤسس معلم مؤسس شارة مؤسس',
+      mohaffez.pricingSearchText,
+    ].whereType<Object>().join(' '),
+  );
+
+  return terms.every(searchableText.contains);
+}
+
+String _genderSearchAliases(String? gender) {
+  return switch (gender?.trim().toLowerCase()) {
+    'male' => 'معلم محفظ رجل ذكر male',
+    'female' => 'معلمة محفظة امرأة انثى female',
+    _ => '',
+  };
 }
 
 class NearbyParams {
@@ -354,7 +398,7 @@ enum TeacherGenderFilter { all, male, female }
 
 enum TeacherTrialSessionFilter { all, enabledOnly }
 
-enum TeacherSessionTypeFilter { all, online, offline }
+enum TeacherSessionTypeFilter { all, online, offline, home, mosque }
 
 /// Provider for mohaffez session counts (for search results)
 final mohaffezSessionCountProvider = FutureProvider.family<int, String>(

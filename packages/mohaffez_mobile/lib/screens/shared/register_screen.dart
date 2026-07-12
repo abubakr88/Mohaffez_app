@@ -22,15 +22,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _autoValidate = false;
   String _selectedRole = 'student';
   String _selectedGender = 'male';
+  String? _selectedHonorific;
 
   IconData _genderIcon(String gender) {
     return gender == 'female' ? Icons.woman_rounded : Icons.man_rounded;
   }
 
   IconData get _roleBadgeIcon {
-    return _selectedRole == 'mohaffez'
-        ? Icons.menu_book_rounded
-        : Icons.school_rounded;
+    if (_selectedRole == roleMohaffez) return Icons.menu_book_rounded;
+    if (_selectedRole == roleParent) return Icons.family_restroom_rounded;
+    return Icons.school_rounded;
+  }
+
+  String _genderTitle(String gender) {
+    if (_selectedRole == roleMohaffez) {
+      return gender == 'female' ? 'معلمة' : 'معلم';
+    }
+    if (_selectedRole == roleParent) {
+      return gender == 'female' ? 'ولية أمر' : 'ولي أمر';
+    }
+    return gender == 'female' ? 'طالبة' : 'طالب';
   }
 
   @override
@@ -54,6 +65,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       await notifier.completeGoogleSignIn(
         role: _selectedRole,
         gender: _selectedGender,
+        honorific: _selectedHonorific,
       );
       return;
     }
@@ -74,7 +86,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             .valueOrNull
             ?.teacherRegistrationEnabled ??
         true;
-    if (_selectedRole == 'mohaffez' && !teacherRegistrationEnabled) {
+    if (_selectedRole == roleMohaffez && !teacherRegistrationEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content:
@@ -93,6 +105,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       name: _nameController.text.trim(),
       role: _selectedRole,
       gender: _selectedGender,
+      honorific: _selectedHonorific,
     );
 
     if (!mounted) return;
@@ -173,11 +186,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 title: 'محفّظ',
                                 subtitle: 'معلم القرآن',
                                 color: AppThemeConstants.primary,
-                                isSelected: _selectedRole == 'mohaffez',
+                                isSelected: _selectedRole == roleMohaffez,
                                 enabled: teacherRegistrationEnabled,
                                 onTap: () {
                                   setState(() {
-                                    _selectedRole = 'mohaffez';
+                                    _selectedRole = roleMohaffez;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(
+                              width: AppThemeConstants.spaceMd -
+                                  AppThemeConstants.spaceXs,
+                            ),
+                            Expanded(
+                              child: _RoleCard(
+                                icon: Icons.family_restroom_rounded,
+                                title: 'ولي أمر',
+                                subtitle: 'أدير أبناءي',
+                                color: AppThemeConstants.primary,
+                                isSelected: _selectedRole == roleParent,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRole = roleParent;
                                   });
                                 },
                               ),
@@ -192,10 +223,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 title: 'طالب',
                                 subtitle: 'دارس القرآن',
                                 color: AppThemeConstants.secondary,
-                                isSelected: _selectedRole == 'student',
+                                isSelected: _selectedRole == roleStudent,
                                 onTap: () {
                                   setState(() {
-                                    _selectedRole = 'student';
+                                    _selectedRole = roleStudent;
                                   });
                                 },
                               ),
@@ -203,6 +234,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ],
                         ),
                         const SizedBox(height: AppThemeConstants.spaceLg),
+                        if (_selectedRole == roleMohaffez) ...[
+                          DropdownButtonFormField<String?>(
+                            initialValue: _selectedHonorific,
+                            decoration: const InputDecoration(
+                              labelText: 'اللقب قبل الاسم',
+                              prefixIcon:
+                                  Icon(Icons.workspace_premium_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
+                              ),
+                              filled: true,
+                              fillColor: AppThemeConstants.background,
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('بدون لقب'),
+                              ),
+                              ...teacherHonorifics.map(
+                                (title) => DropdownMenuItem<String?>(
+                                  value: title,
+                                  child: Text(title),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _selectedHonorific = value);
+                            },
+                          ),
+                          Spacing.vMd,
+                        ],
                         TextFormField(
                           controller: _nameController,
                           decoration: const InputDecoration(
@@ -285,9 +347,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               child: _GenderCard(
                                 icon: _genderIcon('male'),
                                 badgeIcon: _roleBadgeIcon,
-                                title: _selectedRole == 'student'
-                                    ? 'طالب'
-                                    : 'معلم',
+                                title: _genderTitle('male'),
                                 color: AppThemeConstants.primary,
                                 isSelected: _selectedGender == 'male',
                                 onTap: () {
@@ -305,9 +365,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               child: _GenderCard(
                                 icon: _genderIcon('female'),
                                 badgeIcon: _roleBadgeIcon,
-                                title: _selectedRole == 'student'
-                                    ? 'طالبة'
-                                    : 'معلمة',
+                                title: _genderTitle('female'),
                                 color: AppThemeConstants.secondary,
                                 isSelected: _selectedGender == 'female',
                                 onTap: () {

@@ -7,7 +7,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/pay_from_wallet_card.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
+
+const _directPaymentUnavailableMessage =
+    'الدفع المباشر غير متاح لهذا المحفظ حاليًا. يرجى اختيار الدفع الإلكتروني أو المحاولة لاحقًا.';
+
+String _studentSafeDirectPaymentError(FirebaseFunctionsException error) {
+  final message = error.message?.trim();
+  if (error.code == 'failed-precondition' ||
+      message == null ||
+      message.isEmpty ||
+      message.contains('مستحقات') ||
+      message.contains('الحد المسموح')) {
+    return _directPaymentUnavailableMessage;
+  }
+  return message;
+}
 
 class DirectPaymentScreen extends ConsumerStatefulWidget {
   final String? requestId;
@@ -103,6 +119,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
   double? resolvedImamAddressLat;
   double? resolvedImamAddressLng;
   String? resolvedMohaffezPhone;
+  String? resolvedGuardianId;
+  String? resolvedGuardianName;
+  String? resolvedStudentProfileId;
+  String? resolvedStudentProfileName;
+  String? resolvedStudentProfileGender;
+  DateTime? resolvedStudentProfileBirthDate;
+  int? resolvedStudentAge;
 
   // App-kill recovery — populated from sessionRequests doc when provider is empty
   String? _hydratedPlanId;
@@ -129,6 +152,12 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     final flow = ref.read(bookingFlowProvider);
     final slotContext = flow.slotContext;
     final currentUser = ref.read(currentUserProvider).value;
+    final activeProfile = currentUser == null
+        ? null
+        : resolveBookingLearner(context, ref, currentUser);
+    if (currentUser != null && activeProfile == null) {
+      return;
+    }
 
     // 🔍 DIAG Step 3: DirectPaymentScreen building, print all incoming params
     debugPrint('🔵 [BUNDLE_FLOW] Step3_DirectPaymentScreen_BUILD: '
@@ -168,7 +197,8 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     // Resolve values: widget params win over provider context
     resolvedMohaffezId = widget.mohaffezId ?? slotContext?.mohaffezId;
     resolvedMohaffezName = widget.mohaffezName ?? slotContext?.mohaffezName;
-    resolvedStudentName = widget.studentName ?? currentUser?.name ?? '';
+    resolvedStudentName =
+        widget.studentName ?? activeProfile?.name ?? currentUser?.name ?? '';
     resolvedStudentEmail = widget.studentEmail.isNotEmpty
         ? widget.studentEmail
         : currentUser?.email ?? '';
@@ -185,6 +215,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
     resolvedImamAddressLng =
         widget.imamAddressLng ?? slotContext?.imamAddressLng;
     resolvedMohaffezPhone = widget.mohaffezPhone ?? slotContext?.mohaffezPhone;
+    resolvedGuardianId = currentUser?.uid;
+    resolvedGuardianName = currentUser?.name;
+    resolvedStudentProfileId = activeProfile?.id;
+    resolvedStudentProfileName = activeProfile?.name;
+    resolvedStudentProfileGender = activeProfile?.gender;
+    resolvedStudentProfileBirthDate = activeProfile?.dateOfBirth;
+    resolvedStudentAge = activeProfile?.age;
 
     // Slot dates: prefer widget DateTime params first, then parse from provider
     if (widget.slotDate != null) {
@@ -251,6 +288,18 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           resolvedMohaffezName,
           d['mohaffezName'] as String?,
         ]);
+        resolvedStudentName = _firstNonEmpty([
+          d['studentProfileName'] as String?,
+          d['studentName'] as String?,
+          resolvedStudentName,
+        ]);
+        resolvedGuardianId ??= d['guardianId'] as String?;
+        resolvedGuardianName ??= d['guardianName'] as String?;
+        resolvedStudentProfileId ??= d['studentProfileId'] as String?;
+        resolvedStudentProfileName ??= d['studentProfileName'] as String?;
+        resolvedStudentProfileGender ??= d['studentProfileGender'] as String?;
+        resolvedStudentProfileBirthDate ??= parse(d['studentProfileBirthDate']);
+        resolvedStudentAge ??= (d['studentAge'] as num?)?.toInt();
         resolvedSlotDate ??= parse(d['slotDate']);
         resolvedSlotStart ??= parse(d['slotStart']);
         resolvedSlotEnd ??= parse(d['slotEnd']);
@@ -424,6 +473,13 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
         mohaffezId: resolvedMohaffezId!,
         mohaffezName: resolvedMohaffezName ?? '',
         studentName: resolvedStudentName ?? '',
+        guardianId: resolvedGuardianId,
+        guardianName: resolvedGuardianName,
+        studentProfileId: resolvedStudentProfileId,
+        studentProfileName: resolvedStudentProfileName,
+        studentProfileGender: resolvedStudentProfileGender,
+        studentProfileBirthDate: resolvedStudentProfileBirthDate,
+        studentAge: resolvedStudentAge,
         studentEmail: resolvedStudentEmail ?? '',
         studentPhone: resolvedStudentPhone ?? '',
         amount: resolvedAmount!,
@@ -478,7 +534,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             backgroundColor: AppThemeConstants.success,
           ),
         );
-        context.go('/home');
+        context.go('/booking/status/$requestId');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -493,16 +549,11 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
           'code=${e.code}, message=${e.message}');
       if (!mounted) return;
 
-      final message = e.message?.trim();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppThemeConstants.error,
           duration: const Duration(seconds: 7),
-          content: Text(
-            message == null || message.isEmpty
-                ? 'Payment cannot be completed now. Please try another method.'
-                : message,
-          ),
+          content: Text(_studentSafeDirectPaymentError(e)),
         ),
       );
     } on Exception catch (e) {

@@ -170,6 +170,33 @@ class _ConfigForm extends ConsumerWidget {
           ],
         ),
 
+        _ConfigCard(
+          title: 'إعدادات التسعير',
+          children: [
+            _EditableRow(
+              label: 'الحد الأدنى لسعر الساعة',
+              value:
+                  '${config.minimumTeacherHourlyRateEgp.toStringAsFixed(0)} ج.م',
+              onEdit: () => _editNumber(
+                context,
+                title: 'الحد الأدنى لسعر الساعة (ج.م)',
+                initial: config.minimumTeacherHourlyRateEgp.toStringAsFixed(0),
+                minValue: 0,
+                onSave: (n) => _save(
+                  context,
+                  ref,
+                  {'minimumTeacherHourlyRateEgp': n},
+                ),
+              ),
+            ),
+            const SizedBox(height: DSSpacing.sm),
+            Text(
+              'يُحسب الحد من سعر الخطة وعدد الجلسات ومدة كل جلسة. القيمة صفر تعني عدم فرض حد أدنى.',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
+          ],
+        ),
+
         // ── Sessions ────────────────────────────────────────────────────
         _ConfigCard(
           title: 'إعدادات الجلسات',
@@ -414,6 +441,7 @@ class _ConfigForm extends ConsumerWidget {
     required String initial,
     required ValueChanged<double> onSave,
     bool isInt = false,
+    double? minValue,
   }) async {
     final controller = TextEditingController(text: initial);
     String? error;
@@ -445,6 +473,16 @@ class _ConfigForm extends ConsumerWidget {
     if (parsed == null) {
       if (context.mounted) {
         DSToast.show(context, 'قيمة غير صالحة', type: DSToastType.error);
+      }
+      return;
+    }
+    if (minValue != null && parsed < minValue) {
+      if (context.mounted) {
+        DSToast.show(
+          context,
+          'يجب ألا تقل القيمة عن ${minValue.toStringAsFixed(0)}',
+          type: DSToastType.error,
+        );
       }
       return;
     }

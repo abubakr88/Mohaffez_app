@@ -47,7 +47,22 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
       debugPrint('✅ Firebase initialized');
     }
 
-    if (!kIsWeb) {
+    if (kIsWeb) {
+      const recaptchaKey = String.fromEnvironment(
+        'APP_CHECK_RECAPTCHA_KEY',
+        defaultValue: '',
+      );
+      if (recaptchaKey.isNotEmpty) {
+        await FirebaseAppCheck.instance.activate(
+          webProvider: ReCaptchaV3Provider(recaptchaKey),
+        );
+        debugPrint('✅ Firebase App Check activated for web');
+      } else {
+        debugPrint(
+          'ℹ️ Firebase App Check skipped for web: APP_CHECK_RECAPTCHA_KEY is empty',
+        );
+      }
+    } else {
       if (kReleaseMode) {
         await FirebaseAppCheck.instance.activate(
           androidProvider: AndroidProvider.playIntegrity,
@@ -69,8 +84,6 @@ Future<void> bootstrap({required FirebaseOptions firebaseOptions}) async {
               'App Check token: ${hasToken ? 'valid' : 'null_or_empty'}');
         });
       }
-    } else {
-      debugPrint('ℹ️ Firebase App Check skipped for web');
     }
 
     try {

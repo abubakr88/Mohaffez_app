@@ -9,12 +9,16 @@
 import 'dart:ui' as ui;
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../shared/utils/time_formatter.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/widgets/meeting_provider_picker.dart';
 
 class DirectBookingRequestScreen extends ConsumerStatefulWidget {
@@ -75,6 +79,9 @@ class _DirectBookingRequestScreenState
       return;
     }
 
+    final activeProfile = resolveBookingLearner(context, ref, currentUser);
+    if (activeProfile == null) return;
+
     // Capture messenger BEFORE any await
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _submitting = true);
@@ -93,18 +100,13 @@ class _DirectBookingRequestScreenState
         );
         return;
       }
-
-      final result = await FirebaseFunctions.instance
-          .httpsCallable(
-        'createSessionRequest',
-        options: HttpsCallableOptions(
-          timeout: const Duration(seconds: 30),
-        ),
-      )
-          .call({
+      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+      final payload = {
+        if (idToken != null && idToken.isNotEmpty) 'idToken': idToken,
         'mohaffezId': slotContext.mohaffezId,
         'mohaffezName': slotContext.mohaffezName,
-        'studentName': currentUser.name,
+        'studentName': activeProfile.name,
+        ...activeProfile.toCallableBookingSnapshot(currentUser),
         'sessionType': slotContext.sessionType,
         if (slotContext.sessionType == 'online' && _selectedProvider != null)
           'preferredProvider': _selectedProvider,
@@ -129,12 +131,32 @@ class _DirectBookingRequestScreenState
         'validityDays': selectedPlan.validityDays,
         'paymentAmount': selectedPlan.priceEGP,
         ...PricingCountryUtils.paymentSnapshot(selectedPlan),
-        // Tells the CF this is a direct-payment request (not free, not Paymob).
-        // The CF will create the doc with status 'pending' so the teacher sees it
-        // in PendingRequestsScreen and can accept/reject before the student is
-        // asked to transfer money.
-        'selectedPaymentMethod': 'directpayment',
-      });
+        // Payment is selected only after the teacher accepts. New requests no
+        // longer expose an external transfer to the teacher.
+        'selectedPaymentMethod': 'pay_after_acceptance',
+        'requiresPaymentOnAcceptance': true,
+      };
+
+      if (kDebugMode) {
+        final firebaseOptions = Firebase.app().options;
+        debugPrint('[DirectBooking] Sending createSessionRequest');
+        debugPrint('  firebaseProject=${firebaseOptions.projectId}');
+        debugPrint('  firebaseAppId=${firebaseOptions.appId}');
+        debugPrint('  mohaffezId=${slotContext.mohaffezId}');
+        debugPrint('  sessionType=${slotContext.sessionType}');
+        debugPrint('  preferredProvider=$_selectedProvider');
+        debugPrint('  hasIdToken=${idToken != null && idToken.isNotEmpty}');
+        debugPrint('  payloadKeys=${payload.keys.join(', ')}');
+      }
+
+      final result = await FirebaseFunctions.instance
+          .httpsCallable(
+            'createSessionRequest',
+            options: HttpsCallableOptions(
+              timeout: const Duration(seconds: 30),
+            ),
+          )
+          .call(payload);
 
       if (!mounted) return;
 
@@ -142,6 +164,7 @@ class _DirectBookingRequestScreenState
       final success = data['success'] == true;
 
       if (success) {
+        final requestId = data['requestId']?.toString();
         _navigatingAway = true;
         ref.read(bookingFlowProvider.notifier).reset();
         messenger.showSnackBar(
@@ -151,7 +174,11 @@ class _DirectBookingRequestScreenState
             duration: Duration(seconds: 5),
           ),
         );
-        context.go('/home');
+        if (requestId != null && requestId.isNotEmpty) {
+          context.go('/booking/status/$requestId');
+        } else {
+          context.go('/requests');
+        }
       } else {
         messenger.showSnackBar(
           SnackBar(
@@ -161,9 +188,19 @@ class _DirectBookingRequestScreenState
         );
       }
     } on FirebaseFunctionsException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[DirectBooking] FirebaseFunctionsException');
+        debugPrint('  code=${e.code}');
+        debugPrint('  message=${e.message}');
+        debugPrint('  details=${e.details}');
+      }
       if (!mounted) return;
       // Idempotent: if the same request was already sent, treat as success.
       if (e.code == 'already-exists') {
+        String? existingRequestId;
+        if (e.details is Map) {
+          existingRequestId = (e.details as Map)['requestId']?.toString();
+        }
         _navigatingAway = true;
         ref.read(bookingFlowProvider.notifier).reset();
         messenger.showSnackBar(
@@ -172,7 +209,11 @@ class _DirectBookingRequestScreenState
             backgroundColor: AppThemeConstants.warning,
           ),
         );
-        context.go('/requests');
+        if (existingRequestId != null && existingRequestId.isNotEmpty) {
+          context.go('/booking/status/$existingRequestId');
+        } else {
+          context.go('/requests');
+        }
         return;
       }
       messenger.showSnackBar(
@@ -212,6 +253,12 @@ class _DirectBookingRequestScreenState
       studentCountry.code,
     );
     if (visiblePlans.isEmpty) return null;
+    final selectedPlanId = ref.read(bookingFlowProvider).selectedPlanId?.trim();
+    if (selectedPlanId != null && selectedPlanId.isNotEmpty) {
+      for (final plan in visiblePlans) {
+        if (plan.id == selectedPlanId) return plan;
+      }
+    }
     visiblePlans.sort((a, b) => a.priceEGP.compareTo(b.priceEGP));
     return visiblePlans.first;
   }

@@ -34,11 +34,13 @@ import '../screens/student/student_assignments_screen.dart';
 import '../screens/student/student_requests_screen.dart';
 import '../screens/student/student_sessions_screen.dart';
 import '../screens/student/student_schedule_screen.dart';
+import '../screens/student/student_profiles_screen.dart';
 import '../screens/student/student_payment_screen.dart';
 import '../screens/student/nearby_mohaffez_screen.dart';
 import '../screens/student/mohaffez_profile_screen.dart';
 import '../screens/student/rate_session_screen.dart';
 import '../screens/student/booking_method_screen.dart';
+import '../screens/student/booking_status_screen.dart';
 import '../screens/student/select_bundle_plan_screen.dart';
 import '../screens/student/confirm_bundle_session_screen.dart';
 import '../screens/student/direct_booking_request_screen.dart';
@@ -316,6 +318,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const StudentWalletScreen(),
           ),
           GoRoute(
+            path: '/student-profiles',
+            name: 'student-profiles',
+            builder: (context, state) => const StudentProfilesScreen(),
+          ),
+          GoRoute(
             path: '/wallet-topup',
             name: 'wallet-topup',
             builder: (context, state) => const WalletTopupScreen(),
@@ -371,6 +378,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/booking/method',
             name: 'booking-method',
             builder: (context, state) => const BookingMethodScreen(),
+          ),
+          GoRoute(
+            path: '/booking/status/:requestId',
+            name: 'booking-status',
+            builder: (context, state) {
+              final requestId = state.pathParameters['requestId'] ?? '';
+              return BookingStatusScreen(requestId: requestId);
+            },
           ),
           GoRoute(
             path: '/booking/select-bundle-plan',

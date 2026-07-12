@@ -12,7 +12,7 @@ final userRepositoryProvider = Provider<UserRepository>((ref) {
 
 class UserRepository {
   final FirebaseFirestore _firestore;
-  
+
   // ✅ ADDED: Cache for user documents (5 minutes TTL)
   final Map<String, ({UserModel user, DateTime cachedAt})> _userCache = {};
   static const _cacheDuration = Duration(minutes: 5);
@@ -22,86 +22,83 @@ class UserRepository {
   /// ✅ IMPROVED: Watch user with better error handling and retries
   Stream<UserModel?> watchUser(String userId) {
     debugPrint('[UserRepository] Starting stream for $userId');
-    
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .snapshots()
-        .timeout(
-          const Duration(seconds: 30),
-          onTimeout: (sink) {
-            debugPrint('[UserRepository] Timeout for $userId - retrying...');
-            // Don't close sink - let it retry
-          },
-        )
-        .asyncMap((snapshot) async {
-          if (!snapshot.exists) {
-            debugPrint('[UserRepository] User document not found: $userId');
-            return null;
-          }
 
-          try {
-            final data = snapshot.data();
-            if (data == null) {
-              debugPrint('[UserRepository] User document has no data: $userId');
-              return null;
-            }
+    return _firestore.collection('users').doc(userId).snapshots().timeout(
+      const Duration(seconds: 30),
+      onTimeout: (sink) {
+        debugPrint('[UserRepository] Timeout for $userId - retrying...');
+        // Don't close sink - let it retry
+      },
+    ).asyncMap((snapshot) async {
+      if (!snapshot.exists) {
+        debugPrint('[UserRepository] User document not found: $userId');
+        return null;
+      }
 
-            final user = UserModel.fromFirestore(snapshot);
-            
-            // ✅ Update cache
-            _userCache[userId] = (user: user, cachedAt: DateTime.now());
-            
-            debugPrint('[UserRepository] User ${user.name} (${user.role}) loaded');
-            return user;
-          } catch (e, stack) {
-            debugPrint('[UserRepository] Error parsing user data: $e');
-            debugPrintStack(stackTrace: stack);
-            return null;
-          }
-        })
-        .handleError((error, stack) {
-          debugPrint('[UserRepository] Stream error: $error');
-          
-          // ✅ Differentiate error types
-          if (error.toString().contains('PERMISSION_DENIED')) {
-            debugPrint('[UserRepository] Permission denied - check Firestore rules');
-          } else if (error.toString().contains('UNAVAILABLE')) {
-            debugPrint('[UserRepository] Firestore unavailable - network issue');
-          } else if (error.toString().contains('NOT_FOUND')) {
-            debugPrint('[UserRepository] User document not found');
-          }
-          
-          // Return cached value if available
-          final cached = _userCache[userId];
-          if (cached != null) {
-            debugPrint('[UserRepository] Returning cached user data');
-            return Stream.value(cached.user);
-          }
-        })
-        .distinct((prev, next) {
-          // Only emit when user data actually changes
-          if (prev == null && next == null) return true;
-          if (prev == null || next == null) return false;
-          return prev.uid == next.uid &&
-              prev.name == next.name &&
-              prev.role == next.role &&
-              prev.status == next.status &&
-              prev.photoUrl == next.photoUrl;
-        });
+      try {
+        final data = snapshot.data();
+        if (data == null) {
+          debugPrint('[UserRepository] User document has no data: $userId');
+          return null;
+        }
+
+        final user = UserModel.fromFirestore(snapshot);
+
+        // ✅ Update cache
+        _userCache[userId] = (user: user, cachedAt: DateTime.now());
+
+        debugPrint('[UserRepository] User ${user.name} (${user.role}) loaded');
+        return user;
+      } catch (e, stack) {
+        debugPrint('[UserRepository] Error parsing user data: $e');
+        debugPrintStack(stackTrace: stack);
+        return null;
+      }
+    }).handleError((error, stack) {
+      debugPrint('[UserRepository] Stream error: $error');
+
+      // ✅ Differentiate error types
+      if (error.toString().contains('PERMISSION_DENIED')) {
+        debugPrint(
+            '[UserRepository] Permission denied - check Firestore rules');
+      } else if (error.toString().contains('UNAVAILABLE')) {
+        debugPrint('[UserRepository] Firestore unavailable - network issue');
+      } else if (error.toString().contains('NOT_FOUND')) {
+        debugPrint('[UserRepository] User document not found');
+      }
+
+      // Return cached value if available
+      final cached = _userCache[userId];
+      if (cached != null) {
+        debugPrint('[UserRepository] Returning cached user data');
+        return Stream.value(cached.user);
+      }
+    }).distinct((prev, next) {
+      // Only emit when user data actually changes
+      if (prev == null && next == null) return true;
+      if (prev == null || next == null) return false;
+      return prev.uid == next.uid &&
+          prev.name == next.name &&
+          prev.role == next.role &&
+          prev.accountType == next.accountType &&
+          prev.activeStudentProfileId == next.activeStudentProfileId &&
+          prev.status == next.status &&
+          prev.photoUrl == next.photoUrl;
+    });
   }
 
   /// ✅ IMPROVED: Get user once with cache support
   Future<UserModel?> getUser(String userId, {bool useCache = true}) async {
     debugPrint('[UserRepository] Fetching user: $userId (useCache: $useCache)');
-    
+
     // Check cache first
     if (useCache) {
       final cached = _userCache[userId];
       if (cached != null) {
         final age = DateTime.now().difference(cached.cachedAt);
         if (age < _cacheDuration) {
-          debugPrint('[UserRepository] Returning cached user (age: ${age.inSeconds}s)');
+          debugPrint(
+              '[UserRepository] Returning cached user (age: ${age.inSeconds}s)');
           return cached.user;
         }
       }
@@ -120,10 +117,10 @@ class UserRepository {
       }
 
       final user = UserModel.fromFirestore(doc);
-      
+
       // Update cache
       _userCache[userId] = (user: user, cachedAt: DateTime.now());
-      
+
       debugPrint('[UserRepository] User ${user.name} fetched successfully');
       return user;
     } catch (e) {
@@ -136,7 +133,7 @@ class UserRepository {
   Future<void> createUser(UserModel user) async {
     try {
       debugPrint('[UserRepository] Creating user: ${user.uid}');
-      
+
       // Validate required fields
       if (user.name.trim().isEmpty) {
         throw Exception('Name cannot be empty');
@@ -144,13 +141,16 @@ class UserRepository {
       if (user.email.trim().isEmpty) {
         throw Exception('Email cannot be empty');
       }
-      if (!['student', 'mohaffez'].contains(user.role)) {
+      if (!isSelfSelectableSignupRole(user.role)) {
         throw Exception('Invalid role: ${user.role}');
       }
 
       final userData = <String, dynamic>{
         'uid': user.uid,
         'name': user.name.trim(),
+        if (normalizeRole(user.role) == roleMohaffez &&
+            teacherHonorifics.contains(user.honorific))
+          'honorific': user.honorific,
         'email': user.email.trim(),
         'role': user.role,
         'photoUrl': user.photoUrl,
@@ -175,7 +175,7 @@ class UserRepository {
           .timeout(const Duration(seconds: 10));
 
       debugPrint('[UserRepository] User created successfully');
-      
+
       // Update cache
       _userCache[user.uid] = (user: user, cachedAt: DateTime.now());
     } catch (e) {
@@ -188,15 +188,17 @@ class UserRepository {
   Future<void> updateUser(String userId, Map<String, dynamic> data) async {
     try {
       debugPrint('[UserRepository] Updating user $userId: ${data.keys}');
-      
+
       // ✅ Validate fields
       if (data.containsKey('name') && (data['name'] as String).trim().isEmpty) {
         throw Exception('Name cannot be empty');
       }
-      if (data.containsKey('email') && (data['email'] as String).trim().isEmpty) {
+      if (data.containsKey('email') &&
+          (data['email'] as String).trim().isEmpty) {
         throw Exception('Email cannot be empty');
       }
-      if (data.containsKey('role') && !['student', 'mohaffez'].contains(data['role'])) {
+      if (data.containsKey('role') &&
+          !isSelfSelectableSignupRole(data['role']?.toString())) {
         throw Exception('Invalid role: ${data['role']}');
       }
 
@@ -207,7 +209,7 @@ class UserRepository {
           .timeout(const Duration(seconds: 10));
 
       debugPrint('[UserRepository] User updated successfully');
-      
+
       // ✅ Invalidate cache
       _userCache.remove(userId);
     } catch (e) {
@@ -220,17 +222,17 @@ class UserRepository {
   Future<void> deleteUser(String userId) async {
     try {
       debugPrint('[UserRepository] Deleting user: $userId');
-      
+
       // Delete user document
       await _firestore
           .collection('users')
           .doc(userId)
           .delete()
           .timeout(const Duration(seconds: 10));
-      
+
       // ✅ Cleanup: Delete subcollections (credentials, availability)
       final batch = _firestore.batch();
-      
+
       final credentials = await _firestore
           .collection('users')
           .doc(userId)
@@ -239,7 +241,7 @@ class UserRepository {
       for (final doc in credentials.docs) {
         batch.delete(doc.reference);
       }
-      
+
       final availability = await _firestore
           .collection('users')
           .doc(userId)
@@ -248,11 +250,11 @@ class UserRepository {
       for (final doc in availability.docs) {
         batch.delete(doc.reference);
       }
-      
+
       await batch.commit();
-      
+
       debugPrint('[UserRepository] User deleted successfully');
-      
+
       // Remove from cache
       _userCache.remove(userId);
     } catch (e) {
@@ -269,23 +271,23 @@ class UserRepository {
   }) async {
     try {
       debugPrint('[UserRepository] Searching users with role: $role');
-      
+
       Query query = _firestore
           .collection('users')
           .where('role', isEqualTo: role)
           .limit(limit);
-      
+
       if (lastDocument != null) {
         query = query.startAfterDocument(lastDocument);
       }
 
       final snapshot = await query.get().timeout(const Duration(seconds: 10));
 
-      final users = snapshot.docs
-          .map((doc) => UserModel.fromFirestore(doc))
-          .toList();
+      final users =
+          snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
 
-      debugPrint('[UserRepository] Found ${users.length} users with role $role');
+      debugPrint(
+          '[UserRepository] Found ${users.length} users with role $role');
       return users;
     } catch (e) {
       debugPrint('[UserRepository] Error searching users: $e');
@@ -308,7 +310,8 @@ class UserRepository {
         throw Exception('Invalid longitude: $userLng');
       }
 
-      debugPrint('[UserRepository] Searching nearby mohaffez within ${radiusKm}km');
+      debugPrint(
+          '[UserRepository] Searching nearby mohaffez within ${radiusKm}km');
 
       final snapshot = await _firestore
           .collection('users')
@@ -321,29 +324,31 @@ class UserRepository {
       final mohaffezList = snapshot.docs
           .map((doc) => UserModel.fromFirestore(doc))
           .where((user) {
-            if (user.addressLat == null || user.addressLng == null) {
-              return false;
-            }
+        if (user.addressLat == null || user.addressLng == null) {
+          return false;
+        }
 
-            // ✅ Validate mohaffez coordinates
-            if (user.addressLat! < -90 || user.addressLat! > 90 ||
-                user.addressLng! < -180 || user.addressLng! > 180) {
-              debugPrint('[UserRepository] Invalid coordinates for ${user.name}');
-              return false;
-            }
+        // ✅ Validate mohaffez coordinates
+        if (user.addressLat! < -90 ||
+            user.addressLat! > 90 ||
+            user.addressLng! < -180 ||
+            user.addressLng! > 180) {
+          debugPrint('[UserRepository] Invalid coordinates for ${user.name}');
+          return false;
+        }
 
-            final distance = _calculateDistance(
-              userLat,
-              userLng,
-              user.addressLat!,
-              user.addressLng!,
-            );
+        final distance = _calculateDistance(
+          userLat,
+          userLng,
+          user.addressLat!,
+          user.addressLng!,
+        );
 
-            return distance <= radiusKm;
-          })
-          .toList();
+        return distance <= radiusKm;
+      }).toList();
 
-      debugPrint('[UserRepository] Found ${mohaffezList.length} nearby mohaffez');
+      debugPrint(
+          '[UserRepository] Found ${mohaffezList.length} nearby mohaffez');
       return mohaffezList;
     } catch (e) {
       debugPrint('[UserRepository] Error getting nearby mohaffez: $e');
@@ -352,7 +357,8 @@ class UserRepository {
   }
 
   /// ✅ FIXED: Haversine distance calculation with validation
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371; // km
 
     final dLat = _toRadians(lat2 - lat1);

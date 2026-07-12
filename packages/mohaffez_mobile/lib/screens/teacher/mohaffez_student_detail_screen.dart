@@ -1,4 +1,4 @@
-﻿// lib/screens/mohaffez_student_detail_screen.dart
+// lib/screens/mohaffez_student_detail_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -12,16 +12,25 @@ import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/error_widgets.dart';
 
 // Provider: all sessions between this teacher and this specific student
-final studentDetailSessionsProvider = FutureProvider.autoDispose
-    .family<List<Map<String, dynamic>>,
-        ({String mohaffezId, String studentId})>((ref, p) async {
-  final snapshot = await FirebaseFirestore.instance
+final studentDetailSessionsProvider = FutureProvider.autoDispose.family<
+    List<Map<String, dynamic>>,
+    ({
+      String mohaffezId,
+      String studentId,
+      String? studentProfileId
+    })>((ref, p) async {
+  Query<Map<String, dynamic>> query = FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('mohaffezId', isEqualTo: p.mohaffezId)
-      .where('studentId', isEqualTo: p.studentId)
-      .limit(50)
-      .get()
-      .timeout(const Duration(seconds: 15));
+      .where('studentId', isEqualTo: p.studentId);
+
+  final profileId = p.studentProfileId?.trim();
+  if (profileId != null && profileId.isNotEmpty && profileId != 'self') {
+    query = query.where('studentProfileId', isEqualTo: profileId);
+  }
+
+  final snapshot =
+      await query.limit(50).get().timeout(const Duration(seconds: 15));
 
   final docs = snapshot.docs
     ..sort((a, b) {
@@ -59,7 +68,11 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
     final effectiveMohaffezId = mohaffezId.isNotEmpty
         ? mohaffezId
         : (ref.watch(currentUserProvider).value?.uid ?? '');
-    final params = (mohaffezId: effectiveMohaffezId, studentId: student.studentId);
+    final params = (
+      mohaffezId: effectiveMohaffezId,
+      studentId: student.studentId,
+      studentProfileId: student.studentProfileId,
+    );
     final sessionsAsync = ref.watch(studentDetailSessionsProvider(params));
 
     return Directionality(
@@ -85,7 +98,10 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppThemeConstants.primary, AppThemeConstants.primaryVariant],
+                        colors: [
+                          AppThemeConstants.primary,
+                          AppThemeConstants.primaryVariant
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -119,7 +135,8 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                           label: const Text('التحديات'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppThemeConstants.primary,
-                            side: const BorderSide(color: AppThemeConstants.primary),
+                            side: const BorderSide(
+                                color: AppThemeConstants.primary),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
@@ -133,6 +150,7 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                         child: _MarkSurahButton(
                           studentId: student.studentId,
                           studentName: student.studentName,
+                          studentProfileId: student.studentProfileId,
                           mohaffezId: mohaffezId,
                         ),
                       ),
@@ -177,7 +195,8 @@ class MohaffezStudentDetailScreen extends ConsumerWidget {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: AppThemeConstants.warning.withValues(alpha: 0.2),
+                                          color: AppThemeConstants.warning
+                                              .withValues(alpha: 0.2),
                                           borderRadius:
                                               BorderRadius.circular(8),
                                         ),
@@ -233,8 +252,7 @@ class _StudentSummaryCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.all(16),
       elevation: 2,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -263,7 +281,8 @@ class _StudentSummaryCard extends StatelessWidget {
                       Text(
                         '${student.sessionCount} جلسة',
                         style: const TextStyle(
-                            fontSize: 14, color: AppThemeConstants.textSecondary),
+                            fontSize: 14,
+                            color: AppThemeConstants.textSecondary),
                       ),
                     ],
                   ),
@@ -325,11 +344,8 @@ class _InfoRow extends StatelessWidget {
           const SizedBox(width: 8),
           Text('$label: ',
               style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: color)),
-          Expanded(
-              child: Text(value, style: const TextStyle(fontSize: 14))),
+                  fontSize: 14, fontWeight: FontWeight.w600, color: color)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );
@@ -344,9 +360,8 @@ class _SessionHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final date = session['sessionDate'] as DateTime?;
-    final formattedDate = date != null
-        ? DateFormat('dd/MM/yyyy', 'ar').format(date)
-        : '—';
+    final formattedDate =
+        date != null ? DateFormat('dd/MM/yyyy', 'ar').format(date) : '—';
 
     final status = session['status'] as String? ?? 'accepted';
     final (statusColor, statusLabel) = switch (status) {
@@ -364,8 +379,7 @@ class _SessionHistoryCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 1,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -384,8 +398,8 @@ class _SessionHistoryCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -411,12 +425,14 @@ class _SessionHistoryCard extends StatelessWidget {
                       size: 14, color: AppThemeConstants.grey500),
                   const SizedBox(width: 6),
                   Text(
-                    formatTimeToArabicAmPm(session['preferredTimeSlot'] as String? ?? ''),
+                    formatTimeToArabicAmPm(
+                        session['preferredTimeSlot'] as String? ?? ''),
                     style: const TextStyle(
                         fontSize: 13, color: AppThemeConstants.black87),
                   ),
                   const SizedBox(width: 12),
-                  const Icon(Icons.category, size: 14, color: AppThemeConstants.grey500),
+                  const Icon(Icons.category,
+                      size: 14, color: AppThemeConstants.grey500),
                   const SizedBox(width: 4),
                   Text(
                     switch (session['sessionType'] as String? ?? '') {
@@ -527,18 +543,22 @@ class _SessionHistoryCard extends StatelessWidget {
 class _MarkSurahButton extends ConsumerWidget {
   final String studentId;
   final String studentName;
+  final String? studentProfileId;
   final String mohaffezId;
 
   const _MarkSurahButton({
     required this.studentId,
     required this.studentName,
+    this.studentProfileId,
     required this.mohaffezId,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final surahsAsync = ref.watch(memorizedSurahsProvider(studentId));
-    final memorized   = surahsAsync.valueOrNull?.toSet() ?? {};
+    final surahsAsync = ref.watch(learnerMemorizedSurahsProvider(
+      (studentId: studentId, studentProfileId: studentProfileId),
+    ));
+    final memorized = surahsAsync.valueOrNull?.toSet() ?? {};
 
     return OutlinedButton.icon(
       onPressed: () => _showSurahSheet(context, ref, memorized),
@@ -561,7 +581,7 @@ class _MarkSurahButton extends ConsumerWidget {
     Set<int> memorized,
   ) {
     final mohaffezAsync = ref.read(currentUserProvider);
-    final mohaffezName  = mohaffezAsync.valueOrNull?.name ?? '';
+    final mohaffezName = mohaffezAsync.valueOrNull?.name ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -570,6 +590,7 @@ class _MarkSurahButton extends ConsumerWidget {
       builder: (_) => _SurahMarkSheet(
         studentId: studentId,
         studentName: studentName,
+        studentProfileId: studentProfileId,
         mohaffezId: mohaffezId,
         mohaffezName: mohaffezName,
         memorized: memorized,
@@ -582,6 +603,7 @@ class _MarkSurahButton extends ConsumerWidget {
 class _SurahMarkSheet extends ConsumerStatefulWidget {
   final String studentId;
   final String studentName;
+  final String? studentProfileId;
   final String mohaffezId;
   final String mohaffezName;
   final Set<int> memorized;
@@ -589,6 +611,7 @@ class _SurahMarkSheet extends ConsumerStatefulWidget {
   const _SurahMarkSheet({
     required this.studentId,
     required this.studentName,
+    this.studentProfileId,
     required this.mohaffezId,
     required this.mohaffezName,
     required this.memorized,
@@ -622,6 +645,7 @@ class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
     try {
       await toggleMemorizedSurah(
         studentId: widget.studentId,
+        studentProfileId: widget.studentProfileId,
         surahNumber: surahNum,
         isCurrentlyMemorized: wasMemorized,
         mohaffezId: widget.mohaffezId,
@@ -654,8 +678,7 @@ class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
     // Filter surahs by search
     final filtered = List.generate(114, (i) => i + 1).where((n) {
       if (_search.isEmpty) return true;
-      return surahNames[n - 1].contains(_search) ||
-          '$n'.contains(_search);
+      return surahNames[n - 1].contains(_search) || '$n'.contains(_search);
     }).toList();
 
     return Directionality(
@@ -720,7 +743,8 @@ class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
                         color: const Color(0xFFFFF8E1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: const Color(0xFFD4A44A).withValues(alpha: 0.5)),
+                            color:
+                                const Color(0xFFD4A44A).withValues(alpha: 0.5)),
                       ),
                       child: Text(
                         '${_memorized.length} / 114',
@@ -744,19 +768,16 @@ class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
                   onChanged: (v) => setState(() => _search = v.trim()),
                   decoration: InputDecoration(
                     hintText: 'ابحث عن سورة...',
-                    prefixIcon:
-                        const Icon(Icons.search_rounded, size: 20),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFFE5EDE9)),
+                      borderSide: const BorderSide(color: Color(0xFFE5EDE9)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: Color(0xFFE5EDE9)),
+                      borderSide: const BorderSide(color: Color(0xFFE5EDE9)),
                     ),
                     filled: true,
                     fillColor: const Color(0xFFF4F7F6),
@@ -775,7 +796,7 @@ class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
                     controller: controller,
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
-                      final num  = filtered[i];
+                      final num = filtered[i];
                       final name = surahNames[num - 1];
                       final done = _memorized.contains(num);
                       return ListTile(
@@ -799,9 +820,8 @@ class _SurahMarkSheetState extends ConsumerState<_SurahMarkSheet> {
                         title: Text(
                           name,
                           style: TextStyle(
-                            fontWeight: done
-                                ? FontWeight.w800
-                                : FontWeight.w500,
+                            fontWeight:
+                                done ? FontWeight.w800 : FontWeight.w500,
                             color: done
                                 ? const Color(0xFF095752)
                                 : const Color(0xFF111827),

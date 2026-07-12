@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/payment_service.dart';
+import '../../shared/utils/booking_learner_guard.dart';
 import '../../shared/utils/time_formatter.dart';
 import '../../shared/widgets/empty_state.dart';
 
@@ -241,6 +242,8 @@ class _StudentPaymentConfirmationScreenState
           const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')));
       return;
     }
+    final activeProfile = resolveBookingLearner(context, ref, user);
+    if (activeProfile == null) return;
 
     var loadingDialogOpen = true;
     BuildContext? loadingDialogContext;
@@ -266,7 +269,7 @@ class _StudentPaymentConfirmationScreenState
     try {
       final basePayment = PaymentModel(
         studentId: user.uid,
-        studentName: user.name,
+        studentName: activeProfile.name,
         studentEmail: user.email,
         studentPhone: user.phoneNumber ?? '',
         mohaffezId: widget.mohaffezId,
@@ -290,7 +293,9 @@ class _StudentPaymentConfirmationScreenState
           'preferredTimeSlot': _timeSlot,
           'location': _location,
           'sessionDurationMinutes': selectedPlan!.sessionDurationMinutes,
+          ...activeProfile.toBookingSnapshot(user),
         },
+        ...activeProfile.toBookingSnapshot(user),
         ...PricingCountryUtils.paymentSnapshot(selectedPlan!),
       };
 
@@ -314,7 +319,7 @@ class _StudentPaymentConfirmationScreenState
       var paymentUrl = result.paymentUrl;
       if (paymentUrl.isEmpty && selectedPlan!.priceEGP > 0.01) {
         final studentPhone = user.phoneNumber?.trim();
-        final studentName = user.name.trim();
+        final studentName = activeProfile.name.trim();
         final paymobResult =
             await ref.read(paymentServiceProvider).initiatePayment(
                   paymentId: result.paymentId,

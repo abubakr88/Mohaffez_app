@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math'; // ✅ إضافة هذا السطر
 import 'teacher_badge.dart';
+import 'user_model.dart';
 
 class MohaffezModel {
   final String id;
   final String name;
+  final String? honorific;
   final String? photoUrl;
   final String? specialization;
   final double? addressLat;
@@ -16,11 +18,13 @@ class MohaffezModel {
   final String? phoneNumber;
   final String? gender;
   final bool trialSessionEnabled;
+  final String? pricingSearchText;
   final UserBadges badges;
 
   MohaffezModel({
     required this.id,
     required this.name,
+    this.honorific,
     this.photoUrl,
     this.specialization,
     this.addressLat,
@@ -32,6 +36,7 @@ class MohaffezModel {
     this.phoneNumber,
     this.gender,
     this.trialSessionEnabled = false,
+    this.pricingSearchText,
     this.badges = const UserBadges(),
   });
 
@@ -44,6 +49,7 @@ class MohaffezModel {
     return MohaffezModel(
       id: doc.id,
       name: data['name'] as String? ?? 'لا يوجد اسم',
+      honorific: data['honorific'] as String?,
       photoUrl: data['photoUrl'] as String?,
       specialization: data['specialization'] as String?,
       addressLat: (data['addressLat'] as num?)?.toDouble(),
@@ -55,9 +61,12 @@ class MohaffezModel {
       phoneNumber: data['phoneNumber'] as String?,
       gender: data['gender'] as String?,
       trialSessionEnabled: data['trialSessionEnabled'] == true,
+      pricingSearchText: data['pricingSearchText'] as String?,
       badges: UserBadges.fromJson(data['badges']),
     );
   }
+
+  String get displayName => composeTeacherDisplayName(name, honorific);
 
   // Calculate distance from user location
   double? getDistanceFrom(double? userLat, double? userLng) {
