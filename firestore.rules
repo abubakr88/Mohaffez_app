@@ -19,6 +19,26 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
     }
 
+    function minimumTeacherHourlyRateEgp() {
+      let configPath = /databases/$(database)/documents/systemConfig/global;
+      return exists(configPath)
+        ? get(configPath).data.get('minimumTeacherHourlyRateEgp', 0)
+        : 0;
+    }
+
+    function hasValidTeacherPlanRate(plan) {
+      let minimumRate = minimumTeacherHourlyRateEgp();
+      return plan.priceEGP is number &&
+             plan.priceEGP > 0 &&
+             plan.sessionsCount is int &&
+             plan.sessionsCount > 0 &&
+             plan.sessionDurationMinutes is int &&
+             plan.sessionDurationMinutes > 0 &&
+             (minimumRate <= 0 ||
+              plan.priceEGP * 60 >=
+                minimumRate * plan.sessionsCount * plan.sessionDurationMinutes);
+    }
+
     // Admin authority is granted exclusively via custom claims minted server-side
     // (Cloud Functions / Admin SDK). The previous Firestore-doc fallback is removed
     // so a self-set `role: 'admin'` field on /users/{uid} cannot grant admin powers.
@@ -319,11 +339,18 @@ service cloud.firestore {
         allow create: if isOwner(userId) &&
                       request.resource.data.mohaffezId == userId &&
                       request.resource.data.isActive == true &&
-                      request.resource.data.priceEGP > 0 &&
-                      request.resource.data.sessionsCount > 0;
+                      hasValidTeacherPlanRate(request.resource.data);
 
         allow update: if isOwner(userId) &&
-                      request.resource.data.mohaffezId == userId;
+                      request.resource.data.mohaffezId == userId &&
+                      (
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny([
+                            'priceEGP', 'sessionsCount',
+                            'sessionDurationMinutes'
+                          ])
+                        || hasValidTeacherPlanRate(request.resource.data)
+                      );
 
         allow delete: if isOwner(userId);
       }

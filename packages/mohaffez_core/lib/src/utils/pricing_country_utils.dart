@@ -23,6 +23,19 @@ class PricingCountryOption {
 }
 
 class PricingCountryUtils {
+  static double equivalentHourlyRateEgp({
+    required double totalPriceEgp,
+    required int sessionsCount,
+    required int sessionDurationMinutes,
+  }) {
+    if (totalPriceEgp <= 0 ||
+        sessionsCount <= 0 ||
+        sessionDurationMinutes <= 0) {
+      return 0;
+    }
+    return totalPriceEgp * 60 / (sessionsCount * sessionDurationMinutes);
+  }
+
   PricingCountryUtils._();
 
   static const egypt = PricingCountryOption(
