@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math'; // ✅ إضافة هذا السطر
 import 'teacher_badge.dart';
+import 'user_model.dart';
 
 class MohaffezModel {
   final String id;
   final String name;
+  final String? honorific;
   final String? photoUrl;
   final String? specialization;
   final double? addressLat;
@@ -22,6 +24,7 @@ class MohaffezModel {
   MohaffezModel({
     required this.id,
     required this.name,
+    this.honorific,
     this.photoUrl,
     this.specialization,
     this.addressLat,
@@ -46,6 +49,7 @@ class MohaffezModel {
     return MohaffezModel(
       id: doc.id,
       name: data['name'] as String? ?? 'لا يوجد اسم',
+      honorific: data['honorific'] as String?,
       photoUrl: data['photoUrl'] as String?,
       specialization: data['specialization'] as String?,
       addressLat: (data['addressLat'] as num?)?.toDouble(),
@@ -61,6 +65,8 @@ class MohaffezModel {
       badges: UserBadges.fromJson(data['badges']),
     );
   }
+
+  String get displayName => composeTeacherDisplayName(name, honorific);
 
   // Calculate distance from user location
   double? getDistanceFrom(double? userLat, double? userLng) {

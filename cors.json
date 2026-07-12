@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["http://localhost:*", "https://app.mohafezy.com", "https://admin.mohafezy.com", "https://mohafezy.com"],
+    "origin": ["http://localhost:*", "https://app.mohafezy.com", "https://admin.mohafezy.com", "https://mohafezy.com",  "https://dev.mohafezy.com"],
     "method": ["GET", "HEAD", "POST", "PUT", "DELETE"],
     "responseHeader": [
       "Content-Type",

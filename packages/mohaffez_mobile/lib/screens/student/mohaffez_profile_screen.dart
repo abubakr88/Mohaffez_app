@@ -19,6 +19,15 @@ import '../../providers/trial_session_provider.dart';
 import 'request_trial_session_sheet.dart';
 import '../../tour/tour_guard_helper.dart';
 
+String _teacherNameFromProfile(
+  Map<String, dynamic> profile, {
+  String fallback = 'المحفظ',
+}) {
+  final name = (profile['name'] as String?)?.trim() ?? '';
+  if (name.isEmpty) return fallback;
+  return composeTeacherDisplayName(name, profile['honorific'] as String?);
+}
+
 class MohaffezProfileScreen extends ConsumerStatefulWidget {
   final String mohaffezId;
   final double? userLat;
@@ -45,13 +54,29 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // Hardcoding any value (e.g. 'home') let students complete a booking with
   // an unsupported session type when the teacher had no plan for that type.
   String selectedSessionType = '';
+  PricingPlanModel? selectedPricingPlan;
   Map<String, dynamic>? selectedTimeSlot;
   DateTime? selectedDate;
   int? selectedDayOfWeek;
   final GlobalKey _profileExportKey = GlobalKey();
+  final GlobalKey _pricingStepKey = GlobalKey();
+  final GlobalKey _scheduleStepKey = GlobalKey();
   bool _isExportingProfile = false;
 
   bool get _isPublicView => widget.publicMode;
+
+  void _revealStep(GlobalKey key) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = key.currentContext;
+      if (!mounted || targetContext == null) return;
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.08,
+      );
+    });
+  }
 
   /// Helper to filter pricing plans by selected session type
   List<PricingPlanModel> _relevantPlans(List<PricingPlanModel> plans) {
@@ -240,6 +265,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       return;
     }
     if (guardWriteInTour(ref, context)) return;
+    if (selectedPricingPlan == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اختر الباقة المناسبة أولًا'),
+          backgroundColor: AppThemeConstants.warning,
+        ),
+      );
+      _revealStep(_pricingStepKey);
+      return;
+    }
     if (selectedTimeSlot == null || selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -252,7 +287,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     final profileValue =
         ref.read(mohaffezProfileProvider(widget.mohaffezId)).value ?? {};
     final slotContext = _buildSlotContext(profileValue);
-    ref.read(bookingFlowProvider.notifier).setSlotContext(slotContext);
+    final bookingFlow = ref.read(bookingFlowProvider.notifier);
+    final plan = selectedPricingPlan!;
+    bookingFlow.selectPlan(
+      planId: plan.id ?? '',
+      title: plan.title,
+      price: plan.priceEGP,
+      sessions: plan.sessionsCount,
+      validityDays: plan.validityDays,
+    );
+    bookingFlow.setSlotContext(slotContext);
     context.push('/booking/method');
   }
 
@@ -287,7 +331,9 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
     return SlotContext(
       mohaffezId: widget.mohaffezId,
-      mohaffezName: profileValue?['name'] as String? ?? '',
+      mohaffezName: profileValue == null
+          ? ''
+          : _teacherNameFromProfile(profileValue, fallback: ''),
       mohaffezPhone: profileValue?['phoneNumber'] as String?,
       isFoundingTeacher: profileValue?['status'] == 'active' &&
           UserBadges.fromJson(profileValue?['badges']).foundingTeacher.enabled,
@@ -379,7 +425,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 
   String _exportFileName(Map<String, dynamic> profile) {
-    final rawName = ((profile['name'] as String?) ?? 'mohaffez')
+    final rawName = _teacherNameFromProfile(profile, fallback: 'mohaffez')
         .trim()
         .replaceAll(RegExp(r'\s+'), '_')
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), '');
@@ -536,10 +582,23 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               mounted) {
             setState(() {
               selectedSessionType = '';
+              selectedPricingPlan = null;
               selectedTimeSlot = null;
               selectedDate = null;
               selectedDayOfWeek = null;
             });
+            ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
+          } else if (selectedPricingPlan != null &&
+              !plans.any((plan) =>
+                  plan.isActive && plan.id == selectedPricingPlan!.id) &&
+              mounted) {
+            setState(() {
+              selectedPricingPlan = null;
+              selectedTimeSlot = null;
+              selectedDate = null;
+              selectedDayOfWeek = null;
+            });
+            ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
           }
         });
       });
@@ -616,13 +675,19 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                         const SizedBox(height: 20),
                         _buildModernSessionSelector(plansAsync),
                         const SizedBox(height: 20),
-                        _buildModernPricingSection(plansAsync),
+                        KeyedSubtree(
+                          key: _pricingStepKey,
+                          child: _buildModernPricingSection(plansAsync),
+                        ),
                         const SizedBox(height: 20),
-                        _buildModernAvailabilitySection(
-                          ref,
-                          profile,
-                          plansAsync,
-                          publicAvailability: publicBundle?.availability,
+                        KeyedSubtree(
+                          key: _scheduleStepKey,
+                          child: _buildModernAvailabilitySection(
+                            ref,
+                            profile,
+                            plansAsync,
+                            publicAvailability: publicBundle?.availability,
+                          ),
                         ),
                         const SizedBox(height: 120),
                       ],
@@ -761,7 +826,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 
   String _teacherProfileShareText(Map<String, dynamic> profile) {
-    final name = ((profile['name'] as String?) ?? 'محفظ').trim();
+    final name = _teacherNameFromProfile(profile);
     final specialization =
         ((profile['specialization'] as String?) ?? 'تعليم القرآن').trim();
     return 'تعرف على $name على تطبيق محفظي - $specialization\n${_teacherPublicProfileUri()}';
@@ -1170,73 +1235,111 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   Widget _buildReadOnlyPlanCard(PricingPlanModel plan) {
     final isBundle = plan.type == PlanType.bundle;
+    final isSelected = selectedPricingPlan?.id == plan.id;
     final badgeColor = isBundle
         ? AppThemeConstants.accentPurpleDark
         : AppThemeConstants.accentAmberDark;
     final badgeBg = isBundle
         ? AppThemeConstants.accentPurpleLight
         : AppThemeConstants.accentAmberLight;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppThemeConstants.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppThemeConstants.grey200),
-        boxShadow: [
-          BoxShadow(
+    return InkWell(
+      onTap: () {
+        setState(() {
+          selectedPricingPlan = plan;
+          selectedTimeSlot = null;
+          selectedDate = null;
+          selectedDayOfWeek = null;
+        });
+        ref.read(bookingFlowProvider.notifier).selectPlan(
+              planId: plan.id ?? '',
+              title: plan.title,
+              price: plan.priceEGP,
+              sessions: plan.sessionsCount,
+              validityDays: plan.validityDays,
+            );
+        _revealStep(_scheduleStepKey);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppThemeConstants.primary.withValues(alpha: 0.06)
+              : AppThemeConstants.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppThemeConstants.primary
+                : AppThemeConstants.grey200,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
               color: AppThemeConstants.black.withValues(alpha: 0.04),
               blurRadius: 4,
-              offset: const Offset(0, 2))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                  color: badgeBg, borderRadius: BorderRadius.circular(20)),
-              child: Text(isBundle ? 'باقة' : 'جلسة واحدة',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: badgeColor)),
+              offset: const Offset(0, 2),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(plan.title,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.bold))),
-            Text(PricingCountryUtils.displayPriceText(plan),
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppThemeConstants.success)),
-          ]),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            _profileChip('${plan.sessionsCount} جلسة', Icons.event_available),
-            _profileChip(plan.countryName, Icons.public),
-            if (plan.sessionDurationMinutes != null)
-              _profileChip(
-                  '${plan.sessionDurationMinutes} دقيقة', Icons.timer_outlined),
-            if (plan.validityDays != null && plan.validityDays! > 0)
-              _profileChip('${plan.validityDays} يوم', Icons.schedule),
-            if (isBundle)
-              _profileChip(
-                '${(PricingCountryUtils.displayAmount(plan) / plan.sessionsCount).toStringAsFixed(0)} ${plan.currencyLabel}/جلسة',
-                Icons.payments_outlined,
-              ),
-          ]),
-          if (plan.description != null && plan.description!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(plan.description!,
-                style: const TextStyle(
-                    fontSize: 12, color: AppThemeConstants.grey600)),
           ],
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: isSelected
+                    ? AppThemeConstants.primary
+                    : AppThemeConstants.grey500,
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: badgeBg, borderRadius: BorderRadius.circular(20)),
+                child: Text(isBundle ? 'باقة' : 'جلسة واحدة',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: badgeColor)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text(plan.title,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.bold))),
+              Text(PricingCountryUtils.displayPriceText(plan),
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppThemeConstants.success)),
+            ]),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 6, children: [
+              _profileChip('${plan.sessionsCount} جلسة', Icons.event_available),
+              _profileChip(plan.countryName, Icons.public),
+              if (plan.sessionDurationMinutes != null)
+                _profileChip('${plan.sessionDurationMinutes} دقيقة',
+                    Icons.timer_outlined),
+              if (plan.validityDays != null && plan.validityDays! > 0)
+                _profileChip('${plan.validityDays} يوم', Icons.schedule),
+              if (isBundle)
+                _profileChip(
+                  '${(PricingCountryUtils.displayAmount(plan) / plan.sessionsCount).toStringAsFixed(0)} ${plan.currencyLabel}/جلسة',
+                  Icons.payments_outlined,
+                ),
+            ]),
+            if (plan.description != null && plan.description!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(plan.description!,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppThemeConstants.grey600)),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1340,37 +1443,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'خطط التسعير المتاحة',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              child: _BookingStepTitle(
+                number: 2,
+                title: 'اختر الباقة المناسبة',
+                subtitle: 'حدد جلسة واحدة أو إحدى الباقات المتاحة',
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-              decoration: BoxDecoration(
-                color: AppThemeConstants.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppThemeConstants.primary.withValues(alpha: 0.35)),
-              ),
-              child: const Row(children: [
-                Icon(Icons.info_outline_rounded,
-                    size: 16, color: AppThemeConstants.primary),
-                SizedBox(width: 8),
-                Expanded(
-                    child: Text(
-                  'يمكنك التواصل مع المحفظ مباشرة للتفاوض على سعر مناسب',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppThemeConstants.primary),
-                )),
-              ]),
-            ),
-            const SizedBox(height: 14),
             ...relevantPlans.map((plan) => Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _buildReadOnlyPlanCard(plan),
@@ -1564,9 +1643,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   // ─── AppBar ───────────────────────────────────────────────────────────────
 
   Widget _buildAppBar(BuildContext context, Map<String, dynamic> profile) {
-    final name = (profile['name'] as String?)?.trim().isNotEmpty == true
-        ? profile['name'] as String
-        : 'المحفّظ';
+    final name = _teacherNameFromProfile(profile, fallback: 'المحفّظ');
     final hasFoundingBadge = profile['status'] == 'active' &&
         UserBadges.fromJson(profile['badges']).foundingTeacher.enabled;
     final specialization = (profile['specialization'] as String?)?.trim();
@@ -2311,9 +2388,13 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                   final hadSelectedSlot = selectedTimeSlot != null;
                   setState(() {
                     selectedSessionType = type;
+                    selectedPricingPlan = null;
                     selectedTimeSlot = null;
                     selectedDate = null;
+                    selectedDayOfWeek = null;
                   });
+                  ref.read(bookingFlowProvider.notifier).clearSelectedPlan();
+                  _revealStep(_pricingStepKey);
                   if (hadSelectedSlot && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -2391,20 +2472,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'اختر نوع الجلسة',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'ستظهر الخطط والمواعيد المتاحة لهذا النوع فقط',
-            style: TextStyle(
-              color: AppThemeConstants.textSecondary,
-              fontSize: 13,
-            ),
+          const _BookingStepTitle(
+            number: 1,
+            title: 'اختر نوع الجلسة',
+            subtitle: 'أونلاين أو في المسجد أو زيارة منزلية',
           ),
           const SizedBox(height: 14),
           Row(
@@ -2439,7 +2510,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     AsyncValue<List<PricingPlanModel>> plansAsync, {
     List<Map<String, dynamic>>? publicAvailability,
   }) {
-    if (selectedSessionType.isEmpty) {
+    if (selectedSessionType.isEmpty || selectedPricingPlan == null) {
       return const SizedBox.shrink();
     }
 
@@ -2550,19 +2621,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'احجز جلستك',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اختر اليوم والوقت المناسب لك',
-                  style: TextStyle(
-                    color: Colors.grey,
-                  ),
+                const _BookingStepTitle(
+                  number: 3,
+                  title: 'اختر الموعد',
+                  subtitle: 'حدد اليوم والوقت المناسب لك',
                 ),
                 const SizedBox(height: 20),
 
@@ -2812,6 +2874,66 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
   }
 }
 
+class _BookingStepTitle extends StatelessWidget {
+  const _BookingStepTitle({
+    required this.number,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final int number;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: AppThemeConstants.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$number',
+            style: const TextStyle(
+              color: AppThemeConstants.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppThemeConstants.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _TeacherProfileExportCard extends StatelessWidget {
   const _TeacherProfileExportCard({
     required this.profile,
@@ -2831,7 +2953,7 @@ class _TeacherProfileExportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = _string(profile['name'], 'المحفظ');
+    final name = _teacherNameFromProfile(profile);
     final specialization = _string(profile['specialization'], 'معلم قرآن');
     final bio = _string(profile['bio'], '');
     final rating = (profile['rating'] as num?)?.toDouble() ?? 0;

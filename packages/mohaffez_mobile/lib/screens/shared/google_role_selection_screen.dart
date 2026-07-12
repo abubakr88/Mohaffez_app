@@ -23,6 +23,7 @@ class _GoogleRoleSelectionScreenState
     extends ConsumerState<GoogleRoleSelectionScreen> {
   String? _selectedRole;
   String _selectedGender = 'male';
+  String? _selectedHonorific;
   bool _isLoading = false;
 
   IconData _genderIcon(String gender) {
@@ -70,6 +71,7 @@ class _GoogleRoleSelectionScreenState
     await notifier.completeGoogleSignIn(
       role: _selectedRole!,
       gender: _selectedGender,
+      honorific: _selectedHonorific,
     );
 
     if (!mounted) return;
@@ -230,6 +232,35 @@ class _GoogleRoleSelectionScreenState
                             ),
                           ],
                         ),
+                        if (_selectedRole == roleMohaffez) ...[
+                          const SizedBox(height: 20),
+                          DropdownButtonFormField<String?>(
+                            initialValue: _selectedHonorific,
+                            decoration: const InputDecoration(
+                              labelText: 'اللقب قبل الاسم',
+                              prefixIcon:
+                                  Icon(Icons.workspace_premium_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
+                              ),
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('بدون لقب'),
+                              ),
+                              ...teacherHonorifics.map(
+                                (title) => DropdownMenuItem<String?>(
+                                  value: title,
+                                  child: Text(title),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _selectedHonorific = value);
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 32),
                         SizedBox(
                           height: 54,

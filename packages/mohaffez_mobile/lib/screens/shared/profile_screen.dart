@@ -409,7 +409,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  Future<void> _saveName(String userId) async {
+  Future<void> _saveName(
+    String userId, {
+    required bool isTeacher,
+    String? honorific,
+  }) async {
     if (guardWriteInTour(ref, context)) return;
     final trimmed = _nameController.text.trim();
     if (trimmed.isEmpty) {
@@ -418,7 +422,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
     try {
       final repository = ref.read(userRepositoryProvider);
-      await repository.updateUser(userId, {'name': trimmed});
+      await repository.updateUser(userId, {
+        'name': trimmed,
+        if (isTeacher)
+          'honorific': teacherHonorifics.contains(honorific) ? honorific : null,
+      });
       ref.invalidate(currentUserProvider);
       if (mounted) _showSnackBar('تم حفظ الاسم بنجاح', isSuccess: true);
     } catch (_) {
@@ -451,41 +459,81 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _showEditNameDialog(UserModel user) async {
     _nameController.text = user.name;
+    final isTeacher = normalizeRole(user.role) == roleMohaffez;
+    String? selectedHonorific =
+        teacherHonorifics.contains(user.honorific) ? user.honorific : null;
     await showDialog(
       context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
-          title: const Text('تعديل الاسم',
-              style: TextStyle(fontWeight: FontWeight.w700, color: _DS.text1)),
-          content: TextField(
-            controller: _nameController,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              hintText: 'الاسم الكامل',
-              border: OutlineInputBorder(borderRadius: _DS.r12),
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: const RoundedRectangleBorder(borderRadius: _DS.r16),
+            title: Text(isTeacher ? 'تعديل الاسم واللقب' : 'تعديل الاسم',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, color: _DS.text1)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isTeacher) ...[
+                  DropdownButtonFormField<String?>(
+                    initialValue: selectedHonorific,
+                    decoration: const InputDecoration(
+                      labelText: 'اللقب',
+                      border: OutlineInputBorder(borderRadius: _DS.r12),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('بدون لقب'),
+                      ),
+                      ...teacherHonorifics.map(
+                        (title) => DropdownMenuItem<String?>(
+                          value: title,
+                          child: Text(title),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() => selectedHonorific = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    hintText: 'الاسم الكامل',
+                    border: OutlineInputBorder(borderRadius: _DS.r12),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+              ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(ArabicLabels.cancel),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _saveName(user.uid);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _DS.teal500,
-                shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(ArabicLabels.cancel),
               ),
-              child: const Text(ArabicLabels.save),
-            ),
-          ],
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _saveName(
+                    user.uid,
+                    isTeacher: isTeacher,
+                    honorific: selectedHonorific,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _DS.teal500,
+                  shape: const RoundedRectangleBorder(borderRadius: _DS.r8),
+                ),
+                child: const Text(ArabicLabels.save),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -765,7 +813,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       flexibleSpace: FlexibleSpaceBar(
                         collapseMode: CollapseMode.pin,
                         background: _ProfileHeader(
-                          name: user.name,
+                          name: user.displayName,
                           photoUrl: user.photoUrl,
                           isMohaffez: isMohaffez,
                           isParent: normalizeRole(user.role) == roleParent,

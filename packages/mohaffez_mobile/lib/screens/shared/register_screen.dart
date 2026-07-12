@@ -22,6 +22,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _autoValidate = false;
   String _selectedRole = 'student';
   String _selectedGender = 'male';
+  String? _selectedHonorific;
 
   IconData _genderIcon(String gender) {
     return gender == 'female' ? Icons.woman_rounded : Icons.man_rounded;
@@ -64,6 +65,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       await notifier.completeGoogleSignIn(
         role: _selectedRole,
         gender: _selectedGender,
+        honorific: _selectedHonorific,
       );
       return;
     }
@@ -103,6 +105,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       name: _nameController.text.trim(),
       role: _selectedRole,
       gender: _selectedGender,
+      honorific: _selectedHonorific,
     );
 
     if (!mounted) return;
@@ -231,6 +234,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ],
                         ),
                         const SizedBox(height: AppThemeConstants.spaceLg),
+                        if (_selectedRole == roleMohaffez) ...[
+                          DropdownButtonFormField<String?>(
+                            initialValue: _selectedHonorific,
+                            decoration: const InputDecoration(
+                              labelText: 'اللقب قبل الاسم',
+                              prefixIcon:
+                                  Icon(Icons.workspace_premium_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: AppThemeConstants.borderRadiusMd,
+                              ),
+                              filled: true,
+                              fillColor: AppThemeConstants.background,
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('بدون لقب'),
+                              ),
+                              ...teacherHonorifics.map(
+                                (title) => DropdownMenuItem<String?>(
+                                  value: title,
+                                  child: Text(title),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _selectedHonorific = value);
+                            },
+                          ),
+                          Spacing.vMd,
+                        ],
                         TextFormField(
                           controller: _nameController,
                           decoration: const InputDecoration(

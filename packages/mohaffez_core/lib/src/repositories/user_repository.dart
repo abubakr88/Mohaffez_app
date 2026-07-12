@@ -148,6 +148,9 @@ class UserRepository {
       final userData = <String, dynamic>{
         'uid': user.uid,
         'name': user.name.trim(),
+        if (normalizeRole(user.role) == roleMohaffez &&
+            teacherHonorifics.contains(user.honorific))
+          'honorific': user.honorific,
         'email': user.email.trim(),
         'role': user.role,
         'photoUrl': user.photoUrl,

@@ -977,7 +977,7 @@ class _DrawerHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = user.name;
+    final name = user.displayName;
     final email = user.email;
     final roleLabel = isAdmin
         ? 'مدير النظام'

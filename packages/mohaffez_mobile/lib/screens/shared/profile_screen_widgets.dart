@@ -51,12 +51,12 @@ class ProfileAppBar extends StatelessWidget {
                   CachedAvatar(
                     imageUrl: user.photoUrl,
                     radius: 50,
-                    semanticLabel: user.name,
+                    semanticLabel: user.displayName,
                   ),
                   const SizedBox(height: 8),
                   // Name
                   Text(
-                    user.name,
+                    user.displayName,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,

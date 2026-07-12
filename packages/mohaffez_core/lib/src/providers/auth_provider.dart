@@ -162,6 +162,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     required String name,
     required String role,
     String? gender,
+    String? honorific,
   }) async {
     state = const AsyncValue.loading();
 
@@ -186,6 +187,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'name': name,
           'email': email,
           'role': role,
+          if (role == roleMohaffez && teacherHonorifics.contains(honorific))
+            'honorific': honorific,
           'status': 'active',
           'photoUrl': null,
           'bio': null,
@@ -291,6 +294,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
   Future<void> completeGoogleSignIn({
     required String role,
     required String gender,
+    String? honorific,
   }) async {
     state = const AsyncValue.loading();
 
@@ -311,6 +315,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
           'name': name,
           'email': email,
           'role': role,
+          if (role == roleMohaffez && teacherHonorifics.contains(honorific))
+            'honorific': honorific,
           'status': 'active',
           'photoUrl': photoUrl,
           'bio': null,

@@ -306,7 +306,7 @@ bool _matchesMohaffezSearch(
 ) {
   final searchableText = _normalizeSearchText(
     [
-      mohaffez.name,
+      mohaffez.displayName,
       mohaffez.bio,
       mohaffez.specialization,
       mohaffez.addressText,

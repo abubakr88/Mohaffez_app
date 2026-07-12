@@ -40,6 +40,7 @@ import '../screens/student/nearby_mohaffez_screen.dart';
 import '../screens/student/mohaffez_profile_screen.dart';
 import '../screens/student/rate_session_screen.dart';
 import '../screens/student/booking_method_screen.dart';
+import '../screens/student/booking_status_screen.dart';
 import '../screens/student/select_bundle_plan_screen.dart';
 import '../screens/student/confirm_bundle_session_screen.dart';
 import '../screens/student/direct_booking_request_screen.dart';
@@ -377,6 +378,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/booking/method',
             name: 'booking-method',
             builder: (context, state) => const BookingMethodScreen(),
+          ),
+          GoRoute(
+            path: '/booking/status/:requestId',
+            name: 'booking-status',
+            builder: (context, state) {
+              final requestId = state.pathParameters['requestId'] ?? '';
+              return BookingStatusScreen(requestId: requestId);
+            },
           ),
           GoRoute(
             path: '/booking/select-bundle-plan',

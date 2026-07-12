@@ -394,7 +394,8 @@ class StudentHomeContent extends ConsumerWidget {
                 ),
 
                 // ─── Body ────────────────────────────────────────────────
-                if (user != null && activeProfile != null)
+                if (normalizeRole(user?.role) == roleParent &&
+                    activeProfile != null)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),

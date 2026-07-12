@@ -534,7 +534,7 @@ class _DirectPaymentScreenState extends ConsumerState<DirectPaymentScreen> {
             backgroundColor: AppThemeConstants.success,
           ),
         );
-        context.go('/home');
+        context.go('/booking/status/$requestId');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

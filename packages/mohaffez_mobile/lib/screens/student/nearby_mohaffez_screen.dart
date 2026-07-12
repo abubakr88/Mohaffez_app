@@ -2104,7 +2104,7 @@ class _MapTeacherPreviewCard extends StatelessWidget {
               CachedAvatar(
                 imageUrl: teacher.photoUrl,
                 radius: 28,
-                semanticLabel: teacher.name,
+                semanticLabel: teacher.displayName,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -2112,7 +2112,7 @@ class _MapTeacherPreviewCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      teacher.name,
+                      teacher.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -2268,7 +2268,7 @@ class _TeacherPreviewCard extends StatelessWidget {
               CachedAvatar(
                 imageUrl: teacher.photoUrl,
                 radius: 34,
-                semanticLabel: teacher.name,
+                semanticLabel: teacher.displayName,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2279,7 +2279,7 @@ class _TeacherPreviewCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            teacher.name,
+                            teacher.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -2442,7 +2442,7 @@ class _TeacherResultTile extends StatelessWidget {
               CachedAvatar(
                 imageUrl: teacher.photoUrl,
                 radius: 28,
-                semanticLabel: teacher.name,
+                semanticLabel: teacher.displayName,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -2450,7 +2450,7 @@ class _TeacherResultTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      teacher.name,
+                      teacher.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

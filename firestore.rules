@@ -129,6 +129,12 @@ service cloud.firestore {
                     request.resource.data.uid == userId &&
                     request.resource.data.role in ['student', 'parent', 'mohaffez'] &&
                     request.resource.data.status in ['active', 'pending_approval'] &&
+                    (!request.resource.data.keys().hasAny(['honorific']) ||
+                      (request.resource.data.role == 'mohaffez' &&
+                        request.resource.data.honorific in [
+                          'الشيخ', 'الشيخة', 'المعلم', 'المعلمة',
+                          'الدكتور', 'الدكتورة', 'الأستاذ', 'الأستاذة'
+                        ])) &&
                     !request.resource.data.keys().hasAny(['badges']);
 
       // User self-update: profile fields + setup account fields
@@ -139,7 +145,7 @@ service cloud.firestore {
             'followerCount', 'followingCount', 'fcmToken',
             'fcmTokenUpdatedAt', 'photoUrl', 'bio',
             'phoneNumber', 'addressText', 'addressLat',
-            'addressLng', 'specialization', 'name',
+            'addressLng', 'specialization', 'name', 'honorific',
             'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
             'trialSessionEnabled', 'trialSessionDurationMinutes',
@@ -171,6 +177,22 @@ service cloud.firestore {
               ||
               request.resource.data.trialSessionDurationMinutes
                 in [15, 20, 30, 45, 60]
+            )
+          )
+        ) &&
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['honorific'])
+          ||
+          (
+            resource.data.role == 'mohaffez' &&
+            (
+              !request.resource.data.keys().hasAny(['honorific']) ||
+              request.resource.data.honorific == null ||
+              request.resource.data.honorific in [
+                'الشيخ', 'الشيخة', 'المعلم', 'المعلمة',
+                'الدكتور', 'الدكتورة', 'الأستاذ', 'الأستاذة'
+              ]
             )
           )
         );

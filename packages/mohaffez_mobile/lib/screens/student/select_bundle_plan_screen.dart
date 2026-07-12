@@ -56,6 +56,7 @@ class _SelectBundlePlanScreenState
   bool _loadingPlans = true;
   bool _submitting = false;
   bool _requestSent = false; // true after CF returns success
+  String? _createdRequestId;
   String? _error;
 
   @override
@@ -106,13 +107,26 @@ class _SelectBundlePlanScreenState
           .toList();
       final plans = PricingCountryUtils.preferCountryPlans(
           modePlans, studentCountry.code);
+      final selectedPlanId = flow.selectedPlanId?.trim();
+      PricingPlanModel? preselectedPlan;
+      if (selectedPlanId != null && selectedPlanId.isNotEmpty) {
+        for (final plan in plans) {
+          if (plan.id == selectedPlanId) {
+            preselectedPlan = plan;
+            break;
+          }
+        }
+      }
+      final visiblePlans =
+          preselectedPlan == null ? plans : <PricingPlanModel>[preselectedPlan];
 
       debugPrint('✅ [BUNDLE_FLOW] Step2_PlansLoaded: count=${plans.length}, '
           'plans=${plans.map((p) => 'id=${p.id}, title=${p.title}, type=${p.type.name}, sessions=${p.sessionsCount}, price=${p.priceEGP}').toList()}');
 
       if (mounted) {
         setState(() {
-          _plans = plans;
+          _plans = visiblePlans;
+          _selectedPlan = preselectedPlan;
           _loadingPlans = false;
         });
       }
@@ -188,7 +202,7 @@ class _SelectBundlePlanScreenState
           'imamAddressLng': slotCtx.imamAddressLng,
         if (slotCtx.mohaffezPhone != null)
           'mohaffezPhone': slotCtx.mohaffezPhone,
-        'selectedPaymentMethod': 'directpayment',
+        'selectedPaymentMethod': 'pay_after_acceptance',
         // ── plan fields ───────────────────────────────────────────────
         'planType': plan.type.name,
         'planId': plan.id,
@@ -218,9 +232,15 @@ class _SelectBundlePlanScreenState
       debugPrint('✅ [BUNDLE_FLOW] Step3_RequestCreated: requestId=$requestId');
 
       if (mounted) {
+        if (requestId != null && requestId.isNotEmpty) {
+          ref.read(bookingFlowProvider.notifier).reset();
+          context.go('/booking/status/$requestId');
+          return;
+        }
         setState(() {
           _submitting = false;
           _requestSent = true;
+          _createdRequestId = requestId;
         });
       }
     } on FirebaseFunctionsException catch (e) {
@@ -258,11 +278,16 @@ class _SelectBundlePlanScreenState
   @override
   Widget build(BuildContext context) {
     if (_requestSent) return _buildWaitingState();
+    final hasPreselectedPlan =
+        ref.watch(bookingFlowProvider).selectedPlanId?.trim().isNotEmpty ==
+            true;
 
     return Directionality(
       textDirection: ui.TextDirection.rtl,
       child: Scaffold(
-        appBar: const AdminAppBar(title: 'اختر الباقة'),
+        appBar: AdminAppBar(
+          title: hasPreselectedPlan ? 'مراجعة الباقة' : 'اختر الباقة',
+        ),
         body: _loadingPlans
             ? const Center(child: CircularProgressIndicator())
             : _error != null && _plans.isEmpty
@@ -619,6 +644,16 @@ class _SelectBundlePlanScreenState
                   ),
                 ],
                 const SizedBox(height: 32),
+                if (_createdRequestId != null &&
+                    _createdRequestId!.isNotEmpty) ...[
+                  ElevatedButton.icon(
+                    onPressed: () =>
+                        context.go('/booking/status/${_createdRequestId!}'),
+                    icon: const Icon(Icons.track_changes_rounded),
+                    label: const Text('متابعة حالة الطلب'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 OutlinedButton.icon(
                   onPressed: () => context.go('/'),
                   icon: const Icon(Icons.home_outlined),

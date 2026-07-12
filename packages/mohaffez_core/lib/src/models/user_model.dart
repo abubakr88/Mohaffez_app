@@ -34,6 +34,29 @@ bool isSelfSelectableSignupRole(String? role) {
   return selfSelectableSignupRoles.contains(normalizeRole(role));
 }
 
+const List<String> teacherHonorifics = [
+  'الشيخ',
+  'الشيخة',
+  'المعلم',
+  'المعلمة',
+  'الدكتور',
+  'الدكتورة',
+  'الأستاذ',
+  'الأستاذة',
+];
+
+String composeTeacherDisplayName(String name, String? honorific) {
+  final cleanName = name.trim();
+  final cleanHonorific = honorific?.trim() ?? '';
+  if (cleanHonorific.isEmpty || !teacherHonorifics.contains(cleanHonorific)) {
+    return cleanName;
+  }
+  if (cleanName == cleanHonorific || cleanName.startsWith('$cleanHonorific ')) {
+    return cleanName;
+  }
+  return '$cleanHonorific $cleanName';
+}
+
 @freezed
 class UserModel with _$UserModel {
   const factory UserModel({
@@ -41,6 +64,7 @@ class UserModel with _$UserModel {
     required String name,
     required String email,
     required String role,
+    String? honorific,
     @Default('active') String status,
     String? photoUrl,
     String? bio,
@@ -108,6 +132,12 @@ class UserModel with _$UserModel {
       'meetingLinks': meetingLinks,
     });
   }
+}
+
+extension UserTeacherDisplayName on UserModel {
+  String get displayName => normalizeRole(role) == roleMohaffez
+      ? composeTeacherDisplayName(name, honorific)
+      : name;
 }
 
 class TimestampConverter implements JsonConverter<DateTime?, Object?> {
