@@ -197,6 +197,34 @@ class _ConfigForm extends ConsumerWidget {
           ],
         ),
 
+        _ConfigCard(
+          title: 'إعدادات الحسابات',
+          children: [
+            _EditableRow(
+              label: 'الحد الأدنى لعمر حساب الطالب المستقل',
+              value: '${config.minimumIndependentStudentAge} سنة',
+              onEdit: () => _editNumber(
+                context,
+                title: 'الحد الأدنى لعمر الطالب',
+                initial: '${config.minimumIndependentStudentAge}',
+                isInt: true,
+                minValue: 5,
+                maxValue: 30,
+                onSave: (n) => _save(
+                  context,
+                  ref,
+                  {'minimumIndependentStudentAge': n.toInt()},
+                ),
+              ),
+            ),
+            const SizedBox(height: DSSpacing.sm),
+            Text(
+              'الطالب الأصغر من هذا العمر سيُوجّه لاستخدام حساب ولي أمر.',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
+          ],
+        ),
+
         // ── Sessions ────────────────────────────────────────────────────
         _ConfigCard(
           title: 'إعدادات الجلسات',
@@ -442,6 +470,7 @@ class _ConfigForm extends ConsumerWidget {
     required ValueChanged<double> onSave,
     bool isInt = false,
     double? minValue,
+    double? maxValue,
   }) async {
     final controller = TextEditingController(text: initial);
     String? error;
@@ -481,6 +510,16 @@ class _ConfigForm extends ConsumerWidget {
         DSToast.show(
           context,
           'يجب ألا تقل القيمة عن ${minValue.toStringAsFixed(0)}',
+          type: DSToastType.error,
+        );
+      }
+      return;
+    }
+    if (maxValue != null && parsed > maxValue) {
+      if (context.mounted) {
+        DSToast.show(
+          context,
+          'يجب ألا تزيد القيمة عن ${maxValue.toStringAsFixed(0)}',
           type: DSToastType.error,
         );
       }

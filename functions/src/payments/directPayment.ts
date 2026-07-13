@@ -700,6 +700,7 @@ export const mohaffezConfirmDirectPayment = functions.https.onCall(
         tx.update(reqRef, {
           status:                    STATUS.ACCEPTED,
           isPaid:                    true,
+          notificationsAlreadySent:  true,
           paidAt:                    FieldValue.serverTimestamp(),
           sessionId:                 sessionRef.id,
           directPaymentConfirmedAt:  FieldValue.serverTimestamp(),

@@ -804,11 +804,6 @@ class BookingService {
 
   Future<BookingResult> cancelSessionRequest(String requestId) async {
     try {
-      // ignore: unused_local_variable
-      String? notifyMohaffezId;
-      String? notifyStudentId;
-      String? notifyStudentName;
-
       await _firestore.runTransaction((transaction) async {
         final requestRef =
             _firestore.collection('sessionRequests').doc(requestId);
@@ -829,9 +824,6 @@ class BookingService {
           throw Exception('Cannot cancel completed session');
         }
 
-        notifyStudentId = requestData['studentId'] as String?;
-        notifyMohaffezId = requestData['mohaffezId'] as String?;
-        notifyStudentName = requestData['studentName'] as String?;
         final slotLockId = requestData['slotLockId'] as String?;
         final mohaffezId = requestData['mohaffezId'] as String?;
         final slotDate = requestData['slotDate'] as Timestamp?;
@@ -881,21 +873,6 @@ class BookingService {
               });
             }
           }
-        }
-
-        if (mohaffezId != null && notifyStudentId != null) {
-          final notifRef = _firestore.collection('notifications').doc();
-          transaction.set(notifRef, {
-            'userId': mohaffezId,
-            'recipientId': mohaffezId,
-            'senderId': notifyStudentId,
-            'title': 'تم إلغاء طلب الحجز',
-            'body': 'قام $notifyStudentName بإلغاء طلب الحجز',
-            'type': 'sessionCancelled',
-            'isRead': false,
-            'requestId': requestId,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
         }
       });
 

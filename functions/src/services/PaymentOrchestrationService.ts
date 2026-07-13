@@ -156,18 +156,32 @@ export class PaymentOrchestrationService {
       },
     );
 
-    await this.notificationService.send({
-      recipientId: context.payment.studentId,
-      senderId:    context.payment.mohaffezId,
-      type:        'session_confirmed',
-      title:       'Session Confirmed',
-      message:     `Your booking with ${context.payment.mohaffezName} is confirmed after payment.`,
-      data: {
-        sessionId:  bookingResult.sessionId,
-        requestId,
-        mohaffezId: context.payment.mohaffezId,
-      },
-    });
+    await Promise.all([
+      this.notificationService.send({
+        recipientId: context.payment.studentId,
+        senderId:    context.payment.mohaffezId,
+        type:        'session_confirmed',
+        title:       'تم تأكيد حجز الجلسة ✅',
+        message:     `تم تأكيد جلستك مع ${context.payment.mohaffezName} بعد نجاح الدفع.`,
+        data: {
+          sessionId:  bookingResult.sessionId,
+          requestId,
+          mohaffezId: context.payment.mohaffezId,
+        },
+      }),
+      this.notificationService.send({
+        recipientId: context.payment.mohaffezId,
+        senderId:    context.payment.studentId,
+        type:        'session_confirmed',
+        title:       'جلسة مدفوعة جديدة ✅',
+        message:     `تم تأكيد الدفع وحجز جلسة مع ${context.payment.studentName}.`,
+        data: {
+          sessionId: bookingResult.sessionId,
+          requestId,
+          studentId: context.payment.studentId,
+        },
+      }),
+    ]);
 
     await this.eventStore.appendPaymentEvent({
       eventType: PaymentEventType.BOOKING_CONFIRMED,
@@ -203,17 +217,30 @@ export class PaymentOrchestrationService {
       updatedAt:      serverTimestamp(),
     });
 
-    await this.notificationService.send({
-      recipientId: context.payment.studentId,
-      senderId:    context.payment.mohaffezId,
-      type:        'subscription_created',
-      title:       'Subscription Activated',
-      message:     'Your subscription purchase was completed successfully.',
-      data: {
-        subscriptionId: subscriptionResult.subscriptionId,
-        mohaffezId:     context.payment.mohaffezId,
-      },
-    });
+    await Promise.all([
+      this.notificationService.send({
+        recipientId: context.payment.studentId,
+        senderId:    context.payment.mohaffezId,
+        type:        'subscription_created',
+        title:       'تم تفعيل الباقة ✅',
+        message:     `تم شراء باقتك مع ${context.payment.mohaffezName} بنجاح.`,
+        data: {
+          subscriptionId: subscriptionResult.subscriptionId,
+          mohaffezId:     context.payment.mohaffezId,
+        },
+      }),
+      this.notificationService.send({
+        recipientId: context.payment.mohaffezId,
+        senderId:    context.payment.studentId,
+        type:        'subscription_created',
+        title:       'تم شراء باقة جديدة ✅',
+        message:     `${context.payment.studentName} اشترى باقة جديدة معك.`,
+        data: {
+          subscriptionId: subscriptionResult.subscriptionId,
+          studentId:      context.payment.studentId,
+        },
+      }),
+    ]);
 
     await this.eventStore.appendPaymentEvent({
       eventType: PaymentEventType.SUBSCRIPTION_CREATED,
@@ -261,18 +288,32 @@ export class PaymentOrchestrationService {
       },
     );
 
-    await this.notificationService.send({
-      recipientId: context.payment.studentId,
-      senderId:    context.payment.mohaffezId,
-      type:        'subscription_session_consumed',
-      title:       'Session Booked',
-      message:     'A session was booked using your active subscription.',
-      data: {
-        subscriptionId,
-        sessionId:         consumptionResult.sessionId,
-        remainingSessions: consumptionResult.remainingSessions,
-      },
-    });
+    await Promise.all([
+      this.notificationService.send({
+        recipientId: context.payment.studentId,
+        senderId:    context.payment.mohaffezId,
+        type:        'subscription_session_consumed',
+        title:       'تم حجز جلسة من الباقة ✅',
+        message:     `تم تأكيد جلستك مع ${context.payment.mohaffezName} وخصم جلسة من باقتك.`,
+        data: {
+          subscriptionId,
+          sessionId:         consumptionResult.sessionId,
+          remainingSessions: consumptionResult.remainingSessions,
+        },
+      }),
+      this.notificationService.send({
+        recipientId: context.payment.mohaffezId,
+        senderId:    context.payment.studentId,
+        type:        'subscription_session_consumed',
+        title:       'جلسة جديدة من باقة',
+        message:     `${context.payment.studentName} حجز جلسة باستخدام باقته.`,
+        data: {
+          subscriptionId,
+          sessionId: consumptionResult.sessionId,
+          studentId: context.payment.studentId,
+        },
+      }),
+    ]);
 
     return {
       success:       true,

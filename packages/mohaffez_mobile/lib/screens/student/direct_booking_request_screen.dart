@@ -39,28 +39,6 @@ class _DirectBookingRequestScreenState
   // Prevents dispose from resetting the provider too early during navigation.
   bool _navigatingAway = false;
 
-  // FIX[BUNDLE-ORPHAN]: Cache the notifier reference early — before any disposal can occur.
-  // This is the canonical Riverpod pattern for using notifiers in dispose().
-  late final BookingFlowNotifier _bookingFlowNotifier;
-
-  @override
-  void initState() {
-    super.initState();
-    // Cache the notifier reference early
-    _bookingFlowNotifier = ref.read(bookingFlowProvider.notifier);
-  }
-
-  @override
-  void dispose() {
-    // If the user backed out without sending, reset the flow so the slot
-    // isn't left in a dirty state for the next booking attempt.
-    if (!_navigatingAway) {
-      // ✅ Uses cached reference — no ref access, safe after widget disposal
-      _bookingFlowNotifier.reset();
-    }
-    super.dispose();
-  }
-
   // Send request
   Future<void> sendRequest() async {
     final flow = ref.read(bookingFlowProvider);

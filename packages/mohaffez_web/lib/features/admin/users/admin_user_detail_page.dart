@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -166,6 +167,23 @@ class _ProfileHeader extends StatelessWidget {
   final String status;
   final String? photo;
 
+  Uri get _publicTeacherProfileUri => Uri.https(
+        'app.mohafezy.com',
+        '/p/t/$userId',
+      );
+
+  Future<void> _copyPublicTeacherProfile(BuildContext context) async {
+    await Clipboard.setData(
+      ClipboardData(text: _publicTeacherProfileUri.toString()),
+    );
+    if (!context.mounted) return;
+    DSToast.show(
+      context,
+      'تم نسخ رابط ملف المحفظ العام',
+      type: DSToastType.success,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DSCard(
@@ -219,6 +237,7 @@ class _ProfileHeader extends StatelessWidget {
           final summary = Wrap(
             spacing: DSSpacing.md,
             runSpacing: DSSpacing.md,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _HeaderFact(
                 label: 'انضم',
@@ -235,6 +254,14 @@ class _ProfileHeader extends StatelessWidget {
                 value: _date(user['lastActiveAt'] ?? user['lastLoginAt']),
                 icon: Icons.access_time_rounded,
               ),
+              if (role == 'mohaffez')
+                DSButton(
+                  label: 'مشاركة رابط الملف',
+                  size: DSButtonSize.sm,
+                  variant: DSButtonVariant.secondary,
+                  leading: const Icon(Icons.link_rounded, size: 16),
+                  onPressed: () => _copyPublicTeacherProfile(context),
+                ),
             ],
           );
 

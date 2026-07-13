@@ -7,6 +7,7 @@ class SystemConfigModel {
   final double directPaymentCommission;
   final double minimumWithdrawAmount;
   final double minimumTeacherHourlyRateEgp;
+  final int minimumIndependentStudentAge;
   final int paymentDeadlineHours;
   final int promoCodeMaxDiscount;
   final bool freeSessionEnabled;
@@ -67,6 +68,7 @@ class SystemConfigModel {
     required this.directPaymentCommission,
     required this.minimumWithdrawAmount,
     required this.minimumTeacherHourlyRateEgp,
+    required this.minimumIndependentStudentAge,
     required this.paymentDeadlineHours,
     required this.promoCodeMaxDiscount,
     required this.freeSessionEnabled,
@@ -126,6 +128,11 @@ class SystemConfigModel {
       minimumTeacherHourlyRateEgp:
           (data['minimumTeacherHourlyRateEgp'] as num?)?.toDouble() ??
               defaults.minimumTeacherHourlyRateEgp,
+      minimumIndependentStudentAge:
+          ((data['minimumIndependentStudentAge'] as num?)?.toInt() ??
+                  defaults.minimumIndependentStudentAge)
+              .clamp(5, 30)
+              .toInt(),
       paymentDeadlineHours: (data['paymentDeadlineHours'] as num?)?.toInt() ??
           defaults.paymentDeadlineHours,
       promoCodeMaxDiscount: (data['promoCodeMaxDiscount'] as num?)?.toInt() ??
@@ -228,6 +235,7 @@ class SystemConfigModel {
       directPaymentCommission: 0.05,
       minimumWithdrawAmount: 100.0,
       minimumTeacherHourlyRateEgp: 0.0,
+      minimumIndependentStudentAge: 18,
       paymentDeadlineHours: 48,
       promoCodeMaxDiscount: 100,
       freeSessionEnabled: true,
@@ -278,6 +286,7 @@ class SystemConfigModel {
       'directPaymentCommission': directPaymentCommission,
       'minimumWithdrawAmount': minimumWithdrawAmount,
       'minimumTeacherHourlyRateEgp': minimumTeacherHourlyRateEgp,
+      'minimumIndependentStudentAge': minimumIndependentStudentAge,
       'paymentDeadlineHours': paymentDeadlineHours,
       'promoCodeMaxDiscount': promoCodeMaxDiscount,
       'freeSessionEnabled': freeSessionEnabled,

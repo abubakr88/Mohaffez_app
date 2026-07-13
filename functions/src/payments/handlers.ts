@@ -262,6 +262,7 @@ export async function confirmBookingAfterPayment(
     transaction.update(requestRef, {
       status: STATUS.ACCEPTED,
       isPaid: true,
+      notificationsAlreadySent: true,
       sessionId:            sessionRef.id,
       paidAt:               admin.firestore.FieldValue.serverTimestamp(),
       paymentTransactionId: transactionId,
@@ -393,6 +394,7 @@ export async function consumeSubscriptionAndCreateSession(
       transaction.update(requestRef, {
         status:               STATUS.ACCEPTED,
         isPaid:               true,
+        notificationsAlreadySent: true,
         sessionId:            sessionRef.id,
         paidAt:               admin.firestore.FieldValue.serverTimestamp(),
         paymentTransactionId: transactionId,

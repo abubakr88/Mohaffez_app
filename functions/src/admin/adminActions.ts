@@ -522,6 +522,7 @@ export const sendBroadcastNotification = functions.https.onCall(async (data, con
         body,
         type: 'broadcast',
         isRead: false,
+        pushHandledExternally: true,
         data: { type: 'broadcast', targetRole },
         createdAt: FieldValue.serverTimestamp(),
       });

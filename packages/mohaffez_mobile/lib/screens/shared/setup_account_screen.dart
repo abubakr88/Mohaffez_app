@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../providers/setup_provider.dart';
 
 class SetupAccountScreen extends ConsumerStatefulWidget {
@@ -88,14 +89,14 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
   }
 
   // ─── Age check ─────────────────────────────────────────────────
-  bool _isAtLeast18(DateTime dob) {
+  bool _isAtLeastAge(DateTime dob, int minimumAge) {
     final now = DateTime.now();
     int age = now.year - dob.year;
     if (now.month < dob.month ||
         (now.month == dob.month && now.day < dob.day)) {
       age--;
     }
-    return age >= 18;
+    return age >= minimumAge;
   }
 
   int? get _birthDay => _dateOfBirth?.day;
@@ -153,7 +154,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
   }
 
   // ─── Profile "Next" handler ────────────────────────────────────
-  void _onProfileNext() {
+  Future<void> _onProfileNext() async {
     if (!_formKey.currentState!.validate()) return;
     if (_dateOfBirth == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -171,7 +172,9 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       return;
     }
 
-    final isMohaffez = ref.read(currentUserProvider).value?.role == 'mohaffez';
+    final currentUser = ref.read(currentUserProvider).value;
+    final isMohaffez = currentUser?.role == roleMohaffez;
+    final isStudent = currentUser?.role == roleStudent;
 
     if (isMohaffez == true) {
       final teacherRegistrationEnabled = ref
@@ -193,7 +196,7 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       }
     }
 
-    if (isMohaffez == true && !_isAtLeast18(_dateOfBirth!)) {
+    if (isMohaffez == true && !_isAtLeastAge(_dateOfBirth!, 18)) {
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -217,6 +220,60 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       );
       return;
     }
+
+    if (isStudent == true) {
+      late final SystemConfigModel config;
+      try {
+        config =
+            await ref.read(systemConfigRepositoryProvider).getGlobalConfig();
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'تعذّر التحقق من العمر المطلوب حالياً. يرجى المحاولة مرة أخرى.',
+              ),
+              backgroundColor: AppThemeConstants.error,
+            ),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
+      final minimumAge = config.minimumIndependentStudentAge;
+      if (!_isAtLeastAge(_dateOfBirth!, minimumAge)) {
+        final convertToParent = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              title: const Text('حساب ولي أمر مطلوب'),
+              content: Text(
+                'حساب الطالب المستقل متاح من عمر $minimumAge سنة.\n\n'
+                'يمكنك المتابعة بنفس الحساب كولي أمر، ثم إضافة الابن وإدارة حجوزاته.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('رجوع'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('المتابعة كولي أمر'),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (convertToParent == true && mounted) {
+          await _convertStudentToParentAndCompleteSetup();
+        }
+        return;
+      }
+    }
+
+    if (!mounted) return;
 
     if (isMohaffez == true) {
       // Check if user has exhausted max retries
@@ -325,6 +382,60 @@ class _SetupAccountScreenState extends ConsumerState<SetupAccountScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('حدث خطأ. يرجى المحاولة مرة أخرى')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _convertStudentToParentAndCompleteSetup() async {
+    if (_isSubmitting || _dateOfBirth == null) return;
+    setState(() => _isSubmitting = true);
+
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('convertUnderageStudentToParent')
+          .call({
+        'dateOfBirth': '${_dateOfBirth!.year.toString().padLeft(4, '0')}-'
+            '${_dateOfBirth!.month.toString().padLeft(2, '0')}-'
+            '${_dateOfBirth!.day.toString().padLeft(2, '0')}',
+      });
+
+      final uid = ref.read(currentAuthUserProvider)?.uid;
+      if (uid == null) throw Exception('المستخدم غير مسجل');
+      await SetupService.completeStudentSetup(
+        uid: uid,
+        phoneNumber: _phoneController.text.trim(),
+        dateOfBirth: _dateOfBirth!,
+        city: _cityController.text.trim(),
+        addressText: _mainLocationText!.trim(),
+        addressLat: _mainLocationLat!,
+        addressLng: _mainLocationLng!,
+        country: _countryName,
+        countryCode: _countryCode,
+      );
+
+      ref.invalidate(currentUserProvider);
+      if (mounted) context.go('/student-profiles');
+    } on FirebaseFunctionsException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.message ?? 'تعذّر تحويل الحساب إلى ولي أمر',
+            ),
+            backgroundColor: AppThemeConstants.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذّر تحويل الحساب. يرجى المحاولة مرة أخرى'),
+            backgroundColor: AppThemeConstants.error,
+          ),
         );
       }
     } finally {

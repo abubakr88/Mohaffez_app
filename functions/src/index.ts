@@ -3,6 +3,7 @@
 
 // Notification functions
 export { sendNotification } from "./notifications/sendNotification";
+export { onNotificationCreated } from "./notifications/onNotificationCreated";
 export { onSessionRequestAccepted } from "./notifications/triggers";
 export { onSessionRequestStatusChanged } from "./notifications/triggers";
 export {
@@ -69,6 +70,7 @@ export { checkVersion } from "./admin/appVersion";
 export { setAdminClaim } from "./setAdminClaim";
 export { getAdminMetrics, refreshAdminMetrics } from "./admin/metrics";
 export { setTeacherFoundingBadge } from "./admin/teacherBadges";
+export { convertUnderageStudentToParent } from "./auth/convertUnderageStudentToParent";
 
 // Per-teacher commission tier recompute (rolling 30-day revenue → tier).
 export {

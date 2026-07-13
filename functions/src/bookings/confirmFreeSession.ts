@@ -643,51 +643,6 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     };
   }
 
-  const { createAndSendNotification } = await import('../utils/notificationHelpers');
-  try {
-    await Promise.all([
-      createAndSendNotification({
-        userId: studentId,
-        senderId: mohaffezId,
-        title: 'تم تأكيد جلستك المجانية ✅',
-        body: `جلستك مع ${mohaffezName} مؤكدة.`,
-        type: 'sessionconfirmed',
-        highPriority: true,
-        data: { sessionId: result.sessionId, requestId: result.requestId },
-      }),
-      createAndSendNotification({
-        userId: mohaffezId,
-        senderId: studentId,
-        title: 'حجز جلسة مجانية جديد',
-        body: `${studentName} حجز جلسة مجانية معك.`,
-        type: 'sessionconfirmed',
-        highPriority: true,
-        data: { sessionId: result.sessionId, requestId: result.requestId },
-      }),
-    ]);
-  } catch (notifError) {
-    // FIX-CONFIRM-1: Log and enqueue for retry — do NOT crash the function.
-    // The session is already confirmed; only the push notification failed.
-    functions.logger.error('confirmFreeSession: post-transaction FCM failed', {
-      sessionId: result.sessionId,
-      requestId: result.requestId,
-      studentId,
-      mohaffezId,
-      error: notifError instanceof Error ? notifError.message : String(notifError),
-    });
-    await db.collection('failedOperations').add({
-      operationType: 'notification-free-session',
-      sessionId: result.sessionId,
-      requestId: result.requestId,
-      studentId,
-      mohaffezId,
-      error: notifError instanceof Error ? notifError.message : 'unknown',
-      timestamp: FieldValue.serverTimestamp(),
-      retryCount: 0,
-      status: 'pending-retry',
-    });
-  }
-
   // BUG #1 FIX: Call EventStore and update payment document after transaction commits
   // This ensures the payment event is properly recorded for analytics
   if (paymentId && paymentId.trim() !== '') {

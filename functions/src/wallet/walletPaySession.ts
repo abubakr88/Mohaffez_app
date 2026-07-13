@@ -275,6 +275,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
     tx.update(reqRef, {
       status: 'accepted',
       isPaid: true,
+      notificationsAlreadySent: true,
       paidAt: FieldValue.serverTimestamp(),
       sessionId: sessionRef.id,
       subscriptionId,
@@ -297,6 +298,23 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
       body: `${req.studentName ?? 'طالب'} حجز جلسة وتم خصم ${amountEgp} ج.م من محفظته`,
       type: 'session_paid_wallet',
       isRead: false,
+      data: {
+        sessionId: sessionRef.id,
+        sessionRequestId,
+      },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    const studentNotifRef = db.collection('notifications').doc();
+    tx.set(studentNotifRef, {
+      userId: studentId,
+      recipientId: studentId,
+      senderId: mohaffezId,
+      title: 'تم تأكيد الحجز من المحفظة ✅',
+      body: `تم خصم ${amountEgp} ج.م وتأكيد جلستك مع ${req.mohaffezName ?? 'المحفظ'}.`,
+      type: 'session_paid_wallet',
+      isRead: false,
+      highPriority: true,
       data: {
         sessionId: sessionRef.id,
         sessionRequestId,

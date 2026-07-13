@@ -507,6 +507,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
               {
                 status: 'accepted',
                 isPaid: true,
+                notificationsAlreadySent: true,
                 paidAt: FieldValue.serverTimestamp(),
                 subscriptionId: subscriptionRef.id,
                 sessionId: sessionRef.id,
@@ -544,6 +545,7 @@ export const confirmBundleDirectPayment = functions.https.onCall(
               slotStart: slotStartTs,
               slotEnd: slotEndTs,
               status: 'accepted',
+              notificationsAlreadySent: true,
               paymentType: 'bundle',
               subscriptionId: subscriptionRef.id,
               sessionId: sessionRef.id,
