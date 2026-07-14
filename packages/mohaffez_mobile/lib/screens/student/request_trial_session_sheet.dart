@@ -8,6 +8,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 
 import '../../providers/trial_session_provider.dart';
 import '../../shared/utils/booking_learner_guard.dart';
+import '../../shared/widgets/meeting_provider_picker.dart';
 
 class RequestTrialSessionSheet extends ConsumerStatefulWidget {
   const RequestTrialSessionSheet({
@@ -61,6 +62,7 @@ class _RequestTrialSessionSheetState
     extends ConsumerState<RequestTrialSessionSheet> {
   late final List<_DayAvailability> _days;
   late String _sessionType;
+  String? _selectedProvider;
 
   @override
   void initState() {
@@ -110,6 +112,11 @@ class _RequestTrialSessionSheetState
   }
 
   Future<void> _submit() async {
+    if (_sessionType == 'online' && _selectedProvider == null) {
+      _showMessage('اختر وسيلة الاتصال للحلقة التجريبية.');
+      return;
+    }
+
     final enabledDays = _days.where((day) => day.enabled).toList();
     if (enabledDays.isEmpty) {
       _showMessage('اختر يومًا واحدًا على الأقل.');
@@ -154,6 +161,7 @@ class _RequestTrialSessionSheetState
       await ref.read(trialSessionActionsProvider.notifier).createRequest(
         mohaffezId: widget.mohaffezId,
         sessionType: _sessionType,
+        preferredProvider: _sessionType == 'online' ? _selectedProvider : null,
         availabilityWindows: windows,
         learnerSnapshot: {
           'studentName': activeProfile.name,
@@ -256,12 +264,27 @@ class _RequestTrialSessionSheetState
                 ),
                 const SizedBox(height: 18),
               ],
+              if (_sessionType == 'online') ...[
+                MeetingProviderPicker(
+                  teacherId: widget.mohaffezId,
+                  selected: _selectedProvider,
+                  onChanged: (provider) {
+                    if (!mounted || provider == _selectedProvider) return;
+                    setState(() => _selectedProvider = provider);
+                  },
+                ),
+                const SizedBox(height: 18),
+              ],
               ..._days.map(_buildDayCard),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: loading ? null : _submit,
+                  onPressed: loading ||
+                          (_sessionType == 'online' &&
+                              _selectedProvider == null)
+                      ? null
+                      : _submit,
                   icon: loading
                       ? const SizedBox.square(
                           dimension: 18,

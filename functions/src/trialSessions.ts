@@ -22,6 +22,19 @@ const ACTIVE_SESSION_STATUSES = new Set([
   'ongoing',
 ]);
 
+const ONLINE_PROVIDERS = new Set([
+  'zoom',
+  'googleMeet',
+  'teams',
+  'phoneCall',
+]);
+
+const PROVIDER_HOSTS: Record<string, string[]> = {
+  zoom: ['zoom.us'],
+  googleMeet: ['meet.google.com'],
+  teams: ['teams.microsoft.com', 'teams.live.com'],
+};
+
 interface TimeWindow {
   start: admin.firestore.Timestamp;
   end: admin.firestore.Timestamp;
@@ -49,6 +62,30 @@ function optionalTimestamp(value: unknown): admin.firestore.Timestamp | null {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return admin.firestore.Timestamp.fromDate(parsed);
+}
+
+function onlineProviderIsAvailable(
+  provider: string,
+  teacher: FirebaseFirestore.DocumentData,
+  student: FirebaseFirestore.DocumentData,
+): boolean {
+  if (provider === 'phoneCall') {
+    return optionalString(teacher.phoneNumber) !== null &&
+      optionalString(student.phoneNumber) !== null;
+  }
+
+  const rawLinks = teacher.meetingLinks;
+  if (
+    rawLinks &&
+    typeof rawLinks === 'object' &&
+    optionalString((rawLinks as Record<string, unknown>)[provider]) !== null
+  ) {
+    return true;
+  }
+
+  const legacyLink = optionalString(teacher.meetingLink)?.toLowerCase();
+  return legacyLink !== undefined && legacyLink !== null &&
+    (PROVIDER_HOSTS[provider] ?? []).some((host) => legacyLink.includes(host));
 }
 
 function isLearnerRole(role: unknown): boolean {
@@ -293,6 +330,7 @@ export const createTrialSessionRequest = functions.https.onCall(
       typeof data?.mohaffezId === 'string' ? data.mohaffezId.trim() : '';
     const sessionType =
       typeof data?.sessionType === 'string' ? data.sessionType.trim() : '';
+    const preferredProvider = optionalString(data?.preferredProvider);
     const studentProfileId = optionalString(data?.studentProfileId);
     const studentProfileName = optionalString(data?.studentProfileName);
     const studentProfileGender = optionalString(data?.studentProfileGender);
@@ -306,6 +344,16 @@ export const createTrialSessionRequest = functions.https.onCall(
       throw new functions.https.HttpsError(
         'invalid-argument',
         'Teacher and session type are required',
+      );
+    }
+    if (
+      sessionType === 'online' &&
+      preferredProvider !== null &&
+      !ONLINE_PROVIDERS.has(preferredProvider)
+    ) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Choose an available communication method',
       );
     }
     if (studentId === mohaffezId) {
@@ -368,6 +416,23 @@ export const createTrialSessionRequest = functions.https.onCall(
         offsetMinutes,
       );
       const student = studentSnap.data() ?? {};
+      let resolvedPreferredProvider: string | null = null;
+      if (sessionType === 'online') {
+        const availableProviders = [...ONLINE_PROVIDERS].filter((provider) =>
+          onlineProviderIsAvailable(provider, teacher, student),
+        );
+        resolvedPreferredProvider =
+          preferredProvider ?? availableProviders[0] ?? null;
+        if (
+          !resolvedPreferredProvider ||
+          !availableProviders.includes(resolvedPreferredProvider)
+        ) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'The selected communication method is no longer available',
+          );
+        }
+      }
       const displayStudentName =
         studentProfileName ||
         requestedStudentName ||
@@ -387,6 +452,7 @@ export const createTrialSessionRequest = functions.https.onCall(
         mohaffezId,
         mohaffezName: teacher.name ?? teacher.displayName ?? '',
         sessionType,
+        preferredProvider: resolvedPreferredProvider,
         durationMinutes,
         timezoneOffsetMinutes: offsetMinutes,
         availabilityWindows,
@@ -618,6 +684,10 @@ export const confirmTrialSessionTime = functions.https.onCall(
         studentProfileGender: request.studentProfileGender ?? null,
         studentProfileBirthDate: request.studentProfileBirthDate ?? null,
         sessionType: request.sessionType,
+        preferredProvider:
+          request.sessionType === 'online'
+            ? request.preferredProvider ?? null
+            : null,
         preferredTimeSlot: timeSlot,
         timeSlot,
         sessionDate: admin.firestore.Timestamp.fromDate(sessionDay),

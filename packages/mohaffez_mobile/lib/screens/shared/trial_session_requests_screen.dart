@@ -141,6 +141,7 @@ class _TeacherTrialRequestCard extends ConsumerWidget {
       title: request['studentName'] as String? ?? 'طالب',
       status: status,
       sessionType: request['sessionType'] as String? ?? 'online',
+      preferredProvider: request['preferredProvider'] as String?,
       durationMinutes: (request['durationMinutes'] as num?)?.toInt() ?? 30,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,6 +362,7 @@ class _StudentTrialRequestCard extends ConsumerWidget {
       title: request['mohaffezName'] as String? ?? 'المحفظ',
       status: status,
       sessionType: request['sessionType'] as String? ?? 'online',
+      preferredProvider: request['preferredProvider'] as String?,
       durationMinutes: (request['durationMinutes'] as num?)?.toInt() ?? 30,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,6 +433,7 @@ class _TrialCard extends StatelessWidget {
     required this.title,
     required this.status,
     required this.sessionType,
+    this.preferredProvider,
     required this.durationMinutes,
     required this.child,
   });
@@ -438,6 +441,7 @@ class _TrialCard extends StatelessWidget {
   final String title;
   final String status;
   final String sessionType;
+  final String? preferredProvider;
   final int durationMinutes;
   final Widget child;
 
@@ -482,6 +486,12 @@ class _TrialCard extends StatelessWidget {
                   icon: _sessionIcon(sessionType),
                   label: _sessionLabel(sessionType),
                 ),
+                if (sessionType == 'online' &&
+                    preferredProvider?.isNotEmpty == true)
+                  _InfoChip(
+                    icon: _providerIcon(preferredProvider!),
+                    label: _providerLabel(preferredProvider!),
+                  ),
                 const _InfoChip(
                   icon: Icons.money_off,
                   label: 'مجانًا',
@@ -770,6 +780,27 @@ IconData _sessionIcon(String type) {
     default:
       return Icons.videocam_outlined;
   }
+}
+
+String _providerLabel(String provider) {
+  switch (provider) {
+    case 'zoom':
+      return 'Zoom';
+    case 'googleMeet':
+      return 'Google Meet';
+    case 'teams':
+      return 'Microsoft Teams';
+    case 'phoneCall':
+      return 'مكالمة هاتفية';
+    default:
+      return 'وسيلة اتصال أونلاين';
+  }
+}
+
+IconData _providerIcon(String provider) {
+  return provider == 'phoneCall'
+      ? Icons.phone_outlined
+      : Icons.video_call_outlined;
 }
 
 void _message(BuildContext context, String message) {

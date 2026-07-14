@@ -496,8 +496,12 @@ class BookingService {
         case 'not-found':
           errorMessage = 'كود الخصم غير صحيح';
           break;
+        case 'already-exists':
+          errorMessage = e.message ??
+              'لقد استخدمت كود الخصم من قبل، ولا يمكن استخدامه أكثر من مرة.';
+          break;
         case 'failed-precondition':
-          errorMessage = 'لا يمكن إتمام العملية في الوقت الحالي';
+          errorMessage = e.message ?? 'لا يمكن إتمام العملية في الوقت الحالي';
           break;
         case 'deadline-exceeded':
           errorMessage = 'انتهت مهلة الطلب. يرجى المحاولة مرة أخرى';

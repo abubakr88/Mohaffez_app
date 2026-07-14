@@ -686,6 +686,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /adminTeacherAnalytics/{teacherId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ============================================
     // SLOT LOCKING
     // ============================================
@@ -720,19 +725,21 @@ service cloud.firestore {
     match /promocodes/{promoCode} {
       allow read: if isAuthenticated();
       allow create: if canManageFinance();
-      allow update: if isAuthenticated() &&
-                    (canManageFinance() ||
-                     onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']));
+      allow update: if canManageFinance();
       allow delete: if canManageFinance();
     }
 
     match /promoCodes/{promoCode} {
       allow read: if isAuthenticated();
       allow create: if canManageFinance();
-      allow update: if isAuthenticated() &&
-                    (canManageFinance() ||
-                     onlyUpdating(['usedCount', 'updatedAt', 'lastUsedAt', 'lastUsedBy']));
+      allow update: if canManageFinance();
       allow delete: if canManageFinance();
+
+      match /redemptions/{userId} {
+        allow read: if isAuthenticated() &&
+                    (request.auth.uid == userId || canManageFinance());
+        allow write: if false;
+      }
     }
 
     // ============================================
@@ -861,7 +868,10 @@ service cloud.firestore {
     }
 
     match /systemConfig/{configId} {
-      allow read: if configId != 'adminMetrics' || isAdmin();
+      allow read: if (
+                    configId != 'adminMetrics' &&
+                    configId != 'adminInsights'
+                  ) || isAdmin();
       allow write: if isSuperAdmin();
       allow create: if isPaymobToggleWrite(configId) &&
                     request.resource.data.keys().hasOnly([

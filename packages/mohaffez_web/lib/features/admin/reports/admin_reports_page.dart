@@ -12,6 +12,8 @@ class AdminReportsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final metricsAsync = ref.watch(adminMetricsStreamProvider);
+    final insightsAsync = ref.watch(adminInsightsStreamProvider);
+    final insights = insightsAsync.asData?.value;
 
     return PageContainer(
       child: Column(
@@ -26,7 +28,7 @@ class AdminReportsPage extends ConsumerWidget {
                 ),
               ),
               metricsAsync.maybeWhen(
-                data: (m) => _ExportMenu(metrics: m),
+                data: (m) => _ExportMenu(metrics: m, insights: insights),
                 orElse: () => const SizedBox.shrink(),
               ),
             ],
@@ -50,6 +52,13 @@ class AdminReportsPage extends ConsumerWidget {
                 _ComparisonRow(metrics: m),
                 const SizedBox(height: DSSpacing.xxl),
 
+                _InsightsReport(
+                  insights: insights,
+                  loading: insightsAsync.isLoading,
+                  hasError: insightsAsync.hasError,
+                ),
+                const SizedBox(height: DSSpacing.xxl),
+
                 DSGrid(
                   mobileColumns: 1,
                   tabletColumns: 2,
@@ -65,7 +74,14 @@ class AdminReportsPage extends ConsumerWidget {
                 const SizedBox(height: DSSpacing.xxl),
                 const _TopTeachersCard(),
                 const SizedBox(height: DSSpacing.xxl),
-                _CommissionsSummaryCard(c: m.commissions),
+                if (insights?.generatedAt != null)
+                  _FinanceLedgerCard(finance: insights!.finance)
+                else
+                  const DSBanner(
+                    message:
+                        'سيظهر الملخص المالي المرصود بعد نشر دوال التحليلات وتحديث المؤشرات.',
+                    variant: DSBannerVariant.info,
+                  ),
               ],
             ),
           ),
@@ -77,8 +93,9 @@ class AdminReportsPage extends ConsumerWidget {
 
 // ── Export ────────────────────────────────────────────────────────────────
 class _ExportMenu extends StatelessWidget {
-  const _ExportMenu({required this.metrics});
+  const _ExportMenu({required this.metrics, required this.insights});
   final AdminMetrics metrics;
+  final AdminInsights? insights;
 
   String get _stamp => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -94,20 +111,24 @@ class _ExportMenu extends StatelessWidget {
 
   void _exportSummary() {
     final r = metrics.revenue;
-    final c = metrics.commissions;
     final s = metrics.sessions;
     final sub = metrics.subscriptions;
     final u = metrics.users;
+    final finance = insights?.finance;
     final csv = buildCsv(
       ['المؤشر', 'القيمة'],
       [
         ['إيرادات هذا الشهر', r.thisMonth.round()],
         ['إيرادات الشهر السابق', r.lastMonth.round()],
         ['إيرادات السنة', r.ytd.round()],
-        ['عمولات مستحقة', c.outstanding.round()],
-        ['عمولات متأخرة', c.overdue.round()],
-        ['بانتظار التأكيد', c.pendingVerification.round()],
-        ['مدفوع هذا الشهر', c.paidThisMonth.round()],
+        if (finance != null) ...[
+          ['إجمالي المدفوعات المرصودة', finance.grossRevenueEgp],
+          ['صافي المدفوعات المرصودة', finance.netRevenueEgp],
+          ['استردادات مرصودة', finance.refundedAmountEgp],
+          ['عمولة المنصة المرصودة', finance.commissionAccruedEgp],
+          ['عكس عمولة مرصود', finance.commissionReversedEgp],
+          ['شحن محافظ مرصود', finance.walletTopUpsEgp],
+        ],
         ['جلسات منجزة (الشهر)', s.completedThisMonth],
         ['جلسات منجزة (الشهر السابق)', s.completedLastMonth],
         ['جلسات ملغاة (الشهر)', s.cancelledThisMonth],
@@ -124,6 +145,36 @@ class _ExportMenu extends StatelessWidget {
     downloadCsv('mohafezy-summary-$_stamp.csv', csv);
   }
 
+  void _exportInsights() {
+    final value = insights;
+    if (value == null || value.generatedAt == null) return;
+    final growth = value.growth;
+    final operations = value.operations;
+    final finance = value.finance;
+    final csv = buildCsv(
+      ['المؤشر', 'القيمة'],
+      [
+        ['الفترة', value.period],
+        ['تسجيلات جديدة', growth.signups],
+        ['طلبات حجز', growth.requestsCreated],
+        ['طلبات مقبولة', growth.requestsAccepted],
+        ['دفعات مكتملة', growth.paymentsCompleted],
+        ['جلسات مكتملة', growth.sessionsCompleted],
+        ['عمليات فاشلة', operations.failedOperations],
+        ['تنبيهات غير معالجة', operations.unresolvedAlerts],
+        ['مدفوعات معلقة', operations.pendingPayments],
+        ['تحويلات مباشرة معلقة', operations.pendingDirectPayments],
+        ['إجمالي مدفوعات مرصودة', finance.grossRevenueEgp],
+        ['صافي مدفوعات مرصودة', finance.netRevenueEgp],
+        ['استردادات مرصودة', finance.refundedAmountEgp],
+        ['عمولة منصة مرصودة', finance.commissionAccruedEgp],
+        ['عكس عمولة مرصود', finance.commissionReversedEgp],
+        ['شحن محافظ مرصود', finance.walletTopUpsEgp],
+      ],
+    );
+    downloadCsv('mohafezy-insights-$_stamp.csv', csv);
+  }
+
   @override
   Widget build(BuildContext context) {
     return DSDropdownMenu(
@@ -138,6 +189,12 @@ class _ExportMenu extends StatelessWidget {
           icon: Icons.show_chart_rounded,
           onTap: _exportMonthly,
         ),
+        if (insights?.generatedAt != null)
+          DSDropdownItem(
+            label: 'مؤشرات التسويق والتشغيل (CSV)',
+            icon: Icons.analytics_outlined,
+            onTap: _exportInsights,
+          ),
       ],
       child: DSButton(
         label: 'تصدير',
@@ -226,6 +283,256 @@ class _SkeletonGrid extends StatelessWidget {
   }
 }
 
+class _InsightsReport extends StatelessWidget {
+  const _InsightsReport({
+    required this.insights,
+    required this.loading,
+    required this.hasError,
+  });
+
+  final AdminInsights? insights;
+  final bool loading;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = insights;
+    if (loading && value == null) {
+      return const _SkeletonGrid();
+    }
+    if (hasError) {
+      return const DSBanner(
+        message: 'تعذر تحميل مؤشرات التسويق والتشغيل.',
+        variant: DSBannerVariant.error,
+      );
+    }
+    if (value == null || value.generatedAt == null) {
+      return const DSBanner(
+        message:
+            'تبدأ مؤشرات التسويق والتشغيل في الظهور بعد نشر دوال التحليلات.',
+        variant: DSBannerVariant.info,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'التسويق والأداء التشغيلي'),
+        const SizedBox(height: DSSpacing.md),
+        Text(
+          'الفترة الحالية: ${value.period}',
+          style: DSText.caption(context, color: DSColors.text3),
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 3,
+          children: [
+            _ConversionFunnelCard(growth: value.growth),
+            _SignupBreakdownCard(growth: value.growth),
+            _OperationalHealthCard(operations: value.operations),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ConversionFunnelCard extends StatelessWidget {
+  const _ConversionFunnelCard({required this.growth});
+
+  final GrowthInsights growth;
+
+  @override
+  Widget build(BuildContext context) {
+    return DSCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'مسار التحويل'),
+          const SizedBox(height: DSSpacing.lg),
+          _ProgressMetric(
+            label: 'طلبات الحجز',
+            count: growth.requestsCreated,
+            value: growth.requestsCreated > 0 ? 1 : 0,
+            color: DSColors.primary,
+          ),
+          _ProgressMetric(
+            label: 'تم قبولها',
+            count: growth.requestsAccepted,
+            value: _ratio(
+              growth.requestsAccepted,
+              growth.requestsCreated,
+            ),
+            color: DSColors.success,
+          ),
+          _ProgressMetric(
+            label: 'اكتمل دفعها',
+            count: growth.paymentsCompleted,
+            value: _ratio(
+              growth.paymentsCompleted,
+              growth.requestsAccepted,
+            ),
+            color: DSColors.secondary,
+          ),
+          _ProgressMetric(
+            label: 'اكتملت جلساتها',
+            count: growth.sessionsCompleted,
+            value: _ratio(
+              growth.sessionsCompleted,
+              growth.paymentsCompleted,
+            ),
+            color: DSColors.success,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignupBreakdownCard extends StatelessWidget {
+  const _SignupBreakdownCard({required this.growth});
+
+  final GrowthInsights growth;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = growth.signupsByRole.entries.toList()
+      ..sort((left, right) => right.value.compareTo(left.value));
+    return DSCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'التسجيلات الجديدة'),
+          const SizedBox(height: DSSpacing.sm),
+          Text(
+            '${growth.signups} حساب خلال الفترة',
+            style: DSText.caption(context, color: DSColors.text3),
+          ),
+          const SizedBox(height: DSSpacing.lg),
+          if (entries.isEmpty)
+            Text(
+              'لا توجد تسجيلات مرصودة بعد.',
+              style: DSText.body(context, color: DSColors.text3),
+            )
+          else
+            ...entries.map(
+              (entry) => _ProgressMetric(
+                label: _roleLabel(entry.key),
+                count: entry.value,
+                value: _ratio(entry.value, growth.signups),
+                color: _roleColor(entry.key),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OperationalHealthCard extends StatelessWidget {
+  const _OperationalHealthCard({required this.operations});
+
+  final OperationsInsights operations;
+
+  @override
+  Widget build(BuildContext context) {
+    return DSCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeader(title: 'المشكلات والمتابعة'),
+          const SizedBox(height: DSSpacing.lg),
+          _Row(
+            label: 'عمليات فاشلة تحتاج متابعة',
+            value: '${operations.failedOperations}',
+            color: operations.failedOperations > 0 ? DSColors.error : null,
+          ),
+          _Row(
+            label: 'تنبيهات غير معالجة',
+            value: '${operations.unresolvedAlerts}',
+            color: operations.unresolvedAlerts > 0 ? DSColors.warning : null,
+          ),
+          _Row(
+            label: 'مدفوعات إلكترونية معلقة',
+            value: '${operations.pendingPayments}',
+            color: operations.pendingPayments > 0 ? DSColors.warning : null,
+          ),
+          _Row(
+            label: 'تحويلات مباشرة معلقة',
+            value: '${operations.pendingDirectPayments}',
+            color:
+                operations.pendingDirectPayments > 0 ? DSColors.warning : null,
+          ),
+          _Row(
+            label: 'دفعات فاشلة هذا الشهر',
+            value: '${operations.failedPaymentsThisMonth}',
+            color:
+                operations.failedPaymentsThisMonth > 0 ? DSColors.error : null,
+          ),
+          _Row(
+            label: 'جلسات ملغاة هذا الشهر',
+            value: '${operations.cancelledSessionsThisMonth}',
+          ),
+          _Row(
+            label: 'غياب طالب / محفظ',
+            value:
+                '${operations.studentNoShowsThisMonth} / ${operations.teacherNoShowsThisMonth}',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressMetric extends StatelessWidget {
+  const _ProgressMetric({
+    required this.label,
+    required this.count,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final double value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: DSSpacing.md),
+      child: DSProgressBar(
+        label: '$label ($count)',
+        value: value.clamp(0, 1),
+        color: color,
+        showPercent: true,
+      ),
+    );
+  }
+}
+
+double _ratio(num numerator, num denominator) {
+  if (denominator <= 0) return 0;
+  return numerator / denominator;
+}
+
+String _roleLabel(String role) => switch (role) {
+      'student' => 'طلاب',
+      'parent' => 'أولياء أمور',
+      'mohaffez' => 'محفظون',
+      'admin' => 'مديرون',
+      _ => 'أخرى',
+    };
+
+Color _roleColor(String role) => switch (role) {
+      'student' => DSColors.success,
+      'parent' => DSColors.secondary,
+      'mohaffez' => DSColors.primary,
+      _ => DSColors.text3,
+    };
+
 class _UsersBreakdownCard extends StatelessWidget {
   final UserMetrics users;
   const _UsersBreakdownCard({required this.users});
@@ -292,9 +599,15 @@ class _SessionsCard extends StatelessWidget {
         children: [
           const SectionHeader(title: 'الجلسات'),
           const SizedBox(height: DSSpacing.lg),
-          _Row(label: 'منجزة هذا الشهر', value: '${sessions.completedThisMonth}'),
-          _Row(label: 'منجزة الشهر السابق', value: '${sessions.completedLastMonth}'),
-          _Row(label: 'ملغاة هذا الشهر', value: '${sessions.cancelledThisMonth}'),
+          _Row(
+              label: 'منجزة هذا الشهر',
+              value: '${sessions.completedThisMonth}'),
+          _Row(
+              label: 'منجزة الشهر السابق',
+              value: '${sessions.completedLastMonth}'),
+          _Row(
+              label: 'ملغاة هذا الشهر',
+              value: '${sessions.cancelledThisMonth}'),
           _Row(
               label: 'قيد الإنتظار الآن',
               value: '${sessions.pendingNow}',
@@ -364,7 +677,8 @@ class _RevenueLineCard extends StatelessWidget {
         ),
       );
     }
-    final maxValue = months.fold<double>(0, (m, e) => e.total > m ? e.total : m);
+    final maxValue =
+        months.fold<double>(0, (m, e) => e.total > m ? e.total : m);
     final upper = maxValue == 0 ? 1.0 : maxValue * 1.2;
 
     return DSCard(
@@ -457,8 +771,18 @@ class _RevenueLineCard extends StatelessWidget {
 
   static String _shortMonth(int m) {
     const names = [
-      'ينا', 'فبر', 'مار', 'أبر', 'ماي', 'يون',
-      'يول', 'أغس', 'سبت', 'أكت', 'نوف', 'ديس',
+      'ينا',
+      'فبر',
+      'مار',
+      'أبر',
+      'ماي',
+      'يون',
+      'يول',
+      'أغس',
+      'سبت',
+      'أكت',
+      'نوف',
+      'ديس',
     ];
     if (m < 1 || m > 12) return '';
     return names[m - 1];
@@ -480,7 +804,13 @@ class _TopTeachersCardState extends ConsumerState<_TopTeachersCard> {
       ['#', 'المحفظ', 'المعرّف', 'جلسات منجزة', 'الإيراد (ج.م)'],
       [
         for (var i = 0; i < rows.length; i++)
-          [i + 1, rows[i].name, rows[i].mohaffezId, rows[i].sessionCount, rows[i].revenue.round()],
+          [
+            i + 1,
+            rows[i].name,
+            rows[i].mohaffezId,
+            rows[i].sessionCount,
+            rows[i].revenue.round()
+          ],
       ],
     );
     downloadCsv(
@@ -662,55 +992,150 @@ class _TeacherRow extends StatelessWidget {
   }
 }
 
-class _CommissionsSummaryCard extends StatelessWidget {
-  final CommissionMetrics c;
-  const _CommissionsSummaryCard({required this.c});
+class _FinanceLedgerCard extends StatelessWidget {
+  const _FinanceLedgerCard({required this.finance});
 
-  String _money(double v) =>
-      '${NumberFormat.decimalPattern('ar').format(v.round())} ج.م';
+  final FinanceInsights finance;
+
+  String _money(double value) =>
+      '${NumberFormat.decimalPattern('ar').format(value.round())} ج.م';
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'الملخص المالي المرصود'),
+        const SizedBox(height: DSSpacing.md),
+        Text(
+          'يعتمد على أحداث الدفع ودفتر المحفظة غير القابل للتعديل خلال الفترة الحالية.',
+          style: DSText.caption(context, color: DSColors.text3),
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 4,
+          children: [
+            DSStatCard(
+              label: 'إجمالي المدفوعات',
+              value: _money(finance.grossRevenueEgp),
+              icon: Icons.payments_outlined,
+              iconColor: DSColors.primary,
+            ),
+            DSStatCard(
+              label: 'صافي المدفوعات',
+              value: _money(finance.netRevenueEgp),
+              trend: finance.refundedAmountEgp > 0
+                  ? 'استردادات: ${_money(finance.refundedAmountEgp)}'
+                  : 'لا توجد استردادات مرصودة',
+              trendPositive: finance.refundedAmountEgp == 0,
+              icon: Icons.account_balance_outlined,
+              iconColor: DSColors.success,
+            ),
+            DSStatCard(
+              label: 'عمولة المنصة',
+              value: _money(finance.commissionAccruedEgp),
+              trend: finance.commissionReversedEgp > 0
+                  ? 'عكس عمولة: ${_money(finance.commissionReversedEgp)}'
+                  : 'بعد التسويات المسجلة',
+              trendPositive: finance.commissionReversedEgp == 0,
+              icon: Icons.percent_rounded,
+              iconColor: DSColors.secondary,
+            ),
+            DSStatCard(
+              label: 'شحن المحافظ',
+              value: _money(finance.walletTopUpsEgp),
+              icon: Icons.account_balance_wallet_outlined,
+              iconColor: DSColors.warning,
+            ),
+          ],
+        ),
+        const SizedBox(height: DSSpacing.lg),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 2,
+          children: [
+            _FinancialBreakdownCard(
+              title: 'الإيراد حسب وسيلة الدفع',
+              values: finance.revenueByMethod,
+              labelForKey: _paymentMethodLabel,
+              color: DSColors.primary,
+            ),
+            _FinancialBreakdownCard(
+              title: 'الإيراد حسب نوع الخطة',
+              values: finance.revenueByPlanType,
+              labelForKey: _planTypeLabel,
+              color: DSColors.secondary,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FinancialBreakdownCard extends StatelessWidget {
+  const _FinancialBreakdownCard({
+    required this.title,
+    required this.values,
+    required this.labelForKey,
+    required this.color,
+  });
+
+  final String title;
+  final Map<String, double> values;
+  final String Function(String) labelForKey;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = values.entries.where((entry) => entry.value > 0).toList()
+      ..sort((left, right) => right.value.compareTo(left.value));
+    final total = entries.fold<double>(0, (sum, entry) => sum + entry.value);
     return DSCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionHeader(title: 'ملخص العمولات'),
+          SectionHeader(title: title),
           const SizedBox(height: DSSpacing.lg),
-          DSGrid(
-            mobileColumns: 2,
-            tabletColumns: 4,
-            desktopColumns: 5,
-            children: [
-              DSStatCard(
-                  label: 'إجمالي مستحق',
-                  value: _money(c.outstanding),
-                  icon: Icons.account_balance_wallet_outlined,
-                  iconColor: DSColors.warning),
-              DSStatCard(
-                  label: 'متأخرات',
-                  value: _money(c.overdue),
-                  icon: Icons.report_outlined,
-                  iconColor: DSColors.error),
-              DSStatCard(
-                  label: 'بانتظار التأكيد',
-                  value: _money(c.pendingVerification),
-                  icon: Icons.fact_check_outlined,
-                  iconColor: DSColors.secondary),
-              DSStatCard(
-                  label: 'مدفوع هذا الشهر',
-                  value: _money(c.paidThisMonth),
-                  icon: Icons.check_circle_outline_rounded,
-                  iconColor: DSColors.success),
-              DSStatCard(
-                  label: 'مدفوع الشهر السابق',
-                  value: _money(c.paidLastMonth),
-                  icon: Icons.history_rounded,
-                  iconColor: DSColors.primary),
-            ],
-          ),
+          if (entries.isEmpty)
+            Text(
+              'لا توجد بيانات مرصودة بعد.',
+              style: DSText.body(context, color: DSColors.text3),
+            )
+          else
+            ...entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: DSSpacing.md),
+                child: DSProgressBar(
+                  label:
+                      '${labelForKey(entry.key)} (${NumberFormat.decimalPattern('ar').format(entry.value.round())} ج.م)',
+                  value: total <= 0 ? 0 : entry.value / total,
+                  color: color,
+                  showPercent: true,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
+
+String _paymentMethodLabel(String value) => switch (value) {
+      'paymob' || 'card' => 'بطاقة / Paymob',
+      'wallet' => 'محفظة التطبيق',
+      'instapay' => 'InstaPay',
+      'vodafone_cash' => 'Vodafone Cash',
+      'cash' || 'direct' => 'دفع مباشر',
+      _ => value == 'unknown' ? 'غير محدد' : value,
+    };
+
+String _planTypeLabel(String value) => switch (value) {
+      'single' => 'جلسة واحدة',
+      'bundle' => 'باقة جلسات',
+      'subscription' => 'اشتراك',
+      _ => value == 'unknown' ? 'غير محدد' : value,
+    };

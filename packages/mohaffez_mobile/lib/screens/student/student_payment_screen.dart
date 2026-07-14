@@ -1851,7 +1851,12 @@ class _StudentPaymentScreenState extends ConsumerState<StudentPaymentScreen> {
           context.go('/home');
         }
       } else {
-        throw Exception(result.errorMessage ?? 'فشل تأكيد الجلسة');
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(result.errorMessage ?? 'تعذر تأكيد الجلسة'),
+          backgroundColor: AppThemeConstants.error,
+          duration: const Duration(seconds: 5),
+        ));
       }
     } catch (e, stack) {
       debugPrint('Free session error: $e');

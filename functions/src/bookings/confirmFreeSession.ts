@@ -88,6 +88,8 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     studentProfileBirthDate,
     studentAge,
   } = data;
+  const normalizedPromoCode =
+    typeof promoCode === "string" ? promoCode.trim().toUpperCase() : "";
 
   // ✅ LOG INPUT PARAMETERS
   functions.logger.info("📥 Input parameters received", {
@@ -109,7 +111,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     !slotDate ||
     !slotStart ||
     !slotEnd ||
-    !promoCode
+    !normalizedPromoCode
   ) {
     throw new functions.https.HttpsError("invalid-argument", "بيانات غير مكتملة");
   }
@@ -142,7 +144,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     // FIX-1: Move promo code read/validation into transaction to avoid TOCTOU race
     const promoQuery = db
       .collection("promoCodes")
-      .where("code", "==", promoCode)
+      .where("code", "==", normalizedPromoCode)
       .limit(1);
     const promoSnapshot = await transaction.get(promoQuery);
 
@@ -152,12 +154,30 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
 
     const promoDoc = promoSnapshot.docs[0];
     const promoData = promoDoc.data();
+    const redemptionRef = promoDoc.ref
+      .collection("redemptions")
+      .doc(studentId);
+    const redemptionSnapshot = await transaction.get(redemptionRef);
+    const redemptionData = redemptionSnapshot.data();
+    const currentUserUseCount =
+      typeof redemptionData?.useCount === "number"
+        ? redemptionData.useCount
+        : 0;
+    const perUserLimit = 1;
 
     if (!promoData.isActive) {
       throw new functions.https.HttpsError("failed-precondition", "كود الخصم غير نشط");
     }
 
-    if (promoData.discountPercent !== 100) {
+    const discountType = promoData.type ?? promoData.discountType;
+    const discountValue =
+      promoData.discountPercent ??
+      promoData.discountValue ??
+      promoData.discount;
+    const isPercentageDiscount =
+      discountType === "percentage" || discountType === "percent";
+
+    if (!isPercentageDiscount || Number(discountValue) !== 100) {
       throw new functions.https.HttpsError(
         "failed-precondition",
         "كود الخصم يجب أن يكون 100%"
@@ -173,10 +193,12 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     functions.logger.info("✅ Promo code validated", {
-      promoCode,
-      discountPercent: promoData.discountPercent,
+      promoCode: normalizedPromoCode,
+      discountPercent: Number(discountValue),
       usedCount: promoData.usedCount,
       usageLimit: promoData.usageLimit,
+      perUserLimit,
+      currentUserUseCount,
     });
     functions.logger.info("🔄 Transaction started");
 
@@ -237,6 +259,101 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           message: "الجلسة موجودة بالفعل",
         };
       }
+    }
+
+    // Enforce the per-user limit only after idempotency checks. A retried
+    // successful request must return its existing session, not a false
+    // "already used" error.
+    if (
+      currentUserUseCount >= perUserLimit ||
+      (!redemptionSnapshot.exists && promoData.lastUsedBy === studentId)
+    ) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "لقد استخدمت كود الخصم من قبل، ولا يمكن استخدامه أكثر من مرة."
+      );
+    }
+
+    // The original booking request is the source of truth for the reserved
+    // slot. createSessionRequest disables that availability slot as soon as
+    // the request is created, so a disabled slot is expected here when it
+    // belongs to this exact request.
+    if (!requestId) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'معرف الطلب مطلوب للجلسات المجانية'
+      );
+    }
+
+    const requestRef = db.collection('sessionRequests').doc(requestId);
+    const existingRequest = await transaction.get(requestRef);
+
+    functions.logger.info("🔍 Checking existing request document", {
+      requestId,
+      exists: existingRequest.exists,
+      status: existingRequest.exists ? existingRequest.data()?.status : "N/A",
+    });
+
+    if (!existingRequest.exists) {
+      throw new functions.https.HttpsError('not-found', 'طلب الجلسة غير موجود');
+    }
+
+    const existingRequestData = existingRequest.data()!;
+
+    if (
+      existingRequestData.studentId !== studentId ||
+      existingRequestData.mohaffezId !== mohaffezId
+    ) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'طلب الجلسة لا يخص هذا المستخدم أو المحفظ'
+      );
+    }
+
+    if (
+      existingRequestData.status === STATUS.REJECTED ||
+      existingRequestData.status === STATUS.CANCELLED
+    ) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'لا يمكن تأكيد طلب مرفوض أو ملغي'
+      );
+    }
+
+    if (
+      existingRequestData.status === STATUS.ACCEPTED &&
+      existingRequestData.sessionId
+    ) {
+      return {
+        __idempotent: true,
+        success: true,
+        sessionId: existingRequestData.sessionId,
+        requestId,
+        message: 'الجلسة مؤكدة بالفعل',
+      };
+    }
+
+    const requestSlotDate = optionalTimestamp(existingRequestData.slotDate);
+    const requestMatchesSlot =
+      normalizeTimeSlot(existingRequestData.preferredTimeSlot ?? '') ===
+        normalizeTimeSlot(preferredTimeSlot) &&
+      existingRequestData.sessionType === sessionType &&
+      requestSlotDate?.toMillis() === slotDateTimestamp.toMillis();
+
+    if (!requestMatchesSlot) {
+      functions.logger.error('confirmFreeSession: request slot mismatch', {
+        requestId,
+        requestTimeSlot: existingRequestData.preferredTimeSlot,
+        payloadTimeSlot: preferredTimeSlot,
+        requestSessionType: existingRequestData.sessionType,
+        payloadSessionType: sessionType,
+        requestSlotDate: requestSlotDate?.toDate().toISOString() ?? null,
+        payloadSlotDate: slotDateTimestamp.toDate().toISOString(),
+      });
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'بيانات الموعد لا تطابق طلب الحجز'
+      );
     }
 
     // ============================================
@@ -302,15 +419,12 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         }
         
         if (slotFound && !slotEnabled) {
-          functions.logger.error("❌ Slot is disabled", {
+          functions.logger.info("✅ Slot is reserved by the current request", {
             mohaffezId,
+            requestId,
             dayOfWeek,
             timeSlot: normalizedSlot,
           });
-          throw new functions.https.HttpsError(
-            "failed-precondition",
-            "هذا التوقيت غير متاح حالياً"
-          );
         }
       }
     }
@@ -318,74 +432,13 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     // ============================================
     // ✅ STEP 4: HANDLE REQUEST DOCUMENT
     // ============================================
-    let requestRef: FirebaseFirestore.DocumentReference;
-    let isUpdatingExisting = false;
-    let existingRequestData: FirebaseFirestore.DocumentData | undefined;
+    const isUpdatingExisting = true;
 
-    if (requestId) {
-      requestRef = db.collection('sessionRequests').doc(requestId);
-      const existingRequest = await transaction.get(requestRef);
-      
-      // ✅ LOG: Check if request exists
-      functions.logger.info("🔍 Checking existing request document", {
-        requestId,
-        exists: existingRequest.exists,
-        status: existingRequest.exists ? existingRequest.data()?.status : "N/A",
-      });
-      
-      if (!existingRequest.exists) {
-        functions.logger.error("❌ Request document not found!", {
-          requestId,
-          studentId,
-          mohaffezId,
-        });
-        throw new functions.https.HttpsError('not-found', 'طلب الجلسة غير موجود');
-      }
-      
-      const requestData = existingRequest.data();
-      existingRequestData = requestData;
-      
-      // ✅ CHECK: If already accepted
-      if (requestData && requestData.status === STATUS.ACCEPTED) {
-        const sessionId = requestData.sessionId;
-        if (sessionId) {
-          functions.logger.warn("⚠️ Request already accepted!", {
-            requestId,
-            sessionId,
-            oldStatus: requestData.status,
-          });
-          return {
-            __idempotent: true,
-            success: true,
-            sessionId: sessionId,
-            requestId: requestId,
-            message: 'الجلسة مؤكدة بالفعل'
-          };
-        }
-      }
-      
-      isUpdatingExisting = true;
-      
-      // ✅ LOG: Will update existing request
-      functions.logger.info("✅ Will UPDATE existing request", {
-        requestId,
-        currentStatus: requestData?.status,
-        isUpdatingExisting: true,
-      });
-      
-    } else {
-      // ✅ LOG: No requestId provided
-      functions.logger.error("❌ No requestId provided!", {
-        studentId,
-        mohaffezId,
-        promoCode,
-      });
-      
-      throw new functions.https.HttpsError(
-        'invalid-argument', 
-        'معرف الطلب مطلوب للجلسات المجانية'
-      );
-    }
+    functions.logger.info("✅ Will UPDATE existing request", {
+      requestId,
+      currentStatus: existingRequestData.status,
+      isUpdatingExisting,
+    });
 
     const sessionRef = db.collection("hafizSessions").doc();
     const learnerSnapshot = {
@@ -413,6 +466,11 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         optionalNumber(studentAge) ??
         optionalNumber(existingRequestData?.['studentAge']),
     };
+    const effectivePreferredProvider =
+      sessionType === 'online'
+        ? optionalString(preferredProvider) ??
+          optionalString(existingRequestData.preferredProvider)
+        : null;
 
     // ============================================
     // ✅ STEP 5: WRITE PHASE
@@ -421,7 +479,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       status: STATUS.ACCEPTED,
       isPaid: true,
       paymentAmount: 0.0,
-      promoCode,
+      promoCode: normalizedPromoCode,
       promoDiscount: 100,
       notificationsAlreadySent: true,
       sessionId: sessionRef.id,
@@ -484,9 +542,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       ...learnerSnapshot,
       sessionType,
       preferredProvider:
-        sessionType === 'online' && typeof preferredProvider === 'string' && preferredProvider.length > 0
-          ? preferredProvider
-          : null,
+        effectivePreferredProvider,
       location: imamAddressText || "",
       mohaffezPhone: mohaffezPhone || null,
       studentPhone:
@@ -504,7 +560,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       status: STATUS.ACCEPTED,
       isPaid: true,
       sessionPrice: 0.0,
-      promoCode,
+      promoCode: normalizedPromoCode,
       paymentId: paymentId || null,
       createdAt: FieldValue.serverTimestamp(),
       acceptedAt: FieldValue.serverTimestamp(),
@@ -537,6 +593,22 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       lastUsedAt: FieldValue.serverTimestamp(),
       lastUsedBy: studentId,
     });
+
+    transaction.set(
+      redemptionRef,
+      {
+        userId: studentId,
+        promoCodeId: promoDoc.id,
+        code: normalizedPromoCode,
+        useCount: currentUserUseCount + 1,
+        firstUsedAt:
+          redemptionData?.firstUsedAt ?? FieldValue.serverTimestamp(),
+        lastUsedAt: FieldValue.serverTimestamp(),
+        requestId: requestRef.id,
+        sessionId: sessionRef.id,
+      },
+      { merge: true }
+    );
 
     // Disable availability slot
     if (availabilityDoc) {
@@ -615,7 +687,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       paymentId: paymentId || null,
       studentId,
       mohaffezId,
-      promoCode,
+      promoCode: normalizedPromoCode,
       isUpdatingExisting,
       operation: isUpdatingExisting ? "UPDATE" : "CREATE",
       transactionComplete: true,
@@ -651,7 +723,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       await eventStore.appendFreeSessionCompletedEvent({
         paymentId: paymentId,
         userId: studentId,
-        promoCode: promoCode,
+        promoCode: normalizedPromoCode,
       });
       functions.logger.info('EventStore: Free session completed event appended', { paymentId, studentId });
 

@@ -9,6 +9,7 @@ class PromoCodeModel {
   final bool isActive;
   final DateTime? expiryDate;
   final int? usageLimit;
+  final int perUserLimit;
   final int usedCount;
   final String? description;
 
@@ -19,15 +20,24 @@ class PromoCodeModel {
     required this.isActive,
     this.expiryDate,
     this.usageLimit,
+    this.perUserLimit = 1,
     this.usedCount = 0,
     this.description,
   });
 
   factory PromoCodeModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    return PromoCodeModel.fromMap(doc.data() as Map<String, dynamic>);
+  }
 
-    // Try discountPercent first, then fallback to discount (for legacy docs)
-    final discountValue = (data['discountPercent'] ?? data['discount']) as num?;
+  factory PromoCodeModel.fromMap(Map<String, dynamic> data) {
+    // Admin promo documents use discountType/discountValue. Keep the older
+    // fields readable so already-created codes remain valid.
+    final discountValue = (data['discountPercent'] ??
+        data['discountValue'] ??
+        data['discount']) as num?;
+    final rawType =
+        (data['type'] ?? data['discountType'] ?? 'fixed').toString();
+    final normalizedType = rawType == 'percent' ? 'percentage' : rawType;
 
     if (discountValue == null) {
       throw Exception('Promo code missing discount field');
@@ -35,16 +45,16 @@ class PromoCodeModel {
 
     return PromoCodeModel(
       code: data['code'] as String,
-      type: data['type'] as String,
-      discount: discountValue.toDouble(),      // store as double internally
+      type: normalizedType,
+      discount: discountValue.toDouble(),
       isActive: data['isActive'] as bool? ?? true,
       expiryDate: (data['expiryDate'] as Timestamp?)?.toDate(),
-      usageLimit: data['usageLimit'] as int?,
-      usedCount: data['usedCount'] as int? ?? 0,
+      usageLimit: (data['usageLimit'] as num?)?.toInt(),
+      perUserLimit: 1,
+      usedCount: (data['usedCount'] as num?)?.toInt() ?? 0,
       description: data['description'] as String?,
     );
   }
-
 
   bool get isValid {
     if (!isActive) return false;

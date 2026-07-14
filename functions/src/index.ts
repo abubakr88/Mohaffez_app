@@ -69,6 +69,22 @@ export { checkMaintenanceMode } from "./admin/maintenanceCheck";
 export { checkVersion } from "./admin/appVersion";
 export { setAdminClaim } from "./setAdminClaim";
 export { getAdminMetrics, refreshAdminMetrics } from "./admin/metrics";
+export {
+  getAdminInsights,
+  refreshAdminInsights,
+  rolloffTeacherAnalyticsWindows,
+} from "./admin/analyticsAggregation";
+export {
+  onAnalyticsUserCreated,
+  onAnalyticsSessionRequestCreated,
+  onAnalyticsSessionRequestUpdated,
+  onAnalyticsPaymentCreated,
+  onAnalyticsPaymentUpdated,
+  onAnalyticsSessionCreated,
+  onAnalyticsSessionUpdated,
+  onAnalyticsWalletGroupCreated,
+  onAnalyticsFailedOperationCreated,
+} from "./admin/analyticsProjection";
 export { setTeacherFoundingBadge } from "./admin/teacherBadges";
 export { convertUnderageStudentToParent } from "./auth/convertUnderageStudentToParent";
 

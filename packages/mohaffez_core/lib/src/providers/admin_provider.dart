@@ -515,45 +515,83 @@ class TeacherRanking {
 }
 
 /// Top teachers by completed-session count over the last [days] days.
-/// Aggregates `hafizSessions` client-side using the denormalized
-/// `mohaffezName` / `sessionPrice` fields (no user join needed).
+/// Uses the low-cost rolling projection only after it contains a full window.
+/// Until then, the legacy query preserves historical accuracy for existing
+/// installations instead of displaying a partially populated leaderboard.
 final topTeachersProvider = FutureProvider.autoDispose
     .family<List<TeacherRanking>, int>((ref, days) async {
-  final cutoff = DateTime.now().subtract(Duration(days: days));
-  final snap = await FirebaseFirestore.instance
+  final safeDays = switch (days) {
+    90 => 90,
+    365 => 365,
+    _ => 30,
+  };
+  final countField = 'rolling${safeDays}dCompletedSessions';
+  final revenueField = 'rolling${safeDays}dRevenueEgp';
+  final insights = await FirebaseFirestore.instance
+      .collection('systemConfig')
+      .doc('adminInsights')
+      .get();
+  final projectionStart = insights.data()?['projectionStartedAt'];
+  final projectionAgeDays = projectionStart is Timestamp
+      ? DateTime.now().difference(projectionStart.toDate()).inDays
+      : 0;
+
+  if (projectionAgeDays >= safeDays) {
+    final snap = await FirebaseFirestore.instance
+        .collection('adminTeacherAnalytics')
+        .orderBy(countField, descending: true)
+        .limit(10)
+        .get();
+
+    return snap.docs
+        .map((doc) {
+          final data = doc.data();
+          return TeacherRanking(
+            mohaffezId: doc.id,
+            name: data['teacherName'] as String? ?? doc.id,
+            sessionCount: (data[countField] as num?)?.toInt() ?? 0,
+            revenue: (data[revenueField] as num?)?.toDouble() ?? 0,
+          );
+        })
+        .where((ranking) => ranking.sessionCount > 0)
+        .toList();
+  }
+
+  final cutoff = DateTime.now().subtract(Duration(days: safeDays));
+  final sessions = await FirebaseFirestore.instance
       .collection('hafizSessions')
       .where('status', isEqualTo: 'completed')
       .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(cutoff))
       .get();
-
   final counts = <String, int>{};
   final revenue = <String, double>{};
   final names = <String, String>{};
 
-  for (final doc in snap.docs) {
-    final d = doc.data();
-    final id = d['mohaffezId'] as String?;
-    if (id == null || id.isEmpty) continue;
-    counts[id] = (counts[id] ?? 0) + 1;
-    revenue[id] =
-        (revenue[id] ?? 0) + ((d['sessionPrice'] as num?)?.toDouble() ?? 0);
-    final name = d['mohaffezName'] as String?;
-    if (name != null && name.isNotEmpty) names[id] = name;
+  for (final doc in sessions.docs) {
+    final data = doc.data();
+    final teacherId = data['mohaffezId'] as String?;
+    if (teacherId == null || teacherId.isEmpty) continue;
+    counts[teacherId] = (counts[teacherId] ?? 0) + 1;
+    revenue[teacherId] = (revenue[teacherId] ?? 0) +
+        ((data['sessionPrice'] as num?)?.toDouble() ?? 0);
+    final teacherName = data['mohaffezName'] as String?;
+    if (teacherName != null && teacherName.isNotEmpty) {
+      names[teacherId] = teacherName;
+    }
   }
 
   final rankings = counts.entries
-      .map((e) => TeacherRanking(
-            mohaffezId: e.key,
-            name: names[e.key] ?? e.key,
-            sessionCount: e.value,
-            revenue: revenue[e.key] ?? 0,
+      .map((entry) => TeacherRanking(
+            mohaffezId: entry.key,
+            name: names[entry.key] ?? entry.key,
+            sessionCount: entry.value,
+            revenue: revenue[entry.key] ?? 0,
           ))
       .toList()
-    ..sort((a, b) {
-      final byCount = b.sessionCount.compareTo(a.sessionCount);
-      return byCount != 0 ? byCount : b.revenue.compareTo(a.revenue);
+    ..sort((left, right) {
+      final byCount = right.sessionCount.compareTo(left.sessionCount);
+      return byCount != 0 ? byCount : right.revenue.compareTo(left.revenue);
     });
-
   return rankings.take(10).toList();
 });
 

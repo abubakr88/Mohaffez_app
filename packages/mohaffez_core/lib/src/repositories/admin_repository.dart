@@ -316,8 +316,18 @@ class AdminRepository {
   }
 
   Future<void> createPromoCode(Map<String, dynamic> data) {
+    final code = (data['code'] as String? ?? '').trim().toUpperCase();
+    final discountType =
+        data['discountType'] == 'percent' ? 'percentage' : 'fixed';
+    final discountValue = (data['discountValue'] as num?)?.toDouble() ?? 0;
+
     return _firestore.collection('promoCodes').add({
       ...data,
+      'code': code,
+      'type': discountType,
+      'discount': discountValue,
+      if (discountType == 'percentage') 'discountPercent': discountValue,
+      'perUserLimit': 1,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'usedCount': data['usedCount'] ?? 0,

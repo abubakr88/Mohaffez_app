@@ -19,7 +19,10 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
   Future<void> _refresh() async {
     setState(() => _refreshing = true);
     try {
-      await refreshAdminMetricsNow();
+      await Future.wait([
+        refreshAdminMetricsNow(),
+        refreshAdminInsightsNow(),
+      ]);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم تحديث الإحصائيات')),
@@ -40,6 +43,7 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final metricsAsync = ref.watch(adminMetricsStreamProvider);
+    final insightsAsync = ref.watch(adminInsightsStreamProvider);
 
     return PageContainer(
       child: Column(
@@ -65,7 +69,12 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
             loading: () => const _LoadingGrid(),
             error: (e, _) =>
                 DSBanner(message: '$e', variant: DSBannerVariant.error),
-            data: (m) => _MetricsView(metrics: m),
+            data: (m) => _MetricsView(
+              metrics: m,
+              insights: insightsAsync.asData?.value ?? AdminInsights.empty(),
+              insightsLoading: insightsAsync.isLoading,
+              insightsError: insightsAsync.hasError,
+            ),
           ),
         ],
       ),
@@ -94,7 +103,16 @@ class _LoadingGrid extends StatelessWidget {
 
 class _MetricsView extends StatelessWidget {
   final AdminMetrics metrics;
-  const _MetricsView({required this.metrics});
+  final AdminInsights insights;
+  final bool insightsLoading;
+  final bool insightsError;
+
+  const _MetricsView({
+    required this.metrics,
+    required this.insights,
+    required this.insightsLoading,
+    required this.insightsError,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +139,12 @@ class _MetricsView extends StatelessWidget {
           const SizedBox(height: DSSpacing.md),
         ],
         _ActionQueuesSection(metrics: metrics),
+        const SizedBox(height: DSSpacing.xxl),
+        _AdminInsightsSection(
+          insights: insights,
+          loading: insightsLoading,
+          hasError: insightsError,
+        ),
         const SizedBox(height: DSSpacing.xxl),
 
         // Top KPIs ─────────────────────────────────────────────────────────
@@ -250,6 +274,160 @@ class _MetricsView extends StatelessWidget {
     if (diff >= 0) return '+$diff عن الشهر السابق';
     return '$diff عن الشهر السابق';
   }
+}
+
+class _AdminInsightsSection extends StatelessWidget {
+  const _AdminInsightsSection({
+    required this.insights,
+    required this.loading,
+    required this.hasError,
+  });
+
+  final AdminInsights insights;
+  final bool loading;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading && insights.generatedAt == null) {
+      return const DSGrid(
+        mobileColumns: 1,
+        tabletColumns: 2,
+        desktopColumns: 4,
+        children: [
+          DSSkeletonCard(),
+          DSSkeletonCard(),
+          DSSkeletonCard(),
+          DSSkeletonCard(),
+        ],
+      );
+    }
+
+    if (hasError) {
+      return const DSBanner(
+        message: 'تعذر تحميل مؤشرات الأداء التراكمية.',
+        variant: DSBannerVariant.error,
+      );
+    }
+
+    if (insights.generatedAt == null) {
+      return const DSBanner(
+        message:
+            'ستظهر مؤشرات التسويق والتشغيل بعد نشر دوال التحليلات ووصول أول أحداث جديدة.',
+        variant: DSBannerVariant.info,
+      );
+    }
+
+    final growth = insights.growth;
+    final operations = insights.operations;
+    final finance = insights.finance;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'مسار التحويل هذا الشهر'),
+        const SizedBox(height: DSSpacing.md),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 4,
+          children: [
+            DSStatCard(
+              label: 'طلبات الحجز',
+              value: '${growth.requestsCreated}',
+              trend: '${growth.signups} تسجيل جديد',
+              icon: Icons.send_outlined,
+              iconColor: DSColors.primary,
+            ),
+            DSStatCard(
+              label: 'طلبات مقبولة',
+              value: '${growth.requestsAccepted}',
+              trend: _percent(growth.requestAcceptanceRate),
+              trendPositive: growth.requestAcceptanceRate >= 0.5,
+              icon: Icons.task_alt_rounded,
+              iconColor: DSColors.success,
+            ),
+            DSStatCard(
+              label: 'دفعات مكتملة',
+              value: '${growth.paymentsCompleted}',
+              trend: _percent(growth.paymentConversionRate),
+              trendPositive: growth.paymentConversionRate >= 0.5,
+              icon: Icons.credit_card_rounded,
+              iconColor: DSColors.secondary,
+            ),
+            DSStatCard(
+              label: 'جلسات مكتملة',
+              value: '${growth.sessionsCompleted}',
+              trend: _percent(growth.sessionCompletionRate),
+              trendPositive: growth.sessionCompletionRate >= 0.7,
+              icon: Icons.event_available_outlined,
+              iconColor: DSColors.success,
+            ),
+          ],
+        ),
+        const SizedBox(height: DSSpacing.xxl),
+        const SectionHeader(title: 'الصحة التشغيلية والمالية'),
+        const SizedBox(height: DSSpacing.md),
+        DSGrid(
+          mobileColumns: 1,
+          tabletColumns: 2,
+          desktopColumns: 4,
+          children: [
+            DSStatCard(
+              label: 'عمليات تحتاج تدخلاً',
+              value:
+                  '${operations.failedOperations + operations.unresolvedAlerts}',
+              trend:
+                  '${operations.failedOperations} فاشلة، ${operations.unresolvedAlerts} تنبيه',
+              trendPositive: operations.failedOperations == 0 &&
+                  operations.unresolvedAlerts == 0,
+              icon: Icons.health_and_safety_outlined,
+              iconColor: operations.failedOperations > 0
+                  ? DSColors.error
+                  : DSColors.success,
+            ),
+            DSStatCard(
+              label: 'مدفوعات معلقة',
+              value:
+                  '${operations.pendingPayments + operations.pendingDirectPayments}',
+              trend:
+                  '${operations.pendingDirectPayments} تحويل مباشر بانتظار التأكيد',
+              trendPositive: operations.pendingPayments == 0 &&
+                  operations.pendingDirectPayments == 0,
+              icon: Icons.hourglass_top_rounded,
+              iconColor: DSColors.warning,
+            ),
+            DSStatCard(
+              label: 'صافي المدفوعات المرصودة',
+              value: _money(finance.netRevenueEgp),
+              trend: finance.refundedAmountEgp > 0
+                  ? 'استردادات: ${_money(finance.refundedAmountEgp)}'
+                  : 'لا توجد استردادات مرصودة',
+              trendPositive: finance.refundedAmountEgp == 0,
+              icon: Icons.account_balance_outlined,
+              iconColor: DSColors.primary,
+            ),
+            DSStatCard(
+              label: 'عمولة المنصة المرصودة',
+              value: _money(finance.commissionAccruedEgp),
+              trend: finance.commissionReversedEgp > 0
+                  ? 'عكس عمولة: ${_money(finance.commissionReversedEgp)}'
+                  : '${insights.activeTeachers30d} محفظ نشط خلال 30 يومًا',
+              trendPositive: finance.commissionReversedEgp == 0,
+              icon: Icons.percent_rounded,
+              iconColor: DSColors.secondary,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static String _percent(double value) =>
+      '${(value * 100).clamp(0, 999).toStringAsFixed(1)}% من المرحلة السابقة';
+
+  static String _money(double value) =>
+      '${NumberFormat.decimalPattern('ar').format(value.round())} ج.م';
 }
 
 class _ActionQueuesSection extends ConsumerWidget {

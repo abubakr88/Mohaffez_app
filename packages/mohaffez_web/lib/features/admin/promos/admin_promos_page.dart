@@ -20,7 +20,8 @@ class AdminPromosPage extends ConsumerWidget {
             actions: [
               DSButton(
                 label: 'إضافة كود',
-                leading: const Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                leading: const Icon(Icons.add_rounded,
+                    size: 16, color: Colors.white),
                 onPressed: () => _openCreate(context, ref),
               ),
             ],
@@ -28,7 +29,8 @@ class AdminPromosPage extends ConsumerWidget {
           const SizedBox(height: DSSpacing.xxl),
           async.when(
             loading: () => const DSSkeletonCard(),
-            error: (e, _) => DSBanner(message: '$e', variant: DSBannerVariant.error),
+            error: (e, _) =>
+                DSBanner(message: '$e', variant: DSBannerVariant.error),
             data: (promos) {
               if (promos.isEmpty) {
                 return const DSEmptyState(
@@ -44,10 +46,12 @@ class AdminPromosPage extends ConsumerWidget {
                     key: 'code',
                     label: 'الكود',
                     sortable: true,
-                    sortValue: (p) => (p['code'] as String? ?? '').toLowerCase(),
+                    sortValue: (p) =>
+                        (p['code'] as String? ?? '').toLowerCase(),
                     cellBuilder: (ctx, p) => Text(
                       p['code'] as String? ?? '—',
-                      style: DSText.bodyMedium(ctx).copyWith(fontFamily: 'monospace'),
+                      style: DSText.bodyMedium(ctx)
+                          .copyWith(fontFamily: 'monospace'),
                     ),
                   ),
                   DSColumnDef(
@@ -57,10 +61,10 @@ class AdminPromosPage extends ConsumerWidget {
                     cellBuilder: (ctx, p) {
                       final v = p['discountValue'];
                       final t = p['discountType'] as String? ?? 'fixed';
-                      final label = t == 'percent'
-                          ? '${v ?? 0}%'
-                          : '${v ?? 0} ج.م';
-                      return Text(label, style: DSText.body(ctx, color: DSColors.primary));
+                      final label =
+                          t == 'percent' ? '${v ?? 0}%' : '${v ?? 0} ج.م';
+                      return Text(label,
+                          style: DSText.body(ctx, color: DSColors.primary));
                     },
                   ),
                   DSColumnDef(
@@ -70,13 +74,22 @@ class AdminPromosPage extends ConsumerWidget {
                     sortable: true,
                     sortValue: (p) => (p['usedCount'] as num?)?.toInt() ?? 0,
                     cellBuilder: (ctx, p) {
-                      final used  = (p['usedCount'] as num?)?.toInt() ?? 0;
+                      final used = (p['usedCount'] as num?)?.toInt() ?? 0;
                       final limit = p['usageLimit'];
                       return Text(
                         limit != null ? '$used / $limit' : '$used',
                         style: DSText.body(ctx, color: DSColors.text2),
                       );
                     },
+                  ),
+                  DSColumnDef(
+                    key: 'perUserLimit',
+                    label: 'لكل مستخدم',
+                    width: 130,
+                    cellBuilder: (ctx, p) => Text(
+                      'مرة واحدة',
+                      style: DSText.body(ctx, color: DSColors.text2),
+                    ),
                   ),
                   DSColumnDef(
                     key: 'active',
@@ -86,7 +99,9 @@ class AdminPromosPage extends ConsumerWidget {
                       final active = p['isActive'] as bool? ?? false;
                       return DSBadge(
                         label: active ? 'نشط' : 'معطل',
-                        variant: active ? DSBadgeVariant.success : DSBadgeVariant.neutral,
+                        variant: active
+                            ? DSBadgeVariant.success
+                            : DSBadgeVariant.neutral,
                         dot: true,
                       );
                     },
@@ -220,6 +235,7 @@ class _PromoFormDialogState extends State<_PromoFormDialog> {
       'discountType': _type,
       'discountValue': value,
       if (limit != null) 'usageLimit': limit,
+      'perUserLimit': 1,
       'isActive': true,
     });
     if (!mounted) return;
@@ -256,7 +272,11 @@ class _PromoFormDialogState extends State<_PromoFormDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DSTextField(controller: _code, label: 'الكود', hint: 'مثال: RAMADAN25', autofocus: true),
+          DSTextField(
+              controller: _code,
+              label: 'الكود',
+              hint: 'مثال: RAMADAN25',
+              autofocus: true),
           const SizedBox(height: DSSpacing.md),
           DSSelect<String>(
             label: 'نوع الخصم',
@@ -280,9 +300,15 @@ class _PromoFormDialogState extends State<_PromoFormDialog> {
             hint: 'اتركه فارغًا لعدد غير محدود',
             keyboardType: TextInputType.number,
           ),
+          const SizedBox(height: DSSpacing.sm),
+          Text(
+            'يمكن لكل حساب استخدام هذا الكود مرة واحدة فقط.',
+            style: DSText.caption(context, color: DSColors.text2),
+          ),
           if (_error != null) ...[
             const SizedBox(height: DSSpacing.md),
-            Text(_error!, style: DSText.caption(context, color: DSColors.error)),
+            Text(_error!,
+                style: DSText.caption(context, color: DSColors.error)),
           ],
         ],
       ),
