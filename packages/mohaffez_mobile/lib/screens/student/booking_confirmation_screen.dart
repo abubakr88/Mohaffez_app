@@ -37,6 +37,7 @@ class BookingConfirmationDetails {
   final double? paymentAmount;
   final int? sessionsCount;
   final String? planType;
+  final int? sessionDurationMinutes;
 
   const BookingConfirmationDetails({
     required this.mohaffezId,
@@ -65,6 +66,7 @@ class BookingConfirmationDetails {
     this.paymentAmount,
     this.sessionsCount,
     this.planType,
+    this.sessionDurationMinutes,
   });
 }
 
@@ -464,6 +466,7 @@ class _BookingConfirmationScreenState
             paymentAmount: d.paymentAmount ?? d.cost,
             sessionsCount: d.sessionsCount,
             planType: d.planType,
+            sessionDurationMinutes: d.sessionDurationMinutes,
           );
 
       if (!mounted) return;

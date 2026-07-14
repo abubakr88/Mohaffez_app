@@ -87,6 +87,10 @@ function publicPricingPlan(
     mode: safeString(data.mode) ?? "online",
     priceEGP: safeNumber(data.priceEGP),
     sessionsCount: Math.max(0, Math.trunc(safeNumber(data.sessionsCount))),
+    sessionDurationMinutes:
+      typeof data.sessionDurationMinutes === "number"
+        ? Math.trunc(data.sessionDurationMinutes)
+        : null,
     validityDays:
       typeof data.validityDays === "number" ? data.validityDays : null,
     sessionsPerWeek:
@@ -115,6 +119,35 @@ function publicAvailability(
   return {
     id,
     dayOfWeek: data.dayOfWeek,
+    scheduleSchemaVersion:
+      typeof data.scheduleSchemaVersion === "number"
+        ? Math.trunc(data.scheduleSchemaVersion)
+        : 1,
+    scheduleMode: safeString(data.scheduleMode),
+    startTime: safeString(data.startTime),
+    endTime: safeString(data.endTime),
+    sessionTypes: Array.isArray(data.sessionTypes)
+      ? data.sessionTypes.filter((type) => typeof type === "string")
+      : [],
+    legacySessionDurationMinutes:
+      typeof data.legacySessionDurationMinutes === "number"
+        ? Math.trunc(data.legacySessionDurationMinutes)
+        : null,
+    slotStartIntervalMinutes:
+      typeof data.slotStartIntervalMinutes === "number"
+        ? Math.trunc(data.slotStartIntervalMinutes)
+        : 15,
+    breakMinutesBySessionType:
+      data.breakMinutesBySessionType &&
+      typeof data.breakMinutesBySessionType === "object"
+        ? data.breakMinutesBySessionType
+        : {},
+    exclusionRanges: Array.isArray(data.exclusionRanges)
+      ? data.exclusionRanges
+      : [],
+    generatedExclusionRanges: Array.isArray(data.generatedExclusionRanges)
+      ? data.generatedExclusionRanges
+      : [],
     timeSlots,
   };
 }
@@ -166,7 +199,14 @@ export const getPublicTeacherProfile = functions.https.onCall(async (data) => {
     plans,
     availability: availabilitySnapshot.docs
       .map((doc) => publicAvailability(doc.id, doc.data()))
-      .filter((day) => (day.timeSlots as unknown[]).length > 0),
+      .filter((day) => {
+        if (day.scheduleSchemaVersion === 2) {
+          return Boolean(day.startTime) &&
+            Boolean(day.endTime) &&
+            (day.sessionTypes as unknown[]).length > 0;
+        }
+        return (day.timeSlots as unknown[]).length > 0;
+      }),
     stats: {
       completedSessions: Math.max(
         0,

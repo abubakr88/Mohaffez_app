@@ -334,7 +334,7 @@ export const payFromWallet = functions.https.onCall(async (data, context) => {
 });
 
 /**
- * Refund a session payment. Reverses the original three legs. Reason required.
+ * Refund a platform-held session payment. Reason required.
  * Admin-only — refund policy decisions don't belong on the client.
  */
 export const refundSessionPayment = functions.https.onCall(async (data, context) => {
@@ -355,10 +355,14 @@ export const refundSessionPayment = functions.https.onCall(async (data, context)
     }
     const s = sessionSnap.data()!;
 
-    if (s.paymentType !== 'wallet') {
+    const isPlatformHeldPayment =
+      s.paymentType === 'wallet' ||
+      s.paymentType === 'paymob' ||
+      s.paymentGateway === 'paymob';
+    if (!isPlatformHeldPayment) {
       throw new functions.https.HttpsError(
         'failed-precondition',
-        'session was not paid via wallet — refund manually',
+        'session was paid outside the platform - refund manually',
       );
     }
     if (s.refundedAt) {

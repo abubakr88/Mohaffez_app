@@ -319,11 +319,17 @@ export const onSessionCancelled = functions.firestore
           const sessionSnap = await tx.get(change.after.ref);
           const s = sessionSnap.data() as SessionDoc;
           const settled = !!s.settledAt;
-          const isWallet = paymentType === 'wallet';
+          // Paymob money is held by the platform and credited to the teacher's
+          // pending wallet. Cash/InstaPay stays in the direct-payment dues
+          // path because the teacher received it outside the platform.
+          const isPlatformHeldPayment =
+            paymentType === 'wallet' ||
+            paymentType === 'paymob' ||
+            s.paymentGateway === 'paymob';
 
           let legs: Parameters<typeof postLedgerEntry>[1]['legs'];
 
-          if (isWallet && settled) {
+          if (isPlatformHeldPayment && settled) {
             // After cycle settlement: reverse teacher available + system_revenue → student
             const rate = typeof s.settlementCommissionRate === 'number'
               ? (s.settlementCommissionRate as number) : 0.10;
@@ -334,7 +340,7 @@ export const onSessionCancelled = functions.firestore
               { walletId: walletIdForUser(mohaffezId), ownerType: 'mohaffez', amountPiastres: -teacherNet },
               { walletId: SYSTEM_WALLETS.revenue, ownerType: 'system', amountPiastres: -commPiastres },
             ];
-          } else if (isWallet && !settled) {
+          } else if (isPlatformHeldPayment && !settled) {
             // Before settlement: teacher pending → student available
             legs = [
               { walletId: walletIdForUser(studentId), ownerType: 'student', amountPiastres: refundPiastres },
@@ -617,6 +623,30 @@ export const onSessionCancelled = functions.firestore
         // Don't throw — refund already posted, admin alert exists. A failed
         // reversal becomes a manual ops task (will show up as a teacher
         // still owing commission on a cancelled session).
+      }
+    }
+
+    // Keep the originating request aligned with the final session. This also
+    // releases its interval from the lightweight booking-calendar projection.
+    const requestId = after.requestId as string | undefined;
+    if (!isTrial && requestId && requestId.trim().length > 0) {
+      try {
+        await db.collection('sessionRequests').doc(requestId.trim()).set(
+          {
+            status: 'cancelled',
+            cancelledBy,
+            teacherNoShow,
+            cancelledAt: after.cancelledAt ?? FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } catch (error) {
+        functions.logger.error('Failed to sync cancelled session request', {
+          sessionId,
+          requestId,
+          error,
+        });
       }
     }
 

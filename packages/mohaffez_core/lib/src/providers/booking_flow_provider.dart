@@ -16,6 +16,7 @@ class BookingFlowState {
   final double? selectedPlanPrice;
   final int? selectedPlanSessions;
   final int? selectedPlanValidityDays;
+  final int? selectedPlanSessionDurationMinutes;
   final BookingPath? bookingPath;
   final String? directPaymentRequestId;
 
@@ -26,6 +27,7 @@ class BookingFlowState {
     this.selectedPlanPrice,
     this.selectedPlanSessions,
     this.selectedPlanValidityDays,
+    this.selectedPlanSessionDurationMinutes,
     this.bookingPath,
     this.directPaymentRequestId,
   });
@@ -37,6 +39,7 @@ class BookingFlowState {
     double? selectedPlanPrice,
     int? selectedPlanSessions,
     int? selectedPlanValidityDays,
+    int? selectedPlanSessionDurationMinutes,
     BookingPath? bookingPath,
     String? directPaymentRequestId,
     bool clearSlotContext = false,
@@ -59,6 +62,10 @@ class BookingFlowState {
       selectedPlanValidityDays: clearSelectedPlan
           ? null
           : (selectedPlanValidityDays ?? this.selectedPlanValidityDays),
+      selectedPlanSessionDurationMinutes: clearSelectedPlan
+          ? null
+          : (selectedPlanSessionDurationMinutes ??
+              this.selectedPlanSessionDurationMinutes),
       bookingPath: clearBookingPath ? null : (bookingPath ?? this.bookingPath),
       directPaymentRequestId:
           directPaymentRequestId ?? this.directPaymentRequestId,
@@ -83,6 +90,7 @@ class BookingFlowNotifier extends StateNotifier<BookingFlowState> {
     required double price,
     required int sessions,
     int? validityDays,
+    int? sessionDurationMinutes,
   }) {
     state = state.copyWith(
       selectedPlanId: planId,
@@ -90,6 +98,7 @@ class BookingFlowNotifier extends StateNotifier<BookingFlowState> {
       selectedPlanPrice: price,
       selectedPlanSessions: sessions,
       selectedPlanValidityDays: validityDays,
+      selectedPlanSessionDurationMinutes: sessionDurationMinutes,
     );
   }
 

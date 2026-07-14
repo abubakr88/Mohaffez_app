@@ -33,6 +33,7 @@ class SubscriptionModel with _$SubscriptionModel {
     required int remainingSessions,
     required double totalPaid,
     required String paymentTransactionId,
+    int? sessionDurationMinutes,
     @Default(SubscriptionStatus.active) SubscriptionStatus status,
     @TimestampConverter() DateTime? startDate,
     @TimestampConverter() DateTime? expiryDate,
@@ -58,9 +59,9 @@ extension SubscriptionExtension on SubscriptionModel {
   bool get isExpired => status == SubscriptionStatus.expired;
   bool get isDepleted => status == SubscriptionStatus.depleted;
   bool get hasSessionsLeft => remainingSessions > 0;
-  
+
   bool get isBundle => planType == PlanType.bundle;
-  
+
   bool get canBookSession {
     if (!isActive) return false;
     if (!hasSessionsLeft) return false;
@@ -69,7 +70,7 @@ extension SubscriptionExtension on SubscriptionModel {
     }
     return true;
   }
-  
+
   int get usedSessions => totalSessions - remainingSessions;
   double get progressPercentage =>
       totalSessions > 0 ? (usedSessions / totalSessions) * 100 : 0;
@@ -84,6 +85,7 @@ class ActiveBundleInfo {
   final String planTitle;
   final int totalSessions;
   final int remainingSessions;
+  final int? sessionDurationMinutes;
   final String status;
   final DateTime? expiryDate;
 
@@ -95,6 +97,7 @@ class ActiveBundleInfo {
     required this.planTitle,
     required this.totalSessions,
     required this.remainingSessions,
+    this.sessionDurationMinutes,
     required this.status,
     this.expiryDate,
   });
@@ -108,10 +111,11 @@ class ActiveBundleInfo {
       planTitle: map['planTitle'] as String? ?? '',
       totalSessions: map['totalSessions'] as int? ?? 0,
       remainingSessions: map['remainingSessions'] as int? ?? 0,
+      sessionDurationMinutes: (map['sessionDurationMinutes'] as num?)?.toInt(),
       status: map['status'] as String? ?? 'active',
       expiryDate: map['expiryDate'] is Timestamp
           ? (map['expiryDate'] as Timestamp).toDate()
           : null,
-          );
+    );
   }
 }

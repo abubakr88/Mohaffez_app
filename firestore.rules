@@ -320,6 +320,13 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
 
+      // PII-free occupied intervals projected by Cloud Functions. Clients
+      // read them to hide unavailable choices; booking writes stay server-only.
+      match /bookingCalendar/{dateId} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
+
       // ── Unavailable dates ──
       match /unavailableDates/{dateId} {
         allow read: if isAuthenticated();

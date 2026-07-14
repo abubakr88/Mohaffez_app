@@ -129,6 +129,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -157,6 +158,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         studentProfileGender: studentProfileGender,
         studentProfileBirthDate: studentProfileBirthDate,
         studentAge: studentAge,
+        sessionDurationMinutes: sessionDurationMinutes,
       );
 
       if (result.isSuccess) {
@@ -219,6 +221,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     state = state.copyWith(isSubmitting: true, error: null);
 
@@ -264,6 +267,7 @@ class LegacyBookingFlowNotifier extends StateNotifier<LegacyBookingState> {
         studentProfileGender: studentProfileGender,
         studentProfileBirthDate: studentProfileBirthDate,
         studentAge: studentAge,
+        sessionDurationMinutes: sessionDurationMinutes,
       );
 
       if (result.isSuccess) {
@@ -395,6 +399,7 @@ class BookingService {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     try {
       final authError = await _ensureAuthenticatedForCallable('FREE SESSION');
@@ -434,6 +439,8 @@ class BookingService {
           'studentProfileBirthDate':
               studentProfileBirthDate.toUtc().toIso8601String(),
         if (studentAge != null) 'studentAge': studentAge,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
         'sessionType': sessionType,
         'preferredTimeSlot': preferredTimeSlot,
         'slotDate': slotDate.toUtc().toIso8601String(),
@@ -558,6 +565,7 @@ class BookingService {
     String? studentProfileGender,
     DateTime? studentProfileBirthDate,
     int? studentAge,
+    int? sessionDurationMinutes,
   }) async {
     final SlotLockResult? lockResult = slotLockId != null
         ? SlotLockResult(success: true, lockId: slotLockId)
@@ -637,6 +645,8 @@ class BookingService {
         'paymentAmount': paymentAmount,
         'sessionsCount': sessionsCount,
         'planType': planType,
+        if (sessionDurationMinutes != null)
+          'sessionDurationMinutes': sessionDurationMinutes,
         if (lockResult?.lockId != null) 'slotLockId': lockResult!.lockId,
       });
 

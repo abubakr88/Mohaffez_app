@@ -67,7 +67,8 @@ class _AvailabilityManagementScreenState
 
   // ── Session duration & break ────────────────────────────────────────────────
   int _sessionDuration = ScheduleConstants.defaultSessionDurationMinutes;
-  int _breakMinutes = 0;
+  Map<String, int> _breakMinutesByType =
+      Map<String, int>.from(ScheduleConstants.defaultBreakMinutesBySessionType);
 
   // ── Prayer exclusion ────────────────────────────────────────────────────────
   bool _excludePrayers = false;
@@ -146,10 +147,28 @@ class _AvailabilityManagementScreenState
         final s = settingsDoc.data()!;
         _sessionDuration = s['sessionDuration'] as int? ??
             ScheduleConstants.defaultSessionDurationMinutes;
+        if (!ScheduleConstants.supportedSessionDurations
+            .contains(_sessionDuration)) {
+          _sessionDuration = ScheduleConstants.defaultSessionDurationMinutes;
+        }
         _excludePrayers = s['excludePrayers'] as bool? ?? false;
         _prayerBeforeMinutes = s['prayerBeforeMinutes'] as int? ?? -5;
         _prayerAfterMinutes = s['prayerAfterMinutes'] as int? ?? 30;
-        _breakMinutes = s['breakMinutes'] as int? ?? 0;
+        final rawBreaks = s['breakMinutesBySessionType'];
+        if (rawBreaks is Map) {
+          _breakMinutesByType = {
+            for (final type in const ['online', 'mosque', 'home'])
+              type: (rawBreaks[type] as num?)?.toInt() ??
+                  ScheduleConstants.defaultBreakMinutesBySessionType[type]!,
+          };
+        } else if (s['breakMinutes'] is num) {
+          final legacyBreak = (s['breakMinutes'] as num).toInt();
+          _breakMinutesByType = {
+            'online': legacyBreak,
+            'mosque': legacyBreak,
+            'home': legacyBreak,
+          };
+        }
       }
 
       final snapshot = await userRef.collection('availability').get();
@@ -165,20 +184,31 @@ class _AvailabilityManagementScreenState
         final timeSlots =
             List<Map<String, dynamic>>.from(data['timeSlots'] ?? []);
         final enabled = timeSlots.where((s) => s['enabled'] == true).toList();
-        if (enabled.isEmpty) continue;
+        final usesAvailabilityWindow = data['scheduleSchemaVersion'] == 2 &&
+            data['scheduleMode'] == 'availabilityWindows';
+        if (!usesAvailabilityWindow && enabled.isEmpty) continue;
 
         enabled.sort((a, b) =>
             (a['startTime'] as String).compareTo(b['startTime'] as String));
 
         // Use explicitly stored window if available (saved since this version),
         // otherwise derive from slots for backward compatibility.
-        final start = data['startTime'] as String? ??
-            enabled.first['startTime'] as String;
-        final end =
-            data['endTime'] as String? ?? enabled.last['endTime'] as String;
+        final storedStart = data['startTime'] as String?;
+        final storedEnd = data['endTime'] as String?;
+        if ((storedStart == null || storedEnd == null) && enabled.isEmpty) {
+          continue;
+        }
+        final start = storedStart ?? enabled.first['startTime'] as String;
+        final end = storedEnd ?? enabled.last['endTime'] as String;
 
-        final types =
-            enabled.map((s) => s['sessionType'] as String? ?? 'home').toSet();
+        final storedTypes = (data['sessionTypes'] as List<dynamic>? ?? [])
+            .whereType<String>()
+            .where(const {'online', 'mosque', 'home'}.contains)
+            .toSet();
+        final types = storedTypes.isNotEmpty
+            ? storedTypes
+            : enabled.map((s) => s['sessionType'] as String? ?? 'home').toSet();
+        if (types.isEmpty) continue;
 
         final exclusions = (data['exclusionRanges'] as List<dynamic>? ?? [])
             .map((e) => _TimeRange(
@@ -254,8 +284,12 @@ class _AvailabilityManagementScreenState
       batch.set(
         userRef.collection('settings').doc('schedule'),
         {
+          'scheduleSchemaVersion': 2,
           'sessionDuration': _sessionDuration,
-          'breakMinutes': _breakMinutes,
+          'slotStartIntervalMinutes':
+              ScheduleConstants.slotStartIntervalMinutes,
+          'breakMinutesBySessionType': _breakMinutesByType,
+          'breakMinutes': _breakMinutesByType['online'] ?? 0,
           'excludePrayers': _excludePrayers,
           'prayerBeforeMinutes': _prayerBeforeMinutes,
           'prayerAfterMinutes': _prayerAfterMinutes,
@@ -277,19 +311,18 @@ class _AvailabilityManagementScreenState
           ...prayerWindows,
         ];
 
-        final slots = ScheduleConstants.generateTimeSlots(
-          startTime: day.startTime,
-          endTime: day.endTime,
-          durationMinutes: _sessionDuration,
-          breakMinutes: _breakMinutes,
-        );
-
         final timeSlots = <Map<String, dynamic>>[];
-        for (final slot in slots) {
-          if (_isExcluded(slot['start']!, slot['end']!, allExclusions)) {
-            continue;
-          }
-          for (final type in day.sessionTypes) {
+        for (final type in day.sessionTypes) {
+          final slots = ScheduleConstants.generateTimeSlots(
+            startTime: day.startTime,
+            endTime: day.endTime,
+            durationMinutes: _sessionDuration,
+            breakMinutes: _breakMinutesByType[type] ?? 0,
+          );
+          for (final slot in slots) {
+            if (_isExcluded(slot['start']!, slot['end']!, allExclusions)) {
+              continue;
+            }
             timeSlots.add({
               'startTime': slot['start'],
               'endTime': slot['end'],
@@ -301,10 +334,23 @@ class _AvailabilityManagementScreenState
 
         batch.set(docRef, {
           'dayOfWeek': dayOfWeek,
+          'scheduleSchemaVersion': 2,
+          'scheduleMode': 'availabilityWindows',
           'startTime': day.startTime,
           'endTime': day.endTime,
+          'sessionTypes': day.sessionTypes.toList()..sort(),
+          'legacySessionDurationMinutes': _sessionDuration,
+          'slotStartIntervalMinutes':
+              ScheduleConstants.slotStartIntervalMinutes,
+          'breakMinutesBySessionType': _breakMinutesByType,
+          'excludePrayers': _excludePrayers,
+          'prayerBeforeMinutes': _prayerBeforeMinutes,
+          'prayerAfterMinutes': _prayerAfterMinutes,
           'timeSlots': timeSlots,
           'exclusionRanges': day.exclusions
+              .map((e) => {'start': e.start, 'end': e.end})
+              .toList(),
+          'generatedExclusionRanges': allExclusions
               .map((e) => {'start': e.start, 'end': e.end})
               .toList(),
           'recurringWeekly': true,
@@ -673,20 +719,32 @@ class _AvailabilityManagementScreenState
             ),
             const SizedBox(width: 16),
             _StatPill(
-              label: 'مدة الجلسة',
+              label: 'مدة احتياطية',
               value: '$_sessionDuration د',
               color: AppThemeConstants.secondary,
               icon: Icons.timer,
             ),
-            if (_breakMinutes > 0) ...[
-              const SizedBox(width: 16),
-              _StatPill(
-                label: 'استراحة',
-                value: '$_breakMinutes د',
-                color: AppThemeConstants.warning,
-                icon: Icons.free_breakfast_outlined,
-              ),
-            ],
+            const SizedBox(width: 16),
+            _StatPill(
+              label: 'استراحة أونلاين',
+              value: '${_breakMinutesByType['online'] ?? 0} د',
+              color: AppThemeConstants.warning,
+              icon: Icons.videocam_outlined,
+            ),
+            const SizedBox(width: 16),
+            _StatPill(
+              label: 'استراحة المسجد',
+              value: '${_breakMinutesByType['mosque'] ?? 0} د',
+              color: AppThemeConstants.warning,
+              icon: Icons.mosque_outlined,
+            ),
+            const SizedBox(width: 16),
+            _StatPill(
+              label: 'استراحة المنزل',
+              value: '${_breakMinutesByType['home'] ?? 0} د',
+              color: AppThemeConstants.warning,
+              icon: Icons.home_outlined,
+            ),
             if (_excludePrayers) ...[
               const SizedBox(width: 16),
               const _StatPill(
@@ -732,7 +790,7 @@ class _AvailabilityManagementScreenState
 
   void _showScheduleSettings() {
     int tempDuration = _sessionDuration;
-    int tempBreak = _breakMinutes;
+    final tempBreaks = Map<String, int>.from(_breakMinutesByType);
     bool tempExcludePrayers = _excludePrayers;
     int tempBefore = _prayerBeforeMinutes;
     int tempAfter = _prayerAfterMinutes;
@@ -751,49 +809,65 @@ class _AvailabilityManagementScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ── Session duration ────────────────────────────────────
-                  const Text('مدة الجلسة',
+                  const Text('المدة الاحتياطية للخطط القديمة',
                       style:
                           TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Slider(
-                          value: tempDuration.toDouble(),
-                          min: 15,
-                          max: 120,
-                          divisions: 21,
-                          activeColor: AppThemeConstants.primary,
-                          label: '$tempDuration دقيقة',
-                          onChanged: (v) =>
-                              setDS(() => tempDuration = v.toInt()),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 60,
-                        child: Text(
-                          '$tempDuration د',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppThemeConstants.primary),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
+                  DropdownButtonFormField<int>(
+                    initialValue: tempDuration,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.timer_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ScheduleConstants.supportedSessionDurations
+                        .map((minutes) => DropdownMenuItem(
+                              value: minutes,
+                              child: Text('$minutes دقيقة'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDS(() => tempDuration = value);
+                      }
+                    },
                   ),
                   const Divider(height: 28),
 
                   // ── Break between sessions ──────────────────────────────
                   _OffsetRow(
-                    label: 'استراحة بين الجلسات',
-                    sublabel: tempBreak == 0
+                    label: 'استراحة جلسات الأونلاين',
+                    sublabel: tempBreaks['online'] == 0
                         ? 'بدون استراحة'
-                        : '$tempBreak دقيقة بين كل جلستين',
-                    value: tempBreak,
+                        : '${tempBreaks['online']} دقيقة بعد الجلسة',
+                    value: tempBreaks['online'] ?? 10,
                     min: 0,
-                    max: 60,
+                    max: 45,
                     step: 5,
-                    onChanged: (v) => setDS(() => tempBreak = v),
+                    onChanged: (v) => setDS(() => tempBreaks['online'] = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _OffsetRow(
+                    label: 'استراحة جلسات المسجد',
+                    sublabel: tempBreaks['mosque'] == 0
+                        ? 'بدون استراحة'
+                        : '${tempBreaks['mosque']} دقيقة بعد الجلسة',
+                    value: tempBreaks['mosque'] ?? 15,
+                    min: 0,
+                    max: 45,
+                    step: 5,
+                    onChanged: (v) => setDS(() => tempBreaks['mosque'] = v),
+                  ),
+                  const SizedBox(height: 10),
+                  _OffsetRow(
+                    label: 'استراحة الزيارة المنزلية',
+                    sublabel: tempBreaks['home'] == 0
+                        ? 'بدون استراحة'
+                        : '${tempBreaks['home']} دقيقة بعد الجلسة',
+                    value: tempBreaks['home'] ?? 30,
+                    min: 0,
+                    max: 45,
+                    step: 5,
+                    onChanged: (v) => setDS(() => tempBreaks['home'] = v),
                   ),
                   const Divider(height: 28),
 
@@ -886,7 +960,7 @@ class _AvailabilityManagementScreenState
                 onPressed: () {
                   setState(() {
                     _sessionDuration = tempDuration;
-                    _breakMinutes = tempBreak;
+                    _breakMinutesByType = Map<String, int>.from(tempBreaks);
                     _excludePrayers = tempExcludePrayers;
                     _prayerBeforeMinutes = tempBefore;
                     _prayerAfterMinutes = tempAfter;

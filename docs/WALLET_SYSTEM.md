@@ -114,14 +114,10 @@ All in `functions/src/wallet/`.
 
 ### Session payment
 
-- **`payFromWallet({ sessionRequestId })`** — student calls. Reads commission rate from `systemConfig/global`. Posts three legs:
-  - student wallet −total
-  - teacher wallet +(total − commission)
-  - `system_revenue` +commission
-
-  Same transaction: creates `hafizSessions` doc with `paymentType: 'wallet'`, marks request `accepted`, updates weekly commission summary (now informational since commission auto-settles), notifies teacher.
-
-- **`refundSessionPayment({ sessionId, reason })`** — admin only. Reverses the three legs. Marks session `refunded`.
+- **`payFromWallet({ sessionRequestId })`** posts the student debit and credits the full gross amount to the teacher's current-cycle pending balance.
+- A successful **Paymob** payment posts an idempotent ledger group using the payment ID: `system_topups -total / teacher pending +total`.
+- Cycle settlement moves pending earnings to the teacher's available balance after deducting the applicable commission.
+- **`refundSessionPayment({ sessionId, reason })`** supports wallet and Paymob sessions. It reverses pending earnings before settlement, or teacher available revenue and platform commission after settlement.
 
 ### Payout (money out)
 

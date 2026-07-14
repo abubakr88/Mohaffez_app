@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -295,6 +296,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       price: plan.priceEGP,
       sessions: plan.sessionsCount,
       validityDays: plan.validityDays,
+      sessionDurationMinutes: plan.sessionDurationMinutes,
     );
     bookingFlow.setSlotContext(slotContext);
     context.push('/booking/method');
@@ -1256,6 +1258,7 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               price: plan.priceEGP,
               sessions: plan.sessionsCount,
               validityDays: plan.validityDays,
+              sessionDurationMinutes: plan.sessionDurationMinutes,
             );
         _revealStep(_scheduleStepKey);
       },
@@ -2504,6 +2507,113 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
   // ─── Modern Availability/Booking Section ───────────────────────────────────
 
+  List<Map<String, dynamic>> _timeSlotsForAvailabilityDay(
+    Map<String, dynamic> day, {
+    required bool variablePlanDurationEnabled,
+  }) {
+    final schemaVersion = (day['scheduleSchemaVersion'] as num?)?.toInt() ?? 1;
+    final scheduleMode = day['scheduleMode'] as String?;
+    if (!variablePlanDurationEnabled ||
+        schemaVersion < 2 ||
+        scheduleMode != 'availabilityWindows') {
+      return List<Map<String, dynamic>>.from(day['timeSlots'] ?? const []);
+    }
+
+    final sessionTypes =
+        (day['sessionTypes'] as List?)?.whereType<String>().toSet() ??
+            const <String>{};
+    if (!sessionTypes.contains(selectedSessionType)) return const [];
+
+    final duration = selectedPricingPlan?.sessionDurationMinutes ??
+        (day['legacySessionDurationMinutes'] as num?)?.toInt() ??
+        ScheduleConstants.defaultSessionDurationMinutes;
+    final interval = (day['slotStartIntervalMinutes'] as num?)?.toInt() ??
+        ScheduleConstants.slotStartIntervalMinutes;
+    final rawExclusions = day['generatedExclusionRanges'] ??
+        day['exclusionRanges'] ??
+        const <dynamic>[];
+    final exclusions = rawExclusions is List
+        ? rawExclusions
+            .whereType<Map>()
+            .map(
+              (range) => {
+                'start': range['start']?.toString() ?? '',
+                'end': range['end']?.toString() ?? '',
+              },
+            )
+            .toList()
+        : const <Map<String, String>>[];
+
+    return ScheduleConstants.generateWindowCandidates(
+      startTime: day['startTime']?.toString() ?? '',
+      endTime: day['endTime']?.toString() ?? '',
+      durationMinutes: duration,
+      startIntervalMinutes: interval,
+      exclusionRanges: exclusions,
+    )
+        .map(
+          (slot) => <String, dynamic>{
+            'enabled': true,
+            'startTime': slot['start'],
+            'endTime': slot['end'],
+            'sessionType': selectedSessionType,
+          },
+        )
+        .toList();
+  }
+
+  DateTime? _calendarTimestamp(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  bool _isCalendarIntervalOccupied({
+    required Map<String, dynamic> slot,
+    required DateTime date,
+    required Map<String, dynamic> availabilityDay,
+    required List<Map<String, dynamic>> occupiedIntervals,
+  }) {
+    final startParts = (slot['startTime'] as String? ?? '').split(':');
+    final endParts = (slot['endTime'] as String? ?? '').split(':');
+    if (startParts.length != 2 || endParts.length != 2) return true;
+    final startHour = int.tryParse(startParts[0]);
+    final startMinute = int.tryParse(startParts[1]);
+    final endHour = int.tryParse(endParts[0]);
+    final endMinute = int.tryParse(endParts[1]);
+    if (startHour == null ||
+        startMinute == null ||
+        endHour == null ||
+        endMinute == null) {
+      return true;
+    }
+
+    final candidateStart =
+        DateTime(date.year, date.month, date.day, startHour, startMinute);
+    final candidateEnd =
+        DateTime(date.year, date.month, date.day, endHour, endMinute);
+    final rawBreaks = availabilityDay['breakMinutesBySessionType'];
+    final configuredBreak = rawBreaks is Map
+        ? (rawBreaks[selectedSessionType] as num?)?.toInt()
+        : null;
+    final candidateBreak = configuredBreak ??
+        ScheduleConstants
+            .defaultBreakMinutesBySessionType[selectedSessionType] ??
+        0;
+    final candidateReservedUntil =
+        candidateEnd.add(Duration(minutes: candidateBreak));
+
+    return occupiedIntervals.any((interval) {
+      final existingStart = _calendarTimestamp(interval['slotStart']);
+      final existingReservedUntil =
+          _calendarTimestamp(interval['reservedUntil']) ??
+              _calendarTimestamp(interval['slotEnd']);
+      if (existingStart == null || existingReservedUntil == null) return false;
+      return candidateStart.isBefore(existingReservedUntil) &&
+          existingStart.isBefore(candidateReservedUntil);
+    });
+  }
+
   Widget _buildModernAvailabilitySection(
     WidgetRef ref,
     Map<String, dynamic> profile,
@@ -2519,6 +2629,16 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
         : ref.watch(
             availabilityProvider(widget.mohaffezId),
           );
+    final variablePlanDurationEnabled = ref
+            .watch(systemConfigProvider)
+            .valueOrNull
+            ?.variablePlanSessionDurationEnabled ??
+        false;
+    final occupiedIntervals = publicAvailability != null ||
+            !variablePlanDurationEnabled
+        ? const <Map<String, dynamic>>[]
+        : ref.watch(bookingCalendarProvider(widget.mohaffezId)).valueOrNull ??
+            const <Map<String, dynamic>>[];
 
     return availability.when(
       data: (slots) {
@@ -2560,8 +2680,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
         // Pre-filter all slots to check if any exist for selected session type
         final hasAnyFilteredSlots = slots.any((slot) {
-          final timeSlots =
-              List<Map<String, dynamic>>.from(slot['timeSlots'] ?? []);
+          final timeSlots = _timeSlotsForAvailabilityDay(
+            slot,
+            variablePlanDurationEnabled: variablePlanDurationEnabled,
+          );
           return timeSlots.any((ts) =>
               ts['enabled'] == true &&
               ts['sessionType'] == selectedSessionType);
@@ -2658,8 +2780,10 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
 
                   for (final slot in sortedSlots) {
                     final dayOfWeek = slot['dayOfWeek'] as int;
-                    final timeSlots = List<Map<String, dynamic>>.from(
-                        slot['timeSlots'] ?? []);
+                    final timeSlots = _timeSlotsForAvailabilityDay(
+                      slot,
+                      variablePlanDurationEnabled: variablePlanDurationEnabled,
+                    );
                     int daysUntil = dayOfWeek - currentDayOfWeek;
                     if (daysUntil < 0) daysUntil += 7;
                     final targetDate = DateTime(
@@ -2669,6 +2793,14 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                     final enabled = timeSlots.where((ts) {
                       if (ts['enabled'] != true) return false;
                       if (ts['sessionType'] != selectedSessionType) {
+                        return false;
+                      }
+                      if (_isCalendarIntervalOccupied(
+                        slot: ts,
+                        date: targetDate,
+                        availabilityDay: slot,
+                        occupiedIntervals: occupiedIntervals,
+                      )) {
                         return false;
                       }
                       if (isToday) {

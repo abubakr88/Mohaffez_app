@@ -36,6 +36,7 @@ class _ConfirmBundleSessionScreenState
     extends ConsumerState<ConfirmBundleSessionScreen> {
   bool _isLoading = false;
   String? _selectedProvider;
+  bool _showProviderValidation = false;
   ActiveBundleInfo? _activeSubscription;
   bool _loadingSubscription = true;
   String? _subscriptionError;
@@ -223,6 +224,17 @@ class _ConfirmBundleSessionScreenState
       return;
     }
 
+    if (slotContext.sessionType == 'online' && _selectedProvider == null) {
+      setState(() => _showProviderValidation = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اختر وسيلة التواصل المناسبة للجلسة أولاً'),
+          backgroundColor: AppThemeConstants.warning,
+        ),
+      );
+      return;
+    }
+
     final activeProfile = resolveBookingLearner(context, ref, currentUser);
     if (activeProfile == null) return;
 
@@ -313,6 +325,7 @@ class _ConfirmBundleSessionScreenState
         studentProfileGender: activeProfile.gender,
         studentProfileBirthDate: activeProfile.dateOfBirth,
         studentAge: activeProfile.age,
+        sessionDurationMinutes: sub.sessionDurationMinutes,
       );
 
       if (!mounted) return;
@@ -630,7 +643,11 @@ class _ConfirmBundleSessionScreenState
             MeetingProviderPicker(
               teacherId: slotContext.mohaffezId,
               selected: _selectedProvider,
-              onChanged: (id) => setState(() => _selectedProvider = id),
+              showValidationError: _showProviderValidation,
+              onChanged: (id) => setState(() {
+                _selectedProvider = id;
+                _showProviderValidation = false;
+              }),
             ),
           ],
 
@@ -640,11 +657,7 @@ class _ConfirmBundleSessionScreenState
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: (_isLoading ||
-                      (slotContext.sessionType == 'online' &&
-                          _selectedProvider == null))
-                  ? null
-                  : _confirmSession,
+              onPressed: _isLoading ? null : _confirmSession,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppThemeConstants.secondary,
                 foregroundColor: AppThemeConstants.surface,
@@ -661,7 +674,12 @@ class _ConfirmBundleSessionScreenState
                     )
                   : const Icon(Icons.check_circle_outline),
               label: Text(
-                _isLoading ? 'جارٍ الإرسال...' : 'تأكيد الحجز',
+                _isLoading
+                    ? 'جارٍ الإرسال...'
+                    : slotContext.sessionType == 'online' &&
+                            _selectedProvider == null
+                        ? 'اختر وسيلة التواصل ثم أكد الحجز'
+                        : 'تأكيد الحجز',
                 style:
                     const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),

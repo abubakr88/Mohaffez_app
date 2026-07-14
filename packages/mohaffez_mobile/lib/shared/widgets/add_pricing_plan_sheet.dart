@@ -360,7 +360,7 @@ class _AddPricingPlanSheetState extends ConsumerState<AddPricingPlanSheet> {
                     prefixIcon: Icon(Icons.timer_outlined),
                     suffixText: 'دقيقة',
                   ),
-                  items: const [30, 45, 60, 75, 90, 120]
+                  items: ScheduleConstants.supportedSessionDurations
                       .map(
                         (minutes) => DropdownMenuItem(
                           value: minutes,

@@ -243,7 +243,14 @@ class _BookingMethodScreenState extends ConsumerState<BookingMethodScreen> {
     final selectedSinglePlan =
         selectedPlan?.type == PlanType.single ? selectedPlan : lowestPlan;
 
-    if (selectedPlan != null && activeBundle == null && !needsChildSelection) {
+    // Auto-continue only once when this screen is first opened after choosing
+    // a plan. When the user returns from the request screen, keep the selected
+    // plan visible in the booking options instead of showing an endless
+    // transition loader.
+    if (selectedPlan != null &&
+        activeBundle == null &&
+        !needsChildSelection &&
+        !_selectedPlanRouteScheduled) {
       _continueWithSelectedPlan(selectedPlan);
       return const Center(
         child: Padding(

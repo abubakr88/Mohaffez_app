@@ -3,6 +3,13 @@ import * as functions from 'firebase-functions';
 import admin, { db } from '../utils/admin';
 import { PaymentDocument, PaymentMetadata } from '../types/payment.types';
 import { sanitizeForFirestore } from '../utils/firestoreSanitizer';
+import {
+  egpToPiastres,
+  LedgerEntryInput,
+  postLedgerEntry,
+  SYSTEM_WALLETS,
+  walletIdForUser,
+} from '../wallet/walletUtils';
 
 const STATUS = {
   PENDING: 'pending',
@@ -43,6 +50,86 @@ const parseString = (v: unknown, fb: string): string =>
 
 const isPresent = (v: unknown): boolean =>
   v !== undefined && v !== null && v !== '';
+
+export function buildPaymobTeacherEarningLedger(
+  payment: PaymentDocument,
+  paymentUpdate: PaymentStatusUpdate | undefined,
+  relatedId?: { sessionId?: string; subscriptionId?: string },
+): LedgerEntryInput | null {
+  if (!paymentUpdate) return null;
+
+  const amountEgp = Number(payment.amount);
+  if (!Number.isFinite(amountEgp) || amountEgp <= 0) return null;
+
+  const amountPiastres = egpToPiastres(amountEgp);
+  return {
+    type: 'session_payment',
+    legs: [
+      {
+        walletId: SYSTEM_WALLETS.topups,
+        ownerType: 'system',
+        amountPiastres: -amountPiastres,
+      },
+      {
+        walletId: walletIdForUser(payment.mohaffezId),
+        ownerType: 'mohaffez',
+        amountPiastres,
+        target: 'pending',
+      },
+    ],
+    reason: `Paymob payment: ${parseString(payment.metadata?.planTitle, 'session or bundle')}`,
+    relatedSessionId: relatedId?.sessionId ?? null,
+    relatedPaymentId: paymentUpdate.paymentId,
+    groupId: `paymob_earning_${paymentUpdate.paymentId}`,
+    createdBy: 'system',
+    metadata: {
+      gateway: 'paymob',
+      transactionId: paymentUpdate.transactionId,
+      planType: parseString(payment.metadata?.planType, 'single'),
+      ...(relatedId?.subscriptionId
+        ? { subscriptionId: relatedId.subscriptionId }
+        : {}),
+      grossPiastres: amountPiastres,
+    },
+  };
+}
+
+async function creditPaymobPaymentToTeacherPending(
+  transaction: FirebaseFirestore.Transaction,
+  payment: PaymentDocument,
+  paymentUpdate: PaymentStatusUpdate | undefined,
+  relatedId?: { sessionId?: string; subscriptionId?: string },
+): Promise<{ groupId: string; idempotent: boolean } | null> {
+  const ledgerInput = buildPaymobTeacherEarningLedger(
+    payment,
+    paymentUpdate,
+    relatedId,
+  );
+  if (!ledgerInput) {
+    if (paymentUpdate) {
+      functions.logger.info('Skipping teacher wallet credit for zero-value Paymob payment', {
+        paymentId: paymentUpdate.paymentId,
+        amount: payment.amount,
+      });
+    }
+    return null;
+  }
+  return postLedgerEntry(transaction, ledgerInput);
+}
+
+const SUPPORTED_SESSION_DURATIONS = new Set([15, 30, 45, 60, 75, 90, 120]);
+
+const supportedSessionDuration = (value: unknown): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const duration = Math.trunc(value);
+  return SUPPORTED_SESSION_DURATIONS.has(duration) ? duration : null;
+};
+
+const compatibleSessionDuration = (value: unknown): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const duration = Math.trunc(value);
+  return duration >= 5 && duration <= 240 ? duration : null;
+};
 
 const sessionFallbackFields = [
   'slotDate',
@@ -258,6 +345,12 @@ export async function confirmBookingAfterPayment(
 
     // ── WRITES ────────────────────────────────────────────────────────────────
     const sessionRef = db.collection('hafizSessions').doc();
+    const teacherWalletCredit = await creditPaymobPaymentToTeacherPending(
+      transaction,
+      payment,
+      paymentUpdate,
+      { sessionId: sessionRef.id },
+    );
 
     transaction.update(requestRef, {
       status: STATUS.ACCEPTED,
@@ -275,6 +368,10 @@ export async function confirmBookingAfterPayment(
       status:               STATUS.ACCEPTED,
       isPaid:               true,
       ...(paymentUpdate ? { paymentId: paymentUpdate.paymentId } : {}),
+      ...(paymentUpdate ? { paymentType: 'paymob', paymentGateway: 'paymob' } : {}),
+      ...(teacherWalletCredit
+        ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+        : {}),
       paymentTransactionId: transactionId,
       createdAt:            admin.firestore.FieldValue.serverTimestamp(),
       acceptedAt:           admin.firestore.FieldValue.serverTimestamp(),
@@ -303,6 +400,9 @@ export async function confirmBookingAfterPayment(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
         processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(teacherWalletCredit
+          ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+          : {}),
       });
     }
 
@@ -370,6 +470,19 @@ export async function consumeSubscriptionAndCreateSession(
     }
 
     // ── WRITES ────────────────────────────────────────────────────────────────
+    const sessionRef = requestRef && requestSnap && metadata.sessionDetails
+      ? db.collection('hafizSessions').doc()
+      : null;
+    const teacherWalletCredit = await creditPaymobPaymentToTeacherPending(
+      transaction,
+      payment,
+      paymentUpdate,
+      {
+        ...(sessionRef ? { sessionId: sessionRef.id } : {}),
+        subscriptionId,
+      },
+    );
+
     const newRemaining = remainingSessions - 1;
     const status       = newRemaining === 0 ? 'depleted' : parseString(subscription['status'], 'active');
 
@@ -382,8 +495,7 @@ export async function consumeSubscriptionAndCreateSession(
 
     let sessionId: string | undefined;
 
-    if (requestRef && requestSnap && metadata.sessionDetails) {
-      const sessionRef = db.collection('hafizSessions').doc();
+    if (requestRef && requestSnap && metadata.sessionDetails && sessionRef) {
       sessionId = sessionRef.id;
       const requestData = requestSnap.data() as Record<string, unknown>;
       const normalizedSessionDetails = normalizeSessionDetails(
@@ -407,6 +519,10 @@ export async function consumeSubscriptionAndCreateSession(
         status:               STATUS.ACCEPTED,
         isPaid:               true,
         ...(paymentUpdate ? { paymentId: paymentUpdate.paymentId } : {}),
+        ...(paymentUpdate ? { paymentType: 'paymob', paymentGateway: 'paymob' } : {}),
+        ...(teacherWalletCredit
+          ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+          : {}),
         paymentTransactionId: transactionId,
         // Stamp subscriptionId so onSessionCancelled can detect bundle
         // sessions and restore a credit instead of refunding money.
@@ -436,6 +552,9 @@ export async function consumeSubscriptionAndCreateSession(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
         processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(teacherWalletCredit
+          ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+          : {}),
       });
     }
 
@@ -457,7 +576,9 @@ export async function createSubscriptionFromPayment(
   const sessionsCount = parseNumber(metadata['sessionsCount'], 1);
   const validityDays  = typeof metadata['validityDays'] === 'number' ? metadata['validityDays'] : undefined;
   const sessionType   = parseString(metadata['sessionType'],   '');
-  const pricingSnapshot = {
+  const requestId = parseString(metadata['requestId'], '');
+  const planId = parseString(metadata['planId'], '');
+  const pricingSnapshotBase = {
     studentCountryCode: parseString(metadata['studentCountryCode'], ''),
     studentCountryName: parseString(metadata['studentCountryName'], ''),
     displayCurrencyCode: parseString(metadata['displayCurrencyCode'], ''),
@@ -468,10 +589,6 @@ export async function createSubscriptionFromPayment(
       typeof metadata['fxRateToEGP'] === 'number' ? metadata['fxRateToEGP'] : null,
     chargedAmountEGP:
       typeof metadata['chargedAmountEGP'] === 'number' ? metadata['chargedAmountEGP'] : null,
-    sessionDurationMinutes:
-      typeof metadata['sessionDurationMinutes'] === 'number'
-        ? metadata['sessionDurationMinutes']
-        : null,
   };
 
   return db.runTransaction(async (transaction) => {
@@ -495,6 +612,47 @@ export async function createSubscriptionFromPayment(
       );
     }
 
+    let authoritativeSessionDuration: number | null = null;
+    if (requestId) {
+      const requestSnap = await transaction.get(
+        db.collection('sessionRequests').doc(requestId),
+      );
+      if (requestSnap.exists) {
+        const request = requestSnap.data() ?? {};
+        if (
+          request.studentId !== studentId ||
+          request.mohaffezId !== mohaffezId
+        ) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Payment request does not match the booking owner',
+          );
+        }
+        authoritativeSessionDuration = compatibleSessionDuration(
+          request.sessionDurationMinutes,
+        );
+      }
+    }
+
+    if (authoritativeSessionDuration === null && planId) {
+      const planSnap = await transaction.get(
+        db.collection('users').doc(mohaffezId)
+          .collection('pricingPlans').doc(planId),
+      );
+      authoritativeSessionDuration = supportedSessionDuration(
+        planSnap.data()?.sessionDurationMinutes,
+      );
+    }
+
+    authoritativeSessionDuration =
+      authoritativeSessionDuration ??
+      compatibleSessionDuration(metadata['sessionDurationMinutes']) ??
+      45;
+    const pricingSnapshot = {
+      ...pricingSnapshotBase,
+      sessionDurationMinutes: authoritativeSessionDuration,
+    };
+
     const subscriptionRef = db.collection('subscriptions').doc();
     let expiryDate: FirebaseFirestore.Timestamp | null = null;
 
@@ -504,18 +662,29 @@ export async function createSubscriptionFromPayment(
       expiryDate = admin.firestore.Timestamp.fromDate(expiry);
     }
 
+    const teacherWalletCredit = await creditPaymobPaymentToTeacherPending(
+      transaction,
+      payment,
+      paymentUpdate,
+      { subscriptionId: subscriptionRef.id },
+    );
+
     transaction.set(subscriptionRef, {
       studentId:           payment.studentId,
       studentName:         payment.studentName,
       mohaffezId:          payment.mohaffezId,
       mohaffezName:        payment.mohaffezName,
-      planId:              parseString(metadata['planId'], ''),
+      planId,
       planTitle, planType,
       ...pricingSnapshot,
       totalSessions:       sessionsCount,
       remainingSessions:   sessionsCount,
       totalPaid:           payment.amount,
       paymentTransactionId: transactionId,
+      ...(paymentUpdate ? { paymentType: 'paymob', paymentGateway: 'paymob' } : {}),
+      ...(teacherWalletCredit
+        ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+        : {}),
       startDate:           admin.firestore.FieldValue.serverTimestamp(),
       expiryDate,
       status:              'active',
@@ -531,6 +700,9 @@ export async function createSubscriptionFromPayment(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
         processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(teacherWalletCredit
+          ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+          : {}),
       });
     }
 

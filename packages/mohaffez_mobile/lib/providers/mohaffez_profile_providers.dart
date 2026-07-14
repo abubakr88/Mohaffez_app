@@ -160,6 +160,36 @@ final availabilityProvider =
   },
 );
 
+/// PII-free occupied intervals for the nearby booking horizon. This is only a
+/// UI optimization; the booking Cloud Function remains the conflict authority.
+final bookingCalendarProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, mohaffezId) {
+    final now = DateTime.now().toUtc();
+    final rangeStart = DateTime.utc(now.year, now.month, now.day)
+        .subtract(const Duration(days: 2));
+    final rangeEnd = rangeStart.add(const Duration(days: 11));
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(mohaffezId)
+        .collection('bookingCalendar')
+        .where(
+          'dateUtc',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(rangeStart),
+        )
+        .where('dateUtc', isLessThan: Timestamp.fromDate(rangeEnd))
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .expand((doc) => (doc.data()['intervals'] as List? ?? const []))
+              .whereType<Map>()
+              .map((interval) => Map<String, dynamic>.from(interval))
+              .toList(),
+        );
+  },
+);
+
 /// Provider for mohaffez statistics — streams denormalized counters from the
 /// teacher's user document so the profile updates in real-time when Cloud
 /// Functions increment completedSessionsCount / studentsServedCount.

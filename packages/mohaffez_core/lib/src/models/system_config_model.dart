@@ -29,6 +29,7 @@ class SystemConfigModel {
   final bool enableOnlineSessions;
   final bool enableMosqueSessions;
   final bool enableHomeSessions;
+  final bool variablePlanSessionDurationEnabled;
   final bool fcmEnabled;
   final bool paymentReminderEnabled;
   final bool sessionReminderEnabled;
@@ -90,6 +91,7 @@ class SystemConfigModel {
     required this.enableOnlineSessions,
     required this.enableMosqueSessions,
     required this.enableHomeSessions,
+    required this.variablePlanSessionDurationEnabled,
     required this.fcmEnabled,
     required this.paymentReminderEnabled,
     required this.sessionReminderEnabled,
@@ -181,6 +183,9 @@ class SystemConfigModel {
           defaults.enableMosqueSessions,
       enableHomeSessions:
           data['enableHomeSessions'] as bool? ?? defaults.enableHomeSessions,
+      variablePlanSessionDurationEnabled:
+          data['variablePlanSessionDurationEnabled'] as bool? ??
+              defaults.variablePlanSessionDurationEnabled,
       fcmEnabled: data['fcmEnabled'] as bool? ?? defaults.fcmEnabled,
       paymentReminderEnabled: data['paymentReminderEnabled'] as bool? ??
           defaults.paymentReminderEnabled,
@@ -257,6 +262,7 @@ class SystemConfigModel {
       enableOnlineSessions: true,
       enableMosqueSessions: true,
       enableHomeSessions: true,
+      variablePlanSessionDurationEnabled: false,
       fcmEnabled: true,
       paymentReminderEnabled: true,
       sessionReminderEnabled: true,
@@ -308,6 +314,7 @@ class SystemConfigModel {
       'enableOnlineSessions': enableOnlineSessions,
       'enableMosqueSessions': enableMosqueSessions,
       'enableHomeSessions': enableHomeSessions,
+      'variablePlanSessionDurationEnabled': variablePlanSessionDurationEnabled,
       'fcmEnabled': fcmEnabled,
       'paymentReminderEnabled': paymentReminderEnabled,
       'sessionReminderEnabled': sessionReminderEnabled,

@@ -34,6 +34,7 @@ class _DirectBookingRequestScreenState
   bool _submitting = false;
   bool _acknowledged = false;
   String? _selectedProvider;
+  bool _showProviderValidation = false;
 
   // True only after a successful request is sent.
   // Prevents dispose from resetting the provider too early during navigation.
@@ -54,6 +55,17 @@ class _DirectBookingRequestScreenState
           ),
         );
       }
+      return;
+    }
+
+    if (slotContext.sessionType == 'online' && _selectedProvider == null) {
+      setState(() => _showProviderValidation = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('اختر وسيلة التواصل المناسبة للجلسة أولاً'),
+          backgroundColor: AppThemeConstants.warning,
+        ),
+      );
       return;
     }
 
@@ -107,6 +119,7 @@ class _DirectBookingRequestScreenState
         'planTitle': selectedPlan.title,
         'sessionsCount': selectedPlan.sessionsCount,
         'validityDays': selectedPlan.validityDays,
+        'sessionDurationMinutes': selectedPlan.sessionDurationMinutes,
         'paymentAmount': selectedPlan.priceEGP,
         ...PricingCountryUtils.paymentSnapshot(selectedPlan),
         // Payment is selected only after the teacher accepts. New requests no
@@ -321,7 +334,11 @@ class _DirectBookingRequestScreenState
                 MeetingProviderPicker(
                   teacherId: slotContext.mohaffezId,
                   selected: _selectedProvider,
-                  onChanged: (id) => setState(() => _selectedProvider = id),
+                  showValidationError: _showProviderValidation,
+                  onChanged: (id) => setState(() {
+                    _selectedProvider = id;
+                    _showProviderValidation = false;
+                  }),
                 ),
               ],
               const SizedBox(height: 16),
@@ -357,12 +374,8 @@ class _DirectBookingRequestScreenState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: (_submitting ||
-                          !_acknowledged ||
-                          (slotContext.sessionType == 'online' &&
-                              _selectedProvider == null))
-                      ? null
-                      : sendRequest,
+                  onPressed:
+                      (_submitting || !_acknowledged) ? null : sendRequest,
                   icon: _submitting
                       ? const SizedBox(
                           width: 20,
@@ -373,7 +386,12 @@ class _DirectBookingRequestScreenState
                       : const Icon(Icons.send_outlined,
                           color: AppThemeConstants.white),
                   label: Text(
-                    _submitting ? 'جاري الإرسال...' : 'إرسال الطلب',
+                    _submitting
+                        ? 'جاري الإرسال...'
+                        : slotContext.sessionType == 'online' &&
+                                _selectedProvider == null
+                            ? 'اختر وسيلة التواصل ثم أرسل الطلب'
+                            : 'إرسال الطلب',
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

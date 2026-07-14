@@ -33,6 +33,12 @@ function optionalNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function compatibleSessionDuration(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const duration = Math.trunc(value);
+  return duration >= 5 && duration <= 240 ? duration : null;
+}
+
 function optionalTimestamp(
   value: unknown
 ): FirebaseFirestore.Timestamp | null {
@@ -136,7 +142,7 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       typeof sessionsCount === 'number' ? sessionsCount : null;
     const finalValidityDays: number | null =
       typeof validityDays === 'number' ? validityDays : null;
-    const pricingSnapshot = {
+    const pricingSnapshotBase = {
       studentCountryCode:
         typeof studentCountryCode === 'string' ? studentCountryCode : null,
       studentCountryName:
@@ -151,10 +157,6 @@ export const studentMarkedDirectPayment = functions.https.onCall(
         typeof fxRateToEGP === 'number' ? fxRateToEGP : null,
       chargedAmountEGP:
         typeof chargedAmountEGP === 'number' ? chargedAmountEGP : null,
-      sessionDurationMinutes:
-        typeof sessionDurationMinutes === 'number'
-          ? sessionDurationMinutes
-          : null,
     };
     const isBundleOrSubscription =
       finalPlanType === 'bundle' || finalPlanType === 'subscription';
@@ -172,6 +174,14 @@ export const studentMarkedDirectPayment = functions.https.onCall(
       }
 
       const reqData = reqSnap.data()!;
+      const authoritativeSessionDuration =
+        compatibleSessionDuration(reqData.sessionDurationMinutes) ??
+        compatibleSessionDuration(sessionDurationMinutes) ??
+        45;
+      const pricingSnapshot = {
+        ...pricingSnapshotBase,
+        sessionDurationMinutes: authoritativeSessionDuration,
+      };
       const learnerSnapshot = buildLearnerSnapshot(
         data as Record<string, unknown>,
         reqData,
@@ -241,7 +251,19 @@ export const studentMarkedDirectPayment = functions.https.onCall(
 
       const parsedSlotDate  = parseFlutterDate(slotDate  as string);
       const parsedSlotStart = parseFlutterDate(slotStart as string);
-      const parsedSlotEnd   = parseFlutterDate(slotEnd   as string);
+      const requestedSlotEnd = parseFlutterDate(slotEnd as string);
+      const parsedSlotEnd = new Date(
+        parsedSlotStart.getTime() + authoritativeSessionDuration * 60 * 1000,
+      );
+      if (
+        !Number.isFinite(requestedSlotEnd.getTime()) ||
+        Math.abs(requestedSlotEnd.getTime() - parsedSlotEnd.getTime()) > 60 * 1000
+      ) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Selected slot no longer matches the booking duration',
+        );
+      }
       const expiresAt = admin.firestore.Timestamp.fromDate(
         new Date(Date.now() + 24 * 60 * 60 * 1000)
       );

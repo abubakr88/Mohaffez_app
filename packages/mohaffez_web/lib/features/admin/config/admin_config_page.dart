@@ -246,6 +246,21 @@ class _ConfigForm extends ConsumerWidget {
                 value: config.enableHomeSessions,
                 onChanged: (v) =>
                     _save(context, ref, {'enableHomeSessions': v})),
+            const SizedBox(height: DSSpacing.sm),
+            _SwitchRow(
+              label: 'مدة مستقلة لكل خطة سعرية',
+              value: config.variablePlanSessionDurationEnabled,
+              onChanged: (v) => _save(
+                context,
+                ref,
+                {'variablePlanSessionDurationEnabled': v},
+              ),
+            ),
+            const SizedBox(height: DSSpacing.xs),
+            Text(
+              'فعّلها بعد نشر Functions والتطبيقات واختبار المواعيد ذات المدد المختلفة.',
+              style: DSText.caption(context, color: DSColors.text3),
+            ),
             const SizedBox(height: DSSpacing.md),
             _EditableRow(
               label: 'مهلة الدفع (ساعة)',
