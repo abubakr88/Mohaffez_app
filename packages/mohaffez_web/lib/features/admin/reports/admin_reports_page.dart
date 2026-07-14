@@ -1,10 +1,12 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import '../../../design_system/design_system.dart';
 import '../../../platform/web_download.dart';
+import '../payments/admin_payment_formatters.dart';
 
 class AdminReportsPage extends ConsumerWidget {
   const AdminReportsPage({super.key});
@@ -43,10 +45,38 @@ class AdminReportsPage extends ConsumerWidget {
               children: [
                 if (m.generatedAt != null)
                   Text(
-                    'آخر تحديث: ${DateFormat('dd MMM yyyy HH:mm', 'ar').format(m.generatedAt!)}',
+                    'آخر تحديث دقيق: ${adminExactTimestamp(m.generatedAt)} (${adminBrowserTimezoneLabel()})',
                     style: DSText.caption(context, color: DSColors.text3),
                   ),
                 const SizedBox(height: DSSpacing.md),
+                DSBanner(
+                  title: 'تقارير مجمعة منخفضة التكلفة',
+                  message:
+                      'هذه المؤشرات تقرأ مستندات ملخصة مسبقاً. راجع المعاملات أو مسار أحداث الدفع فقط عند التحقيق في عملية محددة.',
+                  variant: DSBannerVariant.info,
+                  action: Wrap(
+                    spacing: DSSpacing.sm,
+                    runSpacing: DSSpacing.sm,
+                    children: [
+                      DSButton(
+                        label: 'مراقبة المعاملات',
+                        onPressed: () => context.go('/admin/payments'),
+                        size: DSButtonSize.sm,
+                        variant: DSButtonVariant.secondary,
+                        leading:
+                            const Icon(Icons.receipt_long_outlined, size: 16),
+                      ),
+                      DSButton(
+                        label: 'أحداث الدفع',
+                        onPressed: () => context.go('/admin/payment-events'),
+                        size: DSButtonSize.sm,
+                        variant: DSButtonVariant.secondary,
+                        leading: const Icon(Icons.timeline_rounded, size: 16),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DSSpacing.xl),
 
                 // Period comparison KPIs ─────────────────────────────────
                 _ComparisonRow(metrics: m),

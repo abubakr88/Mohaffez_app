@@ -571,11 +571,11 @@ service cloud.firestore {
     // ============================================
 
     match /payments/{paymentId} {
-      allow read: if isAuthenticated() && (
+      allow read: if canManageFinance() || (isAuthenticated() && (
         resource == null ||
         request.auth.uid == resource.data.studentId ||
         request.auth.uid == resource.data.mohaffezId
-      );
+      ));
 
       allow create: if isAuthenticated() &&
                     !isSuspended() &&
