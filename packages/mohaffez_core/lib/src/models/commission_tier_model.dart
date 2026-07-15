@@ -15,8 +15,8 @@ class CommissionTierModel {
   /// Display label in Arabic, e.g. 'البداية', 'نشط'.
   final String labelAr;
 
-  /// Inclusive lower bound on on-time sessions completed in the rolling 14-day
-  /// window to qualify for this tier. Sorted ascending defines the ladder.
+  /// Inclusive lower bound on on-time sessions completed in the current
+  /// financial cycle to qualify for this tier. Sorted ascending defines the ladder.
   final int minSessions;
 
   /// Commission rate applied to all transactions while the teacher sits
@@ -69,7 +69,7 @@ class CommissionTierModel {
   }
 
   /// Default tier table seeded when admin hasn't configured one yet.
-  /// Thresholds are on-time sessions per 14-day window; admin can tune via
+  /// Thresholds are on-time sessions per financial cycle; admin can tune via
   /// the admin tier editor without redeploying.
   static const List<CommissionTierModel> defaultTiers = [
     CommissionTierModel(

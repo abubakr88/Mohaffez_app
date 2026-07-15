@@ -1,4 +1,4 @@
-﻿import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +24,7 @@ class SettingsScreen extends ConsumerWidget {
           children: [
             if (ref.watch(currentUserProvider).valueOrNull?.role ==
                 'mohaffez') ...[
-              const _TeacherTrialSettingsSection(),
+              const _TeacherBookingSettingsSection(),
               Spacing.vLg,
             ],
             // التطبيق
@@ -142,8 +142,7 @@ class SettingsScreen extends ConsumerWidget {
         child: AlertDialog(
           title: const Row(
             children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: AppThemeConstants.error),
+              Icon(Icons.warning_amber_rounded, color: AppThemeConstants.error),
               SizedBox(width: 8),
               Text('حذف الحساب'),
             ],
@@ -271,7 +270,7 @@ class SettingsScreen extends ConsumerWidget {
   void _openPrivacyPolicy(BuildContext context) async {
     const privacyPolicyUrl = 'https://mohaffez-ba2ec.web.app/privacy-policy';
     final uri = Uri.parse(privacyPolicyUrl);
-    
+
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -309,8 +308,8 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               ListTile(
                 title: const Text('العربية'),
-                trailing: const Icon(Icons.check,
-                    color: AppThemeConstants.primary),
+                trailing:
+                    const Icon(Icons.check, color: AppThemeConstants.primary),
                 onTap: () => Navigator.pop(ctx),
               ),
               ListTile(
@@ -353,10 +352,13 @@ class SettingsScreen extends ConsumerWidget {
                     labelText: 'كلمة المرور الحالية',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'يرجى إدخال كلمة المرور الحالية' : null,
+                  validator: (v) => (v == null || v.isEmpty)
+                      ? 'يرجى إدخال كلمة المرور الحالية'
+                      : null,
                 ),
-                const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
+                const SizedBox(
+                    height:
+                        AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
                 TextFormField(
                   controller: newPasswordController,
                   obscureText: true,
@@ -365,12 +367,18 @@ class SettingsScreen extends ConsumerWidget {
                     border: OutlineInputBorder(),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'يرجى إدخال كلمة مرور جديدة';
-                    if (v.length < 6) return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                    if (v == null || v.isEmpty) {
+                      return 'يرجى إدخال كلمة مرور جديدة';
+                    }
+                    if (v.length < 6) {
+                      return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                    }
                     return null;
                   },
                 ),
-                const SizedBox(height: AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
+                const SizedBox(
+                    height:
+                        AppThemeConstants.spaceMd - AppThemeConstants.spaceXs),
                 TextFormField(
                   controller: confirmPasswordController,
                   obscureText: true,
@@ -378,8 +386,9 @@ class SettingsScreen extends ConsumerWidget {
                     labelText: 'تأكيد كلمة المرور',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (v) =>
-                      v != newPasswordController.text ? 'كلمتا المرور غير متطابقتين' : null,
+                  validator: (v) => v != newPasswordController.text
+                      ? 'كلمتا المرور غير متطابقتين'
+                      : null,
                 ),
               ],
             ),
@@ -508,8 +517,8 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _TeacherTrialSettingsSection extends ConsumerWidget {
-  const _TeacherTrialSettingsSection();
+class _TeacherBookingSettingsSection extends ConsumerWidget {
+  const _TeacherBookingSettingsSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -521,11 +530,52 @@ class _TeacherTrialSettingsSection extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, __) => const SizedBox.shrink(),
       data: (data) {
+        final acceptingNewBookings = data['acceptingNewBookings'] != false;
         final enabled = data['enabled'] == true;
         final duration = data['durationMinutes'] as int? ?? 30;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Padding(
+              padding: EdgeInsets.only(right: 16, bottom: 8),
+              child: Text(
+                'الحجوزات الجديدة',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppThemeConstants.grey500,
+                ),
+              ),
+            ),
+            Container(
+              decoration: const BoxDecoration(
+                color: AppThemeConstants.surface,
+                borderRadius: AppThemeConstants.borderRadiusMd,
+              ),
+              child: SwitchListTile(
+                secondary: Icon(
+                  acceptingNewBookings
+                      ? Icons.event_available_outlined
+                      : Icons.event_busy_outlined,
+                  color: acceptingNewBookings
+                      ? AppThemeConstants.success
+                      : AppThemeConstants.warning,
+                ),
+                title: const Text('استقبال حجوزات جديدة'),
+                subtitle: Text(
+                  acceptingNewBookings
+                      ? 'يمكن للطلاب إرسال طلبات حجز جديدة.'
+                      : 'متوقف مؤقتًا. الجلسات والطلبات الحالية لن تتأثر.',
+                ),
+                value: acceptingNewBookings,
+                onChanged: (value) => _changeBookingAvailability(
+                  context,
+                  ref,
+                  value,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
             const Padding(
               padding: EdgeInsets.only(right: 16, bottom: 8),
               child: Text(
@@ -551,11 +601,13 @@ class _TeacherTrialSettingsSection extends ConsumerWidget {
                       'يمكن لكل طالب طلب حلقة تجريبية واحدة فقط',
                     ),
                     value: enabled,
-                    onChanged: (value) => _update(
-                      context,
-                      ref,
-                      {'trialSessionEnabled': value},
-                    ),
+                    onChanged: acceptingNewBookings
+                        ? (value) => _update(
+                              context,
+                              ref,
+                              {'trialSessionEnabled': value},
+                            )
+                        : null,
                   ),
                   if (enabled) ...[
                     const Divider(height: 1),
@@ -595,6 +647,42 @@ class _TeacherTrialSettingsSection extends ConsumerWidget {
     );
   }
 
+  Future<void> _changeBookingAvailability(
+    BuildContext context,
+    WidgetRef ref,
+    bool value,
+  ) async {
+    if (!value) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('إيقاف الحجوزات الجديدة؟'),
+          content: const Text(
+            'لن يتمكن الطلاب من إرسال طلبات حجز أو حلقات تجريبية جديدة. '
+            'الجلسات والطلبات الموجودة بالفعل ستظل كما هي.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('إيقاف مؤقتًا'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+
+    await _update(
+      context,
+      ref,
+      {'acceptingNewBookings': value},
+    );
+  }
+
   Future<void> _update(
     BuildContext context,
     WidgetRef ref,
@@ -607,7 +695,7 @@ class _TeacherTrialSettingsSection extends ConsumerWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر حفظ إعدادات الحلقة التجريبية')),
+          const SnackBar(content: Text('تعذر حفظ إعدادات الحجوزات')),
         );
       }
     }

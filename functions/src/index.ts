@@ -89,7 +89,7 @@ export {
 export { setTeacherFoundingBadge } from "./admin/teacherBadges";
 export { convertUnderageStudentToParent } from "./auth/convertUnderageStudentToParent";
 
-// Per-teacher commission tier recompute (rolling 30-day revenue → tier).
+// Per-teacher commission tier recompute for fixed financial cycles.
 export {
   recomputeTeacherTiers,
   recomputeTeacherTiersNow,

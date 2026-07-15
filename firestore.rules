@@ -168,6 +168,7 @@ service cloud.firestore {
             'addressLng', 'specialization', 'name', 'honorific',
             'youtubeVideoUrl', 'meetingLink', 'meetingLinks',
             'walletNumbers',
+            'acceptingNewBookings',
             'trialSessionEnabled', 'trialSessionDurationMinutes',
             'privacySettings', 'updatedAt',
             // ── Setup account fields (one-time setup wizard) ──
@@ -181,10 +182,20 @@ service cloud.firestore {
           ]) &&
         (
           !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['trialSessionEnabled', 'trialSessionDurationMinutes'])
+            .hasAny([
+              'acceptingNewBookings',
+              'trialSessionEnabled',
+              'trialSessionDurationMinutes'
+            ])
           ||
           (
             resource.data.role == 'mohaffez' &&
+            (
+              !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['acceptingNewBookings'])
+              ||
+              request.resource.data.acceptingNewBookings is bool
+            ) &&
             (
               !request.resource.data.diff(resource.data).affectedKeys()
                 .hasAny(['trialSessionEnabled'])

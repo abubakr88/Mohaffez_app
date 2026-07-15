@@ -266,6 +266,17 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       return;
     }
     if (guardWriteInTour(ref, context)) return;
+    final profileValue =
+        ref.read(mohaffezProfileProvider(widget.mohaffezId)).value ?? {};
+    if (profileValue['acceptingNewBookings'] == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('المحفظ لا يستقبل حجوزات جديدة حاليًا'),
+          backgroundColor: AppThemeConstants.warning,
+        ),
+      );
+      return;
+    }
     if (selectedPricingPlan == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -285,8 +296,6 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
       );
       return;
     }
-    final profileValue =
-        ref.read(mohaffezProfileProvider(widget.mohaffezId)).value ?? {};
     final slotContext = _buildSlotContext(profileValue);
     final bookingFlow = ref.read(bookingFlowProvider.notifier);
     final plan = selectedPricingPlan!;
@@ -614,6 +623,8 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
           data: (profile) {
             final videoUrl = _teacherVideoUrl(profile);
             final publicBundle = publicBundleAsync?.valueOrNull;
+            final acceptingNewBookings =
+                profile['acceptingNewBookings'] != false;
             return RefreshIndicator(
               onRefresh: () async {
                 if (_isPublicView) {
@@ -669,28 +680,33 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
                           ref,
                           publicCredentials: publicBundle?.credentials,
                         ),
-                        if (!_isPublicView &&
-                            profile['trialSessionEnabled'] == true) ...[
+                        if (!acceptingNewBookings) ...[
                           const SizedBox(height: 20),
-                          _buildTrialSessionSection(profile, plansAsync),
-                        ],
-                        const SizedBox(height: 20),
-                        _buildModernSessionSelector(plansAsync),
-                        const SizedBox(height: 20),
-                        KeyedSubtree(
-                          key: _pricingStepKey,
-                          child: _buildModernPricingSection(plansAsync),
-                        ),
-                        const SizedBox(height: 20),
-                        KeyedSubtree(
-                          key: _scheduleStepKey,
-                          child: _buildModernAvailabilitySection(
-                            ref,
-                            profile,
-                            plansAsync,
-                            publicAvailability: publicBundle?.availability,
+                          _buildBookingsPausedNotice(),
+                        ] else ...[
+                          if (!_isPublicView &&
+                              profile['trialSessionEnabled'] == true) ...[
+                            const SizedBox(height: 20),
+                            _buildTrialSessionSection(profile, plansAsync),
+                          ],
+                          const SizedBox(height: 20),
+                          _buildModernSessionSelector(plansAsync),
+                          const SizedBox(height: 20),
+                          KeyedSubtree(
+                            key: _pricingStepKey,
+                            child: _buildModernPricingSection(plansAsync),
                           ),
-                        ),
+                          const SizedBox(height: 20),
+                          KeyedSubtree(
+                            key: _scheduleStepKey,
+                            child: _buildModernAvailabilitySection(
+                              ref,
+                              profile,
+                              plansAsync,
+                              publicAvailability: publicBundle?.availability,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 120),
                       ],
                     ),
@@ -1081,6 +1097,55 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
     );
   }
 
+  Widget _buildBookingsPausedNotice() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.warning.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppThemeConstants.warning.withValues(alpha: 0.35),
+          ),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.event_busy_outlined,
+              color: AppThemeConstants.warning,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'الحجوزات الجديدة متوقفة مؤقتًا',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'هذا المحفظ لا يستقبل طلبات حجز أو حلقات تجريبية جديدة حاليًا. يمكنك العودة لاحقًا.',
+                    style: TextStyle(
+                      color: AppThemeConstants.textSecondary,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTrialSessionSection(
     Map<String, dynamic> profile,
     AsyncValue<List<PricingPlanModel>> plansAsync,
@@ -1146,6 +1211,49 @@ class _MohaffezProfileScreenState extends ConsumerState<MohaffezProfileScreen> {
               ),
               error: (_, __) => const Text('تعذر تحميل حالة الطلب'),
               data: (request) {
+                if (request?['status'] == 'rejected_teacher') {
+                  final reason =
+                      (request?['rejectionReason'] as String?)?.trim() ?? '';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color:
+                              AppThemeConstants.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          reason.isEmpty
+                              ? 'الموعد المطلوب لم يكن مناسبًا للمحفظ. يمكنك طلب موعد آخر.'
+                              : 'اقتراح المحفظ: $reason',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _requestTrialSession(
+                            plansAsync.valueOrNull ?? const [],
+                            duration,
+                          ),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('طلب موعد آخر'),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'لم تُحسب المحاولة السابقة كحلقة تجريبية.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppThemeConstants.textSecondary,
+                        ),
+                      ),
+                    ],
+                  );
+                }
                 if (request != null) {
                   return SizedBox(
                     width: double.infinity,

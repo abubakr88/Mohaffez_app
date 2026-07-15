@@ -89,6 +89,7 @@ final teacherTrialSettingsProvider =
         .map((snapshot) {
       final data = snapshot.data() ?? const <String, dynamic>{};
       return {
+        'acceptingNewBookings': data['acceptingNewBookings'] != false,
         'enabled': data['trialSessionEnabled'] == true,
         'durationMinutes':
             (data['trialSessionDurationMinutes'] as num?)?.toInt() ?? 30,
@@ -159,11 +160,11 @@ class TrialSessionActions extends StateNotifier<AsyncValue<void>> {
 
   Future<void> reject({
     required String requestId,
-    String? reason,
+    required String reason,
   }) {
     return _call('rejectTrialSessionRequest', {
       'requestId': requestId,
-      if (reason != null) 'reason': reason,
+      'reason': reason,
     });
   }
 }

@@ -49,6 +49,7 @@ function publicUserProfile(
       0,
       Math.trunc(safeNumber(data.studentsServedCount)),
     ),
+    acceptingNewBookings: data.acceptingNewBookings !== false,
     trialSessionEnabled: data.trialSessionEnabled === true,
     trialSessionDurationMinutes:
       typeof data.trialSessionDurationMinutes === "number"

@@ -1,7 +1,9 @@
 import * as functions from 'firebase-functions';
 import admin, { db, FieldValue } from './utils/admin';
+import { isAcceptingNewBookings } from './teacherBookingPolicy';
 import {
   allowedLocalDayKeys,
+  canRetryTrialRequest,
   intervalIsInsideWindow,
   localDayKey,
 } from './trialSessionPolicy';
@@ -375,7 +377,8 @@ export const createTrialSessionRequest = functions.https.onCall(
         transaction.get(teacherRef),
       ]);
 
-      if (requestSnap.exists) {
+      const previousRequest = requestSnap.data();
+      if (requestSnap.exists && !canRetryTrialRequest(previousRequest?.status)) {
         throw new functions.https.HttpsError(
           'already-exists',
           'You have already requested a trial session with this teacher',
@@ -396,6 +399,12 @@ export const createTrialSessionRequest = functions.https.onCall(
         throw new functions.https.HttpsError(
           'failed-precondition',
           'Teacher account is not available',
+        );
+      }
+      if (!isAcceptingNewBookings(teacher)) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'This teacher is not accepting new booking requests',
         );
       }
       if (teacher?.trialSessionEnabled !== true) {
@@ -440,7 +449,17 @@ export const createTrialSessionRequest = functions.https.onCall(
         optionalString(student.displayName) ||
         '';
 
-      transaction.create(requestRef, {
+      const previousRejections = Array.isArray(previousRequest?.rejectionHistory)
+        ? previousRequest.rejectionHistory.slice(-4)
+        : [];
+      if (previousRequest?.rejectionReason) {
+        previousRejections.push({
+          reason: previousRequest.rejectionReason,
+          rejectedAt: previousRequest.rejectedAt ?? null,
+        });
+      }
+
+      transaction.set(requestRef, {
         studentId,
         studentName: displayStudentName,
         guardianId: studentId,
@@ -459,6 +478,8 @@ export const createTrialSessionRequest = functions.https.onCall(
         status: STATUS.PENDING_TEACHER,
         isTrial: true,
         isPaid: false,
+        attemptCount: Math.max(1, Number(previousRequest?.attemptCount) + 1 || 1),
+        rejectionHistory: previousRejections,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -490,7 +511,6 @@ export const proposeTrialSessionTime = functions.https.onCall(
         'requestId is required',
       );
     }
-
     const requestRef = db.collection('trialSessionRequests').doc(requestId);
     const requestSnap = await requestRef.get();
     if (!requestSnap.exists) {
@@ -746,6 +766,12 @@ export const rejectTrialSessionRequest = functions.https.onCall(
         'requestId is required',
       );
     }
+    if (!reason) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Rejection reason is required',
+      );
+    }
 
     const requestRef = db.collection('trialSessionRequests').doc(requestId);
     await db.runTransaction(async (transaction) => {
@@ -779,6 +805,8 @@ export const rejectTrialSessionRequest = functions.https.onCall(
           : STATUS.REJECTED_STUDENT,
         rejectionReason: reason || null,
         rejectedBy: isTeacher ? 'teacher' : 'student',
+        retryAllowed: isTeacher,
+        trialConsumed: false,
         rejectedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -789,7 +817,9 @@ export const rejectTrialSessionRequest = functions.https.onCall(
           senderId: uid,
           type: 'trial_session_rejected',
           title: 'تعذر إكمال الحلقة التجريبية',
-          body: reason || 'تم رفض طلب الحلقة التجريبية.',
+          body: isTeacher
+            ? `تعذر الموعد المطلوب. اقتراح المحفظ: ${reason}. يمكنك طلب موعد آخر.`
+            : reason,
           requestId,
         }),
       );

@@ -1,12 +1,11 @@
 // Per-teacher commission info streamed from `users/{teacherId}`.
 //
 // Three fields on the user doc are written by the Cloud Function
-// `recomputeTeacherTiers` (scheduled bi-weekly, 1st and 15th):
+// `recomputeTeacherTiers` (financial cycles starting on the 1st and 15th):
 //   commissionRate   — double, effective rate for this teacher
 //   commissionTier   — string id matching one of systemConfig.commissionTiers
-//   tierStats        — map { last14dRevenueEgp, evaluatedAt, nextEvalAt,
-//                            sessionsLast14d, totalSessionsLast14d,
-//                            lateSessionsLast14d }
+//   tierStats        — current cycle totals plus cycleStart/cycleEnd. Legacy
+//                      last14d keys are still read for older documents.
 //
 // Until the CF has run for a given teacher, all three are absent —
 // `TeacherCommissionInfo.fallbackTo(global)` returns the global rate
@@ -23,13 +22,13 @@ class TeacherCommissionInfo {
   final String? tierId;
   final double last14dRevenueEgp;
 
-  /// On-time sessions only — what the tier math uses.
+  /// On-time sessions in the current cycle — what the tier math uses.
   final int sessionsLast14d;
 
-  /// On-time + late combined — for "أكملت X" copy on the card.
+  /// On-time + late combined in the current cycle.
   final int totalSessionsLast14d;
 
-  /// Sessions the student flagged as late at rating time — excluded
+  /// Current-cycle sessions the student flagged as late — excluded
   /// from tier math but shown to the teacher for transparency.
   final int lateSessionsLast14d;
 
@@ -39,6 +38,12 @@ class TeacherCommissionInfo {
 
   final DateTime? evaluatedAt;
   final DateTime? nextEvalAt;
+  final DateTime? cycleStart;
+  final DateTime? cycleEnd;
+
+  int get sessionsInCycle => sessionsLast14d;
+  int get totalSessionsInCycle => totalSessionsLast14d;
+  int get lateSessionsInCycle => lateSessionsLast14d;
 
   const TeacherCommissionInfo({
     this.rate,
@@ -50,6 +55,8 @@ class TeacherCommissionInfo {
     this.penaltyPct = 0,
     this.evaluatedAt,
     this.nextEvalAt,
+    this.cycleStart,
+    this.cycleEnd,
   });
 
   /// Returns the effective rate (base tier rate + cycle penalty),
@@ -98,20 +105,28 @@ class TeacherCommissionInfo {
       return null;
     }
 
-    final onTime = (stats['sessionsLast14d'] as num?)?.toInt() ?? 0;
-    final lateCount = (stats['lateSessionsLast14d'] as num?)?.toInt() ?? 0;
+    final onTime = (stats['sessionsInCycle'] as num?)?.toInt() ??
+        (stats['sessionsLast14d'] as num?)?.toInt() ??
+        0;
+    final lateCount = (stats['lateSessionsInCycle'] as num?)?.toInt() ??
+        (stats['lateSessionsLast14d'] as num?)?.toInt() ??
+        0;
     return TeacherCommissionInfo(
       rate: (data['commissionRate'] as num?)?.toDouble(),
       tierId: data['commissionTier'] as String?,
-      last14dRevenueEgp:
-          (stats['last14dRevenueEgp'] as num?)?.toDouble() ?? 0,
+      last14dRevenueEgp: (stats['cycleRevenueEgp'] as num?)?.toDouble() ??
+          (stats['last14dRevenueEgp'] as num?)?.toDouble() ??
+          0,
       sessionsLast14d: onTime,
       lateSessionsLast14d: lateCount,
-      totalSessionsLast14d:
-          (stats['totalSessionsLast14d'] as num?)?.toInt() ?? (onTime + lateCount),
+      totalSessionsLast14d: (stats['totalSessionsInCycle'] as num?)?.toInt() ??
+          (stats['totalSessionsLast14d'] as num?)?.toInt() ??
+          (onTime + lateCount),
       penaltyPct: (data['commissionPenaltyPercent'] as num?)?.toDouble() ?? 0,
       evaluatedAt: toDate(stats['evaluatedAt']),
       nextEvalAt: toDate(stats['nextEvalAt']),
+      cycleStart: toDate(stats['cycleStart'] ?? stats['windowStart']),
+      cycleEnd: toDate(stats['cycleEnd'] ?? stats['nextEvalAt']),
     );
   }
 }

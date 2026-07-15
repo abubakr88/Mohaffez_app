@@ -12,6 +12,7 @@ import {
   computeEffectiveRate,
   computeSettlementPiastres,
   nextScheduledSettlementAt,
+  settlementCycleAt,
 } from "../recomputeTeacherTiers";
 
 // EGP ↔ piastres helpers (mirror walletUtils.egpToPiastres).
@@ -71,6 +72,42 @@ describe("Next scheduled settlement date", () => {
       year: 2026,
       month: 7,
       day: 1,
+      hour: 0,
+      minute: 5,
+    });
+  });
+
+  it("uses the fixed 15th-to-1st cycle after the settlement boundary", () => {
+    const cycle = settlementCycleAt(new Date("2026-06-24T09:00:00Z"));
+    expect(cairoParts(cycle.start)).toEqual({
+      year: 2026,
+      month: 6,
+      day: 15,
+      hour: 0,
+      minute: 5,
+    });
+    expect(cairoParts(cycle.end)).toEqual({
+      year: 2026,
+      month: 7,
+      day: 1,
+      hour: 0,
+      minute: 5,
+    });
+  });
+
+  it("keeps the old cycle until the 15th settlement boundary passes", () => {
+    const cycle = settlementCycleAt(new Date("2026-06-14T21:00:00Z"));
+    expect(cairoParts(cycle.start)).toEqual({
+      year: 2026,
+      month: 6,
+      day: 1,
+      hour: 0,
+      minute: 5,
+    });
+    expect(cairoParts(cycle.end)).toEqual({
+      year: 2026,
+      month: 6,
+      day: 15,
       hour: 0,
       minute: 5,
     });

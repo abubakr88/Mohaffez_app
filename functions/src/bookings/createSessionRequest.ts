@@ -12,6 +12,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { db, FieldValue } from "../utils/admin";
+import { isAcceptingNewBookings } from "../teacherBookingPolicy";
 
 const STATUS = {
   PENDING: "pending",
@@ -384,6 +385,16 @@ export const createSessionRequest = functions.https.onCall(
       );
       const variablePlanDurationEnabled =
         configSnap.data()?.variablePlanSessionDurationEnabled === true;
+
+      const teacherSnap = await transaction.get(
+        db.collection("users").doc(mohaffezId),
+      );
+      if (!isAcceptingNewBookings(teacherSnap.data())) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "المحفظ لا يستقبل طلبات حجز جديدة حاليًا",
+        );
+      }
 
       // ── 4a. Validate slot lock ─────────────────────────────────────────
       if (slotLockId) {

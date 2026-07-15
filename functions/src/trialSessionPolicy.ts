@@ -37,3 +37,7 @@ export function intervalIsInsideWindow(
 ): boolean {
   return startMs >= windowStartMs && endMs <= windowEndMs;
 }
+
+export function canRetryTrialRequest(status: unknown): boolean {
+  return status === 'rejected_teacher';
+}
