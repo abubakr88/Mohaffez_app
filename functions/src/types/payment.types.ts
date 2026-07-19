@@ -22,6 +22,14 @@ export interface PaymentDocument {
   studentName: string;
   mohaffezId: string;
   mohaffezName: string;
+  planId?: string;
+  planTitle?: string;
+  planType?: string;
+  gateway?: string;
+  sessionId?: string;
+  paidAt?: FirebaseFirestore.Timestamp;
+  completedAt?: FirebaseFirestore.Timestamp;
+  teacherWalletLedgerGroupId?: string;
   metadata?: PaymentMetadata;
   subscriptionId?: string;
 }

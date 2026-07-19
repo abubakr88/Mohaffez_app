@@ -4,6 +4,13 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { db, FieldValue } from "../utils/admin";
 import { EventStore } from "../services/EventStore";
+import { sanitizeForFirestore } from "../utils/firestoreSanitizer";
+import {
+  buildBundleEntitlementValues,
+  isBundlePlan,
+  promoBundleSubscriptionId,
+} from "../payments/paymobBundleEntitlement";
+import { PaymentEventType } from "../types/events.types";
 
 const STATUS = {
   PENDING: 'pending',
@@ -31,6 +38,12 @@ function optionalString(value: unknown): string | null {
 
 function optionalNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function mapValue(value: unknown): Record<string, unknown> {
+  return value != null && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function optionalTimestamp(
@@ -90,13 +103,14 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
   } = data;
   const normalizedPromoCode =
     typeof promoCode === "string" ? promoCode.trim().toUpperCase() : "";
+  const normalizedPaymentId = optionalString(paymentId);
 
   // ✅ LOG INPUT PARAMETERS
   functions.logger.info("📥 Input parameters received", {
     hasRequestId: !!requestId,
     requestId: requestId || "NOT_PROVIDED",
-    hasPaymentId: !!paymentId,
-    paymentId: paymentId || null,
+    hasPaymentId: normalizedPaymentId != null,
+    paymentId: normalizedPaymentId,
     studentId,
     mohaffezId,
     promoCode,
@@ -236,10 +250,10 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     // Check 2: By paymentId
-    if (paymentId) {
+    if (normalizedPaymentId) {
       const existingByPaymentQuery = db
         .collection("hafizSessions")
-        .where("paymentId", "==", paymentId)
+        .where("paymentId", "==", normalizedPaymentId)
         .limit(1);
       
       const existingByPayment = await transaction.get(existingByPaymentQuery);
@@ -248,7 +262,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         const session = existingByPayment.docs[0];
         const sessionData = session.data();
         functions.logger.warn("⚠️ Session already exists (paymentId check)", {
-          paymentId,
+          paymentId: normalizedPaymentId,
           sessionId: session.id,
         });
         return {
@@ -331,6 +345,60 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
         requestId,
         message: 'الجلسة مؤكدة بالفعل',
       };
+    }
+
+    let paymentRef: FirebaseFirestore.DocumentReference | null = null;
+    let paymentData: Record<string, unknown> | null = null;
+    let paymentMetadata: Record<string, unknown> = {};
+    let bundleSubscriptionId: string | null = null;
+    let bundleSubscriptionRef: FirebaseFirestore.DocumentReference | null = null;
+
+    if (normalizedPaymentId) {
+      paymentRef = db.collection('payments').doc(normalizedPaymentId);
+      const paymentSnapshot = await transaction.get(paymentRef);
+      if (!paymentSnapshot.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          'سجل الدفع المجاني غير موجود'
+        );
+      }
+
+      paymentData = paymentSnapshot.data() as Record<string, unknown>;
+      paymentMetadata = mapValue(paymentData.metadata);
+      const paymentPromoCode = optionalString(paymentMetadata.promoCode)?.toUpperCase();
+      const paymentRequestId = optionalString(
+        paymentData.requestId ?? paymentMetadata.requestId
+      );
+      const paymentAmount = optionalNumber(paymentData.amount) ?? 0;
+
+      if (
+        paymentData.studentId !== studentId ||
+        paymentData.mohaffezId !== mohaffezId ||
+        (paymentRequestId != null && paymentRequestId !== requestId) ||
+        paymentAmount > 0.01 ||
+        paymentPromoCode !== normalizedPromoCode
+      ) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'سجل الدفع لا يطابق طلب الحجز المجاني'
+        );
+      }
+
+      if (isBundlePlan(paymentMetadata, paymentData)) {
+        bundleSubscriptionId = promoBundleSubscriptionId(normalizedPaymentId);
+        bundleSubscriptionRef = db
+          .collection('subscriptions')
+          .doc(bundleSubscriptionId);
+        const bundleSubscriptionSnapshot = await transaction.get(
+          bundleSubscriptionRef
+        );
+        if (bundleSubscriptionSnapshot.exists) {
+          throw new functions.https.HttpsError(
+            'already-exists',
+            'اشتراك الباقة المجانية موجود بالفعل'
+          );
+        }
+      }
     }
 
     const requestSlotDate = optionalTimestamp(existingRequestData.slotDate);
@@ -472,6 +540,108 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
           optionalString(existingRequestData.preferredProvider)
         : null;
 
+    const sessionDetails = mapValue(paymentMetadata.sessionDetails);
+    const planId = optionalString(paymentMetadata.planId) ??
+      optionalString(existingRequestData.planId);
+    const planTitle = optionalString(paymentMetadata.planTitle) ??
+      optionalString(existingRequestData.planTitle);
+    const sessionsCount = optionalNumber(paymentMetadata.sessionsCount) ??
+      optionalNumber(existingRequestData.sessionsCount);
+    const validityDays = optionalNumber(paymentMetadata.validityDays) ??
+      optionalNumber(existingRequestData.validityDays);
+    const sessionDurationMinutes =
+      optionalNumber(existingRequestData.sessionDurationMinutes) ??
+      optionalNumber(sessionDetails.sessionDurationMinutes) ??
+      optionalNumber(paymentMetadata.sessionDurationMinutes);
+    const isBundlePayment =
+      paymentData != null && isBundlePlan(paymentMetadata, paymentData);
+    const sessionWriteData: Record<string, unknown> = {
+      requestId: requestRef.id,
+      mohaffezId,
+      studentId,
+      mohaffezName,
+      studentName,
+      ...learnerSnapshot,
+      sessionType,
+      preferredProvider: effectivePreferredProvider,
+      location: imamAddressText || "",
+      mohaffezPhone: mohaffezPhone || null,
+      studentPhone:
+        typeof studentPhone === 'string' && studentPhone.trim().length > 0
+          ? studentPhone.trim()
+          : null,
+      imamAddressLat: imamAddressLat || null,
+      imamAddressLng: imamAddressLng || null,
+      imamAddressText: imamAddressText || null,
+      preferredTimeSlot,
+      timeSlot: preferredTimeSlot,
+      sessionDate: slotDateTimestamp,
+      slotStart: slotStartTimestamp,
+      slotEnd: slotEndTimestamp,
+      status: STATUS.ACCEPTED,
+      isPaid: true,
+      sessionPrice: 0.0,
+      promoCode: normalizedPromoCode,
+      paymentId: normalizedPaymentId,
+      ...(planId ? { planId } : {}),
+      ...(planTitle ? { planTitle } : {}),
+      ...(isBundlePayment ? { planType: 'bundle' } : {}),
+      ...(sessionsCount != null ? { sessionsCount } : {}),
+      ...(validityDays != null ? { validityDays } : {}),
+      ...(sessionDurationMinutes != null
+        ? { sessionDurationMinutes: Math.trunc(sessionDurationMinutes) }
+        : {}),
+      ...(bundleSubscriptionId ? { subscriptionId: bundleSubscriptionId } : {}),
+      createdAt: FieldValue.serverTimestamp(),
+      acceptedAt: FieldValue.serverTimestamp(),
+      reminder24hSent: false,
+      reminder1hSent: false,
+      juzCount: 1,
+      sessionRating: 10,
+    };
+
+    let bundleSubscriptionWriteData: Record<string, unknown> | null = null;
+    let bundleRemainingSessions: number | null = null;
+    if (
+      isBundlePayment &&
+      normalizedPaymentId &&
+      paymentData &&
+      bundleSubscriptionId &&
+      bundleSubscriptionRef
+    ) {
+      const entitlement = buildBundleEntitlementValues({
+        paymentId: normalizedPaymentId,
+        payment: paymentData,
+        metadata: paymentMetadata,
+        requestId: requestRef.id,
+        request: existingRequestData,
+        sessionId: sessionRef.id,
+        session: sessionWriteData,
+        transactionId: normalizedPaymentId,
+        subscriptionId: bundleSubscriptionId,
+        paymentType: 'promo',
+        paymentGateway: 'promo',
+        promoCode: normalizedPromoCode,
+      });
+      const startDate = admin.firestore.Timestamp.now();
+      const expiryDate = entitlement.validityDays == null
+        ? null
+        : admin.firestore.Timestamp.fromMillis(
+            startDate.toMillis() + entitlement.validityDays * 86400000
+          );
+      bundleRemainingSessions = entitlement.remainingSessions;
+      bundleSubscriptionWriteData = sanitizeForFirestore({
+        ...entitlement.data,
+        promoCode: normalizedPromoCode,
+        promoDiscount: 100,
+        startDate,
+        expiryDate,
+        lastUsedAt: startDate,
+        createdAt: startDate,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
     // ============================================
     // ✅ STEP 5: WRITE PHASE
     // ============================================
@@ -483,6 +653,12 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       promoDiscount: 100,
       notificationsAlreadySent: true,
       sessionId: sessionRef.id,
+      ...(bundleSubscriptionId
+        ? {
+            subscriptionId: bundleSubscriptionId,
+            planType: 'bundle',
+          }
+        : {}),
       ...learnerSnapshot,
       acceptedAt: FieldValue.serverTimestamp(),
       paidAt: FieldValue.serverTimestamp(),
@@ -533,42 +709,28 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     }
 
     // Create hafizSession
-    transaction.set(sessionRef, {
-      requestId: requestRef.id,
-      mohaffezId,
-      studentId,
-      mohaffezName,
-      studentName,
-      ...learnerSnapshot,
-      sessionType,
-      preferredProvider:
-        effectivePreferredProvider,
-      location: imamAddressText || "",
-      mohaffezPhone: mohaffezPhone || null,
-      studentPhone:
-        typeof studentPhone === 'string' && studentPhone.trim().length > 0
-          ? studentPhone.trim()
-          : null,
-      imamAddressLat: imamAddressLat || null,
-      imamAddressLng: imamAddressLng || null,
-      imamAddressText: imamAddressText || null,
-      preferredTimeSlot,
-      timeSlot: preferredTimeSlot,
-      sessionDate: slotDateTimestamp,
-      slotStart: slotStartTimestamp,
-      slotEnd: slotEndTimestamp,
-      status: STATUS.ACCEPTED,
-      isPaid: true,
-      sessionPrice: 0.0,
-      promoCode: normalizedPromoCode,
-      paymentId: paymentId || null,
-      createdAt: FieldValue.serverTimestamp(),
-      acceptedAt: FieldValue.serverTimestamp(),
-      reminder24hSent: false,
-      reminder1hSent: false,
-      juzCount: 1,
-      sessionRating: 10,
-    });
+    transaction.set(sessionRef, sessionWriteData);
+
+    if (bundleSubscriptionRef && bundleSubscriptionWriteData) {
+      transaction.set(bundleSubscriptionRef, bundleSubscriptionWriteData);
+      const subscriptionEventRef = db.collection('paymentEvents').doc();
+      transaction.set(subscriptionEventRef, sanitizeForFirestore({
+        eventId: subscriptionEventRef.id,
+        eventType: PaymentEventType.SUBSCRIPTION_CREATED,
+        paymentId: normalizedPaymentId,
+        userId: studentId,
+        data: {
+          requestId: requestRef.id,
+          sessionId: sessionRef.id,
+          subscriptionId: bundleSubscriptionId,
+          totalSessions: sessionsCount,
+          remainingSessions: bundleRemainingSessions,
+          promoCode: normalizedPromoCode,
+        },
+        metadata: { source: 'client' },
+        timestamp: FieldValue.serverTimestamp(),
+      }));
+    }
 
     functions.logger.info("📝 Creating hafizSession", {
       sessionId: sessionRef.id,
@@ -576,14 +738,20 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     });
 
     // Update payment (if provided)
-    if (paymentId) {
-      const paymentRef = db.collection("payments").doc(paymentId);
+    if (paymentRef) {
       transaction.update(paymentRef, {
         status: "completed",
         paidAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         sessionId: sessionRef.id,
         notes: "Free session via promo code",
+        ...(bundleSubscriptionId
+          ? {
+              subscriptionId: bundleSubscriptionId,
+              planType: 'bundle',
+              bundleEntitlementCreatedAt: FieldValue.serverTimestamp(),
+            }
+          : {}),
       });
     }
 
@@ -684,7 +852,7 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
     functions.logger.info("✅ FREE SESSION COMPLETED SUCCESSFULLY", {
       sessionId: sessionRef.id,
       requestId: requestRef.id,
-      paymentId: paymentId || null,
+      paymentId: normalizedPaymentId,
       studentId,
       mohaffezId,
       promoCode: normalizedPromoCode,
@@ -697,7 +865,8 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
       success: true,
       sessionId: sessionRef.id,
       requestId: requestRef.id,
-      paymentId: paymentId || null,
+      paymentId: normalizedPaymentId,
+      subscriptionId: bundleSubscriptionId,
       message: "تم إنشاء الجلسة المجانية بنجاح",
       isUpdatingExisting,  // ✅ Include in response
     };
@@ -717,27 +886,32 @@ export const confirmFreeSession = functions.https.onCall(async (data, context) =
 
   // BUG #1 FIX: Call EventStore and update payment document after transaction commits
   // This ensures the payment event is properly recorded for analytics
-  if (paymentId && paymentId.trim() !== '') {
+  if (normalizedPaymentId) {
     try {
       const eventStore = new EventStore();
       await eventStore.appendFreeSessionCompletedEvent({
-        paymentId: paymentId,
+        paymentId: normalizedPaymentId,
         userId: studentId,
         promoCode: normalizedPromoCode,
       });
-      functions.logger.info('EventStore: Free session completed event appended', { paymentId, studentId });
+      functions.logger.info('EventStore: Free session completed event appended', {
+        paymentId: normalizedPaymentId,
+        studentId,
+      });
 
       // Also ensure payment document is marked as completed (idempotent update)
-      await db.collection('payments').doc(paymentId).update({
+      await db.collection('payments').doc(normalizedPaymentId).update({
         status: 'completed',
         paidAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
-      functions.logger.info('Payment document marked as completed', { paymentId });
+      functions.logger.info('Payment document marked as completed', {
+        paymentId: normalizedPaymentId,
+      });
     } catch (eventStoreError) {
       // Do NOT throw - the session is already confirmed
       functions.logger.error('Failed to update payment status via EventStore (non-critical)', {
-        paymentId,
+        paymentId: normalizedPaymentId,
         error: eventStoreError instanceof Error ? eventStoreError.message : String(eventStoreError),
       });
     }

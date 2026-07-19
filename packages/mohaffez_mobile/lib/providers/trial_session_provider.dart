@@ -77,7 +77,7 @@ final trialSessionRequestsProvider =
     });
     return requests;
   });
-});
+}, dependencies: [currentUserProvider]);
 
 final teacherTrialSettingsProvider =
     StreamProvider.autoDispose.family<Map<String, dynamic>, String>(

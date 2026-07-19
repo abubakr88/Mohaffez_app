@@ -4,6 +4,7 @@ import 'package:mohaffez_core/mohaffez_core.dart';
 import '../providers/mohaffez_profile_providers.dart';
 import '../providers/quiz_access_provider.dart';
 import '../providers/student_count_provider.dart';
+import '../providers/trial_session_provider.dart';
 import '../screens/teacher/mohaffez_student_detail_screen.dart';
 import 'tour_fixtures.dart';
 import 'tour_mode_state.dart';
@@ -118,6 +119,10 @@ List<Override> _studentOverrides(DemoStudentFixture fixture) {
 
   return [
     ..._commonOverrides(fixture.user),
+    studentProfilesProvider
+        .overrideWith((ref, _) => Stream.value(const <StudentProfileModel>[])),
+    trialSessionRequestsProvider
+        .overrideWith((ref) => Stream.value(const <Map<String, dynamic>>[])),
     studentRequestsFirstPageProvider
         .overrideWith((ref, _) => Stream.value(fixture.requests)),
     studentUpcomingSessionsProvider
@@ -190,6 +195,8 @@ const _demoStudentSummaries = [
 List<Override> _teacherOverrides(DemoTeacherFixture fixture) {
   return [
     ..._commonOverrides(fixture.user),
+    trialSessionRequestsProvider
+        .overrideWith((ref) => Stream.value(const <Map<String, dynamic>>[])),
     upcomingSessionsProvider
         .overrideWith((ref, _) => Stream.value(fixture.upcomingSessions)),
     pendingRequestsCountProvider

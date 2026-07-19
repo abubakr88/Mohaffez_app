@@ -4,6 +4,10 @@ import admin, { db } from '../utils/admin';
 import { PaymentDocument, PaymentMetadata } from '../types/payment.types';
 import { sanitizeForFirestore } from '../utils/firestoreSanitizer';
 import {
+  buildBundleEntitlementValues,
+  paymobBundleSubscriptionId,
+} from './paymobBundleEntitlement';
+import {
   egpToPiastres,
   LedgerEntryInput,
   postLedgerEntry,
@@ -24,6 +28,11 @@ const STATUS = {
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface BookingConfirmationResult  { sessionId: string; }
+interface BundleBookingConfirmationResult {
+  sessionId: string;
+  subscriptionId: string;
+  created: boolean;
+}
 interface SubscriptionCreationResult { subscriptionId: string; }
 interface SubscriptionConsumptionResult { remainingSessions: number; sessionId?: string; }
 
@@ -408,6 +417,234 @@ export async function confirmBookingAfterPayment(
 
     functions.logger.info('Booking confirmed in transaction', { requestId, sessionId: sessionRef.id });
     return { sessionId: sessionRef.id };
+  });
+}
+
+/**
+ * Confirms the first booking of a paid bundle and creates its entitlement in
+ * the same transaction. The deterministic subscription id makes webhook and
+ * reconciliation retries idempotent without touching financial balances twice.
+ */
+export async function confirmBundleBookingAfterPayment(
+  requestId: string,
+  sessionDetails: Record<string, unknown>,
+  payment: PaymentDocument,
+  transactionId: string,
+  slotInfo: SlotInfo | undefined,
+  paymentUpdate: PaymentStatusUpdate,
+): Promise<BundleBookingConfirmationResult> {
+  const sessionRef = db.collection('hafizSessions').doc();
+  const subscriptionId = paymobBundleSubscriptionId(paymentUpdate.paymentId);
+
+  return db.runTransaction(async (transaction) => {
+    // READS: Firestore requires every read to complete before the first write.
+    const requestRef = db.collection('sessionRequests').doc(requestId);
+    const paymentRef = db.collection('payments').doc(paymentUpdate.paymentId);
+    const subscriptionRef = db.collection('subscriptions').doc(subscriptionId);
+    const [requestSnap, paymentSnap, subscriptionSnap] = await Promise.all([
+      transaction.get(requestRef),
+      transaction.get(paymentRef),
+      transaction.get(subscriptionRef),
+    ]);
+
+    if (!requestSnap.exists) throw new Error('Session request not found');
+    if (!paymentSnap.exists) throw new Error('Payment not found');
+
+    const requestData = requestSnap.data() as Record<string, unknown>;
+    const persistedPayment = paymentSnap.data() as PaymentDocument;
+    const paymentMetadata = {
+      ...(payment.metadata ?? {}),
+      ...(persistedPayment.metadata ?? {}),
+    };
+    const currentPayment: PaymentDocument = {
+      ...payment,
+      ...persistedPayment,
+      metadata: paymentMetadata,
+    };
+
+    if (
+      requestData.studentId !== currentPayment.studentId ||
+      requestData.mohaffezId !== currentPayment.mohaffezId
+    ) {
+      throw new Error('Payment request does not match the booking owner');
+    }
+
+    if (subscriptionSnap.exists) {
+      const existing = subscriptionSnap.data() ?? {};
+      return {
+        sessionId: parseString(
+          existing.firstSessionId,
+          parseString(persistedPayment.sessionId, parseString(requestData.sessionId, '')),
+        ),
+        subscriptionId,
+        created: false,
+      };
+    }
+
+    const existingSubscriptionId = parseString(
+      persistedPayment.subscriptionId,
+      '',
+    );
+    if (existingSubscriptionId) {
+      return {
+        sessionId: parseString(
+          persistedPayment.sessionId,
+          parseString(requestData.sessionId, ''),
+        ),
+        subscriptionId: existingSubscriptionId,
+        created: false,
+      };
+    }
+
+    const planId = parseString(
+      requestData.planId,
+      parseString(paymentMetadata.planId, currentPayment.planId ?? ''),
+    );
+    const planRef = planId
+      ? db.collection('users').doc(currentPayment.mohaffezId)
+          .collection('pricingPlans').doc(planId)
+      : null;
+    const planSnap = planRef ? await transaction.get(planRef) : null;
+
+    const availUpdate = slotInfo
+      ? await readAvailabilityInTransaction(transaction, slotInfo)
+      : null;
+
+    const authoritativeSessionDuration =
+      compatibleSessionDuration(requestData.sessionDurationMinutes) ??
+      supportedSessionDuration(planSnap?.data()?.sessionDurationMinutes) ??
+      compatibleSessionDuration(sessionDetails.sessionDurationMinutes) ??
+      compatibleSessionDuration(paymentMetadata.sessionDurationMinutes) ??
+      45;
+    const normalizedSessionDetails = normalizeSessionDetails(
+      sessionDetails,
+      requestData,
+    );
+    normalizedSessionDetails.sessionDurationMinutes = authoritativeSessionDuration;
+
+    const slotStart = toDate(normalizedSessionDetails.slotStart);
+    if (slotStart) {
+      normalizedSessionDetails.slotEnd = admin.firestore.Timestamp.fromMillis(
+        slotStart.getTime() + authoritativeSessionDuration * 60 * 1000,
+      );
+    }
+
+    const entitlement = buildBundleEntitlementValues({
+      paymentId: paymentUpdate.paymentId,
+      payment: currentPayment,
+      metadata: paymentMetadata,
+      requestId,
+      request: {
+        ...requestData,
+        sessionDurationMinutes: authoritativeSessionDuration,
+      },
+      sessionId: sessionRef.id,
+      session: normalizedSessionDetails,
+      transactionId,
+    });
+
+    let expiryDate: FirebaseFirestore.Timestamp | null = null;
+    if (entitlement.validityDays != null) {
+      expiryDate = admin.firestore.Timestamp.fromMillis(
+        Date.now() + entitlement.validityDays * 86400000,
+      );
+    }
+
+    // This preserves the existing deterministic Paymob wallet ledger group.
+    const teacherWalletCredit = await creditPaymobPaymentToTeacherPending(
+      transaction,
+      currentPayment,
+      paymentUpdate,
+      { sessionId: sessionRef.id, subscriptionId },
+    );
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+    transaction.set(subscriptionRef, sanitizeForFirestore({
+      ...entitlement.data,
+      startDate: timestamp,
+      expiryDate,
+      ...(teacherWalletCredit
+        ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+        : {}),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
+
+    transaction.set(sessionRef, sanitizeForFirestore({
+      ...normalizedSessionDetails,
+      requestId,
+      subscriptionId,
+      planId: entitlement.data.planId,
+      planTitle: entitlement.data.planTitle,
+      planType: 'bundle',
+      status: STATUS.ACCEPTED,
+      isPaid: true,
+      notificationsAlreadySent: true,
+      paymentId: paymentUpdate.paymentId,
+      paymentType: 'paymob',
+      paymentGateway: 'paymob',
+      paymentTransactionId: transactionId,
+      ...(teacherWalletCredit
+        ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+        : {}),
+      createdAt: timestamp,
+      acceptedAt: timestamp,
+      studentId: currentPayment.studentId,
+      studentName: currentPayment.studentName,
+      mohaffezId: currentPayment.mohaffezId,
+      mohaffezName: currentPayment.mohaffezName,
+      sessionPrice: currentPayment.amount,
+    }));
+
+    transaction.update(requestRef, {
+      status: STATUS.ACCEPTED,
+      isPaid: true,
+      notificationsAlreadySent: true,
+      sessionId: sessionRef.id,
+      subscriptionId,
+      paymentId: paymentUpdate.paymentId,
+      paymentType: 'paymob',
+      planType: 'bundle',
+      sessionDurationMinutes: authoritativeSessionDuration,
+      paidAt: timestamp,
+      paymentTransactionId: transactionId,
+      updatedAt: timestamp,
+    });
+
+    if (availUpdate) {
+      transaction.update(availUpdate.doc.ref, {
+        timeSlots: availUpdate.updatedSlots,
+        updatedAt: timestamp,
+      });
+    }
+
+    transaction.update(paymentRef, {
+      status: 'completed',
+      sessionId: sessionRef.id,
+      subscriptionId,
+      planType: 'bundle',
+      paidAt: timestamp,
+      updatedAt: timestamp,
+      idempotencyKey: `${paymentUpdate.paymentId}:${paymentUpdate.transactionId}`,
+      processedAt: timestamp,
+      ...(teacherWalletCredit
+        ? { teacherWalletLedgerGroupId: teacherWalletCredit.groupId }
+        : {}),
+    });
+
+    functions.logger.info('Bundle booking and entitlement confirmed atomically', {
+      paymentId: paymentUpdate.paymentId,
+      requestId,
+      sessionId: sessionRef.id,
+      subscriptionId,
+      totalSessions: entitlement.totalSessions,
+      remainingSessions: entitlement.remainingSessions,
+    });
+    return {
+      sessionId: sessionRef.id,
+      subscriptionId,
+      created: true,
+    };
   });
 }
 

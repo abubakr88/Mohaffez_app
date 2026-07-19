@@ -11,35 +11,40 @@ import 'tour_overrides.dart';
 ///
 /// When inactive, returns [child] unchanged so the real Firestore providers
 /// stay in effect.
-class TourScope extends ConsumerWidget {
+class TourScope extends ConsumerStatefulWidget {
   final Widget child;
   const TourScope({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tour = ref.watch(tourModeProvider);
-    if (!tour.active || tour.role == null) return child;
+  ConsumerState<TourScope> createState() => _TourScopeState();
+}
 
-    final loader = tour.role == TourRole.student
+class _TourScopeState extends ConsumerState<TourScope> {
+  TourRole? _cachedRole;
+  List<Override>? _cachedOverrides;
+
+  List<Override> _overridesFor(TourRole role) {
+    if (_cachedRole == role && _cachedOverrides != null) {
+      return _cachedOverrides!;
+    }
+
+    final fixture = role == TourRole.student
         ? TourFixtures.loadStudent()
         : TourFixtures.loadTeacher();
+    _cachedRole = role;
+    _cachedOverrides = List.unmodifiable(buildTourOverrides(role, fixture));
+    return _cachedOverrides!;
+  }
 
-    return FutureBuilder<Object>(
-      future: loader,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            ),
-          );
-        }
-        return ProviderScope(
-          overrides: buildTourOverrides(tour.role!, snapshot.data!),
-          child: child,
-        );
-      },
+  @override
+  Widget build(BuildContext context) {
+    final tour = ref.watch(tourModeProvider);
+    if (!tour.active || tour.role == null) return widget.child;
+
+    return ProviderScope(
+      key: ValueKey(tour.role),
+      overrides: _overridesFor(tour.role!),
+      child: widget.child,
     );
   }
 }

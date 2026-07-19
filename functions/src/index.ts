@@ -87,6 +87,10 @@ export {
   onAnalyticsFailedOperationCreated,
 } from "./admin/analyticsProjection";
 export { setTeacherFoundingBadge } from "./admin/teacherBadges";
+export {
+  repairMissingFreePromoBundleSubscription,
+  repairMissingPaymobBundleSubscription,
+} from "./admin/paymobBundleRepair";
 export { convertUnderageStudentToParent } from "./auth/convertUnderageStudentToParent";
 
 // Per-teacher commission tier recompute for fixed financial cycles.

@@ -8,11 +8,13 @@ import {
   serverTimestamp,
 } from '../types/payment.types';
 import {
+  confirmBundleBookingAfterPayment,
   confirmBookingAfterPayment,
   consumeSubscriptionAndCreateSession,
   createSubscriptionFromPayment,
   SlotInfo,
 } from '../payments/handlers';
+import { isRequestBackedBundlePayment } from '../payments/paymobBundleEntitlement';
 import { EventStore }          from './EventStore';
 import { PaymentEventType }    from '../types/events.types';
 import { NotificationService } from './NotificationService';
@@ -43,7 +45,9 @@ export class PaymentOrchestrationService {
     let result: PaymentResult | undefined;
 
     try {
-      if (context.metadata.confirmBooking && context.metadata.requestId) {
+      if (isRequestBackedBundlePayment(context.metadata, context.payment)) {
+        result = await this.handleBundleBookingConfirmation(context);
+      } else if (context.metadata.confirmBooking && context.metadata.requestId) {
         result = await this.handleBookingConfirmation(context);
       } else if (context.metadata.subscriptionId) {
         result = await this.handleSubscriptionConsumption(context);
@@ -123,6 +127,102 @@ export class PaymentOrchestrationService {
   }
 
   // ─── Private handlers ─────────────────────────────────────────────────────
+
+  private async handleBundleBookingConfirmation(
+    context: PaymentContext,
+  ): Promise<PaymentResult> {
+    const requestId = context.metadata.requestId;
+    const sessionDetails = context.metadata.sessionDetails as
+      | Record<string, unknown>
+      | undefined;
+
+    if (!requestId || !sessionDetails || typeof sessionDetails !== 'object') {
+      throw new Error('Missing bundle booking confirmation metadata');
+    }
+
+    const slotInfo = this.buildSlotInfo(
+      context.payment.mohaffezId,
+      sessionDetails['slotDate'],
+      sessionDetails['preferredTimeSlot'],
+      sessionDetails['sessionType'],
+    );
+    const bundleResult = await confirmBundleBookingAfterPayment(
+      requestId,
+      sessionDetails,
+      context.payment,
+      context.transactionId,
+      slotInfo,
+      {
+        paymentId: context.paymentId,
+        transactionId: context.transactionId,
+      },
+    );
+
+    if (bundleResult.created) {
+      await Promise.all([
+        this.notificationService.send({
+          recipientId: context.payment.studentId,
+          senderId: context.payment.mohaffezId,
+          type: 'subscription_created',
+          title: 'تم تفعيل الباقة وتأكيد الجلسة ✅',
+          message: `تم تفعيل باقتك مع ${context.payment.mohaffezName} وحجز الجلسة الأولى بنجاح.`,
+          data: {
+            requestId,
+            sessionId: bundleResult.sessionId,
+            subscriptionId: bundleResult.subscriptionId,
+            mohaffezId: context.payment.mohaffezId,
+          },
+        }),
+        this.notificationService.send({
+          recipientId: context.payment.mohaffezId,
+          senderId: context.payment.studentId,
+          type: 'subscription_created',
+          title: 'تم شراء باقة جديدة ✅',
+          message: `${context.payment.studentName} اشترى باقة وتم تأكيد الجلسة الأولى.`,
+          data: {
+            requestId,
+            sessionId: bundleResult.sessionId,
+            subscriptionId: bundleResult.subscriptionId,
+            studentId: context.payment.studentId,
+          },
+        }),
+        this.eventStore.appendPaymentEvent({
+          eventType: PaymentEventType.BOOKING_CONFIRMED,
+          paymentId: context.paymentId,
+          userId: context.payment.studentId,
+          data: {
+            requestId,
+            sessionId: bundleResult.sessionId,
+            subscriptionId: bundleResult.subscriptionId,
+          },
+          metadata: {
+            source: 'webhook',
+            transactionId: context.transactionId,
+          },
+        }),
+        this.eventStore.appendPaymentEvent({
+          eventType: PaymentEventType.SUBSCRIPTION_CREATED,
+          paymentId: context.paymentId,
+          userId: context.payment.studentId,
+          data: {
+            requestId,
+            sessionId: bundleResult.sessionId,
+            subscriptionId: bundleResult.subscriptionId,
+          },
+          metadata: {
+            source: 'webhook',
+            transactionId: context.transactionId,
+          },
+        }),
+      ]);
+    }
+
+    return {
+      success: true,
+      sessionId: bundleResult.sessionId,
+      subscriptionId: bundleResult.subscriptionId,
+    };
+  }
 
   private async handleBookingConfirmation(
     context: PaymentContext,

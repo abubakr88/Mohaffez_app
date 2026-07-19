@@ -1,4 +1,4 @@
-﻿// lib/screens/teacher/mohaffez_students_screen.dart
+// lib/screens/teacher/mohaffez_students_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_widgets.dart';
+import 'teacher_active_bundle_card.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Design tokens — single source for radii / spacing in this screen
@@ -25,6 +26,8 @@ const _kScreenBg = Color(0xFFF7FAF9);
 // Segmented filter (single-select)
 // ─────────────────────────────────────────────────────────────────────────────
 enum _Segment { all, hifz, muraja }
+
+enum _StudentsView { students, activeBundles }
 
 extension _SegmentX on _Segment {
   String get label => switch (this) {
@@ -104,11 +107,21 @@ class _StudentsBody extends ConsumerStatefulWidget {
 
 class _StudentsBodyState extends ConsumerState<_StudentsBody> {
   final _searchCtrl = TextEditingController();
+  _StudentsView _view = _StudentsView.students;
   _SortBy _sortBy = _SortBy.lastSession;
   bool _sortAsc = false;
   bool _filterHifz = false;
   bool _filterMuraja = false;
   String _searchQuery = '';
+
+  void _changeView(_StudentsView view) {
+    if (_view == view) return;
+    _searchCtrl.clear();
+    setState(() {
+      _view = view;
+      _searchQuery = '';
+    });
+  }
 
   @override
   void dispose() {
@@ -129,11 +142,9 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
     });
   }
 
-  List<MohaffezStudentSummary> _applyFilters(
-      List<MohaffezStudentSummary> all) {
+  List<MohaffezStudentSummary> _applyFilters(List<MohaffezStudentSummary> all) {
     var list = all.where((s) {
-      if (_searchQuery.isNotEmpty &&
-          !s.studentName.contains(_searchQuery)) {
+      if (_searchQuery.isNotEmpty && !s.studentName.contains(_searchQuery)) {
         return false;
       }
       if (_filterHifz && s.hifzAssignment.isEmpty) return false;
@@ -158,6 +169,19 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
     });
 
     return list;
+  }
+
+  List<TeacherActiveBundleInfo> _filterBundles(
+    List<TeacherActiveBundleInfo> bundles,
+  ) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return bundles;
+    return bundles.where((bundle) {
+      return bundle.learnerName.toLowerCase().contains(query) ||
+          (bundle.guardianDisplayName?.toLowerCase().contains(query) ??
+              false) ||
+          bundle.planTitle.toLowerCase().contains(query);
+    }).toList();
   }
 
   void _showSortSheet() {
@@ -247,26 +271,235 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
     );
   }
 
+  Future<void> _refresh() async {
+    if (_view == _StudentsView.activeBundles) {
+      ref.invalidate(teacherActiveBundlesProvider(widget.mohaffezId));
+      await ref
+          .read(teacherActiveBundlesProvider(widget.mohaffezId).future)
+          .catchError((_) => <TeacherActiveBundleInfo>[]);
+      return;
+    }
+    ref.invalidate(mohaffezStudentsProvider(widget.mohaffezId));
+    await ref
+        .read(mohaffezStudentsProvider(widget.mohaffezId).future)
+        .catchError((_) => <MohaffezStudentSummary>[]);
+  }
+
+  List<Widget> _studentSlivers(
+    AsyncValue<List<MohaffezStudentSummary>> studentsAsync,
+  ) {
+    return [
+      SliverPersistentHeader(
+        pinned: true,
+        delegate: _SearchFilterDelegate(
+          searchCtrl: _searchCtrl,
+          searchQuery: _searchQuery,
+          segment: _segmentFromFilters(),
+          sortLabel: _SortByX(_sortBy).label,
+          sortAsc: _sortAsc,
+          onSearchChanged: (v) => setState(() => _searchQuery = v),
+          onSearchClear: () {
+            _searchCtrl.clear();
+            setState(() => _searchQuery = '');
+          },
+          onSegmentChanged: _applySegment,
+          onSortTap: _showSortSheet,
+        ),
+      ),
+      studentsAsync.when(
+        skipLoadingOnRefresh: true,
+        data: (students) {
+          if (students.isEmpty) {
+            return SliverToBoxAdapter(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: const EmptyState(
+                  icon: Icons.people_outline,
+                  title: 'لا يوجد طلاب بعد',
+                  message: 'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
+                  animated: true,
+                ),
+              ),
+            );
+          }
+
+          final filtered = _applyFilters(students);
+          if (filtered.isEmpty) {
+            return SliverToBoxAdapter(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: EmptyState(
+                  icon: Icons.search_off,
+                  title: 'لا توجد نتائج',
+                  message: _searchQuery.isNotEmpty
+                      ? 'لا يوجد طالب باسم "$_searchQuery"'
+                      : 'جرّب تغيير معايير الفلتر',
+                ),
+              ),
+            );
+          }
+
+          return SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (ctx, index) {
+                  final student = filtered[index];
+                  final card = StudentCard(
+                    student: student,
+                    onTap: () => context.push(
+                      '/student/${student.studentId}',
+                      extra: student,
+                    ),
+                  );
+                  if (index != 0) return card;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ResultsHeader(
+                        total: students.length,
+                        filtered: filtered.length,
+                      ),
+                      const SizedBox(height: 8),
+                      card,
+                    ],
+                  );
+                },
+                childCount: filtered.length,
+              ),
+            ),
+          );
+        },
+        loading: () => const SliverToBoxAdapter(child: _SkeletonList()),
+        error: (e, _) => SliverToBoxAdapter(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 300),
+            child: ErrorDisplay.dataLoad(
+              onRetry: () => ref.invalidate(
+                mohaffezStudentsProvider(widget.mohaffezId),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _bundleSlivers(
+    AsyncValue<List<TeacherActiveBundleInfo>> bundlesAsync,
+  ) {
+    return [
+      SliverToBoxAdapter(
+        child: _BundleSearchBar(
+          controller: _searchCtrl,
+          onChanged: (value) => setState(() => _searchQuery = value),
+          onClear: () {
+            _searchCtrl.clear();
+            setState(() => _searchQuery = '');
+          },
+        ),
+      ),
+      bundlesAsync.when(
+        skipLoadingOnRefresh: true,
+        data: (bundles) {
+          final filtered = _filterBundles(bundles);
+          if (bundles.isEmpty) {
+            return SliverToBoxAdapter(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: const EmptyState(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'لا توجد باقات نشطة',
+                  message: 'ستظهر هنا باقات طلابك بعد إتمام الدفع',
+                  animated: true,
+                ),
+              ),
+            );
+          }
+          if (filtered.isEmpty) {
+            return SliverToBoxAdapter(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: EmptyState(
+                  icon: Icons.search_off_rounded,
+                  title: 'لا توجد نتائج',
+                  message: 'لا توجد باقة مطابقة لـ "$_searchQuery"',
+                ),
+              ),
+            );
+          }
+          return SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, index) {
+                  final card = TeacherActiveBundleCard(bundle: filtered[index]);
+                  if (index != 0) return card;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          '${filtered.length} باقة نشطة',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppThemeConstants.textSecondary,
+                          ),
+                        ),
+                      ),
+                      card,
+                    ],
+                  );
+                },
+                childCount: filtered.length,
+              ),
+            ),
+          );
+        },
+        loading: () => const SliverToBoxAdapter(child: _SkeletonList()),
+        error: (e, _) => SliverToBoxAdapter(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 300),
+            child: ErrorDisplay.dataLoad(
+              onRetry: () => ref.invalidate(
+                teacherActiveBundlesProvider(widget.mohaffezId),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final studentsAsync =
         ref.watch(mohaffezStudentsProvider(widget.mohaffezId));
-    final totalCount = studentsAsync.valueOrNull?.length;
+    final bundlesAsync = _view == _StudentsView.activeBundles
+        ? ref.watch(teacherActiveBundlesProvider(widget.mohaffezId))
+        : null;
+    final totalCount = _view == _StudentsView.students
+        ? studentsAsync.valueOrNull?.length
+        : bundlesAsync?.valueOrNull?.length;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: _kScreenBg,
         body: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(mohaffezStudentsProvider(widget.mohaffezId));
-            await ref
-                .read(mohaffezStudentsProvider(widget.mohaffezId).future)
-                .catchError((_) => <MohaffezStudentSummary>[]);
-          },
+          onRefresh: _refresh,
           child: CustomScrollView(
             slivers: [
-              // ── Compact gradient header ─────────────────────────────────
               SliverAppBar(
                 pinned: true,
                 automaticallyImplyLeading: false,
@@ -292,8 +525,11 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                         color: AppThemeConstants.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(_R.pill),
                       ),
-                      child: const Icon(Icons.groups_rounded,
-                          size: 20, color: AppThemeConstants.onPrimary),
+                      child: const Icon(
+                        Icons.groups_rounded,
+                        size: 20,
+                        color: AppThemeConstants.onPrimary,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     const Text(
@@ -308,7 +544,9 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppThemeConstants.secondary,
                           borderRadius: BorderRadius.circular(_R.pill),
@@ -326,116 +564,157 @@ class _StudentsBodyState extends ConsumerState<_StudentsBody> {
                   ],
                 ),
               ),
-
-              // ── Search + segmented filter (pinned) ──────────────────────
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _SearchFilterDelegate(
-                  searchCtrl: _searchCtrl,
-                  searchQuery: _searchQuery,
-                  segment: _segmentFromFilters(),
-                  sortLabel: _SortByX(_sortBy).label,
-                  sortAsc: _sortAsc,
-                  onSearchChanged: (v) => setState(() => _searchQuery = v),
-                  onSearchClear: () {
-                    _searchCtrl.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                  onSegmentChanged: _applySegment,
-                  onSortTap: _showSortSheet,
+              SliverToBoxAdapter(
+                child: _StudentsViewSelector(
+                  value: _view,
+                  onChanged: _changeView,
                 ),
               ),
-
-              // ── Student list ─────────────────────────────────────────────
-              studentsAsync.when(
-                skipLoadingOnRefresh: true,
-                data: (students) {
-                  if (students.isEmpty) {
-                    return SliverToBoxAdapter(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: MediaQuery.of(context).size.height * 0.5,
-                        ),
-                        child: const EmptyState(
-                          icon: Icons.people_outline,
-                          title: 'لا يوجد طلاب بعد',
-                          message:
-                              'ستظهر هنا قائمة طلابك بعد إجراء أول جلسة',
-                          animated: true,
-                        ),
-                      ),
-                    );
-                  }
-
-                  final filtered = _applyFilters(students);
-
-                  if (filtered.isEmpty) {
-                    return SliverToBoxAdapter(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: MediaQuery.of(context).size.height * 0.5,
-                        ),
-                        child: EmptyState(
-                          icon: Icons.search_off,
-                          title: 'لا توجد نتائج',
-                          message: _searchQuery.isNotEmpty
-                              ? 'لا يوجد طالب باسم "$_searchQuery"'
-                              : 'جرّب تغيير معايير الفلتر',
-                        ),
-                      ),
-                    );
-                  }
-
-                  return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (ctx, index) {
-                          if (index == 0) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _ResultsHeader(
-                                  total: students.length,
-                                  filtered: filtered.length,
-                                ),
-                                const SizedBox(height: 8),
-                                StudentCard(
-                                  student: filtered[0],
-                                  onTap: () => context.push(
-                                    '/student/${filtered[0].studentId}',
-                                    extra: filtered[0],
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          final student = filtered[index];
-                          return StudentCard(
-                            student: student,
-                            onTap: () => context.push(
-                              '/student/${student.studentId}',
-                              extra: student,
-                            ),
-                          );
-                        },
-                        childCount: filtered.length,
-                      ),
-                    ),
-                  );
-                },
-                loading: () => const SliverToBoxAdapter(child: _SkeletonList()),
-                error: (e, _) => SliverToBoxAdapter(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 300),
-                    child: ErrorDisplay.dataLoad(
-                      onRetry: () => ref.invalidate(
-                          mohaffezStudentsProvider(widget.mohaffezId)),
-                    ),
-                  ),
-                ),
-              ),
+              if (_view == _StudentsView.students)
+                ..._studentSlivers(studentsAsync)
+              else
+                ..._bundleSlivers(bundlesAsync!),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentsViewSelector extends StatelessWidget {
+  const _StudentsViewSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final _StudentsView value;
+  final ValueChanged<_StudentsView> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppThemeConstants.grey100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppThemeConstants.grey300),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _StudentsViewButton(
+                label: 'كل الطلاب',
+                icon: Icons.groups_rounded,
+                selected: value == _StudentsView.students,
+                onTap: () => onChanged(_StudentsView.students),
+              ),
+            ),
+            Expanded(
+              child: _StudentsViewButton(
+                label: 'الباقات النشطة',
+                icon: Icons.workspace_premium_rounded,
+                selected: value == _StudentsView.activeBundles,
+                onTap: () => onChanged(_StudentsView.activeBundles),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentsViewButton extends StatelessWidget {
+  const _StudentsViewButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? AppThemeConstants.onPrimary
+        : AppThemeConstants.textSecondary;
+    return Material(
+      color: selected ? AppThemeConstants.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BundleSearchBar extends StatelessWidget {
+  const _BundleSearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'ابحث باسم الطالب أو ولي الأمر أو الباقة',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'مسح البحث',
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppThemeConstants.grey300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppThemeConstants.grey300),
           ),
         ),
       ),
@@ -699,8 +978,7 @@ class _ResultsHeader extends StatelessWidget {
         if (isFiltered) ...[
           const SizedBox(width: 6),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: AppThemeConstants.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
@@ -749,8 +1027,7 @@ class StudentCard extends StatelessWidget {
     final formattedDate = student.lastSessionDate != null
         ? DateFormat('dd MMM yyyy', 'ar').format(student.lastSessionDate!)
         : null;
-    final hasPhoto =
-        student.photoUrl != null && student.photoUrl!.isNotEmpty;
+    final hasPhoto = student.photoUrl != null && student.photoUrl!.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -809,12 +1086,11 @@ class StudentCard extends StatelessWidget {
                       ),
                       child: CircleAvatar(
                         radius: 24,
-                        backgroundColor: AppThemeConstants.primary
-                            .withValues(alpha: 0.85),
+                        backgroundColor:
+                            AppThemeConstants.primary.withValues(alpha: 0.85),
                         backgroundImage:
                             hasPhoto ? NetworkImage(student.photoUrl!) : null,
-                        onBackgroundImageError:
-                            hasPhoto ? (_, __) {} : null,
+                        onBackgroundImageError: hasPhoto ? (_, __) {} : null,
                         child: hasPhoto
                             ? null
                             : Text(
@@ -848,8 +1124,7 @@ class StudentCard extends StatelessWidget {
                           Row(
                             children: [
                               const Icon(Icons.school_rounded,
-                                  size: 13,
-                                  color: AppThemeConstants.primary),
+                                  size: 13, color: AppThemeConstants.primary),
                               const SizedBox(width: 4),
                               Text(
                                 '${student.sessionCount} جلسة',
@@ -965,8 +1240,8 @@ class StudentCard extends StatelessWidget {
                     student.performanceNotes!.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppThemeConstants.secondaryContainer
                           .withValues(alpha: 0.5),
@@ -982,8 +1257,7 @@ class StudentCard extends StatelessWidget {
                     child: Row(
                       children: [
                         const Icon(Icons.format_quote_rounded,
-                            size: 14,
-                            color: AppThemeConstants.secondary),
+                            size: 14, color: AppThemeConstants.secondary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -1096,9 +1370,7 @@ class _AssignmentChip extends StatelessWidget {
             child: Text(
               value,
               style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  fontWeight: FontWeight.w500),
+                  fontSize: 12, color: color, fontWeight: FontWeight.w500),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

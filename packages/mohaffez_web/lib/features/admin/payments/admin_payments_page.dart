@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,7 +76,10 @@ class _AdminPaymentsPageState extends ConsumerState<AdminPaymentsPage> {
   List<Map<String, dynamic>> get _payments {
     final normalizedQuery = _query.trim().toLowerCase();
     return _paymentDocs
-        .map((doc) => <String, dynamic>{'id': doc.id, ...doc.data()})
+        // The Firestore document id is authoritative. Some legacy payments
+        // contain an empty `id` field, so add doc.id after the stored data to
+        // prevent that field from breaking admin actions such as repairs.
+        .map((doc) => <String, dynamic>{...doc.data(), 'id': doc.id})
         .where((payment) {
       final status = '${payment['status'] ?? ''}'.toLowerCase();
       if (_statusFilter != null && status != _statusFilter) return false;
@@ -243,86 +247,291 @@ class _AdminPaymentsPageState extends ConsumerState<AdminPaymentsPage> {
     final metadata = adminMap(payment['metadata']);
     final reference = adminTransactionReference(payment);
     final paymentId = '${payment['id'] ?? '—'}';
+    final requestId = _firstText(payment['requestId'], metadata['requestId']);
+    final sessionId = _firstText(payment['sessionId'], metadata['sessionId']);
+    final bundleRepairCallable = _bundleRepairCallable(payment);
+    final needsBundleRepair = bundleRepairCallable != null;
+    final isSuperAdmin =
+        ref.read(currentAdminAccessProvider).valueOrNull?.isSuperAdmin == true;
+    var repairing = false;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('تفاصيل المعاملة'),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _DetailLine(
-                    label: 'الحالة',
-                    value:
-                        adminPaymentStatusLabel('${payment['status'] ?? ''}')),
-                _DetailLine(
-                    label: 'المبلغ',
-                    value: adminMoney(
-                        payment['amount'], '${payment['currency'] ?? 'EGP'}')),
-                _DetailLine(
-                    label: 'وسيلة الدفع',
-                    value: adminPaymentMethodLabel(payment)),
-                _DetailLine(
-                    label: 'الطالب', value: '${payment['studentName'] ?? '—'}'),
-                _DetailLine(
-                    label: 'المحفظ',
-                    value: '${payment['mohaffezName'] ?? '—'}'),
-                _DetailLine(
-                    label: 'الخطة', value: '${payment['planTitle'] ?? '—'}'),
-                _DetailLine(
-                    label: 'نوع الخطة',
-                    value: adminPlanTypeLabel(
-                        payment['planType'] ?? metadata['planType'])),
-                _DetailLine(
-                    label: 'وقت الإنشاء',
-                    value: adminExactTimestamp(payment['createdAt'])),
-                _DetailLine(
-                    label: 'وقت الدفع',
-                    value: adminExactTimestamp(
-                        payment['paidAt'] ?? payment['completedAt'])),
-                _DetailLine(
-                    label: 'آخر تحديث',
-                    value: adminExactTimestamp(payment['updatedAt'])),
-                _CopyDetailLine(label: 'Payment ID', value: paymentId),
-                _CopyDetailLine(label: 'مرجع البوابة', value: reference),
-                if ('${metadata['requestId'] ?? ''}'.isNotEmpty)
-                  _CopyDetailLine(
-                      label: 'Request ID', value: '${metadata['requestId']}'),
-                if ('${payment['subscriptionId'] ?? ''}'.isNotEmpty)
-                  _CopyDetailLine(
-                      label: 'Subscription ID',
-                      value: '${payment['subscriptionId']}'),
-                if ('${payment['sessionId'] ?? ''}'.isNotEmpty)
-                  _CopyDetailLine(
-                      label: 'Session ID', value: '${payment['sessionId']}'),
-                if ('${payment['failureReason'] ?? ''}'.isNotEmpty)
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('تفاصيل المعاملة'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   _DetailLine(
-                      label: 'سبب الفشل',
-                      value: '${payment['failureReason']}',
-                      valueColor: DSColors.error),
-                const SizedBox(height: DSSpacing.sm),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(adminBrowserTimezoneLabel(),
-                      style:
-                          DSText.caption(dialogContext, color: DSColors.text3)),
-                ),
-              ],
+                      label: 'الحالة',
+                      value: adminPaymentStatusLabel(
+                          '${payment['status'] ?? ''}')),
+                  _DetailLine(
+                      label: 'المبلغ',
+                      value: adminMoney(payment['amount'],
+                          '${payment['currency'] ?? 'EGP'}')),
+                  _DetailLine(
+                      label: 'وسيلة الدفع',
+                      value: adminPaymentMethodLabel(payment)),
+                  _DetailLine(
+                      label: 'الطالب',
+                      value: '${payment['studentName'] ?? '—'}'),
+                  _DetailLine(
+                      label: 'المحفظ',
+                      value: '${payment['mohaffezName'] ?? '—'}'),
+                  _DetailLine(
+                      label: 'الخطة', value: '${payment['planTitle'] ?? '—'}'),
+                  _DetailLine(
+                      label: 'نوع الخطة',
+                      value: adminPlanTypeLabel(
+                          payment['planType'] ?? metadata['planType'])),
+                  _DetailLine(
+                      label: 'وقت الإنشاء',
+                      value: adminExactTimestamp(payment['createdAt'])),
+                  _DetailLine(
+                      label: 'وقت الدفع',
+                      value: adminExactTimestamp(
+                          payment['paidAt'] ?? payment['completedAt'])),
+                  _DetailLine(
+                      label: 'آخر تحديث',
+                      value: adminExactTimestamp(payment['updatedAt'])),
+                  _CopyDetailLine(label: 'Payment ID', value: paymentId),
+                  _CopyDetailLine(label: 'مرجع البوابة', value: reference),
+                  if (requestId.isNotEmpty)
+                    _CopyDetailLine(label: 'Request ID', value: requestId),
+                  if ('${payment['subscriptionId'] ?? ''}'.isNotEmpty)
+                    _CopyDetailLine(
+                        label: 'Subscription ID',
+                        value: '${payment['subscriptionId']}'),
+                  if (sessionId.isNotEmpty)
+                    _CopyDetailLine(label: 'Session ID', value: sessionId),
+                  if ('${payment['failureReason'] ?? ''}'.isNotEmpty)
+                    _DetailLine(
+                        label: 'سبب الفشل',
+                        value: '${payment['failureReason']}',
+                        valueColor: DSColors.error),
+                  const SizedBox(height: DSSpacing.sm),
+                  if (needsBundleRepair) ...[
+                    DSBanner(
+                      title: 'الباقة المكتملة غير مفعلة',
+                      message: isSuperAdmin
+                          ? 'تم تأكيد العملية وإنشاء الجلسة الأولى، لكن لا يوجد اشتراك مرتبط. افحص العملية أولاً ثم نفذ الإصلاح دون أي حركة مالية جديدة أو إعادة استخدام للكوبون.'
+                          : 'تم اكتشاف باقة غير مرتبطة. يلزم السوبر أدمن لفحصها وإصلاحها دون تكرار الدفع أو استخدام الكوبون.',
+                      variant: DSBannerVariant.warning,
+                    ),
+                    const SizedBox(height: DSSpacing.md),
+                  ],
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(adminBrowserTimezoneLabel(),
+                        style: DSText.caption(dialogContext,
+                            color: DSColors.text3)),
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            if (needsBundleRepair && isSuperAdmin)
+              DSButton(
+                label: repairing ? 'جاري الفحص...' : 'فحص وإصلاح الباقة',
+                onPressed: repairing
+                    ? null
+                    : () async {
+                        setDialogState(() => repairing = true);
+                        final repaired = await _inspectAndRepairBundle(
+                          dialogContext,
+                          paymentId,
+                          bundleRepairCallable,
+                        );
+                        if (!dialogContext.mounted) return;
+                        setDialogState(() => repairing = false);
+                        if (repaired) {
+                          Navigator.of(dialogContext).pop();
+                          await _loadPayments(reset: true);
+                        }
+                      },
+                variant: DSButtonVariant.primary,
+                leading: const Icon(Icons.build_circle_outlined, size: 17),
+              ),
+            DSButton(
+              label: 'إغلاق',
+              onPressed:
+                  repairing ? null : () => Navigator.of(dialogContext).pop(),
+              variant: DSButtonVariant.ghost,
+            ),
+          ],
         ),
-        actions: [
-          DSButton(
-            label: 'إغلاق',
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            variant: DSButtonVariant.ghost,
-          ),
-        ],
       ),
     );
   }
+
+  Future<bool> _inspectAndRepairBundle(
+    BuildContext context,
+    String paymentId,
+    String callableName,
+  ) async {
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable(callableName);
+      final inspection = await callable.call(<String, dynamic>{
+        'paymentId': paymentId,
+        'dryRun': true,
+      });
+      final preview = Map<String, dynamic>.from(inspection.data as Map);
+      if (preview['alreadyRepaired'] == true || preview['eligible'] != true) {
+        if (!context.mounted) return false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('الباقة مرتبطة بالفعل ولا تحتاج إصلاحاً.')),
+        );
+        return false;
+      }
+
+      if (!context.mounted) return false;
+      final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (confirmContext) => AlertDialog(
+              title: const Text('تأكيد إصلاح الباقة'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const DSBanner(
+                      title: 'نتيجة الفحص الآمن',
+                      message:
+                          'لن يتم تحصيل مبلغ جديد أو تعديل رصيد المحفظ أو حالة الدفع أو استخدام الكوبون. سيُنشأ فقط الاشتراك المفقود وتُربط به الجلسة الأولى.',
+                      variant: DSBannerVariant.info,
+                    ),
+                    const SizedBox(height: DSSpacing.md),
+                    _DetailLine(
+                      label: 'الخطة',
+                      value: '${preview['planTitle'] ?? '—'}',
+                    ),
+                    _DetailLine(
+                      label: 'إجمالي الجلسات',
+                      value: '${preview['totalSessions'] ?? '—'}',
+                    ),
+                    _DetailLine(
+                      label: 'المتبقي بعد الأولى',
+                      value: '${preview['remainingSessions'] ?? '—'}',
+                    ),
+                    _CopyDetailLine(
+                      label: 'Subscription ID',
+                      value: '${preview['subscriptionId'] ?? '—'}',
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                DSButton(
+                  label: 'إلغاء',
+                  onPressed: () => Navigator.of(confirmContext).pop(false),
+                  variant: DSButtonVariant.ghost,
+                ),
+                DSButton(
+                  label: 'تنفيذ الإصلاح',
+                  onPressed: () => Navigator.of(confirmContext).pop(true),
+                  variant: DSButtonVariant.primary,
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!confirmed) return false;
+
+      final repair = await callable.call(<String, dynamic>{
+        'paymentId': paymentId,
+        'dryRun': false,
+      });
+      final result = Map<String, dynamic>.from(repair.data as Map);
+      if (!context.mounted) return result['changed'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result['changed'] == true
+                ? 'تم إنشاء الباقة وربط الجلسة الأولى بنجاح.'
+                : 'لم تُجرَ تغييرات؛ الباقة مرتبطة بالفعل.',
+          ),
+        ),
+      );
+      return result['changed'] == true;
+    } on FirebaseFunctionsException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر إصلاح الباقة: ${error.message ?? error.code}'),
+          ),
+        );
+      }
+      return false;
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر إصلاح الباقة: $error')),
+        );
+      }
+      return false;
+    }
+  }
+}
+
+String _firstText(Object? first, [Object? second]) {
+  for (final value in <Object?>[first, second]) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isNotEmpty) return text;
+  }
+  return '';
+}
+
+int _intValue(Object? value) {
+  if (value is num) return value.toInt();
+  return int.tryParse('${value ?? ''}') ?? 0;
+}
+
+String? _bundleRepairCallable(Map<String, dynamic> payment) {
+  final metadata = adminMap(payment['metadata']);
+  final gatewayResponse = adminMap(payment['gatewayResponse']);
+  final gateway = _firstText(
+    payment['gateway'],
+    payment['paymentGateway'] ?? gatewayResponse['provider'],
+  ).toLowerCase();
+  final planType = _firstText(
+    payment['planType'],
+    metadata['planType'],
+  ).toLowerCase();
+  final sessionsCount =
+      _intValue(payment['sessionsCount'] ?? metadata['sessionsCount']);
+  final isBundle = planType == 'bundle' || sessionsCount > 1;
+  final requestId = _firstText(payment['requestId'], metadata['requestId']);
+  final sessionId = _firstText(payment['sessionId'], metadata['sessionId']);
+  final subscriptionId = _firstText(
+    payment['subscriptionId'],
+    metadata['subscriptionId'],
+  );
+  final isEligible =
+      '${payment['status'] ?? ''}'.toLowerCase() == 'completed' &&
+          isBundle &&
+          requestId.isNotEmpty &&
+          sessionId.isNotEmpty &&
+          subscriptionId.isEmpty;
+  if (!isEligible) return null;
+
+  if (gateway == 'paymob' || gateway == 'paymob_flash') {
+    return 'repairMissingPaymobBundleSubscription';
+  }
+
+  final amount = payment['amount'] is num
+      ? (payment['amount'] as num).toDouble()
+      : double.tryParse('${payment['amount'] ?? ''}');
+  final promoCode = _firstText(payment['promoCode'], metadata['promoCode']);
+  if (amount != null && amount <= 0.01 && promoCode.isNotEmpty) {
+    return 'repairMissingFreePromoBundleSubscription';
+  }
+  return null;
 }
 
 class _PaymentsTable extends StatelessWidget {

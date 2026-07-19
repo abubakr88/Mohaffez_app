@@ -43,7 +43,7 @@ class AdminUsersPage extends ConsumerWidget {
               final search = SizedBox(
                 width: wide ? 380 : double.infinity,
                 child: DSSearchField(
-                  hint: 'بحث بالاسم، البريد، الهاتف أو المعرّف',
+                  hint: 'بحث بالاسم، البريد، الهاتف، المعرّف أو اسم الباقة',
                   onChanged: (v) =>
                       ref.read(userFilterProvider.notifier).setSearch(v),
                 ),

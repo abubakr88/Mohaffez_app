@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/broadcast_model.dart';
 import '../repositories/admin_repository.dart';
+import '../utils/admin_user_search.dart';
 
 final adminRepositoryProvider = Provider<AdminRepository>((ref) {
   return AdminRepository(FirebaseFirestore.instance);
@@ -198,11 +199,12 @@ class AdminUsersListResult {
   });
 }
 
-/// Server-side filtered stream — applies role/status filters via Firestore .where()
-/// Text search is applied to the loaded page across name, uid, email and phone.
+/// Server-side filtered stream — applies role/status filters via Firestore .where().
+/// Text search covers identity fields and the teacher pricing search projection.
 final filteredUsersProvider =
     StreamProvider.autoDispose<AdminUsersListResult>((ref) {
   final filter = ref.watch(userFilterProvider);
+  final searchTerms = adminUserSearchTerms(filter.searchQuery);
 
   Query<Map<String, dynamic>> query =
       FirebaseFirestore.instance.collection('users').orderBy('name');
@@ -214,27 +216,23 @@ final filteredUsersProvider =
     query = query.where('status', isEqualTo: filter.statusFilter);
   }
 
+  if (searchTerms.isNotEmpty) {
+    return Stream.fromFuture(
+      _searchAdminUsers(
+        baseQuery: query,
+        filter: filter,
+        searchTerms: searchTerms,
+      ),
+    );
+  }
+
   return query.limit(filter.pageSize + 1).snapshots().map((snap) {
     final docs = snap.docs;
     final hasMore = docs.length > filter.pageSize;
-    var users = docs
+    final users = docs
         .take(filter.pageSize)
         .map((d) => {'id': d.id, ...d.data()})
         .toList();
-
-    final queryText = filter.searchQuery.trim().toLowerCase();
-    if (queryText.isNotEmpty) {
-      users = users.where((u) {
-        final name = (u['name'] as String? ?? '').toLowerCase();
-        final uid = (u['id'] as String? ?? '').toLowerCase();
-        final email = (u['email'] as String? ?? '').toLowerCase();
-        final phone = (u['phoneNumber'] as String? ?? '').toLowerCase();
-        return name.contains(queryText) ||
-            uid.contains(queryText) ||
-            email.contains(queryText) ||
-            phone.contains(queryText);
-      }).toList();
-    }
 
     return AdminUsersListResult(
       users: users,
@@ -244,6 +242,77 @@ final filteredUsersProvider =
     );
   });
 });
+
+Future<AdminUsersListResult> _searchAdminUsers({
+  required Query<Map<String, dynamic>> baseQuery,
+  required UserFilterState filter,
+  required List<String> searchTerms,
+}) async {
+  final usersCollection = FirebaseFirestore.instance.collection('users');
+  final shouldSearchPricing =
+      filter.roleFilter == null || filter.roleFilter == 'mohaffez';
+
+  final baseFuture = baseQuery.limit(filter.pageSize + 1).get();
+  final pricingFuture = shouldSearchPricing
+      ? usersCollection
+          .where(
+            'pricingSearchKeywords',
+            arrayContains: strongestAdminUserSearchTerm(searchTerms),
+          )
+          .limit(filter.pageSize + 1)
+          .get()
+      : null;
+
+  final baseSnapshot = await baseFuture;
+  final pricingSnapshot = await pricingFuture;
+  final candidates = <String, Map<String, dynamic>>{};
+
+  for (final doc in baseSnapshot.docs.take(filter.pageSize)) {
+    candidates[doc.id] = {'id': doc.id, ...doc.data()};
+  }
+
+  if (pricingSnapshot != null) {
+    for (final doc in pricingSnapshot.docs.take(filter.pageSize)) {
+      final user = {'id': doc.id, ...doc.data()};
+      if (!_matchesAdminFilters(user, filter)) continue;
+      candidates[doc.id] = user;
+    }
+  }
+
+  final users = candidates.values
+      .where((user) => matchesAdminUserSearch(user, searchTerms))
+      .toList()
+    ..sort((a, b) {
+      final aName = (a['name'] as String? ?? '').toLowerCase();
+      final bName = (b['name'] as String? ?? '').toLowerCase();
+      final byName = aName.compareTo(bName);
+      if (byName != 0) return byName;
+      return (a['id'] as String).compareTo(b['id'] as String);
+    });
+
+  final baseHasMore = baseSnapshot.docs.length > filter.pageSize;
+  final pricingHasMore =
+      pricingSnapshot != null && pricingSnapshot.docs.length > filter.pageSize;
+
+  return AdminUsersListResult(
+    users: users,
+    hasMore: baseHasMore || pricingHasMore,
+    loadedCount: candidates.length,
+  );
+}
+
+bool _matchesAdminFilters(
+  Map<String, dynamic> user,
+  UserFilterState filter,
+) {
+  if (filter.roleFilter != null && user['role'] != filter.roleFilter) {
+    return false;
+  }
+  if (filter.statusFilter != null && user['status'] != filter.statusFilter) {
+    return false;
+  }
+  return true;
+}
 
 final pendingCredentialsProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {

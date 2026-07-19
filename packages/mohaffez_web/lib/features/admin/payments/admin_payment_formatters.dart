@@ -45,6 +45,15 @@ DSBadgeVariant adminPaymentStatusVariant(String value) =>
     };
 
 String adminPaymentMethodLabel(Map<String, dynamic> data) {
+  final metadata = _map(data['metadata']);
+  final amount = data['amount'] is num
+      ? (data['amount'] as num).toDouble()
+      : double.tryParse('${data['amount'] ?? ''}');
+  final promoCode = _firstText(data, const ['promoCode']) ??
+      _firstText(metadata, const ['promoCode']);
+  if (amount != null && amount <= 0.01 && promoCode != null) {
+    return 'كوبون خصم 100%';
+  }
   final method = _normalized('${data['method'] ?? ''}');
   final gateway = _normalized('${data['gateway'] ?? ''}');
   if (gateway == 'paymob' || method == 'card') return 'بطاقة عبر Paymob';
@@ -77,6 +86,7 @@ String adminPaymentEventLabel(String value) => switch (_normalized(value)) {
       'webhookreceived' => 'استلام تأكيد البوابة',
       'bookingconfirmed' => 'تأكيد الحجز',
       'subscriptioncreated' => 'تفعيل الباقة',
+      'subscriptionrepaired' => 'إصلاح ربط الباقة',
       _ => value.trim().isEmpty ? 'حدث غير محدد' : value,
     };
 
@@ -86,6 +96,7 @@ DSBadgeVariant adminPaymentEventVariant(String value) =>
       'bookingconfirmed' ||
       'subscriptioncreated' =>
         DSBadgeVariant.success,
+      'subscriptionrepaired' => DSBadgeVariant.success,
       'paymentfailed' => DSBadgeVariant.error,
       'webhookreceived' || 'paymentprocessing' => DSBadgeVariant.info,
       'paymentcreated' => DSBadgeVariant.warning,
@@ -107,6 +118,8 @@ String adminPaymentEventDescription(Map<String, dynamic> event) {
     'webhookreceived' => 'وصل إشعار من بوابة الدفع إلى الخادم.',
     'bookingconfirmed' => 'تم إنشاء الجلسة وتأكيد الحجز بعد الدفع.',
     'subscriptioncreated' => 'تم إنشاء وتفعيل اشتراك الباقة.',
+    'subscriptionrepaired' =>
+      'تم إنشاء اشتراك الباقة المفقود وربطه بالدفعة والطلب والجلسة الأولى دون حركة مالية جديدة.',
     _ => 'تم تسجيل حدث دفع جديد.',
   };
 }
