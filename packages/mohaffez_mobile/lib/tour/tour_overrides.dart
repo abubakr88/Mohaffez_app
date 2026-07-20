@@ -31,18 +31,15 @@ List<Override> _commonOverrides(UserModel user) {
   return [
     currentUserProvider.overrideWith((ref) => Stream.value(user)),
     isUserSuspendedProvider.overrideWith((ref) => Stream.value(false)),
-    unreadNotificationsCountProvider
-        .overrideWith((ref, _) => Stream.value(0)),
+    unreadNotificationsCountProvider.overrideWith((ref, _) => Stream.value(0)),
     // Wallet system — synthetic UIDs have no real wallet docs in Firestore.
     // Provide an empty wallet + empty ledger so tour-mode users can navigate
     // to the wallet screen without triggering PERMISSION_DENIED.
     walletProvider.overrideWith(
       (ref, _) => Stream.value(WalletModel.empty(user.uid, ownerType)),
     ),
-    walletTransactionsProvider
-        .overrideWith((ref, _) => Stream.value(const [])),
-    payoutRequestsProvider
-        .overrideWith((ref, _) => Stream.value(const [])),
+    walletTransactionsProvider.overrideWith((ref, _) => Stream.value(const [])),
+    payoutRequestsProvider.overrideWith((ref, _) => Stream.value(const [])),
   ];
 }
 
@@ -127,30 +124,26 @@ List<Override> _studentOverrides(DemoStudentFixture fixture) {
         .overrideWith((ref, _) => Stream.value(fixture.requests)),
     studentUpcomingSessionsProvider
         .overrideWith((ref, _) => Stream.value(fixture.upcomingSessions)),
-    studentSessionsFirstPageProvider
-        .overrideWith((ref, _) => Stream.value([...fixture.upcomingSessions, ...pastSessions])),
+    studentSessionsFirstPageProvider.overrideWith((ref, _) =>
+        Stream.value([...fixture.upcomingSessions, ...pastSessions])),
     activeSubscriptionsProvider
         .overrideWith((ref, _) => Stream.value(const <SubscriptionModel>[])),
     allStudentSubscriptionsProvider
         .overrideWith((ref, _) => Stream.value(const <SubscriptionModel>[])),
     filteredSubscriptionsProvider
         .overrideWith((ref, _) => Stream.value(const <SubscriptionModel>[])),
-    activeSubscriptionCountProvider
-        .overrideWith((ref, _) => Stream.value(0)),
-    activeBundleForTeacherProvider
-        .overrideWith((ref, _) async => null),
+    activeSubscriptionCountProvider.overrideWith((ref, _) => Stream.value(0)),
+    activeBundleForTeacherProvider.overrideWith((ref, _) async => null),
     studentCompletedSessionsProvider
         .overrideWith((ref, _) async => fixture.completedSessionsCount),
-    quizUnlockedSessionProvider
-        .overrideWith((ref, _) => Stream.value(null)),
-    nearbyMohaffezProvider
-        .overrideWith((ref, _) async => _demoMohaffezList),
-    mohaffezProfileProvider.overrideWith((ref, mohaffezId) async {
+    quizUnlockedSessionProvider.overrideWith((ref, _) => Stream.value(null)),
+    nearbyMohaffezProvider.overrideWith((ref, _) async => _demoMohaffezList),
+    mohaffezProfileProvider.overrideWith((ref, mohaffezId) {
       final demo = _demoMohaffezList.firstWhere(
         (m) => m.id == mohaffezId,
         orElse: () => _demoMohaffezList.first,
       );
-      return {
+      return Stream.value(<String, dynamic>{
         'uid': demo.id,
         'name': demo.name,
         'specialization': demo.specialization ?? '',
@@ -162,13 +155,13 @@ List<Override> _studentOverrides(DemoStudentFixture fixture) {
         'photoUrl': null,
         'youtubeVideoUrl': null,
         'role': 'mohaffez',
-      };
+      });
     }),
     followStatusProvider.overrideWith((ref, _) => Stream.value(false)),
     credentialsProvider.overrideWith((ref, _) => Stream.value(const [])),
     availabilityProvider.overrideWith((ref, _) => Stream.value(const [])),
-    mohaffezStatsProvider.overrideWith(
-        (ref, _) => Stream.value({'completedSessions': 45, 'uniqueStudents': 18})),
+    mohaffezStatsProvider.overrideWith((ref, _) =>
+        Stream.value({'completedSessions': 45, 'uniqueStudents': 18})),
     mohaffezStudentCountProvider.overrideWith((ref, _) async => 18),
   ];
 }
@@ -206,23 +199,25 @@ List<Override> _teacherOverrides(DemoTeacherFixture fixture) {
     mohaffezStudentsProvider
         .overrideWith((ref, _) async => _demoStudentSummaries),
     // Teacher viewing their own profile page
-    mohaffezProfileProvider.overrideWith((ref, _) async => {
-      'uid': fixture.user.uid,
-      'name': fixture.user.name,
-      'specialization': fixture.user.specialization ?? 'حفظ ومراجعة وتجويد',
-      'bio': fixture.user.bio ?? '',
-      'rating': fixture.user.rating,
-      'followerCount': 0,
-      'addressText': fixture.user.addressText ?? '',
-      'reviewCount': fixture.user.reviewCount,
-      'photoUrl': null,
-      'youtubeVideoUrl': null,
-      'role': 'mohaffez',
-    }),
+    mohaffezProfileProvider.overrideWith(
+      (ref, _) => Stream.value(<String, dynamic>{
+        'uid': fixture.user.uid,
+        'name': fixture.user.name,
+        'specialization': fixture.user.specialization ?? 'حفظ ومراجعة وتجويد',
+        'bio': fixture.user.bio ?? '',
+        'rating': fixture.user.rating,
+        'followerCount': 0,
+        'addressText': fixture.user.addressText ?? '',
+        'reviewCount': fixture.user.reviewCount,
+        'photoUrl': null,
+        'youtubeVideoUrl': null,
+        'role': 'mohaffez',
+      }),
+    ),
     credentialsProvider.overrideWith((ref, _) => Stream.value(const [])),
     availabilityProvider.overrideWith((ref, _) => Stream.value(const [])),
-    mohaffezStatsProvider.overrideWith(
-        (ref, _) => Stream.value({'completedSessions': 45, 'uniqueStudents': 18})),
+    mohaffezStatsProvider.overrideWith((ref, _) =>
+        Stream.value({'completedSessions': 45, 'uniqueStudents': 18})),
     pricingPlansProvider.overrideWith((ref, _) => Stream.value(const [])),
     activePricingPlansProvider.overrideWith((ref, _) => Stream.value(const [])),
     meetingInfoProvider.overrideWith((ref, _) => Stream.value(null)),

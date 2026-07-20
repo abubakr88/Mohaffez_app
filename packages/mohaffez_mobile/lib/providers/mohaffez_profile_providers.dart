@@ -4,23 +4,29 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 
-/// Provider for mohaffez profile data
+/// Live provider for mohaffez profile data.
+///
+/// Booking availability can be changed by the teacher while a student has the
+/// profile open. Keeping this provider scoped to the screen prevents stale
+/// `acceptingNewBookings` values without leaving a Firestore listener alive
+/// after the profile is closed.
 final mohaffezProfileProvider =
-    FutureProvider.family<Map<String, dynamic>, String>(
-  (ref, mohaffezId) async {
-    final doc = await FirebaseFirestore.instance
+    StreamProvider.autoDispose.family<Map<String, dynamic>, String>(
+  (ref, mohaffezId) {
+    return FirebaseFirestore.instance
         .collection('users')
         .doc(mohaffezId)
-        .get();
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) {
+        throw Exception('المحفظ غير موجود');
+      }
 
-    if (!doc.exists) {
-      throw Exception('المحفظ غير موجود');
-    }
-
-    return {
-      ...doc.data()!,
-      'uid': doc.id,
-    };
+      return {
+        ...doc.data()!,
+        'uid': doc.id,
+      };
+    });
   },
 );
 

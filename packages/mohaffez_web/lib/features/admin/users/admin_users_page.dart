@@ -3,17 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mohaffez_core/mohaffez_core.dart';
 import '../../../design_system/design_system.dart';
+import '../../../platform/web_download.dart';
 import '../../auth/auth_provider.dart' as web_auth;
+import 'admin_users_csv.dart';
 
-class AdminUsersPage extends ConsumerWidget {
+class AdminUsersPage extends ConsumerStatefulWidget {
   const AdminUsersPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminUsersPage> createState() => _AdminUsersPageState();
+}
+
+class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
+  final Map<String, Map<String, dynamic>> _selectedUsers = {};
+
+  @override
+  Widget build(BuildContext context) {
     final filter = ref.watch(userFilterProvider);
     final usersAsync = ref.watch(filteredUsersProvider);
     final adminAccess = ref.watch(currentAdminAccessProvider).valueOrNull ??
         AdminAccessState.none();
+    final canExportUsers = adminAccess.isSuperAdmin ||
+        adminAccess.can(AdminPermission.manageUsers);
 
     return PageContainer(
       child: Column(
@@ -189,11 +200,23 @@ class AdminUsersPage extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'المعروض: ${users.length} من ${result.loadedCount}'
-                    '${result.hasMore ? ' - توجد نتائج أخرى' : ''}',
-                    style: DSText.caption(context, color: DSColors.text3),
-                  ),
+                  if (canExportUsers)
+                    _UsersExportToolbar(
+                      visibleUsers: users,
+                      selectedUsers: _selectedUsers,
+                      resultLabel:
+                          'المعروض: ${users.length} من ${result.loadedCount}'
+                          '${result.hasMore ? ' - توجد نتائج أخرى' : ''}',
+                      onToggleAllVisible: () => _toggleAllVisible(users),
+                      onClear: _clearSelection,
+                      onExport: _exportSelectedUsers,
+                    )
+                  else
+                    Text(
+                      'المعروض: ${users.length} من ${result.loadedCount}'
+                      '${result.hasMore ? ' - توجد نتائج أخرى' : ''}',
+                      style: DSText.caption(context, color: DSColors.text3),
+                    ),
                   const SizedBox(height: DSSpacing.sm),
                   DSDataTable<Map<String, dynamic>>(
                     initialSortKey: 'name',
@@ -202,6 +225,24 @@ class AdminUsersPage extends ConsumerWidget {
                       if (id.isNotEmpty) context.go('/admin/users/$id');
                     },
                     columns: [
+                      if (canExportUsers)
+                        DSColumnDef(
+                          key: 'selected',
+                          label: 'تحديد',
+                          width: 72,
+                          cellBuilder: (ctx, u) {
+                            final id = u['id'] as String? ?? '';
+                            return Checkbox(
+                              value: id.isNotEmpty &&
+                                  _selectedUsers.containsKey(id),
+                              activeColor: DSColors.primary,
+                              onChanged: id.isEmpty
+                                  ? null
+                                  : (checked) =>
+                                      _toggleUser(u, checked ?? false),
+                            );
+                          },
+                        ),
                       DSColumnDef(
                         key: 'name',
                         label: 'الاسم',
@@ -399,6 +440,63 @@ class AdminUsersPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _toggleUser(Map<String, dynamic> user, bool selected) {
+    final id = user['id'] as String? ?? '';
+    if (id.isEmpty) return;
+    setState(() {
+      if (selected) {
+        _selectedUsers[id] = Map<String, dynamic>.from(user);
+      } else {
+        _selectedUsers.remove(id);
+      }
+    });
+  }
+
+  void _toggleAllVisible(List<Map<String, dynamic>> users) {
+    final visible = users.where((user) {
+      final id = user['id'] as String? ?? '';
+      return id.isNotEmpty;
+    }).toList();
+    final allSelected = visible.isNotEmpty &&
+        visible.every((user) {
+          return _selectedUsers.containsKey(user['id'] as String);
+        });
+
+    setState(() {
+      for (final user in visible) {
+        final id = user['id'] as String;
+        if (allSelected) {
+          _selectedUsers.remove(id);
+        } else {
+          _selectedUsers[id] = Map<String, dynamic>.from(user);
+        }
+      }
+    });
+  }
+
+  void _clearSelection() {
+    if (_selectedUsers.isEmpty) return;
+    setState(_selectedUsers.clear);
+  }
+
+  void _exportSelectedUsers() {
+    if (_selectedUsers.isEmpty) return;
+    final csv = buildCsv(
+      adminUsersCsvHeader,
+      buildAdminUsersCsvRows(_selectedUsers.values),
+    );
+    final now = DateTime.now();
+    final stamp = '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    downloadCsv('mohafezy-users-$stamp.csv', csv);
+    DSToast.show(
+      context,
+      'تم تصدير بيانات ${_selectedUsers.length} مستخدم',
+      type: DSToastType.success,
     );
   }
 
@@ -642,6 +740,75 @@ class AdminUsersPage extends ConsumerWidget {
     } finally {
       emailController.dispose();
     }
+  }
+}
+
+class _UsersExportToolbar extends StatelessWidget {
+  const _UsersExportToolbar({
+    required this.visibleUsers,
+    required this.selectedUsers,
+    required this.resultLabel,
+    required this.onToggleAllVisible,
+    required this.onClear,
+    required this.onExport,
+  });
+
+  final List<Map<String, dynamic>> visibleUsers;
+  final Map<String, Map<String, dynamic>> selectedUsers;
+  final String resultLabel;
+  final VoidCallback onToggleAllVisible;
+  final VoidCallback onClear;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectableIds = visibleUsers
+        .map((user) => user['id'] as String? ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+    final allVisibleSelected = selectableIds.isNotEmpty &&
+        selectableIds.every(selectedUsers.containsKey);
+
+    return Wrap(
+      spacing: DSSpacing.sm,
+      runSpacing: DSSpacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          resultLabel,
+          style: DSText.caption(context, color: DSColors.text3),
+        ),
+        DSButton(
+          label: allVisibleSelected
+              ? 'إلغاء تحديد الظاهر'
+              : 'تحديد كل النتائج الظاهرة',
+          variant: DSButtonVariant.secondary,
+          leading: Icon(
+            allVisibleSelected
+                ? Icons.deselect_rounded
+                : Icons.select_all_rounded,
+            size: 18,
+          ),
+          onPressed: selectableIds.isEmpty ? null : onToggleAllVisible,
+        ),
+        if (selectedUsers.isNotEmpty) ...[
+          DSBadge(
+            label: 'تم تحديد ${selectedUsers.length}',
+            variant: DSBadgeVariant.info,
+          ),
+          DSButton(
+            label: 'تصدير CSV',
+            leading: const Icon(Icons.download_rounded, size: 18),
+            onPressed: onExport,
+          ),
+          DSButton(
+            label: 'مسح التحديد',
+            variant: DSButtonVariant.ghost,
+            onPressed: onClear,
+          ),
+        ],
+      ],
+    );
   }
 }
 
@@ -976,7 +1143,7 @@ class _UserActionsMenu extends ConsumerWidget {
     String name,
     Map<String, dynamic> user,
   ) async {
-    var selectedRole = AdminUsersPage._adminRole(user);
+    var selectedRole = _AdminUsersPageState._adminRole(user);
     final permissions = _limitedPermissionsFromUser(user);
 
     return DSDialog.show<_AdminAccessInput>(
